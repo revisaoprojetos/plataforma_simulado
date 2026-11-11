@@ -8,9 +8,11 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import {
-  getProdutoCurriculo, gruposDoProduto, buscarRecursos, nomesDeRecursos, listarPastasProduto,
+  getProdutoCurriculo, moduloCardsProduto, aulasDoModulo, buscarAulasProduto, listarModulosProduto,
+  gruposDoProduto, buscarRecursos, nomesDeRecursos, listarPastasProduto,
   type FiltroCurriculo, type RecursoTipo, type RecursoBusca,
 } from '@/lib/produtos/estudio'
+import type { FiltroModulos, MaterialChave, OrdemModulos } from '@/lib/produtos/curriculo'
 
 async function guard() {
   const access = await getCurrentAccess()
@@ -81,4 +83,41 @@ export async function carregarGruposDoProdutoAction(produtoId: string) {
 export async function listarPastasProdutoAction() {
   const g = await guard(); if ('error' in g) return { error: g.error }
   return { ok: true as const, pastas: await listarPastasProduto(g.tenantId) }
+}
+
+const MATS: (MaterialChave | 'todos')[] = ['todos', 'pdfull', 'pdflash', 'pdfight', 'legproc', 'juris', 'questoes', 'video', 'outros']
+const FILTROS_MOD: FiltroModulos[] = ['todos', 'com_sub', 'programadas', 'rascunho']
+const ORDENS_MOD: OrdemModulos[] = ['ordem', 'nome', 'nome_desc', 'aulas', 'aulas_asc', 'sub', 'sub_asc', 'rascunhos', 'rascunhos_asc']
+const mat = (m?: string) => (MATS.includes(m as MaterialChave | 'todos') ? (m as MaterialChave | 'todos') : 'todos')
+const pgn = (n: unknown, d: number) => Math.max(1, Math.floor(Number(n)) || d)
+
+/** Aba CONTEÚDOS › visão de módulos: cards da página com agregados (aulas/tipos/liberação) calculados no servidor. */
+export async function carregarModulosAction(produtoId: string, o: { paiId?: string | null; q?: string; filtro?: string; material?: string; ordem?: string; page?: number; pp?: number } = {}) {
+  const g = await guard(); if ('error' in g) return { error: g.error }
+  const r = await moduloCardsProduto(g.tenantId, produtoId, {
+    paiId: o.paiId ?? null, q: (o.q ?? '').slice(0, 120),
+    filtro: FILTROS_MOD.includes(o.filtro as FiltroModulos) ? (o.filtro as FiltroModulos) : 'todos',
+    material: mat(o.material), ordem: ORDENS_MOD.includes(o.ordem as OrdemModulos) ? (o.ordem as OrdemModulos) : 'ordem',
+    page: pgn(o.page, 1), pp: pgn(o.pp, 12),
+  })
+  return { ok: true as const, ...r }
+}
+
+/** Aba CONTEÚDOS › visão interna: só as aulas DIRETAS do módulo aberto (paginadas) + cards dos submódulos. */
+export async function carregarModuloInternoAction(produtoId: string, moduloId: string, o: { q?: string; material?: string; page?: number; pp?: number } = {}) {
+  const g = await guard(); if ('error' in g) return { error: g.error }
+  const [aulas, subs] = await Promise.all([
+    aulasDoModulo(g.tenantId, produtoId, moduloId, { q: (o.q ?? '').slice(0, 120), material: mat(o.material), page: pgn(o.page, 1), pp: pgn(o.pp, 25) }),
+    moduloCardsProduto(g.tenantId, produtoId, { paiId: moduloId, pp: 60 }),
+  ])
+  const atual = subs.todos.find((m) => m.id === moduloId) ?? null
+  const irmaos = atual ? subs.todos.filter((m) => (m.pai_id ?? null) === (atual.pai_id ?? null)).sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id)).map((m) => ({ id: m.id, titulo: m.titulo })) : []
+  return { ok: true as const, aulas, subs: subs.cards, modulos: subs.modulos, atual, irmaos }
+}
+
+/** Busca global de aulas do produto (resultados limitados, com a lista de módulos p/ o agrupamento). */
+export async function buscarAulasProdutoAction(produtoId: string, q: string) {
+  const g = await guard(); if ('error' in g) return { error: g.error }
+  const [r, modulos] = await Promise.all([buscarAulasProduto(g.tenantId, produtoId, (q ?? '').slice(0, 120)), listarModulosProduto(g.tenantId, produtoId)])
+  return { ok: true as const, ...r, modulos }
 }

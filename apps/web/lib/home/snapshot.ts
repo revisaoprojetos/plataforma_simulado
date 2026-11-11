@@ -100,6 +100,27 @@ export async function computarHome(svc: SupabaseClient, tenantId: string, estId:
       }
     }
   } catch { /* sem plano adaptativo → calendário em branco */ }
+
+  // CS › Calendário de eventos (migração 20261112040000): eventos da SEMANA para "Todos" ou para os grupos do aluno.
+  try {
+    const { data: evs } = await svc.from('simulado_eventos_calendario').select('titulo, tipo, data, hora, grupo_id, link')
+      .eq('tenant_id', tenantId).gte('data', inicioIso).lte('data', fimIso).order('data', { ascending: true }).order('hora', { ascending: true }).limit(200)
+    const lista = (evs ?? []) as { titulo: string; tipo: string; data: string; hora: string; grupo_id: string | null; link: string | null }[]
+    if (lista.length) {
+      let meus = new Set<string>()
+      if (lista.some((e) => e.grupo_id)) {
+        const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', tenantId).eq('estudante_id', estId).limit(500)
+        meus = new Set(((gm ?? []) as { grupo_id: string }[]).map((g) => g.grupo_id))
+      }
+      const TAG: Record<string, [string, HomeTagKind]> = { live: ['Live', 'pink'], aula: ['Aula ao vivo', 'blue'], sim: ['Simulado', 'gold'], mentoria: ['Mentoria', 'green'], prazo: ['Prazo', 'red'] }
+      for (const e of lista) {
+        if (e.grupo_id && !meus.has(e.grupo_id)) continue
+        const [tag, kind] = TAG[e.tipo] ?? ['Evento', 'brand']
+        ;(agendaCal[String(e.data).slice(0, 10)] ??= []).push({ hora: String(e.hora).slice(0, 5), tag, kind, titulo: e.titulo, contexto: null, acao: e.link ? 'Abrir' : undefined, href: e.link ?? undefined })
+      }
+      for (const k of Object.keys(agendaCal)) agendaCal[k].sort((a, b) => (a.hora ?? '99').localeCompare(b.hora ?? '99'))
+    }
+  } catch { /* sem a tabela de eventos → só as metas do cronograma */ }
   const diasCal: HomeDiaCal[] = semanaDias.map((d) => { const iso = isoDe(d); return { iso, wd: WD[d.getUTCDay()], dia: d.getUTCDate(), hoje: iso === hojeIsoCal, dots: (agendaCal[iso] ?? []).map((it) => it.kind) } })
   const rangeCal = `DE ${seg.getUTCDate()} DE ${MES_LONGO[seg.getUTCMonth()].toUpperCase()} A ${semanaDias[6].getUTCDate()} DE ${MES_LONGO[semanaDias[6].getUTCMonth()].toUpperCase()}`
 
@@ -143,20 +164,56 @@ export async function marcarHomeDesatualizado(svc: SupabaseClient, tenantId: str
 }
 
 /** BANNERS da Início (dado de TENANT, igual p/ todos) — cacheados por tenant (remember), não vão ao snapshot. */
-export async function carregarBannersHome(svc: SupabaseClient, tenantId: string): Promise<HomeDestaque[]> {
-  if (!tenantId) return []
-  return remember(`home-banners:${tenantId}`, 120, async () => {
+// CS › Avisos e pop-ups (migração 20261112040000): respeita "sai do ar em" (`ate`) e "para quem" (`grupo_id`,
+// filtrado por aluno no READ quando `estId` é informado). Sem a migração, lê as colunas antigas e segue igual.
+type BannerRaw = { id?: string; tipo: string | null; titulo: string | null; mensagem: string | null; imagem_url: string | null; link: string | null; cor: string | null; grupo_id?: string | null; ate?: string | null }
+
+/** Banners/pop-ups ativos do tenant (cache 120 s) já filtrados por "sai do ar" e por grupo (quando `estId`). */
+async function carregarBannersVisiveis(svc: SupabaseClient, tenantId: string, estId?: string): Promise<BannerRaw[]> {
+  const todos = await remember<BannerRaw[]>(`home-banners:${tenantId}`, 120, async () => {
     try {
-      const { data: banRows } = await svc.from('simulado_banners')
-        .select('tipo, titulo, mensagem, imagem_url, link, cor')
+      const ler = (cols: string) => svc.from('simulado_banners').select(cols)
         .eq('tenant_id', tenantId).eq('ativo', true)
         .order('ordem', { ascending: true }).order('criado_em', { ascending: false })
-      return ((banRows ?? []) as any[])
-        .filter((b) => b.tipo !== 'popup')
-        .map((b): HomeDestaque => ({
-          eyebrow: '', titulo: b.titulo ?? '', subtitulo: b.mensagem ?? '', chips: [],
-          cta: { rotulo: 'Abrir', url: b.link ?? '#' }, imagem: b.imagem_url ?? null, cores: b.cor ?? undefined,
-        }))
-    } catch { return [] as HomeDestaque[] }
+      let r: any = await ler('id, tipo, titulo, mensagem, imagem_url, link, cor, grupo_id, ate')
+      if (r.error) r = await ler('id, tipo, titulo, mensagem, imagem_url, link, cor')
+      return ((r.data ?? []) as BannerRaw[])
+    } catch { return [] as BannerRaw[] }
   })
+  const agora = Date.now()
+  let meusGrupos: Set<string> | null = null
+  if (estId && todos.some((b) => b.grupo_id)) {
+    try {
+      const { data } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', tenantId).eq('estudante_id', estId).limit(500)
+      meusGrupos = new Set(((data ?? []) as { grupo_id: string }[]).map((g) => g.grupo_id))
+    } catch { meusGrupos = new Set() }
+  }
+  return todos
+    .filter((b) => !b.ate || new Date(b.ate).getTime() >= agora)
+    .filter((b) => !b.grupo_id || (meusGrupos?.has(b.grupo_id) ?? false))
+}
+
+export async function carregarBannersHome(svc: SupabaseClient, tenantId: string, estId?: string): Promise<HomeDestaque[]> {
+  if (!tenantId) return []
+  return (await carregarBannersVisiveis(svc, tenantId, estId))
+    .filter((b) => b.tipo !== 'popup')
+    .map((b): HomeDestaque => ({
+      eyebrow: '', titulo: b.titulo ?? '', subtitulo: b.mensagem ?? '', chips: [],
+      cta: { rotulo: 'Abrir', url: b.link ?? '#' }, imagem: b.imagem_url ?? null, cores: b.cor ?? undefined,
+    }))
+}
+
+/** POP-UPS ao entrar (tipo 'popup') para a Início nova — mesmos filtros de data/grupo; estilo/frequência vêm de
+ *  tema.banner_destaques (editor completo de banners). Renderizados por <BannersPortal> só com os pop-ups. */
+export async function carregarPopupsHome(svc: SupabaseClient, tenantId: string, estId: string): Promise<import('@/components/aluno/banners-portal').BannerPortal[]> {
+  if (!tenantId) return []
+  const pops = (await carregarBannersVisiveis(svc, tenantId, estId)).filter((b) => b.tipo === 'popup' && b.id)
+  if (!pops.length) return []
+  const tema = await remember<Record<string, any>>(`home-popups-tema:${tenantId}`, 120, async () => {
+    try { const { data } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle(); return ((data?.tema as any)?.banner_destaques ?? {}) as Record<string, any> } catch { return {} }
+  })
+  return pops.map((b) => ({
+    id: b.id as string, tipo: 'popup' as const, titulo: b.titulo, mensagem: b.mensagem, imagem_url: b.imagem_url, link: b.link, cor: b.cor,
+    estilo: tema[b.id as string]?.popupEstilo ?? null, pontas: tema[b.id as string]?.popupPontas ?? null, freq: tema[b.id as string]?.freq ?? null,
+  }))
 }

@@ -6,32 +6,37 @@ import { R } from '@/lib/nova/rotas'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { carregarPainel } from '@/lib/painel/snapshot'
-import { listarPlanosAdaptativo } from '@/lib/cronograma/adaptativo/dados'
+import { carregarMeusCronogramas, type MeusCronogramas } from '@/lib/cronograma/meus'
 import { MetasPainel, type MetaPainel } from './_metas-painel'
-import { CronogramasHub, type PlanoHub } from './_cronogramas-hub'
+import { CronogramasHub } from './_cronogramas-hub'
 import { RefreshOnReturn } from './_refresh-on-return'
 
 export const dynamic = 'force-dynamic'
 
-// HUB do cronograma: o "Meu painel de estudos" é a casa do CRONOGRAMA ADAPTATIVO 2.0 (multi-plano).
-// As metas de hoje vêm do plano FIXADO (snapshot). O embed do Adaptativo (iframe) é renderizado em
-// /aluno/cronograma (shell interno, com título/marca como as demais páginas) — FORA da sidebar.
-const CRONOGRAMA = '/aluno/cronograma'
+// HUB do cronograma: o "Meu painel de estudos" é a casa dos DOIS tipos de cronograma (multi-plano):
+// Cronograma Revisão (emissão do modelo/metas do admin) e Cronograma Adaptativo 2.0. As metas de hoje vêm do plano
+// FIXADO de qualquer tipo (snapshot). O embed do Adaptativo (iframe) e a emissão Revisão abrem em /aluno/cronograma
+// (shell interno, com título/marca como as demais páginas) — FORA da sidebar.
+const CRONOGRAMA_ABRIR = '/aluno/cronograma' // fallback quando não há plano em foco
+const CRONOGRAMA_CRIAR = '/aluno/cronograma?criar'
+const MEUS_VAZIO: MeusCronogramas = { itens: [], total: 0, totalGeral: 0, pagina: 0, porPagina: 12, modelos: [], modelosBrutos: [], tipos: { revisao: false, adaptativo: false } }
 
 export default async function PainelPage() {
   const sessao = await getSessaoAluno()
   const svc = createAdminClient()
-  // Metas do dia (plano FIXADO, via snapshot) + lista de cronogramas do aluno (multi-plano).
-  const [d, planos] = sessao
+  // Metas do dia (plano FIXADO, via snapshot) + lista de cronogramas do aluno (os dois tipos, 1ª página no servidor).
+  const [d, meus] = sessao
     ? await Promise.all([
         carregarPainel(svc, sessao.tenantId, sessao.estudanteId),
-        listarPlanosAdaptativo(svc, sessao.tenantId, sessao.estudanteId),
+        carregarMeusCronogramas(sessao.tenantId, sessao.estudanteId, { pagina: 0 }),
       ])
-    : [{ temCronograma: false, feitasHoje: 0, totalHoje: 0, pctHoje: 0, pendencias: 0, pctSemana: 0, horasLabel: '0min', streak: 0, metas: [], continue: null }, [] as PlanoHub[]]
+    : [{ temCronograma: false, feitasHoje: 0, totalHoje: 0, pctHoje: 0, pendencias: 0, pctSemana: 0, horasLabel: '0min', streak: 0, metas: [], continue: null, foco: null }, MEUS_VAZIO]
   const primeiroNome = (sessao?.nome ?? 'Aluno').trim().split(/\s+/)[0] || 'Aluno'
   const cont = d.continue
-  const temCronograma = planos.length > 0
-  const focoNome = (planos.find((p) => p.fixado)?.titulo || '').trim() // cronograma em foco → nome ao lado de "Metas de hoje"
+  const temCronograma = meus.totalGeral > 0
+  const focoNome = (d.foco?.titulo || '').trim() // cronograma em foco → nome ao lado de "Metas de hoje"
+  const CRONOGRAMA = d.foco?.href ?? CRONOGRAMA_ABRIR // abrir o plano fixado (qualquer tipo)
+  const focoRotulo = d.foco?.tipo === 'revisao' ? 'Cronograma Revisão' : 'Cronograma Adaptativo'
 
   return (
     <>
@@ -45,7 +50,7 @@ export default async function PainelPage() {
             <Col gap={14} style={{ maxWidth: 560 }}>
               <Eyebrow color="var(--pn-c9b8ff,#C9B8FF)">Painel de estudos</Eyebrow>
               <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.1, color: '#fff' }}>Olá, {primeiroNome}. Seu estudo de hoje</h1>
-              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>{d.totalHoje > 0 ? `${d.totalHoje} ${d.totalHoje === 1 ? 'meta' : 'metas'} para hoje no seu Cronograma Adaptativo.` : 'Nenhuma meta para hoje — abra seu cronograma para ajustar o plano.'}</span></P>
+              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>{d.totalHoje > 0 ? `${d.totalHoje} ${d.totalHoje === 1 ? 'meta' : 'metas'} para hoje no seu ${focoRotulo}.` : 'Nenhuma meta para hoje — abra seu cronograma para ajustar o plano.'}</span></P>
               <Row gap={10} style={{ marginTop: 2 }}>
                 <Btn kind="gold" icon="play" href={CRONOGRAMA}>Continuar estudando</Btn>
                 <Btn kind="ghostdark" icon="chart" href={R.desempenho}>Meu desempenho</Btn>
@@ -63,9 +68,9 @@ export default async function PainelPage() {
             <Col gap={14} style={{ maxWidth: 640 }}>
               <Eyebrow color="var(--pn-c9b8ff,#C9B8FF)">Painel de estudos</Eyebrow>
               <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.12, color: '#fff' }}>Olá, {primeiroNome}. Vamos montar seu estudo?</h1>
-              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>Você ainda não tem um cronograma. Crie o seu — o Cronograma Adaptativo organiza seu estudo semana a semana e as metas de cada dia passam a aparecer aqui no painel.</span></P>
+              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>Você ainda não tem um cronograma. Crie o seu — o Cronograma Revisão (a partir de um modelo pronto) ou o Adaptativo organizam seu estudo semana a semana e as metas de cada dia passam a aparecer aqui no painel.</span></P>
               <Row gap={10} style={{ marginTop: 2 }}>
-                <Btn kind="gold" icon="plus" href={CRONOGRAMA}>Criar cronograma</Btn>
+                <Btn kind="gold" icon="plus" href={CRONOGRAMA_CRIAR}>Criar cronograma</Btn>
                 <Btn kind="ghostdark" icon="chart" href={R.desempenho}>Meu desempenho</Btn>
               </Row>
             </Col>
@@ -80,14 +85,14 @@ export default async function PainelPage() {
       <Split
         main={
           <Card>
-            <SecHead eyebrow="Cronograma adaptativo" title={focoNome ? <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>Metas de hoje<span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--brand)', alignSelf: 'center' }} /><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--brand)' }}>{focoNome}</span></span> : 'Metas de hoje'} right={<Btn kind="link" href={CRONOGRAMA}>Abrir cronograma</Btn>} />
+            <SecHead eyebrow={focoRotulo} title={focoNome ? <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>Metas de hoje<span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--brand)', alignSelf: 'center' }} /><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--brand)' }}>{focoNome}</span></span> : 'Metas de hoje'} right={<Btn kind="link" href={CRONOGRAMA}>Abrir cronograma</Btn>} />
             {d.totalHoje > 0 ? (
               <Row gap={12} style={{ flexWrap: 'nowrap' }}>
                 <Bar pct={d.pctHoje} color={GBAR} style={{ flex: 1 }} />
                 <b style={{ fontSize: 12.5, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{d.feitasHoje} de {d.totalHoje}{d.horasLabel ? ` · ${d.horasLabel}` : ''}</b>
               </Row>
             ) : null}
-            <MetasPainel metas={d.metas as MetaPainel[]} />
+            <MetasPainel metas={d.metas as MetaPainel[]} hrefAbrir={CRONOGRAMA} />
           </Card>
         }
         aside={
@@ -137,8 +142,8 @@ export default async function PainelPage() {
       />
       ) : null}
 
-      {/* Meus cronogramas (multi-plano): fixar troca o foco → metas de hoje acima; renomear/arquivar/+novo. */}
-      {temCronograma ? <CronogramasHub planos={planos as PlanoHub[]} /> : null}
+      {/* Meus cronogramas (multi-plano, os dois tipos): fixar troca o foco → metas de hoje acima; renomear/arquivar/+novo. */}
+      {temCronograma ? <CronogramasHub itens={meus.itens} tipos={meus.tipos} total={meus.total} /> : null}
     </>
   )
 }

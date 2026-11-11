@@ -344,7 +344,7 @@ function RegraDialog({ modo, regra, produtoId, segmentos, onClose, onSalvo, onCr
 }
 
 // ═══════════════════════ Criar / editar segmento ═══════════════════════
-function SegmentoDialog({ seg, produtoId, podeEditar, nomes, onNomes, onClose, onSalvo }: {
+export function SegmentoDialog({ seg, produtoId, podeEditar, nomes, onNomes, onClose, onSalvo }: {
   seg: Segmento | null; produtoId: string; podeEditar: boolean; nomes: Record<string, string>
   onNomes: (n: Record<string, string>) => void; onClose: () => void; onSalvo: (s: Segmento) => void
 }) {
@@ -542,20 +542,22 @@ function RefPicker({ tipo, value, nome, obrigatoria, disabled, onChange }: {
   return (
     <div ref={caixa} className="relative">
       <button type="button" disabled={disabled} onClick={() => { setAberto((a) => !a); setRows(null) }}
-        className={cn(sel, 'inline-flex w-56 items-center justify-between gap-1 text-left', !value && obrigatoria && 'text-muted-foreground')}>
+        className={cn(sel, 'inline-flex w-72 items-center justify-between gap-1 text-left', !value && obrigatoria && 'text-muted-foreground')}>
         <span className="truncate">{rotulo}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
       {aberto && (
-        <div className="absolute left-0 top-10 z-50 w-72 rounded-xl border bg-popover p-2 shadow-lg">
+        <div className="absolute left-0 top-10 z-50 w-[34rem] max-w-[calc(100vw-4rem)] rounded-xl border bg-popover p-2 shadow-lg">
           <div className="relative mb-1"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${REF_LABEL[tipo]}…`} className="h-8 pl-8" /></div>
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-72 overflow-auto [scrollbar-gutter:stable]">
+            <div className="min-w-max">
             {!obrigatoria && <button type="button" onClick={() => { onChange(null); setAberto(false) }} className={cn('flex w-full items-center rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted', !value && 'font-medium text-primary')}>Qualquer {REF_LABEL[tipo]}</button>}
             {rows === null ? <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Buscando…</div>
               : rows.length ? rows.map((r) => (
-                <button key={r.id} type="button" onClick={() => { onChange(r.id, r.nome); setAberto(false) }} className={cn('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted', value === r.id && 'font-medium text-primary')}>
-                  <span className="truncate">{r.nome}</span>{value === r.id && <Check className="ml-auto h-4 w-4 shrink-0" />}
+                <button key={r.id} type="button" onClick={() => { onChange(r.id, r.nome); setAberto(false) }} className={cn('flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted', value === r.id && 'font-medium text-primary')}>
+                  <span>{r.nome}</span>{value === r.id && <Check className="ml-auto h-4 w-4 shrink-0" />}
                 </button>
               )) : <p className="px-2 py-3 text-sm text-muted-foreground">Nada encontrado.</p>}
+            </div>
           </div>
         </div>
       )}

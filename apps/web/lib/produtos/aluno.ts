@@ -1,7 +1,8 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { ITENS_PASTA, type VitrineLayout } from './tipos'
+import { ITENS_PASTA, ehModuloLayout, MODULO_LAYOUT_PADRAO, type VitrineLayout, type ModuloLayout } from './tipos'
 import { curriculoDoAluno, type ModuloAluno } from './curriculo-aluno'
+import { ehTipoNovo } from './blocos-pagina'
 import { acessoPorSegmento, acessosPorSegmentoDoAluno } from '@/lib/segmentos/visibilidade'
 
 /**
@@ -86,6 +87,20 @@ export async function acessoAoProduto(svc: any, tenantId: string, estudanteId: s
   return (await produtosGratuitos(svc, tenantId, produtoId)).has(produtoId) ? { expira_em: null } : null
 }
 
+/** Produtos cujo CURSO (simulado_cursos) tem janela abre_em/fecha_em e hoje (Brasília) está fora dela. Tolerante: sem a tabela, ninguém é filtrado. */
+async function produtosForaDaJanelaDoCurso(svc: any, tenantId: string, produtoIds: string[]): Promise<Set<string>> {
+  const fora = new Set<string>()
+  try {
+    const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10)
+    for (let i = 0; i < produtoIds.length; i += 80) {
+      const { data, error } = await svc.from('simulado_cursos').select('produto_id, abre_em, fecha_em').eq('tenant_id', tenantId).eq('deletado', false).in('produto_id', produtoIds.slice(i, i + 80))
+      if (error) return fora
+      for (const c of (data ?? []) as any[]) if ((c.abre_em && c.abre_em > hoje) || (c.fecha_em && c.fecha_em < hoje)) fora.add(c.produto_id)
+    }
+  } catch { /* tabela ausente */ }
+  return fora
+}
+
 /** Produtos ativos do aluno (assinatura ativa, grupo de acesso vinculado, liberado para todos OU segmento), ordenados por `ordem`. */
 export async function produtosDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoCard[]> {
   const svc = createAdminClient()
@@ -111,7 +126,9 @@ export async function produtosDoAluno(tenantId: string, estudanteId: string): Pr
   ])
   const cont = new Map<string, number>()
   for (const it of (itens ?? []) as any[]) cont.set(it.produto_id, (cont.get(it.produto_id) ?? 0) + 1)
-  return ((prods ?? []) as any[]).map((p) => ({
+  // Montagem de curso (Admin › Cursos): janela "abre em / fecha em" — fora dela o curso some do menu do aluno.
+  const foraDaJanela = await produtosForaDaJanelaDoCurso(svc, tenantId, uniq)
+  return ((prods ?? []) as any[]).filter((p) => !foraDaJanela.has(p.id)).map((p) => ({
     id: p.id, slug: p.slug, nome: p.nome, tipo: p.tipo, descricao: p.descricao ?? null,
     cor: p.cor ?? null, capa_url: p.capa_url ?? null, itens: cont.get(p.id) ?? 0, expira_em: expira.get(p.id) ?? null,
   }))
@@ -163,9 +180,11 @@ export interface VitrineAluno {
   cor: string | null; cor_secundaria: string | null; tema: string; logo_url: string | null
   capa_url: string | null; banner_url: string | null; banner_mobile_url: string | null
   vitrine_layout: VitrineLayout; expira_em: string | null; secoes: VitrineSecao[]
+  /** Todos os blocos da página em ordem (aba Vitrine = construtor): linhas cruas; banner/carrossel resolvidos em `secoes`. */
+  estrutura: { id: string; tipo: string; nome: string | null; ativo: boolean; config: any; tamanho?: string }[]
 }
 
-function hrefDoItem(tipo: string, area: string | null): string {
+export function hrefDoItem(tipo: string, area: string | null): string {
   if (tipo === 'simulado') return '/aluno/simulados'
   if (tipo === 'cronograma') return '/aluno/cronograma'
   if (area === 'maratona') return '/aluno/maratona'
@@ -190,11 +209,14 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
     const vl: any = await svc.from('simulado_produtos').select('vitrine_layout').eq('tenant_id', tenantId).eq('id', prod.id).maybeSingle()
     if (!vl.error && vl.data?.vitrine_layout) vitrineLayout = vl.data.vitrine_layout
   } catch { /* coluna ausente → netflix */ }
-  const { data: secoes } = await svc.from('simulado_produto_secoes').select('id, ordem, tipo, nome, tamanho, config').eq('tenant_id', tenantId).eq('produto_id', prod.id).eq('ativo', true).order('ordem', { ascending: true })
+  const { data: secoesAll } = await svc.from('simulado_produto_secoes').select('id, ordem, tipo, nome, tamanho, config, ativo').eq('tenant_id', tenantId).eq('produto_id', prod.id).order('ordem', { ascending: true }).limit(300)
+  const todas = ((secoesAll ?? []) as any[])
+  // Banner/carrossel só ativos (como antes); os blocos novos (progresso/cronograma/modulos) chegam crus em `estrutura`.
+  const secoes = todas.filter((s) => s.ativo !== false && !ehTipoNovo(s.tipo))
 
   // Resolve nomes dos itens dos carrosséis em lote por tipo.
   const simIds = new Set<string>(), pastaIds = new Set<string>(), cronoIds = new Set<string>()
-  for (const s of (secoes ?? []) as any[]) for (const it of (s.config?.itens ?? [])) {
+  for (const s of secoes as any[]) for (const it of (s.config?.itens ?? [])) {
     if (it.tipo_item === 'simulado') simIds.add(it.item_id)
     else if (it.tipo_item === 'cronograma') cronoIds.add(it.item_id)
     else if (ITENS_PASTA.includes(it.tipo_item)) pastaIds.add(it.item_id)
@@ -209,7 +231,7 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
   const pastaInfo = new Map<string, { nome: string; area: string | null }>((((pastas as any).data) ?? []).map((r: any): [string, { nome: string; area: string | null }] => [r.id, { nome: r.nome, area: r.folder_area ?? null }]))
   const nomeCron = new Map<string, string>((((cronos as any).data) ?? []).map((r: any): [string, string] => [r.id, r.nome]))
 
-  const secoesOut: VitrineSecao[] = ((secoes ?? []) as any[]).map((s) => {
+  const secoesOut: VitrineSecao[] = (secoes as any[]).map((s) => {
     const cfg = s.config ?? {}
     const itens: VitrineItem[] = (cfg.itens ?? []).map((it: any): VitrineItem | null => {
       if (it.tipo_item === 'simulado') { const n = nomeSim.get(it.item_id); return n ? { tipo: 'simulado', id: it.item_id, nome: n, area: null, href: hrefDoItem('simulado', null) } : null }
@@ -224,6 +246,7 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
     cor: prod.cor ?? null, cor_secundaria: prod.cor_secundaria ?? null, tema: prod.tema ?? 'claro', logo_url: prod.logo_url ?? null,
     capa_url: prod.capa_url ?? null, banner_url: prod.banner_url ?? null, banner_mobile_url: prod.banner_mobile_url ?? null,
     vitrine_layout: vitrineLayout, expira_em: (ass as any).expira_em ?? null, secoes: secoesOut,
+    estrutura: todas.map((s) => ({ id: s.id, tipo: s.tipo, nome: s.nome ?? null, ativo: s.ativo !== false, config: s.config ?? {}, tamanho: s.tamanho ?? 'vertical_small' })),
   }
 }
 
@@ -324,4 +347,13 @@ export async function curriculoDoExtensivo(tenantId: string, estudanteId: string
   const svc = createAdminClient()
   // "Voltar" do leitor → página do MÓDULO da aula (não a vitrine do extensivo).
   return curriculoDoAluno(svc, tenantId, estudanteId, produtoId, (moduloId) => `/aluno/extensivos/${slug}/modulo/${moduloId}`).catch(() => [])
+}
+
+/** Formato da página do módulo do produto. Leitura TOLERANTE: sem a coluna (migr 20261113070000) → 'cards_lista'. */
+export async function moduloLayoutDoProduto(tenantId: string, produtoId: string): Promise<ModuloLayout> {
+  try {
+    const r: any = await createAdminClient().from('simulado_produtos').select('modulo_layout').eq('tenant_id', tenantId).eq('id', produtoId).maybeSingle()
+    if (!r.error && ehModuloLayout(r.data?.modulo_layout)) return r.data.modulo_layout
+  } catch { /* coluna ausente */ }
+  return MODULO_LAYOUT_PADRAO
 }

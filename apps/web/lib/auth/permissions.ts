@@ -10,6 +10,23 @@ export interface Access {
   permissions: string[] // "resource:action"
 }
 
+/**
+ * Cache CURTO em memória (por processo) das consultas de PAPEL/PERMISSÃO — a validação do token (getUser) continua a cada
+ * request. Sem isto, cada chamada de API admin gastava ~3 idas ao banco só para provar o acesso (~0,6 s de piso, mesmo com
+ * a rota 100% cacheada). Efeito colateral aceito: mudança de papel/permissão/super-admin leva até TTL_ACESSO_MS para valer.
+ */
+const TTL_ACESSO_MS = 15_000
+const memoAcesso = new Map<string, { at: number; v: Promise<any> }>()
+function comMemo<T>(chave: string, fn: () => Promise<T>): Promise<T> {
+  const agora = Date.now()
+  const e = memoAcesso.get(chave)
+  if (e && agora - e.at < TTL_ACESSO_MS) return e.v
+  const v = fn().catch((err) => { memoAcesso.delete(chave); throw err })
+  memoAcesso.set(chave, { at: agora, v })
+  if (memoAcesso.size > 500) for (const [k, x] of memoAcesso) if (agora - x.at >= TTL_ACESSO_MS) memoAcesso.delete(k)
+  return v
+}
+
 const EMPTY: Access = { userId: null, tenantId: null, role: null, isAdmin: false, permissions: [] }
 
 /**
@@ -37,7 +54,7 @@ export const getAuthUser = cache(async () => {
 })
 
 /** Checagem de super-admin memoizada por userId/request (isSuperAdmin e getCurrentAccess batem nos dois). */
-const superAdminMemo = cache((userId: string): Promise<boolean> => consultarSuperAdmin(createAdminClient(), userId))
+const superAdminMemo = cache((userId: string): Promise<boolean> => comMemo(`sa:${userId}`, () => consultarSuperAdmin(createAdminClient(), userId)))
 
 /**
  * Resolve o acesso do usuário atual: papel (de tenant_acessos) + permissões
@@ -46,13 +63,14 @@ const superAdminMemo = cache((userId: string): Promise<boolean> => consultarSupe
 export const getCurrentAccess = cache(async (): Promise<Access> => {
   const user = await getAuthUser()
   if (!user) return EMPTY
-  const tenantId = await getCurrentTenantId()
+  // tenant (por host) e super-admin não dependem um do outro: em PARALELO (antes eram 2 idas em fila)
+  const [tenantId, ehSuper] = await Promise.all([getCurrentTenantId(), superAdminMemo(user.id)])
 
   // Super-admin GLOBAL (acima dos tenants): acesso TOTAL a QUALQUER plataforma — inclusive quando o
   // tenant NÃO resolve (entrada neutra / subdomínio sem tenant mapeado). Precisa vir ANTES do guard
   // de tenant abaixo: senão um `tenantId` nulo zerava o acesso do super-admin (menu vazio + "sem
   // acesso"). Usa service role REAL (createAdminClient), que bypassa RLS.
-  if (await superAdminMemo(user.id)) {
+  if (ehSuper) {
     return { userId: user.id, tenantId, role: 'super_admin', isAdmin: true, permissions: ['*'] }
   }
 
@@ -63,13 +81,15 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
   // rodaria como o usuário e falharia, zerando o acesso do admin.
   const svc = createAdminClient()
 
-  const { data: acesso } = await svc
+  const chaveAcesso = `ac:${user.id}:${tenantId}`
+  const { data: acesso, error: erroAcesso } = await comMemo(chaveAcesso, async () => await svc
     .from('simulado_tenant_acessos')
     .select('role')
     .eq('user_id', user.id)
     .eq('tenant_id', tenantId)
     .eq('ativo', true)
-    .maybeSingle()
+    .maybeSingle())
+  if (erroAcesso) memoAcesso.delete(chaveAcesso) // falha transitória nunca fica em cache
 
   const role = (acesso?.role as string | undefined) ?? null
   if (!role) return { ...EMPTY, userId: user.id, tenantId }
@@ -82,6 +102,8 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
   // Demais papéis: resolve permissões em consultas explícitas (sem join embutido).
   let permissions: string[] = []
   try {
+    permissions = await comMemo(`pm:${tenantId}:${role}`, async () => {
+    let perms: string[] = []
     const { data: roleRows } = await svc.from('simulado_roles').select('id, tenant_id, is_sistema').eq('nome', role)
     const roleRow = (roleRows ?? []).find((r: any) => r.tenant_id === tenantId || r.is_sistema)
 
@@ -90,9 +112,11 @@ export const getCurrentAccess = cache(async (): Promise<Access> => {
       const permIds = (rp ?? []).map((r: any) => r.permission_id).filter(Boolean)
       if (permIds.length) {
         const { data: pms } = await svc.from('simulado_permissions').select('resource, action').in('id', permIds)
-        permissions = (pms ?? []).map((p: any) => `${p.resource}:${p.action}`)
+        perms = (pms ?? []).map((p: any) => `${p.resource}:${p.action}`)
       }
     }
+    return perms
+    })
   } catch {
     /* tabelas RBAC indisponíveis — sem permissões extras */
   }

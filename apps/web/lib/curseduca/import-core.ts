@@ -10,6 +10,7 @@ import { aplicarProdutosPorFonte } from '@/lib/produtos/produtos'
 import { configDoEnv, listarMembrosDoGrupo, mapaMatriculasGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 /**
  * Núcleo do import da Curseduca — server-only, NÃO 'use server' (não vira endpoint RPC).
@@ -233,7 +234,7 @@ export async function executarImport(
       const m = porId.get(b.curseducaId); if (!m) continue
       const rec = recPorId.get(b.estudanteId); const patch: Record<string, unknown> = {}
       const cpf = cpfDe(m), tel = telDe(m)
-      if (!rec?.cpf && cpf) patch.cpf = cpf
+      if (!rec?.cpf && cpf) { patch.cpf = cpf; Object.assign(patch, colunasCpfCripto(cpf)) }
       if (!rec?.telefone && tel) patch.telefone = tel
       if (!rec?.classificacao) patch.classificacao = classificar(gruposDe(m))
       if (Object.keys(patch).length) {
@@ -246,6 +247,7 @@ export async function executarImport(
       tenant_id: g.tenantId, user_id: null,
       nome: m.nome || m.email || 'Aluno', email: m.email,
       cpf: cpfDe(m),
+      ...colunasCpfCripto(cpfDe(m)),
       telefone: telDe(m),
       classificacao: classificar(gruposDe(m)),
       matricula_externa: String(m.id),

@@ -2,6 +2,7 @@ import type { StorageProvider, StorageProviderName, UploadResult } from '@/lib/s
 import { createSupabaseProvider } from '@/lib/storage/providers/supabase'
 import { createS3Provider } from '@/lib/storage/providers/s3'
 import { createGcsProvider } from '@/lib/storage/providers/gcs'
+import { comFallbackSupabase } from '@/lib/storage/providers/com-fallback'
 import { validateFile, type ValidateOptions } from '@/lib/storage/validate'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -20,7 +21,10 @@ export function getStorage(): StorageProvider {
   const name = (process.env.STORAGE_PROVIDER as StorageProviderName) ?? 'supabase'
   switch (name) {
     case 's3':
-      _cached = createS3Provider()
+      // Durante a migração, objetos ainda não copiados p/ o Hetzner são lidos do Supabase (nunca escreve lá).
+      _cached = process.env.STORAGE_FALLBACK_SUPABASE === 'off'
+        ? createS3Provider()
+        : comFallbackSupabase(createS3Provider(), createSupabaseProvider)
       break
     case 'gcs':
       _cached = createGcsProvider()

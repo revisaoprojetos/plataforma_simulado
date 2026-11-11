@@ -5,5 +5,5 @@ import { redirect } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 export default function CronogramaMontarPage() {
-  redirect('/aluno/cronograma')
+  redirect('/aluno/cronograma?ver=adaptativo')
 }

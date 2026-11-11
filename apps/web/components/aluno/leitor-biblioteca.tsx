@@ -19,7 +19,7 @@ import { prepararHtmlLegproc } from '@/lib/leitura/legproc-caixas'
 import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
 
 // LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
-const LEITOR_REV = 'lp58'
+const LEITOR_REV = 'lp59'
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
@@ -53,7 +53,12 @@ export type ParteCrono = { id: string; i: number; f: number; r: string }
 export function LeitorBiblioteca({
   documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
   partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false, marca, video,
+  semProgresso = false, posicaoInicialPct = 0,
 }: {
+  /** NÃO grava progresso de leitura (preview/admin/impersonation). Padrão false = grava. */
+  semProgresso?: boolean
+  /** Texto/LegProc: % de rolagem (0..100) onde o aluno parou, para retomar. */
+  posicaoInicialPct?: number
   /** Vídeo da leitura (faixa recolhível acima da folha). */
   video?: { kind: 'embed' | 'file'; url: string; titulo: string } | null
   /** Identidade da empresa (logo clara + nome) exibida na barra do leitor. */
@@ -107,6 +112,69 @@ export function LeitorBiblioteca({
     return () => { window.removeEventListener('pagehide', h); window.removeEventListener('beforeunload', h) }
   }, [salvarTempo])
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  // PROGRESSO DE LEITURA (folha X de N ou % de rolagem) → POST /api/aluno/biblioteca/progresso.
+  // O iframe manda 'leitor-jus-progresso'; aqui só guardamos o último valor e enviamos com debounce (20 s,
+  // somente se mudou), com tempo acumulado apenas enquanto a aba está visível. Flush imediato por sendBeacon
+  // em pagehide/visibilitychange. Falhas são silenciosas: nunca atrapalha a leitura.
+  const prog = useRef<{ pagina: number | null; total: number | null; pct: number | null }>({ pagina: null, total: null, pct: null })
+  const progSujo = useRef(false)
+  const tempoAc = useRef(0)
+  const progIds = useRef({ documentoId, versaoId }); progIds.current = { documentoId, versaoId }
+  const semProg = useRef(semProgresso); semProg.current = semProgresso
+  useEffect(() => {
+    const montar = () => {
+      const p = prog.current
+      const inc = Math.min(600, Math.max(0, Math.round(tempoAc.current)))
+      if (!progSujo.current && inc <= 0) return null
+      if (p.pct == null && p.pagina == null && inc <= 0) return null
+      const { documentoId: dId, versaoId: vId } = progIds.current
+      const body: Record<string, unknown> = { documentoId: dId, versaoId: vId, tempoIncSeg: inc }
+      if (p.pagina != null) { body.pagina = p.pagina; body.totalPaginas = p.total }
+      if (p.pct != null) body.pct = p.pct
+      tempoAc.current = Math.max(0, tempoAc.current - inc); progSujo.current = false
+      return JSON.stringify(body)
+    }
+    const enviar = () => {
+      if (semProg.current) return
+      const body = montar(); if (!body) return
+      try {
+        fetch('/api/aluno/biblioteca/progresso', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', keepalive: true, body }).catch(() => {})
+      } catch { /* best-effort */ }
+    }
+    const beacon = () => {
+      if (semProg.current) return
+      const body = montar(); if (!body) return
+      try {
+        if (!navigator.sendBeacon?.('/api/aluno/biblioteca/progresso', new Blob([body], { type: 'application/json' }))) {
+          fetch('/api/aluno/biblioteca/progresso', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', keepalive: true, body }).catch(() => {})
+        }
+      } catch { /* best-effort */ }
+    }
+    const onMsg = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return
+      const m = e.data; if (!m || typeof m !== 'object' || m.type !== 'leitor-jus-progresso') return
+      const pct = Number.isFinite(Number(m.pct)) ? Math.max(0, Math.min(100, Math.round(Number(m.pct)))) : null
+      const pagina = Number.isFinite(Number(m.pagina)) && m.pagina != null ? Math.max(1, Math.trunc(Number(m.pagina))) : null
+      const total = Number.isFinite(Number(m.total)) && m.total != null ? Math.max(1, Math.trunc(Number(m.total))) : null
+      const a = prog.current
+      if (a.pct === pct && a.pagina === pagina && a.total === total) return
+      prog.current = { pagina, total, pct }; progSujo.current = true
+    }
+    const tick = setInterval(() => { if (document.visibilityState === 'visible') tempoAc.current += 1 }, 1000)
+    const save = setInterval(() => { if (document.visibilityState === 'visible') enviar() }, 20000)
+    const onVis = () => { if (document.visibilityState === 'hidden') beacon() }
+    window.addEventListener('message', onMsg)
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('pagehide', beacon)
+    return () => {
+      clearInterval(tick); clearInterval(save)
+      window.removeEventListener('message', onMsg)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('pagehide', beacon)
+      enviar() // troca de rota dentro do app (SPA): grava o que faltou
+    }
+  }, [])
   const { setTheme } = useTheme()
   const setTemaRef = useRef(setTheme); setTemaRef.current = setTheme
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
@@ -197,6 +265,7 @@ export function LeitorBiblioteca({
         grifos: texto ? texto.grifos : iniciais.map(aEngine),
         caminho: ['Biblioteca', d.titulo], voltarHref: d.voltarHref, questoesHref: d.voltarHref,
         paginaInicial: d.paginaInicial || 1,
+        posicaoPct: texto ? posicaoInicialPct || 0 : 0,
         paginaMinima: d.paginaMinima || 1, // 1ª página que entra na leitura (as anteriores não são montadas nem contadas)
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
         marca: marca || null,
@@ -210,7 +279,7 @@ export function LeitorBiblioteca({
         tempoDeterminadoSeg: d.tempoDeterminadoSeg || 0, tempoBaseSeg: d.tempoBase || 0,
       },
     }, '*')
-  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto])
+  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto, posicaoInicialPct])
 
   const reconciliar = useCallback(async (grifos: GrifoEngine[]) => {
     if (busy.current) { pendente.current = grifos; return }

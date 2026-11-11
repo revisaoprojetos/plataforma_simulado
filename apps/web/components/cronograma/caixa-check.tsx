@@ -37,8 +37,8 @@ export function CaixaCheck({
       onClick={() => aoTrocar(!marcada)}
       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border outline-none transition focus-visible:ring-3 focus-visible:ring-ring/50 ${
         marcada
-          ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-          : 'border-input bg-[var(--input-bg,transparent)] hover:border-primary/60 hover:bg-primary/5'
+          ? 'border-[var(--brand,var(--primary))] bg-[var(--brand,var(--primary))] text-[var(--btnText,var(--primary-foreground))] shadow-sm'
+          : 'border-[var(--line,var(--border))] bg-[var(--surface,transparent)] hover:border-[var(--brand,var(--primary))] hover:bg-[var(--chip,transparent)]'
       } ${className}`}
     >
       <Check

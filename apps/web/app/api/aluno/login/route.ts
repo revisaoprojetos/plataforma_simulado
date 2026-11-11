@@ -83,10 +83,21 @@ export async function POST(request: NextRequest) {
     if (!a || a !== b) return NextResponse.json({ message: 'Telefone não confere com o cadastro.' }, { status: 403 })
   }
 
+  // CS › Membros: acesso bloqueado pelo admin (migração 20261112040000). Só depois de validar CPF/telefone (não revela o bloqueio a quem não prova a identidade). Consulta À PARTE e tolerante:
+  // sem a coluna (migração pendente) o erro é ignorado e o login segue como sempre.
+  try {
+    const { data: bl, error: blErr } = await supabase.from('simulado_estudantes').select('acesso_bloqueado').eq('id', estudante.id).maybeSingle()
+    if (!blErr && (bl as { acesso_bloqueado?: boolean } | null)?.acesso_bloqueado === true) {
+      return NextResponse.json({ message: 'Seu acesso está bloqueado. Fale com o suporte.' }, { status: 403 })
+    }
+  } catch { /* coluna ausente → não bloqueia */ }
+
   // Exibe o e-mail que a pessoa REALMENTE usou para entrar (pode ser um secundário) — o acesso
   // é o mesmo perfil de qualquer forma. Assim o portal mostra o e-mail digitado, não o principal.
   const emailLogin = email || (estudante.email as string | null) || undefined
   await criarSessaoAluno({ estudanteId: estudante.id, tenantId, nome: estudante.nome ?? 'Aluno', email: emailLogin })
+  // CS › Membros: carimba o último acesso (alimenta "Sem acesso há dias"). Best-effort; sem a coluna é no-op.
+  try { await supabase.from('simulado_estudantes').update({ ultimo_acesso_em: new Date().toISOString() }).eq('id', estudante.id) } catch { /* coluna ausente */ }
   // Auditoria: acesso do aluno à plataforma (portal). ator_id fica no entidade_id p/ evitar FK.
   await registrarAudit({ operacao: 'LOGIN', entidade: 'aluno_portal', entidadeId: estudante.id, atorTipo: 'estudante', tenantId, depois: { nome: estudante.nome ?? 'Aluno', email: emailLogin, email_conta: (estudante.email as string | null) ?? null } })
   return NextResponse.json({ ok: true })

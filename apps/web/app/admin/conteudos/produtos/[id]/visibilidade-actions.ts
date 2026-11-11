@@ -1,5 +1,5 @@
 'use server'
-import type { SegmentoAdmin, AlvosProduto, AlvoNome } from './visibilidade-actions-tipos'
+import type { SegmentoAdmin, AlvosProduto, AlvoNome, AlvoLote, AcaoVisibilidadeLote, VisibilidadeConteudo } from './visibilidade-actions-tipos'
 
 // Aba VISIBILIDADE do produto: SEGMENTOS (públicos de alunos por condições) + REGRAS que aplicam os
 // segmentos ao acesso do produto e aos conteúdos (módulos/aulas). Tabelas simulado_segmentos e
@@ -234,6 +234,98 @@ export async function excluirRegraVisibilidadeAction(produtoId: string, id: stri
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_visibilidade', entidadeId: id })
   revalidar(produtoId)
   return { ok: true }
+}
+
+const chunks = <T,>(a: T[], n = 80): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
+
+/** Carga LEVE p/ a aba Conteúdos: segmentos (id+nome) e só as regras de módulo/aula deste produto. */
+export async function carregarVisibilidadeConteudoAction(produtoId: string): Promise<{ ok: true; disponivel: boolean; dados: VisibilidadeConteudo } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const [segR, regR] = await Promise.all([
+    svc.from('simulado_segmentos').select('id, nome, descricao, regra, atualizado_em').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }).limit(500),
+    svc.from('simulado_produto_visibilidade').select('id, segmento_id, alvo_tipo, alvo_id, efeito, sem_acesso, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('alvo_tipo', ['modulo', 'aula']).limit(5000),
+  ])
+  if (segR.error || regR.error) {
+    const msg = segR.error?.message ?? regR.error?.message
+    return { ok: true, disponivel: !faltaTabela(msg), dados: { segmentos: [], regras: [], nomes: {} } }
+  }
+  const segmentos: Segmento[] = ((segR.data ?? []) as any[]).map((s) => ({ id: s.id, nome: s.nome, descricao: s.descricao ?? null, regra: normalizarRegra(s.regra), atualizado_em: s.atualizado_em ?? null }))
+  return {
+    ok: true, disponivel: true,
+    dados: {
+      segmentos, nomes: await nomesDasRefs(g.tenantId, segmentos.map((x) => x.regra)),
+      regras: ((regR.data ?? []) as any[]).map((r) => ({ id: r.id, segmento_id: r.segmento_id, alvo_tipo: r.alvo_tipo, alvo_id: r.alvo_id ?? null, efeito: r.efeito, sem_acesso: r.sem_acesso, ativo: r.ativo !== false })),
+    },
+  }
+}
+
+/** Aplica UMA regra de visibilidade (mostrar somente para / ocultar para um segmento) a VÁRIOS módulos/aulas de uma vez —
+ *  ou limpa as regras deles. Valida que os alvos são deste produto/tenant, troca as regras anteriores (mesmo segmento, ou todas
+ *  se `substituir`) e audita UMA entrada com a lista. Consultas em chunks de 80. */
+export async function aplicarVisibilidadeEmLoteAction(produtoId: string, alvos: AlvoLote[], acao: AcaoVisibilidadeLote): Promise<{ ok: true; alvos: number; criadas: number; removidas: number } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  if (!Array.isArray(alvos) || !alvos.length) return { error: 'Selecione ao menos um conteúdo.' }
+  if (alvos.length > 3000) return { error: 'Selecione no máximo 3.000 itens por vez.' }
+  const mods = [...new Set(alvos.filter((a) => a?.tipo === 'modulo' && UUID.test(a.id)).map((a) => a.id))]
+  const aulas = [...new Set(alvos.filter((a) => a?.tipo === 'aula' && UUID.test(a.id)).map((a) => a.id))]
+  if (!mods.length && !aulas.length) return { error: 'Conteúdos inválidos.' }
+  const svc = createAdminClient()
+
+  // Só os que são DESTE produto e do tenant.
+  const validar = async (tabela: string, ids: string[]) => {
+    const ok: string[] = []
+    for (const c of chunks(ids)) {
+      const { data } = await svc.from(tabela).select('id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).in('id', c)
+      for (const r of (data ?? []) as any[]) ok.push(r.id)
+    }
+    return ok
+  }
+  const [modOk, aulaOk] = await Promise.all([validar('simulado_produto_modulos', mods), validar('simulado_produto_modulo_itens', aulas)])
+  const alvosOk: { tipo: 'modulo' | 'aula'; id: string }[] = [...modOk.map((id) => ({ tipo: 'modulo' as const, id })), ...aulaOk.map((id) => ({ tipo: 'aula' as const, id }))]
+  if (!alvosOk.length) return { error: 'Conteúdo não encontrado neste produto.' }
+
+  // Regras já existentes desses alvos.
+  const existentes: { id: string; alvo_id: string; segmento_id: string }[] = []
+  for (const c of chunks(alvosOk.map((a) => a.id))) {
+    const { data, error } = await svc.from('simulado_produto_visibilidade').select('id, alvo_id, segmento_id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('alvo_tipo', ['modulo', 'aula']).in('alvo_id', c)
+    if (error) return { error: faltaTabela(error.message) ? MIGRACAO : error.message }
+    for (const r of (data ?? []) as any[]) existentes.push(r)
+  }
+
+  let aRemover: string[] = []
+  const linhas: Record<string, unknown>[] = []
+  if (acao.tipo === 'limpar') {
+    aRemover = existentes.map((r) => r.id)
+  } else {
+    if (!['mostrar', 'ocultar'].includes(acao.efeito)) return { error: 'Efeito inválido.' }
+    if (!acao.segmento_id || !UUID.test(acao.segmento_id)) return { error: 'Escolha um segmento.' }
+    const { data: seg } = await svc.from('simulado_segmentos').select('id').eq('id', acao.segmento_id).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+    if (!seg) return { error: 'Segmento não encontrado.' }
+    aRemover = existentes.filter((r) => acao.substituir || r.segmento_id === acao.segmento_id).map((r) => r.id)
+    const agora = new Date().toISOString()
+    for (const a of alvosOk) linhas.push({
+      tenant_id: g.tenantId, produto_id: produtoId, segmento_id: acao.segmento_id, alvo_tipo: a.tipo, alvo_id: a.id, efeito: acao.efeito,
+      sem_acesso: acao.sem_acesso === 'bloqueado_cadeado' ? 'bloqueado_cadeado' : 'oculto', ativo: true, criado_por: g.userId, atualizado_em: agora,
+    })
+  }
+
+  for (const c of chunks(aRemover)) {
+    const { error } = await svc.from('simulado_produto_visibilidade').delete().eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('id', c)
+    if (error) return { error: error.message }
+  }
+  let criadas = 0
+  for (const c of chunks(linhas, 200)) {
+    const { error } = await svc.from('simulado_produto_visibilidade').insert(c)
+    if (error) return { error: faltaTabela(error.message) ? MIGRACAO : error.message }
+    criadas += c.length
+  }
+  await registrarAudit({
+    operacao: 'UPDATE', entidade: 'simulado_produto_visibilidade', entidadeId: produtoId,
+    depois: { lote: true, acao: acao.tipo, ...(acao.tipo === 'aplicar' ? { segmento_id: acao.segmento_id, efeito: acao.efeito, sem_acesso: acao.sem_acesso, substituir: acao.substituir } : {}), modulos: modOk, aulas: aulaOk, criadas, removidas: aRemover.length },
+  })
+  revalidar(produtoId)
+  return { ok: true, alvos: alvosOk.length, criadas, removidas: aRemover.length }
 }
 
 /** Busca de grupo / produto / simulado para as condições (20 por vez). */

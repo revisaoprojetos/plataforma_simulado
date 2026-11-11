@@ -18,9 +18,18 @@ export const VITRINE_LAYOUTS: { v: VitrineLayout; label: string; descricao: stri
   { v: 'trilha', label: 'Trilha simples', descricao: 'Etapas conectadas em caminho, só com texto e progresso (sem capas).' },
   { v: 'lista', label: 'Lista / acordeão', descricao: 'Módulos empilhados que expandem mostrando as aulas.' },
 ]
+/** Formato da PÁGINA DO MÓDULO (aulas organizadas por tipo de material). Coluna simulado_produtos.modulo_layout. */
+export type ModuloLayout = 'cards_lista' | 'colunas' | 'abas'
+export const MODULO_LAYOUTS: { v: ModuloLayout; label: string; descricao: string }[] = [
+  { v: 'cards_lista', label: 'Cards + lista', descricao: 'Cards por tipo de material (PDFull, LegProc…) com progresso; ao escolher um, abaixo aparece a lista de aulas.' },
+  { v: 'colunas', label: 'Colunas por tipo', descricao: 'Uma coluna para cada tipo de material, lado a lado, cada uma com suas aulas e progresso.' },
+  { v: 'abas', label: 'Abas por tipo', descricao: 'Abas sublinhadas por tipo de material, com a contagem; cada aba lista as aulas daquele tipo.' },
+]
+export const MODULO_LAYOUT_PADRAO: ModuloLayout = 'cards_lista'
+export const ehModuloLayout = (v: unknown): v is ModuloLayout => MODULO_LAYOUTS.some((l) => l.v === v)
 /** Layout dos carrosséis da vitrine (espelha os tamanhos da Curseduca). */
 export type SecaoTamanho = 'vertical_small' | 'vertical_large' | 'horizontal_small' | 'horizontal_large' | 'destaque'
-export type SecaoTipo = 'banner' | 'carrossel'
+export type SecaoTipo = 'banner' | 'carrossel' | 'progresso' | 'cronograma' | 'modulos'
 export type SecaoOrdenacao = 'manual' | 'alfabetica' | 'recentes'
 
 export interface Produto {
@@ -47,6 +56,8 @@ export interface Produto {
   acesso_bloqueado: boolean
   /** Formato de exibição do conteúdo pro aluno (default 'netflix'). Opcional: coluna nova, lida tolerante. */
   vitrine_layout?: VitrineLayout
+  /** Formato da página do módulo (default 'cards_lista'). Opcional: coluna nova, lida tolerante. */
+  modulo_layout?: ModuloLayout
   ordem: number
 }
 
@@ -62,7 +73,8 @@ export interface ProdutoSecao {
   nome: string | null
   tamanho: SecaoTamanho
   ordenacao: SecaoOrdenacao
-  config: { imagem?: string; imagem_mobile?: string; link?: string; itens?: ItemRef[] }
+  // Blocos da página do extensivo (progresso/cronograma/modulos) guardam a config em jsonb — ver blocos-pagina.ts.
+  config: { imagem?: string; imagem_mobile?: string; link?: string; itens?: ItemRef[] } & Record<string, unknown>
   ativo: boolean
 }
 

@@ -123,9 +123,9 @@ export function PreviaViva() {
     <p className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{datada.erro}</p>
   ) : datada.grade ? (
     <div className="space-y-3">
-      <ResumoGrade grade={datada.grade} />
+      <ResumoGrade grade={datada.grade} variante="admin" />
       <p className="text-[11px] text-muted-foreground">Grade datada a partir de hoje, sem revisão inserida — amostra do formato. O aluno escolhe início/revisão/recesso ao gerar.</p>
-      <GradeCronograma grade={datada.grade} paletaSlug="padrao" titulo={draft.nome.trim() || undefined} />
+      <GradeCronograma grade={datada.grade} variante="admin" titulo={draft.nome.trim() || undefined} />
     </div>
   ) : null
 

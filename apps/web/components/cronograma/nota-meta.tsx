@@ -1,19 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, NotebookPen } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { salvarNota } from '@/app/aluno/(portal)/cronograma/notas-actions'
+import { NovaModal } from '@/components/nova/modal'
 import type { MetaDatada } from '@/lib/cronograma/tipos'
 
 /**
@@ -51,6 +41,10 @@ export function NotaMeta({
 
   const tem = !!(nota ?? '').trim()
 
+  // onClose estável: o NovaModal refoca o painel quando a função muda, o que tiraria o foco do textarea a cada tecla.
+  const gravarRef = useRef<() => Promise<void>>(async () => {})
+  const aoFechar = useCallback(() => { void gravarRef.current() }, [])
+
   async function gravar() {
     const limpo = texto.trim()
     if (limpo === (nota ?? '').trim()) {
@@ -58,7 +52,12 @@ export function NotaMeta({
       return
     }
     setSalvando(true)
-    const r = await salvarNota(emissaoId, meta.id, limpo, { data: meta.data, titulo: meta.titulo })
+    let r: { ok: boolean; error?: string }
+    try {
+      // Rota de API: server action não funciona em domínio custom / iframe Curseduca.
+      const res = await fetch('/api/aluno/cronograma/nota', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emissaoId, metaId: meta.id, texto: limpo, data: meta.data, titulo: meta.titulo }) })
+      r = await res.json()
+    } catch { r = { ok: false, error: 'Sem conexão. Tente de novo.' } }
     setSalvando(false)
     if (!r.ok) {
       toast.error(r.error ?? 'Não foi possível salvar a anotação.')
@@ -68,6 +67,8 @@ export function NotaMeta({
     setAberto(false)
     toast.success(limpo ? 'Anotação salva' : 'Anotação removida', { duration: 1400 })
   }
+
+  gravarRef.current = gravar
 
   return (
     <>
@@ -81,28 +82,29 @@ export function NotaMeta({
         aria-label={tem ? 'Ver a anotação desta meta' : 'Anotar nesta meta'}
         className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-xs transition ${
           tem
-            ? 'border-primary/40 bg-primary/10 text-primary'
-            : 'border-transparent text-muted-foreground/50 hover:border-input hover:text-foreground'
+            ? 'border-[var(--brand)] bg-[var(--chip)] text-[var(--brand)]'
+            : 'border-transparent text-[var(--sub)] hover:border-[var(--line)] hover:text-[var(--ink)]'
         }`}
       >
         <NotebookPen className="h-3.5 w-3.5" />
         {!compacto && (tem ? 'anotação' : 'anotar')}
       </button>
 
-      <Dialog open={aberto} onOpenChange={(v) => (v ? setAberto(true) : gravar())}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <NotebookPen className="h-5 w-5 text-primary" />
-              Sua anotação
-            </DialogTitle>
-            <DialogDescription>
-              {meta.tipoDef.nome} · {meta.titulo}
-              {meta.complemento && <span className="block text-xs">{meta.complemento}</span>}
-            </DialogDescription>
-          </DialogHeader>
+      {aberto && (
+        <div onClick={(e) => e.stopPropagation()}>
+        <NovaModal
+          w={560}
+          onClose={aoFechar}
+          titulo={<span className="flex items-center gap-2"><NotebookPen className="h-5 w-5" style={{ color: 'var(--brand)' }} />Sua anotação</span>}
+        >
+          {/* O modal fica dentro do mapa de tokens shadcn (--muted = fundo); aqui o texto de apoio usa --sub. */}
+          <p className="text-[13px]" style={{ color: 'var(--sub)', margin: 0 }}>
+            {meta.tipoDef.nome} · {meta.titulo}
+            {meta.complemento && <span className="block text-xs">{meta.complemento}</span>}
+          </p>
 
-          <Textarea
+          <textarea
+            className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--brand)]"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={7}
@@ -118,22 +120,23 @@ export function NotaMeta({
             }}
           />
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs" style={{ color: 'var(--sub)', margin: 0 }}>
             Só você vê. Fica salva neste cronograma e aparece no PDF, se você exportar.{' '}
             <span className="opacity-70">Ctrl+Enter salva · apagar tudo remove a anotação.</span>
           </p>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAberto(false)} disabled={salvando}>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => setAberto(false)} disabled={salvando} className="h-9 rounded-[11px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-bold text-[var(--ink)] disabled:opacity-60">
               Fechar sem salvar
-            </Button>
-            <Button onClick={gravar} disabled={salvando}>
-              {salvando && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            </button>
+            <button type="button" onClick={gravar} disabled={salvando} className="inline-flex h-9 items-center gap-1.5 rounded-[11px] px-3.5 text-[13px] font-extrabold disabled:opacity-60" style={{ background: 'var(--btnPrimary)', color: 'var(--btnText, var(--pn-ffffff,#FFFFFF))' }}>
+              {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
               Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </button>
+          </div>
+        </NovaModal>
+        </div>
+      )}
     </>
   )
 }

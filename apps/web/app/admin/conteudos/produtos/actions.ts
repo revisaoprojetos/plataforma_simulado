@@ -322,6 +322,156 @@ export async function alterarTipoItemAction(id: string, produtoId: string, subti
   revalidar(produtoId); return { ok: true as const }
 }
 
+// ── Ações EM LOTE sobre aulas (uma ida ao servidor; update em chunks de 80 + 1 auditoria com a lista de ids) ──
+
+const DISP_TIPOS = ['na_matricula', 'data', 'intervalo', 'data_e_intervalo', 'dia_semana_e_intervalo']
+function chunks<T>(arr: T[], n = 80): T[][] { const out: T[][] = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out }
+
+/** Normaliza a disponibilidade vinda do cliente (mesmo formato que o "Editar" individual grava). */
+function normalizarDisp(d: Disponibilidade): Disponibilidade | null {
+  if (!d || !DISP_TIPOS.includes(d.tipo)) return null
+  const data = d.data && !Number.isNaN(Date.parse(d.data)) ? new Date(d.data).toISOString() : null
+  if ((d.tipo === 'data' || d.tipo === 'data_e_intervalo') && !data) return null
+  return {
+    tipo: d.tipo, antes: d.antes === 'oculto' ? 'oculto' : 'bloqueado_cadeado',
+    data: d.tipo === 'data' || d.tipo === 'data_e_intervalo' ? data : null,
+    dias: ['intervalo', 'data_e_intervalo', 'dia_semana_e_intervalo'].includes(d.tipo) ? Math.max(0, Math.floor(Number(d.dias) || 0)) : null,
+    diaSemana: d.tipo === 'dia_semana_e_intervalo' ? Math.min(6, Math.max(0, Math.floor(Number(d.diaSemana) || 0))) : null,
+  }
+}
+
+type LotePatch = { disponibilidade?: Disponibilidade; situacao?: 'ativo' | 'rascunho'; visibilidade?: 'privado' | 'publico'; modulo_id?: string }
+
+/** Ids que realmente pertencem ao produto+tenant (e não estão na lixeira). */
+async function idsDoProduto(svc: any, tenantId: string, produtoId: string, ids: string[]): Promise<string[]> {
+  const ok: string[] = []
+  for (const c of chunks([...new Set(ids)])) {
+    const { data } = await svc.from('simulado_produto_modulo_itens').select('id').eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false).in('id', c)
+    for (const r of (data ?? []) as any[]) ok.push(r.id)
+  }
+  return ok
+}
+
+/** Atualiza várias aulas de uma vez gravando o MESMO que o "Editar" individual (disponibilidade / situação / visibilidade) ou move para outro módulo. */
+export async function atualizarItensEmLoteAction(produtoId: string, ids: string[], patch: LotePatch) {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!Array.isArray(ids) || !ids.length) return { error: 'Selecione ao menos uma aula.' }
+  const svc = createAdminClient()
+  const campos: any = {}
+  if (patch.disponibilidade !== undefined) {
+    const d = normalizarDisp(patch.disponibilidade); if (!d) return { error: 'Disponibilidade inválida (informe a data).' }
+    campos.disponibilidade = d
+  }
+  if (patch.situacao !== undefined) { if (!['ativo', 'rascunho'].includes(patch.situacao)) return { error: 'Situação inválida.' }; campos.situacao = patch.situacao }
+  if (patch.visibilidade !== undefined) { if (!['privado', 'publico'].includes(patch.visibilidade)) return { error: 'Visibilidade inválida.' }; campos.visibilidade = patch.visibilidade }
+  if (patch.modulo_id !== undefined) {
+    const { data: mod } = await svc.from('simulado_produto_modulos').select('id').eq('id', patch.modulo_id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).maybeSingle()
+    if (!mod) return { error: 'Módulo de destino inválido.' }
+  }
+  if (!Object.keys(campos).length && patch.modulo_id === undefined) return { error: 'Nada para atualizar.' }
+
+  const alvo = await idsDoProduto(svc, g.tenantId, produtoId, ids)
+  if (!alvo.length) return { error: 'Nenhuma das aulas selecionadas foi encontrada neste produto.' }
+  const agora = new Date().toISOString()
+
+  if (Object.keys(campos).length) {
+    for (const c of chunks(alvo)) {
+      const { error } = await svc.from('simulado_produto_modulo_itens').update({ ...campos, atualizado_em: agora }).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('id', c)
+      if (error) return { error: erroItem(error.message) }
+    }
+  }
+  if (patch.modulo_id !== undefined) {
+    // Mantém a ordem relativa atual e acrescenta ao fim do módulo de destino.
+    const base = await proximaOrdem(svc, 'simulado_produto_modulo_itens', { tenant_id: g.tenantId, modulo_id: patch.modulo_id })
+    const atuais: { id: string; modulo_id: string; ordem: number }[] = []
+    for (const c of chunks(alvo)) {
+      const { data } = await svc.from('simulado_produto_modulo_itens').select('id, modulo_id, ordem').eq('tenant_id', g.tenantId).in('id', c)
+      atuais.push(...((data ?? []) as any[]))
+    }
+    atuais.sort((a, b) => a.modulo_id.localeCompare(b.modulo_id) || a.ordem - b.ordem)
+    const novaOrdem = atuais.map((it, i) => ({ id: it.id, ordem: base + i }))
+    for (const c of chunks(novaOrdem)) {
+      const rs = await Promise.all(c.map((it) => svc.from('simulado_produto_modulo_itens')
+        .update({ modulo_id: patch.modulo_id, ordem: it.ordem, atualizado_em: agora }).eq('id', it.id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)))
+      const err = rs.find((r: any) => r.error); if (err) return { error: erroItem((err as any).error.message) }
+    }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produto_modulo_itens', entidadeId: produtoId, depois: { lote: true, quantidade: alvo.length, ids: alvo, ...campos, ...(patch.modulo_id ? { modulo_id: patch.modulo_id } : {}) }, tenantId: g.tenantId })
+  revalidar(produtoId); return { ok: true as const, atualizadas: alvo.length }
+}
+
+/** Exclui (Lixeira) várias aulas de uma vez. */
+export async function excluirItensEmLoteAction(produtoId: string, ids: string[]) {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!Array.isArray(ids) || !ids.length) return { error: 'Selecione ao menos uma aula.' }
+  const svc = createAdminClient()
+  const alvo = await idsDoProduto(svc, g.tenantId, produtoId, ids)
+  if (!alvo.length) return { error: 'Nenhuma das aulas selecionadas foi encontrada neste produto.' }
+  const agora = new Date().toISOString()
+  for (const c of chunks(alvo)) {
+    const { error } = await svc.from('simulado_produto_modulo_itens').update({ deletado: true, deletado_em: agora, deletado_por: g.userId }).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('id', c)
+    if (error) return { error: error.message }
+  }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_modulo_itens', entidadeId: produtoId, depois: { lote: true, quantidade: alvo.length, ids: alvo }, tenantId: g.tenantId })
+  revalidar(produtoId); return { ok: true as const, atualizadas: alvo.length }
+}
+
+// ── Ações EM LOTE no nível de MÓDULO (valem para as aulas do módulo e de seus submódulos) ──
+
+/** Ids dos módulos escolhidos + todos os descendentes (do mesmo produto/tenant, fora da lixeira). */
+async function modulosComDescendentes(svc: any, tenantId: string, produtoId: string, ids: string[]): Promise<{ raiz: string[]; todos: string[] }> {
+  const { data } = await svc.from('simulado_produto_modulos').select('id, pai_id').eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false).limit(2000)
+  const rows = (data ?? []) as { id: string; pai_id: string | null }[]
+  const existentes = new Set(rows.map((r) => r.id))
+  const raiz = [...new Set(ids)].filter((i) => existentes.has(i))
+  const todos = new Set(raiz)
+  let mudou = true
+  while (mudou) { mudou = false; for (const r of rows) if (r.pai_id && todos.has(r.pai_id) && !todos.has(r.id)) { todos.add(r.id); mudou = true } }
+  return { raiz, todos: [...todos] }
+}
+
+/** Ativar/rascunho e/ou disponibilidade em TODAS as aulas dos módulos escolhidos (e submódulos). */
+export async function atualizarModulosEmLoteAction(produtoId: string, moduloIds: string[], patch: { situacao?: 'ativo' | 'rascunho'; disponibilidade?: Disponibilidade }) {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!Array.isArray(moduloIds) || !moduloIds.length) return { error: 'Selecione ao menos um módulo.' }
+  const campos: any = {}
+  if (patch.disponibilidade !== undefined) { const d = normalizarDisp(patch.disponibilidade); if (!d) return { error: 'Disponibilidade inválida (informe a data).' }; campos.disponibilidade = d }
+  if (patch.situacao !== undefined) { if (!['ativo', 'rascunho'].includes(patch.situacao)) return { error: 'Situação inválida.' }; campos.situacao = patch.situacao }
+  if (!Object.keys(campos).length) return { error: 'Nada para atualizar.' }
+  const svc = createAdminClient()
+  const { raiz, todos } = await modulosComDescendentes(svc, g.tenantId, produtoId, moduloIds)
+  if (!raiz.length) return { error: 'Nenhum dos módulos selecionados foi encontrado neste produto.' }
+  const agora = new Date().toISOString()
+  let total = 0
+  for (const c of chunks(todos)) {
+    const { data, error } = await svc.from('simulado_produto_modulo_itens').update({ ...campos, atualizado_em: agora })
+      .eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).in('modulo_id', c).select('id')
+    if (error) return { error: erroItem(error.message) }
+    total += (data ?? []).length
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produto_modulo_itens', entidadeId: produtoId, depois: { lote_modulos: true, modulos: raiz, aulas: total, ...campos }, tenantId: g.tenantId })
+  revalidar(produtoId); return { ok: true as const, modulos: raiz.length, aulas: total }
+}
+
+/** Exclui (Lixeira) vários módulos com seus submódulos e aulas. */
+export async function excluirModulosEmLoteAction(produtoId: string, moduloIds: string[]) {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!Array.isArray(moduloIds) || !moduloIds.length) return { error: 'Selecione ao menos um módulo.' }
+  const svc = createAdminClient()
+  const { raiz, todos } = await modulosComDescendentes(svc, g.tenantId, produtoId, moduloIds)
+  if (!raiz.length) return { error: 'Nenhum dos módulos selecionados foi encontrado neste produto.' }
+  const now = new Date().toISOString()
+  const marca = { deletado: true, deletado_em: now, deletado_por: g.userId }
+  for (const c of chunks(todos)) {
+    const a = await svc.from('simulado_produto_modulos').update(marca).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('id', c)
+    if (a.error) return { error: a.error.message }
+    const b = await svc.from('simulado_produto_modulo_itens').update(marca).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).in('modulo_id', c)
+    if (b.error) return { error: b.error.message }
+  }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_modulos', entidadeId: produtoId, depois: { lote: true, modulos: raiz, total_modulos: todos.length }, tenantId: g.tenantId })
+  revalidar(produtoId); return { ok: true as const, modulos: raiz.length }
+}
+
 // ── helpers ──
 async function proximaOrdem(svc: any, tabela: string, match: Record<string, unknown>): Promise<number> {
   try {

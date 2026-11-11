@@ -93,11 +93,15 @@ services:
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
       - S3_BUCKET_PREFIX=${S3_BUCKET_PREFIX}
       - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
-      - STORAGE_CONTENT_BUCKET=${STORAGE_CONTENT_BUCKET:-conteudos}
+      - STORAGE_CONTENT_BUCKET=${STORAGE_CONTENT_BUCKET:-pdfs}
       - STORAGE_IMAGE_BUCKET=${STORAGE_IMAGE_BUCKET:-imagens}
+      # Migração S3: com s3, o que ainda não foi copiado p/ o Hetzner é lido do Supabase (off = desliga).
+      - STORAGE_FALLBACK_SUPABASE=${STORAGE_FALLBACK_SUPABASE:-on}
       - PDF_PUBLIC_BASE=${PDF_PUBLIC_BASE}
       - WEB_INTERNAL_URL=http://web:3000
       - CRON_SECRET=${CRON_SECRET}
+      # Domínios custom extras p/ server actions (next.config lê em runtime; os 2 conhecidos já estão no código).
+      - SERVER_ACTION_ORIGINS=${SERVER_ACTION_ORIGINS:-}
       # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant).
       # FIXE este valor e NUNCA troque: se mudar, as credenciais salvas ficam ilegíveis e a integração
       # "some". Ao precisar rotacionar, mova a chave antiga para APP_ENCRYPTION_KEY_OLD (lista separada por
@@ -182,7 +186,7 @@ services:
         # EXPLÍCITA. TEM que ficar AQUI (na stack), não só num label manual do Portainer — senão o
         # próximo re-deploy da stack apaga e o domínio cai. Vários: `Host(`a`) || Host(`b`)` na env.
         # Prioridade > catch-all (1) para vencer. Cert individual via HTTP-01 (o wildcard só cobre a base).
-        - "traefik.http.routers.plataforma-simulado-custom.rule=${APP_CUSTOM_HOSTS_RULE:-Host(`simulado.vocenadefensoria.com.br`)}"
+        - "traefik.http.routers.plataforma-simulado-custom.rule=${APP_CUSTOM_HOSTS_RULE:-Host(`simulado.vocenadefensoria.com.br`) || Host(`simulado.meqconcursos.com.br`)}"
         - "traefik.http.routers.plataforma-simulado-custom.priority=10"
         - "traefik.http.routers.plataforma-simulado-custom.entrypoints=websecure"
         - "traefik.http.routers.plataforma-simulado-custom.tls=true"

@@ -9,6 +9,7 @@ import { carregarPastasCP } from '@/lib/conteudo/capa-pagina-server'
 import { mapaPastas, resolverPaginaInicialDoc } from '@/lib/conteudo/capa-pagina'
 import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
 import { lerOverride } from './catalogo-override-db'
+import { lerDiscSemTipo } from './config-metas'
 import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, disciplinaRetirada, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
 // Loader de CONTEÚDO REAL do Cronograma Adaptativo. As aulas e matérias são as da Biblioteca; os dados do
@@ -75,7 +76,9 @@ async function selectInChunks<T>(
 /** Conteúdo para o motor: catálogo-base (Biblioteca + modelo) + overlay editado no admin (Catálogo de metas). */
 export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: string): Promise<ConteudoBanco> {
   const [c, jp] = await Promise.all([montarConteudo(svc, tenantId, await lerOverride(svc, tenantId)), carregarJurisDocs(svc, tenantId).catch(() => [])])
-  return { ...c, JPdoc: jp }
+  // Jurisprudência desligada por disciplina (admin › Cronograma › Disciplinas): a pasta-raiz de mesmo nome sai da meta semanal.
+  const off = new Set(((await lerDiscSemTipo(svc, tenantId).catch(() => ({}) as Record<string, string[]>)).jp ?? []).map(chaveDisciplina))
+  return { ...c, JPdoc: off.size ? jp.filter((x) => !off.has(chaveDisciplina(x.disc))) : jp }
 }
 
 /** Docs publicados das pastas JurisClub marcadas com tipo 'jurisclub' (herdado pelas subpastas). `disc` = pasta-raiz. */

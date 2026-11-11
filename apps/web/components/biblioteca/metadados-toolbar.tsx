@@ -69,8 +69,10 @@ interface ResultadoImport {
 }
 
 export function BarraMetadados({
-  docIds, metadados, colunas, onColunas, filtros, onFiltros, pastaId, categoria, escopoRotulo, onImportado,
+  docIds, metadados, colunas, onColunas, filtros, onFiltros, pastaId, categoria, escopoRotulo, onImportado, opcoesFiltro, acaoFinal,
 }: {
+  /** Botão extra no fim da barra (à direita de "Importar planilha") — ex.: o "Novo" do Drive na tela de gestão. */
+  acaoFinal?: React.ReactNode
   docIds: string[]
   metadados: Record<string, Metadados>
   colunas: ColunasLista
@@ -82,6 +84,8 @@ export function BarraMetadados({
   /** Ex.: "a pasta PDFull (e subpastas)" ou "toda a biblioteca" — descreve o escopo da planilha. */
   escopoRotulo: string
   onImportado: () => void
+  /** Valores distintos dos filtros calculados NO SERVIDOR (lista paginada: o cliente não enxerga todos os docs). Omitido → deriva de docIds/metadados. */
+  opcoesFiltro?: Partial<Record<CampoMeta, string[]>>
 }) {
   const [menuCols, setMenuCols] = useState(false)
   const [painelFiltros, setPainelFiltros] = useState(false)
@@ -102,7 +106,7 @@ export function BarraMetadados({
   }, [menuCols])
 
   // Valores distintos por campo (só dos docs desta pasta) → opções dos filtros.
-  const opcoes = useMemo(() => {
+  const opcoesLocais = useMemo(() => {
     const out: Partial<Record<CampoMeta, string[]>> = {}
     for (const k of FILTRAVEIS) {
       const set = new Map<string, string>()
@@ -111,6 +115,7 @@ export function BarraMetadados({
     }
     return out
   }, [docIds, metadados])
+  const opcoes = opcoesFiltro ?? opcoesLocais
   const nFiltros = Object.values(filtros).filter(Boolean).length
   const temOpcoes = Object.keys(opcoes).length > 0
 
@@ -211,6 +216,7 @@ export function BarraMetadados({
           <button type="button" className={btn} onClick={() => { setResultado(null); setDlgImport(true) }} title={`Atualiza metadados de ${escopoRotulo} a partir de uma planilha`}>
             <Upload className="h-4 w-4" /> Importar planilha
           </button>
+          {acaoFinal}
         </div>
       </div>
 

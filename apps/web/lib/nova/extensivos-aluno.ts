@@ -5,16 +5,16 @@ import { produtosDoAluno } from '@/lib/produtos/aluno'
 import { getCurrentTenant } from '@/lib/tenant'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 
-export type ExtensivoAtalho = { qtd: number; href: string; titulo: string; sub: string }
+export type ExtensivoAtalho = { qtd: number; href: string; titulo: string; sub: string; capa: string | null }
 
 export async function extensivoAtalhoDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoAtalho | null> {
   const produtos = (await produtosDoAluno(tenantId, estudanteId).catch(() => [])).filter((p) => p.tipo !== 'jurisclub') // JurisClub tem área própria
   if (!produtos.length) return null
   if (produtos.length === 1) {
     const p = produtos[0]
-    return { qtd: 1, href: `/aluno/extensivos/${p.slug}`, titulo: 'Extensivo da Advocacia', sub: p.descricao || `${p.itens} item(ns) liberado(s)` }
+    return { qtd: 1, href: `/aluno/extensivos/${p.slug}`, titulo: 'Extensivo da Advocacia', sub: p.descricao || `${p.itens} item(ns) liberado(s)`, capa: p.capa_url ?? null }
   }
-  return { qtd: produtos.length, href: '/aluno/extensivos', titulo: 'Extensivos', sub: `${produtos.length} extensivos liberados` }
+  return { qtd: produtos.length, href: '/aluno/extensivos', titulo: 'Extensivos', sub: `${produtos.length} extensivos liberados`, capa: null }
 }
 
 /** Para onde o "Voltar" de um extensivo retorna: Revisão (que tem a área Cursos) → Cursos; demais → lista Meus Extensivos. */

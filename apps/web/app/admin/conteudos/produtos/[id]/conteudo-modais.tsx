@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import {
-  Loader2, Save, Trash2, FolderOpen, FileText, Video, Link2, ClipboardList, Check, Info, ArrowRight,
+  Loader2, Save, Trash2, FolderOpen, FileText, Video, Link2, ClipboardList, Check, Info, ArrowRight, CalendarDays,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -209,7 +209,8 @@ export function EditarItemDialog({ tenantId, produtoId, modulos, item, criar, on
 
   const precisaSimulado = tipoRef === 'simulado' || tipoRef === 'quiz'
 
-  const temRef = precisaSimulado ? !!refId : (tipoRef === 'documento_biblioteca' ? !!refId : !!refUrl)
+  const ehCronograma = tipoRef === 'cronograma' // ref_id opcional (template do catálogo); o Adaptativo usa o plano do aluno
+  const temRef = ehCronograma ? true : precisaSimulado ? !!refId : (tipoRef === 'documento_biblioteca' ? !!refId : !!refUrl)
 
   function salvar() {
     if (!titulo.trim()) { toast.error('Informe o título da aula.'); return }
@@ -233,7 +234,9 @@ export function EditarItemDialog({ tenantId, produtoId, modulos, item, criar, on
           {/* Referência (leve: aponta a um recurso existente) */}
           <div>
             <span className="mb-1 block text-sm font-medium">Recurso</span>
-            {precisaSimulado ? (
+            {ehCronograma ? (
+              <SimuladoBusca tipo="cronograma" valorId={refId} onChange={setRefId} />
+            ) : precisaSimulado ? (
               <SimuladoBusca valorId={refId} onChange={setRefId} />
             ) : (
               <div className="flex items-center gap-2">
@@ -243,7 +246,11 @@ export function EditarItemDialog({ tenantId, produtoId, modulos, item, criar, on
                 <Button variant="outline" onClick={() => setPicker(true)}>{iconeTipoRef(tipoRef)}Escolher</Button>
               </div>
             )}
-            <p className="mt-1 text-xs text-muted-foreground">Currículo leve: a aula <strong>aponta</strong> para um recurso existente — não cria cópia nem hospeda vídeo.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {ehCronograma
+                ? <>No aluno aparece o card <strong>Plano de estudo</strong> (resumo do plano fixado dele + “Abrir cronograma”). Escolher um cronograma do catálogo é opcional — no tenant com Cronograma Adaptativo deixe em branco.</>
+                : <>Currículo leve: a aula <strong>aponta</strong> para um recurso existente — não cria cópia nem hospeda vídeo.</>}
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -285,7 +292,8 @@ export function EditarItemDialog({ tenantId, produtoId, modulos, item, criar, on
 }
 
 // Seletor de simulado com BUSCA no servidor (ilike + count + .range, 20 por vez) — sem baixar a lista de simulados.
-function SimuladoBusca({ valorId, onChange }: { valorId: string | null; onChange: (id: string | null) => void }) {
+function SimuladoBusca({ valorId, onChange, tipo = 'simulado' }: { valorId: string | null; onChange: (id: string | null) => void; tipo?: 'simulado' | 'cronograma' }) {
+  const rotulo = tipo === 'cronograma' ? 'cronograma' : 'simulado'
   const [q, setQ] = useState('')
   const [aberto, setAberto] = useState(false)
   const [atual, setAtual] = useState<string>('')
@@ -298,13 +306,13 @@ function SimuladoBusca({ valorId, onChange }: { valorId: string | null; onChange
   // Nome do simulado já ligado (1 consulta por id; nada de lista).
   useEffect(() => {
     if (!valorId) { setAtual(''); return }
-    nomesRecursosAction('simulado', [valorId]).then((r) => setAtual(r.ok ? (r.nomes[valorId]?.nome ?? '') : '')).catch(() => {})
-  }, [valorId])
+    nomesRecursosAction(tipo, [valorId]).then((r) => setAtual(r.ok ? (r.nomes[valorId]?.nome ?? '') : '')).catch(() => {})
+  }, [valorId, tipo])
 
   function buscar(pg: number, anexar: boolean) {
     const mine = ++seq.current
     setBuscando(true)
-    buscarRecursosAction('simulado', q, pg)
+    buscarRecursosAction(tipo, q, pg)
       .then((r) => {
         if (mine !== seq.current) return
         const novos = ('ok' in r ? r.rows : []) as { id: string; nome: string }[]
@@ -324,15 +332,15 @@ function SimuladoBusca({ valorId, onChange }: { valorId: string | null; onChange
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1 truncate rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
-          {valorId ? (atual || 'Simulado ligado') : 'Nenhum simulado escolhido'}
+          {valorId ? (atual || `${rotulo === 'simulado' ? 'Simulado' : 'Cronograma'} ligado`) : tipo === 'cronograma' ? 'Nenhum cronograma do catálogo (opcional)' : 'Nenhum simulado escolhido'}
         </div>
         {valorId && <Button variant="ghost" size="sm" onClick={() => onChange(null)}>Limpar</Button>}
       </div>
-      <Input value={q} onChange={(e) => { setQ(e.target.value); setAberto(true) }} onFocus={() => setAberto(true)} placeholder="Buscar simulado pelo título…" />
+      <Input value={q} onChange={(e) => { setQ(e.target.value); setAberto(true) }} onFocus={() => setAberto(true)} placeholder={`Buscar ${rotulo} pelo ${tipo === 'cronograma' ? 'nome' : 'título'}…`} />
       {aberto && (
         <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border p-1">
           {buscando && rows.length === 0 ? <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando…</div>
-            : rows.length === 0 ? <div className="py-3 text-center text-xs text-muted-foreground">Nenhum simulado.</div>
+            : rows.length === 0 ? <div className="py-3 text-center text-xs text-muted-foreground">Nenhum {rotulo}.</div>
             : rows.map((r) => (
               <button key={r.id} type="button" onClick={() => { onChange(r.id); setAtual(r.nome); setAberto(false) }}
                 className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted', r.id === valorId && 'bg-primary/10 text-primary')}>
@@ -366,7 +374,7 @@ export function DisponibilidadeDialog({ valor, escopo, onClose, onAplicar }: {
   function aplicar() {
     onAplicar({
       tipo, antes,
-      data: temData && data ? new Date(data).toISOString() : null,
+      data: temData && data ? new Date(`${data}T00:00:00-03:00`).toISOString() : null,
       dias: temDias ? (Number(dias) || 0) : null,
       diaSemana: tipo === 'dia_semana_e_intervalo' ? diaSemana : null,
     })
@@ -398,7 +406,7 @@ export function DisponibilidadeDialog({ valor, escopo, onClose, onAplicar }: {
             </label>
           </div>
         )}
-        <div className="flex items-start gap-1.5 rounded-xl bg-primary/5 px-3 py-2 text-xs text-muted-foreground"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />{resumoDisponibilidade({ tipo, data: temData && data ? new Date(data).toISOString() : null, dias: temDias ? Number(dias) || 0 : null, diaSemana })}</div>
+        <div className="flex items-start gap-1.5 rounded-xl bg-primary/5 px-3 py-2 text-xs text-muted-foreground"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />{resumoDisponibilidade({ tipo, data: temData && data ? new Date(`${data}T00:00:00-03:00`).toISOString() : null, dias: temDias ? Number(dias) || 0 : null, diaSemana })}</div>
         <div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={aplicar}><Check className="h-4 w-4" />Aplicar</Button></div>
       </DialogContent>
     </Dialog>
@@ -429,6 +437,26 @@ export function MoverAulaDialog({ produtoId, item, modulos, onClose, onPronto }:
           </select>
         </label>
         <div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose} disabled={pending}>Cancelar</Button><Button onClick={mover} disabled={pending}>{pending && <Loader2 className="h-4 w-4 animate-spin" />}Mover</Button></div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ═══════════════════════ Mover aulas (em lote) ═══════════════════════
+export function MoverAulasLoteDialog({ quantidade, modulos, onClose, onConfirmar }: {
+  quantidade: number; modulos: ModuloRow[]; onClose: () => void; onConfirmar: (moduloId: string) => void
+}) {
+  const [destino, setDestino] = useState(modulos[0]?.id ?? '')
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent showCloseButton className="sm:max-w-md">
+        <DialogTitle>Mover {quantidade} aula{quantidade === 1 ? '' : 's'}</DialogTitle>
+        <label className="block"><span className="mb-1 block text-sm font-medium">Módulo / submódulo de destino</span>
+          <select value={destino} onChange={(e) => setDestino(e.target.value)} className="h-9 w-full rounded-lg border bg-background px-2.5 text-sm">
+            {modulos.map((m) => <option key={m.id} value={m.id}>{m.pai_id ? '— ' : ''}{m.titulo}</option>)}
+          </select>
+        </label>
+        <div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={() => onConfirmar(destino)} disabled={!destino}>Mover</Button></div>
       </DialogContent>
     </Dialog>
   )
@@ -510,6 +538,7 @@ export function iconeTipoRef(t: TipoRef) {
   if (t === 'video_url') return <Video className="h-4 w-4" />
   if (t === 'simulado' || t === 'quiz') return <ClipboardList className="h-4 w-4" />
   if (t === 'link') return <Link2 className="h-4 w-4" />
+  if (t === 'cronograma') return <CalendarDays className="h-4 w-4" />
   return <FolderOpen className="h-4 w-4" />
 }
 

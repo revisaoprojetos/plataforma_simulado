@@ -1936,6 +1936,8 @@ const mk=CFG.marca;if(mk&&mk.logo){const im=$('#brandLogo');im.src=mk.logo;im.al
     $('#article').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;if(!(e.target&&e.target.closest&&e.target.closest('.caixa-cab')))return;e.preventDefault();toggleCaixa(e)});
   }
   $('#article').innerHTML=`<section class="sec" id="t1" data-title="${esc(titulo)}" data-cite="${esc(titulo)}"><div class="flow bib-flow${CFG.modeloJuris?' modelo-juris':''}">${safe}</div></section>`; /* sem o título extra: o documento já traz o próprio cabeçalho */
+  /* RETOMADA (texto): o portal manda posicaoPct (0..100) = onde o aluno parou; só aplica se houver (e <97, quase fim = recomeça). */
+  {const pp=+CFG.posicaoPct;if(pp>1&&pp<97){setTimeout(()=>{try{const mx=scroller.scrollHeight-scroller.clientHeight;if(mx>0)scroller.scrollTo({top:Math.round(mx*pp/100),behavior:'auto'})}catch(e){}},120)}}
 }
 
 // ── Cronograma Adaptativo: divisórias de PARTE entre as páginas ──────────────────────────────
@@ -2664,7 +2666,23 @@ function onScroll(){const vh=scroller.clientHeight,top=scroller.getBoundingClien
   if(best!==activeBlock){activeBlock&&activeBlock.classList.remove('is-active');activeBlock=best;best&&best.classList.add('is-active')}
   store.set('pos',{sec:S.cur,top:scroller.scrollTop});
   if(CFG&&CFG.pdf&&$('#toc').dataset.built==='pdf')marcarTocAtivo(); // título ativo pela POSIÇÃO real (toda rolagem)
-  if(changed){save('seen');atualizarToc()}renderProgress()}
+  if(changed){save('seen');atualizarToc()}renderProgress();try{bibProg()}catch(_){}}
+/* PROGRESSO (Biblioteca): informa ao portal a folha atual/total (PDF) ou o % de rolagem (texto). O portal faz o debounce e grava. */
+let __bibProgUlt='';
+function bibProg(){
+  if(!CFG||CFG.modo!=='biblioteca'||window.parent===window)return;
+  let pagina=null,total=null,pct;
+  if(CFG.pdf&&Array.isArray(CFG.pdf.pages)&&CFG.pdf.pages.length){
+    const m=/^p(\d+)$/.exec(S.cur||'');if(!m)return;
+    pagina=+m[1];total=CFG.pdf.pages.length;pct=Math.round(pagina/total*100);
+  }else{
+    const mx=scroller.scrollHeight-scroller.clientHeight;if(scroller.scrollHeight<=4)return;
+    pct=mx<=0?100:Math.round(scroller.scrollTop/mx*100);
+  }
+  pct=Math.max(0,Math.min(100,pct));
+  const k=pagina+'|'+total+'|'+pct;if(k===__bibProgUlt)return;__bibProgUlt=k;
+  window.parent.postMessage({type:'leitor-jus-progresso',pagina,total,pct},'*');
+}
 function renderProgress(){let read=0;secs.forEach(s=>read+=secWords[s.id]*Math.min(1,S.seen[s.id]||0));const pct=Math.round(read/totalWords*100);const left=Math.max(0,Math.ceil((totalWords-read)/WPM));
   $('#hair').style.width=pct+'%';$('#ovBar').style.width=pct+'%';$('#ovTxt').textContent=pct+'%'}
 let tick=false;scroller.addEventListener('scroll',()=>{if(!tick){tick=true;requestAnimationFrame(()=>{onScroll();tick=false})}},{passive:true});

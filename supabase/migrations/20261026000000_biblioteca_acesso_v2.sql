@@ -105,7 +105,7 @@ BEGIN
   END LOOP;
   ALTER TABLE public.simulado_conteudo_documentos
     ADD CONSTRAINT chk_cdoc_tipo_origem
-    CHECK (tipo_origem IS NULL OR tipo_origem IN ('docx','pdf','html','pptx','xlsx','video','audio'));
+    CHECK (tipo_origem IS NULL OR tipo_origem IN ('docx','pdf','html','pptx','xlsx','video','audio','questoes'));
 END $$;
 
 -- RLS das 4 tabelas + pastas/documentos já existe (não recriar aqui).

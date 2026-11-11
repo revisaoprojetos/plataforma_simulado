@@ -9,7 +9,7 @@ import { PARAMS_SEM_EFEITO, type ParamsAdaptativo } from '@/lib/cronograma/adapt
 import type { PainelMetas } from '../actions-tipos'
 import {salvarPainelMetas} from '../actions'
 
-type NumKey = { [K in keyof ParamsAdaptativo]: ParamsAdaptativo[K] extends number ? K : never }[keyof ParamsAdaptativo]
+type NumKey = { [K in keyof ParamsAdaptativo]-?: ParamsAdaptativo[K] extends number ? K : never }[keyof ParamsAdaptativo]
 type SetFn = <K extends keyof ParamsAdaptativo>(k: K, v: ParamsAdaptativo[K]) => void
 type Ctx = { p: ParamsAdaptativo; padrao: ParamsAdaptativo; set: SetFn }
 

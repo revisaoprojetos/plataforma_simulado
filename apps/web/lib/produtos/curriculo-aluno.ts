@@ -1,8 +1,9 @@
 import 'server-only'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-import type { Disponibilidade, TipoRef } from './curriculo'
+import { materialDoItem, MATERIAIS, type Disponibilidade, type TipoRef, type MaterialChave } from './curriculo'
 import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
+import { resumoCronogramaDoAluno, type ResumoCronograma } from './resumo-cronograma'
 
 /**
  * CURRÍCULO do produto visto pelo ALUNO — os módulos/submódulos e as aulas montados no configurador
@@ -30,7 +31,15 @@ export interface AulaAluno {
   lida: boolean             // documento já aberto pelo aluno (simulado_conteudo_leitura_progresso)
   exclusivo: boolean        // bloqueada por segmento (conteúdo exclusivo de outro público)
   quizDocId?: string | null // JurisClub: documento-âncora das questões da meta (meta.quiz_documento_id)
+  material?: MaterialChave  // tipo de material (agrupamento da página do módulo) — derivado no servidor
+  cronograma?: ResumoCronograma | null // item 'cronograma': resumo curto do plano do aluno (lido no servidor)
+  /** Progresso de leitura (null = nunca abriu). Campos novos podem vir null se a migração ainda não foi aplicada. */
+  leitura?: LeituraAluno | null
+  /** Mesmo progresso já FORMATADO no servidor (a tela só renderiza). null = nada a mostrar. */
+  leituraFmt?: LeituraFmt | null
 }
+export interface LeituraAluno { pagina: number | null; totalPaginas: number | null; pct: number | null; ultimoAcessoEm: string | null; concluidoEm: string | null }
+export interface LeituraFmt { onde: string | null; pct: number | null; ultimo: string | null; concluida: string | null }
 export interface ModuloAluno {
   id: string
   titulo: string
@@ -45,7 +54,58 @@ export interface ModuloAluno {
   submodulos: ModuloAluno[]
 }
 
+/** Grupo de aulas de um MÓDULO por tipo de material, com progresso JÁ calculado (a tela só renderiza). */
+export interface GrupoMaterial {
+  chave: MaterialChave; label: string; curto: string
+  total: number; lidas: number; pct: number
+  liberadas: number          // aulas abertas (não bloqueadas)
+  liberaEm: string | null    // se NADA está aberto: a data mais próxima de liberação (ISO); senão null
+  aulas: AulaAluno[]
+}
+export interface ModuloAgrupado { grupos: GrupoMaterial[]; cronogramas: AulaAluno[]; total: number; lidas: number; pct: number }
+
+/** Agrupa TODAS as aulas do módulo (incluindo submódulos) por tipo de material; cronograma sai à parte. Ordem fixa de MATERIAIS. */
+export function agruparModulo(m: ModuloAluno): ModuloAgrupado {
+  const todas: AulaAluno[] = []
+  const coleta = (x: ModuloAluno) => { todas.push(...x.aulas); x.submodulos.forEach(coleta) }
+  coleta(m)
+  const cronogramas = todas.filter((a) => a.tipoRef === 'cronograma')
+  const mapa = new Map<MaterialChave, AulaAluno[]>()
+  for (const a of todas) {
+    if (a.tipoRef === 'cronograma') continue
+    const k = a.material ?? 'outros'
+    const l = mapa.get(k) ?? []; l.push(a); mapa.set(k, l)
+  }
+  const grupos: GrupoMaterial[] = []
+  for (const d of MATERIAIS) {
+    const aulas = mapa.get(d.v); if (!aulas?.length) continue
+    const lidas = aulas.filter((x) => x.lida).length
+    grupos.push({ chave: d.v, label: d.label, curto: d.curto, total: aulas.length, lidas, pct: Math.round((lidas / aulas.length) * 100), liberadas: aulas.filter((x) => x.liberada).length, liberaEm: aulas.some((x) => x.liberada) ? null : (aulas.map((x) => x.liberaEm).filter(Boolean).sort()[0] ?? null), aulas })
+  }
+  const total = grupos.reduce((s, g) => s + g.total, 0), lidas = grupos.reduce((s, g) => s + g.lidas, 0)
+  return { grupos, cronogramas, total, lidas, pct: total ? Math.round((lidas / total) * 100) : 0 }
+}
+
 const DIA = 86400000
+
+/** dd/mm (dd/mm/aaaa se o ano difere do atual), em America/Sao_Paulo. */
+function dataCurta(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso); if (isNaN(+d)) return null
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', ...o }).format(d)
+  const ano = f({ year: 'numeric' }), anoAgora = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric' }).format(new Date())
+  return ano === anoAgora ? f({ day: '2-digit', month: '2-digit' }) : f({ day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function formatarLeitura(l: LeituraAluno | null): LeituraFmt | null {
+  if (!l) return null
+  const pct = l.pct != null ? Math.max(0, Math.min(100, Math.round(l.pct))) : null
+  const onde = l.pagina != null && l.pagina > 0
+    ? (l.totalPaginas ? `Parou na folha ${l.pagina} de ${l.totalPaginas}` : `Parou na folha ${l.pagina}`)
+    : pct != null ? `Progresso ${pct}%` : null
+  const f = { onde, pct, ultimo: dataCurta(l.ultimoAcessoEm), concluida: dataCurta(l.concluidoEm) }
+  return f.onde || f.ultimo || f.concluida ? f : null
+}
 
 function normDisp(v: any): Disponibilidade {
   const d = v && typeof v === 'object' ? v : {}
@@ -84,6 +144,7 @@ export function momentoLiberacao(d: Disponibilidade, matricula: Date | null): Da
 function hrefDaAula(tipo: TipoRef, refId: string | null, refUrl: string | null, meta: any, voltar: string, produtoId?: string): { href: string | null; externo: boolean } {
   if (tipo === 'documento_biblioteca') return refId ? { href: `/aluno/biblioteca/${refId}?voltar=${encodeURIComponent(voltar)}${produtoId ? `&produto=${produtoId}` : ''}`, externo: false } : { href: null, externo: false }
   if (tipo === 'simulado' || tipo === 'quiz') return { href: '/aluno/simulados', externo: false }
+  if (tipo === 'cronograma') return { href: '/aluno/cronograma', externo: false }
   // Vídeo próprio (hospedado): `video-proprio:<courseId>:<lessonId>` abre o player interno, na mesma aba.
   const propria = parseReferenciaVideoProprio(refUrl ?? '')
   if (propria) return { href: `/aluno/video/${propria.courseId}/${propria.lessonId}`, externo: false }
@@ -128,12 +189,40 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
-  const lidos = new Set<string>()
-  for (let k = 0; k < docIds.length; k += 200) {
-    const { data } = await svc.from('simulado_conteudo_leitura_progresso').select('documento_id')
-      .eq('tenant_id', tenantId).eq('aluno_id', estudanteId).in('documento_id', docIds.slice(k, k + 200))
-    for (const r of (data ?? []) as any[]) lidos.add(r.documento_id)
+  const lidos = new Map<string, LeituraAluno>()
+  let colunasNovas = true // tolerância à migração ausente (pagina/total_paginas/pct/concluido_em)
+  for (let k = 0; k < docIds.length; k += 80) {
+    const bloco = docIds.slice(k, k + 80)
+    const consulta = (cols: string) => svc.from('simulado_conteudo_leitura_progresso').select(cols)
+      .eq('tenant_id', tenantId).eq('aluno_id', estudanteId).in('documento_id', bloco)
+    let res = await consulta(colunasNovas ? 'documento_id, ultima_leitura_em, pagina, total_paginas, pct, concluido_em' : 'documento_id, ultima_leitura_em')
+    if (res.error && colunasNovas) { colunasNovas = false; res = await consulta('documento_id, ultima_leitura_em') }
+    for (const r of (res.data ?? []) as any[]) {
+      lidos.set(r.documento_id, {
+        pagina: r.pagina ?? null, totalPaginas: r.total_paginas ?? null, pct: r.pct ?? null,
+        ultimoAcessoEm: r.ultima_leitura_em ?? null, concluidoEm: r.concluido_em ?? null,
+      })
+    }
   }
+  // Total de páginas ausente: usa a contagem da versão atual do documento (tolerante).
+  const semTotal = [...lidos.entries()].filter(([, l]) => l.pagina != null && !l.totalPaginas).map(([id]) => id)
+  if (semTotal.length) {
+    try {
+      for (let k = 0; k < semTotal.length; k += 80) {
+        const { data: docs } = await svc.from('simulado_conteudo_documentos').select('id, versao_atual_id').eq('tenant_id', tenantId).in('id', semTotal.slice(k, k + 80))
+        const vids = [...new Set(((docs ?? []) as any[]).map((d) => d.versao_atual_id).filter(Boolean))] as string[]
+        if (!vids.length) continue
+        const { data: vers } = await svc.from('simulado_conteudo_versoes').select('id, paginas').in('id', vids)
+        const pg = new Map(((vers ?? []) as any[]).map((v) => [v.id, v.paginas as number | null]))
+        for (const d of (docs ?? []) as any[]) { const n = pg.get(d.versao_atual_id); const l = lidos.get(d.id); if (l && n && n > 0) l.totalPaginas = n }
+      }
+    } catch { /* sem contagem: mostra só a folha */ }
+  }
+  // Item 'cronograma': resumo lido UMA vez (snapshot do painel / última emissão) — só se houver o item.
+  const itensCrono = irows.filter((i: any) => i.tipo_ref === 'cronograma')
+  const resumoCrono = itensCrono.length
+    ? await resumoCronogramaDoAluno(svc, tenantId, estudanteId, [...new Set(itensCrono.map((i: any) => i.ref_id as string | null).filter(Boolean) as string[])]).catch(() => null)
+    : null
   const agora = Date.now()
   const maisTarde = (a: Date | null, b: Date | null) => (!a ? b : !b ? a : a > b ? a : b)
 
@@ -166,7 +255,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       const liberada = noPrazo && !exclusivo
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
       const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta, produtoId)
-      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), exclusivo, quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null })
+      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), leitura: (i.ref_id && lidos.get(i.ref_id)) || null, leituraFmt: formatarLeitura((i.ref_id && lidos.get(i.ref_id)) || null), exclusivo, material: materialDoItem(i.subtipo, tipo, String(i.titulo ?? '')), quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null, cronograma: tipo === 'cronograma' && liberada ? resumoCrono : null })
     }
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra

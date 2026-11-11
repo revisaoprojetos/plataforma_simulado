@@ -39,4 +39,11 @@ export type EmissaoAberta = {
   cargaHoraria: number | null
   /** O cronograma saiu do ar (despublicado ou excluído) desde a emissão. */
   indisponivel: boolean
+  /**
+   * O catálogo mudou (metas/semanas) depois que esta emissão foi gerada. A grade NÃO foi alterada
+   * (datas congeladas); a tela pode oferecer "Gerar novamente" (regenerarEmissao).
+   */
+  desatualizada?: boolean
+  /** versao_grade do cronograma no momento da leitura (null = sem migration). Chave de cache da rota do iframe. */
+  versaoGrade?: number | null
 }

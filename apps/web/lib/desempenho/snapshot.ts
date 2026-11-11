@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { montarPerfilAnalytics } from '@/lib/aluno/perfil-analytics'
 import { carregarPainel } from '@/lib/painel/snapshot'
+import { planoFixado } from '@/lib/cronograma/fixar'
 import { agregarTempoEstudo } from '@/lib/desempenho/tempo-estudo'
 
 // DESEMPENHO — serviço backend. TODA a computação pesada do "Meu desempenho" vive aqui
@@ -113,18 +114,22 @@ export async function computarDesempenho(svc: SupabaseClient, tenantId: string, 
   }
 }
 
-/** Foco atual = emissão de cronograma ativa mais recente (nome + data da prova, se houver no formulário). */
+/** Foco atual = plano FIXADO do aluno (Adaptativo ou Cronograma Revisão). Sem fixado (aluno antigo / migração pendente)
+ * cai no comportamento anterior: emissão ativa mais recente. Data da prova só existe no formulário da emissão Revisão. */
 async function focoDoCronograma(svc: SupabaseClient, tenantId: string, estId: string): Promise<{ nome: string; provaEm: string | null } | null> {
   try {
+    const fx = await planoFixado(svc, tenantId, estId)
+    const dataProva = (f: any): string | null => {
+      const v = f?.data_prova ?? f?.prova_em ?? f?.edital ?? f?.dataProva ?? null
+      return typeof v === 'string' ? v : null
+    }
+    if (fx) return { nome: (fx.titulo || '').trim() || 'Meu cronograma', provaEm: fx.tipo === 'revisao' ? dataProva(fx.formulario) : null }
     const { data } = await svc.from('simulado_cronograma_emissoes').select('cronograma_nome, titulo, formulario')
       .eq('tenant_id', tenantId).eq('estudante_id', estId).eq('arquivada', false)
       .order('criado_em', { ascending: false }).limit(1).maybeSingle()
     const row = data as { cronograma_nome?: string; titulo?: string; formulario?: any } | null
     if (!row) return null
-    const nome = row.titulo?.trim() || row.cronograma_nome || 'Meu cronograma'
-    const f = row.formulario ?? {}
-    const provaEm = f.data_prova ?? f.prova_em ?? f.edital ?? f.dataProva ?? null
-    return { nome, provaEm: typeof provaEm === 'string' ? provaEm : null }
+    return { nome: row.titulo?.trim() || row.cronograma_nome || 'Meu cronograma', provaEm: dataProva(row.formulario) }
   } catch { return null }
 }
 

@@ -56,6 +56,9 @@ import {
   Tag,
   Tags,
   Lock,
+  History,
+  Send,
+  Gavel,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -108,6 +111,7 @@ interface NavItem {
 
 interface NavGroup {
   label: string
+  divisor?: string // título de uma DIVISÃO desenhada acima deste grupo (separa blocos da sidebar)
   icon: IconType
   items: NavItem[]
 }
@@ -279,6 +283,63 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    // ===== PLATAFORMA REVISÃO (áreas novas) — protótipo admin-plataforma-revisao =====
+    // Tudo acima segue como era. Daqui para baixo: Pedagógico · CS · Montagem de curso · Análise · Configurar,
+    // com os nomes do protótipo. Cada item abre a tela nova em /admin/revisao/*.
+    label: 'Dashboard (Revisão)',
+    divisor: 'Plataforma Revisão',
+    icon: LayoutDashboard,
+    items: [
+      { label: 'Dashboard', href: '/admin/revisao/inicio', icon: LayoutDashboard, perm: 'relatorios:view' },
+    ],
+  },
+  {
+    label: 'Pedagógico',
+    icon: GraduationCap,
+    items: [
+      { label: 'Biblioteca', href: '/admin/revisao/biblioteca', icon: BookOpen, perm: 'configuracoes:view' },
+      { label: 'JurisClub', href: '/admin/revisao/jurisclub', icon: Gavel, perm: 'configuracoes:view' },
+      { label: 'Cronograma Adaptativo', href: '/admin/revisao/cronograma', icon: Route, perm: 'cronogramas:update' },
+      { label: 'Videoteca', href: '/admin/revisao/videoteca', icon: PlayCircle, perm: 'configuracoes:view' },
+      { label: 'Central de Dúvidas', href: '/admin/revisao/duvidas', icon: MessageCircle, perm: 'estudantes:view' },
+      { label: 'Central de Atualizações', href: '/admin/revisao/atualizacoes', icon: History, perm: 'configuracoes:view' },
+    ],
+  },
+  {
+    label: 'CS',
+    icon: UsersRound,
+    items: [
+      { label: 'Membros', href: '/admin/revisao/membros', icon: Users, perm: 'estudantes:view' },
+      { label: 'Grupos de acesso', href: '/admin/revisao/grupos', icon: KeyRound, perm: 'grupos:view' },
+      { label: 'Calendário de eventos', href: '/admin/revisao/calendario', icon: CalendarDays, perm: 'estudantes:view' },
+      { label: 'Disparo de Campanha', href: '/admin/revisao/campanhas', icon: Send, perm: 'estudantes:view' },
+      { label: 'Avisos e pop-ups', href: '/admin/revisao/avisos', icon: Megaphone, perm: 'configuracoes:view' },
+    ],
+  },
+  {
+    label: 'Montagem de curso',
+    icon: Layers,
+    items: [
+      { label: 'Cursos', href: '/admin/revisao/cursos', icon: BookOpen, perm: 'produtos:view' },
+      { label: 'Simulados', href: '/admin/revisao/simulados', icon: ClipboardList, perm: 'simulados:view' },
+    ],
+  },
+  {
+    label: 'Análise (Revisão)',
+    icon: BarChart3,
+    items: [
+      { label: 'Relatórios', href: '/admin/revisao/relatorios', icon: PieChart, perm: 'relatorios:view' },
+    ],
+  },
+  {
+    label: 'Configurar',
+    icon: SlidersHorizontal,
+    items: [
+      { label: 'Aparência da plataforma', href: '/admin/revisao/aparencia', icon: SlidersHorizontal, perm: 'configuracoes:view' },
+      { label: 'Permissões da equipe', href: '/admin/revisao/equipe', icon: UserCog, perm: 'rbac:view' },
+    ],
+  },
+  {
     // SPIKE: teste dos editores Office reais (Collabora / OnlyOffice) — avaliar migração do construtor
     // de caderno de blocos HTML para docx nativo. Área isolada, não afeta o resto. Visibilidade/acesso
     // é controlada pela MANUTENÇÃO POR ÁREA (nasce bloqueada; libere por allowlist em Sistema → Páginas
@@ -419,6 +480,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                 if (recolhida) {
                   return (
                     <SidebarMenuItem key={group.label}>
+                      {group.divisor && <div className="mx-auto mb-1 mt-2 h-px w-6 bg-sidebar-border" aria-hidden />}
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           aria-label={lblGrupo(group)}
@@ -482,6 +544,13 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
 
                 return (
                   <SidebarMenuItem key={group.label}>
+                    {group.divisor && (
+                      <div className="mb-1 mt-3 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
+                        <span className="h-px flex-1 bg-sidebar-border" />
+                        <span className="shrink-0">{group.divisor}</span>
+                        <span className="h-px flex-1 bg-sidebar-border" />
+                      </div>
+                    )}
                     <SidebarMenuButton
                       className={NAV_STATES}
                       onClick={() => toggle(group.label)}

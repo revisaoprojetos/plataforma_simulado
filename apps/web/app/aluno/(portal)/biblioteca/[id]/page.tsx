@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { carregarDocParaLeitura, registrarLeituraAluno } from '@/lib/conteudo/leitor'
+import { carregarDocParaLeitura, registrarLeituraAluno, lerProgressoLeituraAluno } from '@/lib/conteudo/leitor'
 import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
 import { paginaInicialDoDocumento } from '@/lib/conteudo/capa-pagina-server'
 import { MidiaPlayer } from '@/components/aluno/midia-player'
@@ -92,7 +92,13 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   // Aberto pelo CRONOGRAMA (meta/partes) a página é a da PARTE (?pagina= ou a 1ª): a página inicial do documento NÃO se aplica.
   const doCronograma = !!sp?.meta || !!sp?.partes
   const paginaExplicita = sp?.pagina !== undefined && Number.isFinite(Number(sp.pagina))
-  const paginaAbrir = paginaExplicita || doCronograma ? paginaInicial : paginaDoc
+  // RETOMAR de onde parou (abertura normal, leitura ainda não concluída): usa o progresso salvo do aluno.
+  const salvo = !paginaExplicita && !doCronograma && tenantId ? await lerProgressoLeituraAluno(tenantId, sessao.estudanteId, id) : null
+  const retomar = !!salvo && !salvo.concluidoEm
+  const paginaRetomar = retomar && salvo!.pagina && salvo!.pagina > 1 ? salvo!.pagina : null
+  const posicaoPct = retomar && !paginaRetomar && salvo!.pct && salvo!.pct > 1 ? salvo!.pct : null
+  const semProgresso = !!sessao.impersonation // admin visualizando a conta NÃO grava progresso do aluno
+  const paginaAbrir = paginaExplicita || doCronograma ? paginaInicial : (paginaRetomar ?? paginaDoc)
 
   // Progresso de leitura (histórico + snapshot de cursos) NÃO precisa concluir para a página renderizar:
   // roda APÓS a resposta (`after`), tirando o upsert + o write-behind do caminho crítico da abertura.
@@ -131,6 +137,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
         tempoBase={tempoBase}
         tempoDeterminadoSeg={tempoDeterminadoSeg}
         mostrarLegenda={t.mostrarLegenda}
+        semProgresso={semProgresso}
+        posicaoInicialPct={posicaoPct ?? undefined}
       />
     )
   }
@@ -153,6 +161,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       tempoBase={tempoBase}
       tempoDeterminadoSeg={tempoDeterminadoSeg}
       mostrarLegenda={leitura.mostrarLegenda}
+      semProgresso={semProgresso}
     />
   )
 }

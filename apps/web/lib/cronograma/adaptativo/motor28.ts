@@ -241,11 +241,45 @@ export function horasDia(cfg: Cfg28, d: DataISO): number {
   if (p != null && Number.isFinite(+p)) return Math.max(0, Math.min(24, +p))
   return recessoEm(cfg, d) ? 0 : (+(horasEm(cfg, d)[dDow(d)] || 0))
 }
+// ── semana de revisão OBRIGATÓRIA (modelo 3.0, regraRotina300 = 15) ─────────────────────────────────
+// Só vale para planos do motor 3.x (cfg.motor = '3.…'); o legado 2.8.1 mantém a regra antiga (revisao.ativa/cada).
+export const motorRevObrigatoria = (cfg: Cfg28): boolean => typeof (cfg as { motor?: unknown }).motor === 'string' && ((cfg as { motor?: string }).motor as string).startsWith('3.')
+/** Rotina até 24h30 semanais (somadas pelas horas da ROTINA vigente em cada dia da semana): revisão obrigatória a cada 4 semanas. */
+export function revisaoObrigatoria300(cfg: Cfg28, sem: number): boolean {
+  const inicio = semInicio(cfg.start, sem)
+  let horas = 0
+  for (let k = 0; k < 7; k++) horas += +(horasEm(cfg, dAdd(inicio, k))[k] || 0)
+  return horas <= 24.5
+}
+/** Capacidade (min) de uma semana de revisão obrigatória, descontada a reserva semanal de Jurisprudência (só se marcada e ≥14h30). */
+export function capacidadeRevisao300(cfg: Cfg28, sem: number): number {
+  const inicio = semInicio(cfg.start, sem)
+  let horas = 0
+  for (let k = 0; k < 7; k++) horas += horasDia(cfg, dAdd(inicio, k))
+  return Math.round(horas * 60) - (((cfg.metas as Record<string, boolean | undefined>)?.jp ? horas >= 14.5 : false) ? 60 : 0)
+}
+/** Semana (nº) do próximo ciclo de revisão obrigatória com capacidade para a data; 0 quando a data não está sujeita ao ciclo. */
+export function cicloRevisao300(cfg: Cfg28, data: DataISO): number {
+  const sem = semDe(cfg.start, data)
+  if (!revisaoObrigatoria300(cfg, sem)) return 0
+  const proxima = (Math.floor(sem / 4) + 1) * 4
+  for (let ciclo = proxima; ciclo < proxima + 600; ciclo += 4) {
+    if (!revisaoObrigatoria300(cfg, ciclo)) return 0
+    if (capacidadeRevisao300(cfg, ciclo) > 0) return ciclo
+  }
+  return proxima
+}
 export function ehRev(cfg: Cfg28, sem: number): boolean {
   const r = cfg.revisao
+  if (motorRevObrigatoria(cfg)) {
+    if (revisaoObrigatoria300(cfg, sem)) return sem > 0 && sem % 4 === 0
+    const c = Number(r?.cada) // 10/12: só planos legados que já os tinham (a interface nova oferece 4/6/8)
+    return sem > 0 && sem % ([4, 6, 8, 10, 12].includes(c) ? c : 8) === 0
+  }
   return !!(r && r.ativa && r.cada && r.cada > 0 && sem > 0 && sem % r.cada === 0)
 }
 export function proxSemConteudo(cfg: Cfg28, s: DataISO, n: number): DataISO {
+  if (motorRevObrigatoria(cfg)) { const ciclo = cicloRevisao300(cfg, s); if (ciclo) return semInicio(cfg.start, ciclo) }
   let sem = semDe(cfg.start, s), k = 0
   while (k < n) { sem++; if (!ehRev(cfg, sem)) k++ }
   return dAdd(semInicio(cfg.start, sem), dDow(s))

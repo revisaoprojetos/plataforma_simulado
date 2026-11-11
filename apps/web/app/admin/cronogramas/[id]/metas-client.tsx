@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Link2, ListChecks, Loader2, Package, Pencil, Plus, Search, Send, Trash2, Users, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { BookOpen, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Link2, ListChecks, Loader2, Package, Pencil, Plus, Search, Send, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import { MontarSemana } from './montar-semana'
+import { FilePicker } from '@/components/admin/file-picker'
 import { AdicionarDoBancoDialog } from '@/components/admin/adicionar-do-banco-dialog'
 import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simulado-picker'
 import { alternarCronogramaNoPacote } from '../pacotes/actions'
@@ -58,7 +59,9 @@ export function MetasClient({
   simulados,
   pacotes,
   diagnostico,
+  tenantId,
 }: {
+  tenantId?: string
   cronograma: CronogramaDetalhe
   metasIniciais: MetaFonte[]
   tipos: TipoMetaDef[]
@@ -112,6 +115,18 @@ export function MetasClient({
   const [pac, setPac] = useState(pacotes)
   const [pacotesAberto, setPacotesAberto] = useState(false)
   const [propagarMeta, setPropagarMeta] = useState<MetaFonte | null>(null)
+  // Vínculo meta -> documento da Biblioteca (cronograma Revisão): explícito do admin + o que o sistema resolve sozinho.
+  const [conteudoMeta, setConteudoMeta] = useState<MetaFonte | null>(null)
+  const [semMaterialAberto, setSemMaterialAberto] = useState(false)
+  const [vinc, setVinc] = useState<VinculosConteudo>({ explicitos: {}, auto: {}, sem: {}, cobertura: {}, migrado: true })
+  const recarregarVinculos = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/admin/cronogramas/meta-conteudo?cronogramaId=${encodeURIComponent(c.id)}`, { credentials: 'same-origin', cache: 'no-store' })
+      const j = await r.json().catch(() => null)
+      if (j?.ok) setVinc({ explicitos: j.explicitos ?? {}, auto: j.auto ?? {}, sem: j.sem ?? {}, cobertura: j.cobertura ?? {}, migrado: j.migrado !== false })
+    } catch { /* sem vínculos: a tela segue funcionando */ }
+  }, [c.id])
+  useEffect(() => { void recarregarVinculos() }, [recarregarVinculos])
   // Vínculo com o banco da meta em edição: null = ainda carregando; [] = não está no banco.
   const [vinculo, setVinculo] = useState<BancoAulaRef[] | null>(null)
 
@@ -251,7 +266,12 @@ export function MetasClient({
 
   function salvar() {
     iniciar(async () => {
-      const r = editando ? await atualizarMeta(c.id, editando, form) : await criarMeta(c.id, form)
+      let r: { ok: boolean; error?: string; requerConfirmacao?: boolean; id?: string } = editando ? await atualizarMeta(c.id, editando, form) : await criarMeta(c.id, form)
+      if (!r.ok && r.requerConfirmacao && editando) {
+        const sim = await confirmar({ titulo: 'Mover meta com emissões de alunos', mensagem: r.error ?? 'Há emissões de alunos neste cronograma. Continuar?', destrutivo: true })
+        if (!sim) return
+        r = await atualizarMeta(c.id, editando, form, { confirmarEmissoes: true })
+      }
       if (!r.ok) {
         toast.error(r.error ?? 'Não foi possível salvar.')
         return
@@ -598,6 +618,16 @@ export function MetasClient({
               </span>
 
               <div className="flex shrink-0 items-center">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setConteudoMeta(m)}
+                  disabled={pendente}
+                  title={vinc.explicitos[m.id] ? `Conteúdo vinculado: ${vinc.explicitos[m.id].titulo}` : vinc.auto[m.id] ? `Conteúdo automático: ${vinc.auto[m.id].titulo}` : 'Vincular conteúdo da Biblioteca'}
+                >
+                  <BookOpen className={`h-3.5 w-3.5 ${vinc.explicitos[m.id] ? 'text-primary' : vinc.auto[m.id] ? 'text-foreground' : 'text-muted-foreground/50'}`} />
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => abrirPropagar(m)} disabled={pendente} title="Propagar este conteúdo (outros cronogramas / banco)">
                   <Send className="h-3.5 w-3.5" />
                 </Button>
@@ -659,6 +689,34 @@ export function MetasClient({
           )
         })()}
       </Card>
+
+      {/* ── Cobertura do "Abrir material" do aluno (vínculo meta -> Biblioteca) */}
+      <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+        <SecaoHeader
+          icon={BookOpen}
+          titulo="Material das metas"
+          subtitulo={
+            Object.keys(vinc.cobertura).length === 0
+              ? 'Carregando a cobertura do material…'
+              : Object.entries(vinc.cobertura).map(([tp, v]) => `${rotulo(tp)} ${v.com}/${v.total}`).join(' · ')
+          }
+          acao={
+            <Button size="sm" variant="outline" onClick={() => setSemMaterialAberto(true)} disabled={pendente}>
+              <BookOpen className="mr-1 h-4 w-4" />
+              Metas sem material ({Object.keys(vinc.sem).length.toLocaleString('pt-BR')})
+            </Button>
+          }
+        />
+      </Card>
+
+      <SemMaterialDialog
+        aberto={semMaterialAberto}
+        aoFechar={() => setSemMaterialAberto(false)}
+        metas={metas}
+        sem={vinc.sem}
+        rotuloTipo={rotulo}
+        aoVincular={(m) => { setSemMaterialAberto(false); setConteudoMeta(m) }}
+      />
 
       {/* Os pacotes vêm DEPOIS das metas: editar metas é o trabalho desta tela, e o cartão de
           pacotes empurrava a lista para baixo da dobra em todo carregamento. */}
@@ -931,6 +989,242 @@ export function MetasClient({
       </Dialog>
 
       <PropagarMetaDialog meta={propagarMeta} aoFechar={() => setPropagarMeta(null)} aoAplicado={recarregarMetas} />
+      <ConteudoMetaDialog
+        meta={conteudoMeta}
+        cronogramaId={c.id}
+        tenantId={tenantId ?? ''}
+        vinc={vinc}
+        rotuloTipo={rotulo}
+        aoFechar={() => setConteudoMeta(null)}
+        aoAlterado={recarregarVinculos}
+      />
+    </>
+  )
+}
+
+type VinculosConteudo = {
+  explicitos: Record<string, { docId: string; titulo: string; pagina: number | null }>
+  auto: Record<string, { docId: string; titulo: string }>
+  /** meta -> motivo (MotivoSemDocumento) das metas que deveriam ter documento e não têm. */
+  sem: Record<string, string>
+  cobertura: Record<string, { total: number; com: number }>
+  migrado: boolean
+}
+
+const MOTIVOS: Record<string, string> = {
+  sem_numero_aula: 'Sem nº da aula',
+  disciplina_nao_casa: 'Disciplina não casa com a Biblioteca',
+  aula_inexistente: 'Aula inexistente na Biblioteca',
+  legproc_sem_documento: 'Disciplina sem LegProc',
+  legproc_ambiguo: 'LegProc ambíguo (várias leis)',
+}
+
+// ── Metas sem material: lista filtrável (busca, tipo, motivo), paginada, exportável em CSV, com atalho para vincular ──
+function SemMaterialDialog({
+  aberto, aoFechar, metas, sem, rotuloTipo, aoVincular,
+}: {
+  aberto: boolean
+  aoFechar: () => void
+  metas: MetaFonte[]
+  sem: Record<string, string>
+  rotuloTipo: (slug: string) => string
+  aoVincular: (m: MetaFonte) => void
+}) {
+  const [busca, setBusca] = useState('')
+  const [tipo, setTipo] = useState('todos')
+  const [motivo, setMotivo] = useState('todos')
+  const [pagina, setPagina] = useState(1)
+  const POR_PAG = 25
+  const linhas = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return metas
+      .filter((m) => sem[m.id])
+      .filter((m) => tipo === 'todos' || m.tipo === tipo)
+      .filter((m) => motivo === 'todos' || sem[m.id] === motivo)
+      .filter((m) => !q || `${m.disciplina} ${m.aula ?? ''} ${m.conteudo ?? ''}`.toLowerCase().includes(q))
+      .sort((a, b) => a.disciplina.localeCompare(b.disciplina, 'pt-BR') || String(a.aula ?? '').localeCompare(String(b.aula ?? ''), 'pt-BR', { numeric: true }) || a.semana - b.semana)
+  }, [metas, sem, busca, tipo, motivo])
+  useEffect(() => { setPagina(1) }, [busca, tipo, motivo])
+  const tipos = useMemo(() => [...new Set(metas.filter((m) => sem[m.id]).map((m) => m.tipo))], [metas, sem])
+  const total = Math.max(1, Math.ceil(linhas.length / POR_PAG))
+  const vis = linhas.slice((pagina - 1) * POR_PAG, pagina * POR_PAG)
+
+  function exportar() {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const csv = ['Semana;Tipo;Disciplina;Aula;Conteudo;Motivo', ...linhas.map((m) => [m.semana, rotuloTipo(m.tipo), m.disciplina, m.aula ?? '', m.conteudo ?? '', MOTIVOS[sem[m.id]] ?? sem[m.id]].map(esc).join(';'))].join('\r\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = 'metas-sem-material.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => { if (!o) aoFechar() }}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Metas sem material</DialogTitle>
+          <DialogDescription>
+            PDFull, Revisão e LegProc que o sistema não conseguiu ligar a um documento da Biblioteca. Vincule à mão (o vínculo vale para este cronograma).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-8" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar disciplina, aula ou conteúdo" />
+          </div>
+          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={tipo} onChange={(e) => setTipo(e.target.value)} aria-label="Filtrar por tipo">
+            <option value="todos">Todos os tipos</option>
+            {tipos.map((tp) => <option key={tp} value={tp}>{rotuloTipo(tp)}</option>)}
+          </select>
+          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={motivo} onChange={(e) => setMotivo(e.target.value)} aria-label="Filtrar por motivo">
+            <option value="todos">Todos os motivos</option>
+            {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <Button size="sm" variant="outline" onClick={exportar} disabled={!linhas.length}>Exportar CSV</Button>
+        </div>
+        <div className="max-h-[50vh] overflow-auto rounded-lg border">
+          {vis.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma meta sem material com esses filtros.</p>
+          ) : (
+            vis.map((m) => (
+              <div key={m.id} className="flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0">
+                <span className="w-10 shrink-0 text-xs font-semibold text-primary">S{m.semana}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{rotuloTipo(m.tipo)} · {m.disciplina}{m.aula ? ` · aula ${m.aula}` : ''}</p>
+                  <p className="truncate text-xs text-muted-foreground">{m.conteudo ?? ''}</p>
+                </div>
+                <Badge variant="outline" className="shrink-0">{MOTIVOS[sem[m.id]] ?? sem[m.id]}</Badge>
+                <Button size="sm" variant="outline" onClick={() => aoVincular(m)}>Vincular</Button>
+              </div>
+            ))
+          )}
+        </div>
+        <DialogFooter className="items-center sm:justify-between">
+          <span className="text-xs text-muted-foreground">{linhas.length.toLocaleString('pt-BR')} meta(s) · página {pagina} de {total}</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button size="sm" variant="ghost" disabled={pagina >= total} onClick={() => setPagina((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+            <Button size="sm" variant="ghost" onClick={aoFechar}>Fechar</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Conteúdo da meta: documento da Biblioteca que o aluno abre pelo "Abrir material" do cronograma Revisão ──
+// Automático = disciplina + nº da aula (+ tipo de material da subpasta) — o mesmo critério do Cronograma Adaptativo.
+// Explícito = escolhido aqui com o seletor da Biblioteca (o mesmo do Estúdio); vence o automático.
+function ConteudoMetaDialog({
+  meta, cronogramaId, tenantId, vinc, rotuloTipo, aoFechar, aoAlterado,
+}: {
+  meta: MetaFonte | null
+  cronogramaId: string
+  tenantId: string
+  vinc: VinculosConteudo
+  rotuloTipo: (slug: string) => string
+  aoFechar: () => void
+  aoAlterado: () => void
+}) {
+  const [picker, setPicker] = useState(false)
+  const [iguais, setIguais] = useState(true)
+  const [pagina, setPagina] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  useEffect(() => { setPagina(''); setIguais(true) }, [meta?.id])
+  if (!meta) return null
+  const exp = vinc.explicitos[meta.id]
+  const auto = vinc.auto[meta.id]
+
+  async function enviar(documentoId: string | null) {
+    if (!meta || salvando) return
+    setSalvando(true)
+    try {
+      const r = await fetch('/api/admin/cronogramas/meta-conteudo', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cronogramaId, metaId: meta.id, documentoId, paginaIni: pagina.trim() === '' ? null : Number(pagina), aplicarIguais: iguais }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!j?.ok) { toast.error(j?.message ?? 'Não foi possível salvar o vínculo.'); return }
+      toast.success(documentoId ? (j.afetadas > 1 ? `Conteúdo vinculado a ${j.afetadas} metas.` : 'Conteúdo vinculado.') : 'Vínculo removido.')
+      aoAlterado()
+    } catch {
+      toast.error('Sem conexão. Tente de novo.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <>
+      <Dialog open onOpenChange={(o) => { if (!o) aoFechar() }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Conteúdo da meta</DialogTitle>
+            <DialogDescription>
+              {rotuloTipo(meta.tipo)} · {meta.disciplina}{meta.aula ? ` · aula ${meta.aula}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            {exp ? (
+              <div className="rounded-lg border p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Vinculado pelo admin</p>
+                <p className="mt-1 font-medium">{exp.titulo}</p>
+                {exp.pagina ? <p className="text-xs text-muted-foreground">Abre na página {exp.pagina}</p> : null}
+              </div>
+            ) : auto ? (
+              <div className="rounded-lg border p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Automático (disciplina + aula)</p>
+                <p className="mt-1 font-medium">{auto.titulo}</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-3 text-muted-foreground">
+                Nenhum documento encontrado automaticamente. Escolha um da Biblioteca para o aluno abrir pelo cronograma.
+              </div>
+            )}
+            {!vinc.migrado && (
+              <AlertBox>Vínculos explícitos ficam disponíveis após a atualização do banco. Até lá vale só o automático.</AlertBox>
+            )}
+            <div className="grid gap-1.5">
+              <Label htmlFor="cm-pagina">Abrir na página (opcional)</Label>
+              <Input id="cm-pagina" type="number" min={1} value={pagina} onChange={(e) => setPagina(e.target.value)} placeholder="Ex.: 15" />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={iguais} onChange={(e) => setIguais(e.target.checked)} />
+              Aplicar às metas iguais deste cronograma (mesmo tipo, disciplina e aula)
+            </label>
+          </div>
+
+          <DialogFooter>
+            {exp && (
+              <Button variant="ghost" onClick={() => enviar(null)} disabled={salvando}>
+                Remover vínculo
+              </Button>
+            )}
+            <Button onClick={() => setPicker(true)} disabled={salvando || !tenantId || !vinc.migrado}>
+              <BookOpen className="mr-1 h-4 w-4" />
+              Escolher da Biblioteca
+            </Button>
+            <Button variant="ghost" onClick={aoFechar}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {picker && (
+        <FilePicker
+          open
+          tenantId={tenantId}
+          abaInicial="biblioteca"
+          onClose={() => setPicker(false)}
+          onSelecionar={(r) => {
+            setPicker(false)
+            if (r.tipo === 'biblioteca' || r.tipo === 'upload') void enviar(r.documentoId)
+            else toast.info('Escolha um documento da Biblioteca.')
+          }}
+        />
+      )}
     </>
   )
 }

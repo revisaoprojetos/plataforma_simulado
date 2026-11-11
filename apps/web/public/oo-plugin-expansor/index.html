@@ -71,49 +71,98 @@
   .edit { margin-top:8px; padding-top:8px; border-top:1px dashed var(--oo-line2); }
   .conf { margin-top:8px; font-size:11px; font-weight:600; color:#dc2626; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .count { font-size:10.5px; color:var(--oo-txt2); margin-bottom:6px; }
+  .tabs { display:flex; background:var(--oo-bar); border-bottom:1px solid var(--oo-line2); padding:0 6px; flex:none; }
+  .tab { flex:1; padding:9px 6px; font-size:12px; font-weight:600; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--oo-txt2); cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+  .tab:hover { color:var(--oo-txt); }
+  .tab.on { color:var(--oo-accent); border-bottom-color:var(--oo-accent); }
+  .bdg { min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--oo-line2); color:var(--oo-txt2); font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+  .tab.on .bdg { background:var(--oo-accent); color:#fff; }
+  .pane { display:none; } .pane.on { display:block; }
+  .pv { margin:8px 0 2px; border:2px solid; border-radius:6px; overflow:hidden; }
+  .pvh { display:flex; align-items:center; gap:7px; padding:7px 9px; cursor:pointer; user-select:none; font-size:12px; font-weight:700; line-height:1.25; }
+  .pvh .chev { display:inline-block; width:10px; font-size:10px; transition:transform .15s; flex:none; }
+  .pv.open .pvh .chev { transform:rotate(90deg); }
+  .pvb { display:none; padding:7px 10px 9px; font-size:10.5px; line-height:1.45; border-top:1px solid rgba(0,0,0,.12); background:rgba(255,255,255,.55); color:#363636; max-height:240px; overflow:auto; }
+  .pvb p { margin:0 0 6px; } .pvb .mais { color:#6b6b6b; font-style:italic; }
+  .pv.open .pvb { display:block; }
+  .pvlb { margin-top:8px; font-size:10px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; color:var(--oo-txt2); }
+  .steps { margin:0; padding-left:18px; font-size:11px; line-height:1.5; color:var(--oo-txt); } .steps li { margin-bottom:5px; }
   #msg { position:fixed; left:10px; right:10px; bottom:10px; font-size:11.5px; font-weight:600; padding:8px 11px; border-radius:3px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 3px 10px rgba(0,0,0,.25); color:#fff; background:#447f3b; }
   #msg.show { opacity:1; transform:translateY(0); }
   #msg.err { background:#b42318; }
 </style>
 </head>
 <body>
+<div class="tabs">
+  <button class="tab on" id="t-criar" data-p="criar">Criar</button>
+  <button class="tab" id="t-blocos" data-p="blocos">Blocos <span class="bdg" id="bdg">0</span></button>
+  <button class="tab" id="t-ajuda" data-p="ajuda">Ajuda</button>
+</div>
 <div class="scroll"><div class="wrap">
-  <div class="ptitle">Expansor</div>
-
+  <div class="pane on" id="p-criar">
   <div class="sec">
     <h4><span class="n">1</span>Novo bloco expansível</h4>
     <label class="lb" for="nome">Título</label>
     <input type="text" id="nome" maxlength="80" placeholder="Ex.: Ver exemplo resolvido" autocomplete="off" />
     <label class="lb" style="margin-top:8px">Cores</label>
     <div class="pgrid" id="pgrid-novo" style="margin-top:0"></div>
-    <button class="btn" id="b-ini">Marcar início aqui</button>
+    <button class="btn" id="b-sel">Aplicar na seleção</button>
+    <div class="note">Selecione o trecho no documento, informe o título e a cor e clique em <b>Aplicar na seleção</b>. O texto e a formatação ficam como estão; o trecho ganha só um fundo e uma borda na cor do bloco.</div>
+    <button class="btn sec2" id="b-ini">Só marcar o início (avançado)</button>
+    <div class="note">Alternativa sem seleção: marque o início aqui e depois use <b>Marcar fim aqui</b> na aba <b>Blocos</b>.</div>
   </div>
 
   <div class="sec">
-    <h4><span class="n">2</span>Blocos do documento</h4>
+    <h4><span class="n">2</span>Faixas</h4>
+    <label class="sw"><input type="checkbox" id="sw-faixas" /><span class="track"></span><span>Mostrar o código dos marcadores</span></label>
+    <div class="note">Desligado, só aparece o cabeçalho "▸ Título" no topo do bloco. Ligado, o código <code>[[EXP:…]]</code> também aparece (só para o admin). O aluno nunca vê nenhum dos dois.</div>
+  </div>
+  </div>
+
+  <div class="pane" id="p-blocos">
     <div class="count" id="cont"></div>
     <div id="lista"><div class="empty">Clique em “Atualizar” para ler o documento.</div></div>
     <button class="btn sec2" id="b-att">Atualizar</button>
+    <div class="sec" style="margin-top:14px">
+      <h4>Ver como o aluno</h4>
+      <button class="btn" id="b-leitor">Abrir no leitor do aluno</button>
+      <div class="note">No leitor o bloco <b>expande e recolhe de verdade</b>. O leitor mostra a versão <b>salva</b>, e salvar no editor <b>publica</b> a versão — use só em documento de teste.</div>
+    </div>
   </div>
 
-  <div class="sec">
-    <h4><span class="n">3</span>Faixas</h4>
-    <label class="sw"><input type="checkbox" id="sw-faixas" checked /><span class="track"></span><span>Mostrar faixas dos marcadores</span></label>
-    <div class="note">Só visual para o admin. O servidor remove os marcadores para o aluno.</div>
-  </div>
-
-  <div class="sec">
-    <h4>Ajuda</h4>
-    <div class="hint">No modo texto o aluno vê este trecho como um bloco recolhível com o título acima. No PDF ele aparece normal.</div>
+  <div class="pane" id="p-ajuda">
+    <div class="sec">
+      <h4>Como usar</h4>
+      <ol class="steps">
+        <li><b>Selecione</b> no documento o trecho que vira bloco.</li>
+        <li>Na aba <b>Criar</b>, digite o <b>título</b>, escolha a <b>cor</b> e clique em <b>Aplicar na seleção</b>.</li>
+        <li>O texto e a formatação permanecem; o trecho ganha um fundo e uma borda na cor do bloco e, no topo, um <b>cabeçalho "▸ Título"</b> que identifica o bloco expansível. O bloco aparece na aba <b>Blocos</b>.</li>
+      </ol>
+    </div>
+    <div class="sec">
+      <h4>Como o aluno vê</h4>
+      <div class="hint">No <b>modo texto</b> o aluno vê o <b>título</b> do bloco com uma seta: ao clicar, o conteúdo <b>expande e recolhe</b>. No PDF ele aparece normal, sempre aberto.</div>
+      <div class="note">O editor de documentos não recolhe texto: aqui o conteúdo fica sempre visível, dentro da moldura. Para ver o bloco recolhendo e expandindo de verdade, use <b>Abrir no leitor do aluno</b> (aba <b>Blocos</b>) depois de salvar. A <b>prévia</b> de cada bloco, na mesma aba, mostra o conteúdo real. A prévia de cada bloco, na aba <b>Blocos</b>, mostra a aparência do título e a cor.</div>
+    </div>
   </div>
 </div></div>
 <div id="msg"></div>
 
 <script>
+/* carrega o plugins.js do MESMO servidor do editor (origem do referrer), síncrono via document.write.
+   Sem isto `window.Asc` não existe, o init nunca dispara e o plugin fica em "Editor não conectado". */
+(function(){
+  var o='http://localhost:8082';
+  try{ if(document.referrer) o=new URL(document.referrer).origin; }catch(e){}
+  document.write('<scr'+'ipt src="'+o+'/sdkjs-plugins/v1/plugins.js"></scr'+'ipt>');
+})();
+</script>
+<script>
 /* ============================================================================================
    Plugin "Expansor" (OnlyOffice, Word, painel).
    CONTRATO (o servidor depende — NÃO MUDAR): bloco = DOIS parágrafos de nível de corpo:
-     início: [[EXP:<id>|<Nome>]] ou [[EXP:<id>|<Nome>|<preset>]] (preset opcional; omitido = padrão do tenant)
+     início: [[EXP:<id>|<Nome>]] ou [[EXP:<id>|<Nome>|<preset>]] (preset opcional; omitido = padrão do tenant), seguido
+       do CABEÇALHO visível só no editor "▸ <Nome>" no MESMO parágrafo (o servidor remove o parágrafo inteiro p/ o aluno)
      fim: [[/EXP:<id>]]      id = 8 chars [a-z0-9]; Nome sem "]" nem "|".
    Gerenciamento (Renomear/trocar preset, Apagar marcação, Ir para): callCommand localiza o parágrafo pelo ID
      (nunca por índice guardado), reescreve/remove só os parágrafos-marcador e preserva o conteúdo entre eles.
@@ -139,30 +188,39 @@ function gerarId(){
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
 
-/* Insere um parágrafo-marcador no cursor. tipo: 'ini' | 'fim' */
-function inserirMarcador(texto, tipo){
+/* Insere um parágrafo-marcador no cursor. tipo: 'ini' (com cabeçalho "▸ Título") | 'fim'. depois(): chamado após a inserção. */
+function inserirMarcador(texto, tipo, depois){
   var p = api();
   if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return false; }
   try {
     Asc.scope.mTexto = texto;
     Asc.scope.mTipo = tipo;
+    Asc.scope.mMostrar = faixasVisiveis();
+    Asc.scope.pmap = pmapDe();
     p.callCommand(function(){
       var doc = Api.GetDocument();
       var par = Api.CreateParagraph();
-      var run = Api.CreateRun();
-      run.AddText(Asc.scope.mTexto);
-      run.SetFontSize(18); // 9pt (meio-pontos)
-      if (Asc.scope.mTipo === 'ini') run.SetColor(146, 64, 14); else run.SetColor(146, 64, 14);
-      par.AddElement(run);
-      par.SetShd('clear', 255, 244, 219);
+      if (Asc.scope.mTipo === 'ini') {
+        var m = /^\[\[EXP:[a-z0-9]{8}\|([^\]|]*)(?:\|([a-z]*))?\]\]$/.exec(Asc.scope.mTexto);
+        var pr = Asc.scope.pmap[(m && m[2]) || 'padrao'] || Asc.scope.pmap['padrao'];
+        var rc = Api.CreateRun(); rc.AddText(Asc.scope.mTexto);
+        if (Asc.scope.mMostrar) { rc.SetFontSize(16); rc.SetColor(146, 64, 14); } else { rc.SetFontSize(2); rc.SetColor(pr.bg[0], pr.bg[1], pr.bg[2]); }
+        par.AddElement(rc);
+        var rh = Api.CreateRun(); rh.AddText('\u25B8 ' + ((m && m[1]) || '')); rh.SetBold(true); rh.SetFontSize(22); rh.SetColor(pr.tx[0], pr.tx[1], pr.tx[2]);
+        par.AddElement(rh);
+        par.SetSpacingBefore(0); par.SetSpacingAfter(0);
+      } else {
+        var run = Api.CreateRun(); run.AddText(Asc.scope.mTexto);
+        if (Asc.scope.mMostrar) { run.SetFontSize(18); run.SetColor(146, 64, 14); par.AddElement(run); par.SetShd('clear', 255, 244, 219); }
+        else { run.SetFontSize(2); run.SetColor(255, 255, 255); par.AddElement(run); par.SetSpacingBefore(0); par.SetSpacingAfter(0); par.SetSpacingLine(20, 'exact'); }
+      }
       doc.InsertContent([par], false);
-    }, false, true, function(){ setTimeout(atualizar, 150); });
+    }, false, true, function(){ setTimeout(atualizar, 200); setTimeout(atualizar, 1500); if (depois) depois(); });
     return true;
   } catch (e) {
     try { /* fallback: PasteHtml */
-      var cor = '#92400E';
-      p.executeMethod('PasteHtml', ['<p style="background-color:#FFF4DB;color:'+cor+';font-size:9pt;margin:0">'+esc(texto)+'</p>']);
-      setTimeout(atualizar, 300);
+      p.executeMethod('PasteHtml', ['<p style="background-color:#FFF4DB;color:#92400E;font-size:9pt;margin:0">'+esc(texto)+'</p>']);
+      setTimeout(atualizar, 300); if (depois) setTimeout(depois, 400);
       return true;
     } catch (e2) { msg('Não foi possível inserir o marcador: '+(e2 && e2.message || e2), true); return false; }
   }
@@ -179,6 +237,12 @@ var PRESETS = [
   { id:'cinza',    nome:'Cinza (impedimento)',      bg:'#D9D9D9', bd:'#A7A7A7' },
   { id:'verde',    nome:'Verde',                    bg:'#E2F0D9', bd:'#ACB5A7' }
 ];
+/* Mapa de cores por preset p/ o callCommand: fundo, borda, texto do cabeçalho (RGB). */
+function pmapDe(){
+  var pm = {};
+  PRESETS.forEach(function(pr){ pm[pr.id] = { bg: hexRgb(pr.bg), bd: hexRgb(pr.bd), tx: hexRgb(pr.tx || '#363636'), branco: String(pr.bg).toUpperCase() === '#FFFFFF' }; });
+  return pm;
+}
 function presetDe(id){ for (var i=0;i<PRESETS.length;i++) if (PRESETS[i].id===id) return PRESETS[i]; return PRESETS[0]; }
 function textoIni(id, nome, preset){
   return '[[EXP:'+id+'|'+nome+((preset && preset!=='padrao') ? '|'+preset : '')+']]';
@@ -203,12 +267,162 @@ function montarGrade(box, inicial){
 }
 var gradeNovo = null;
 
+function irAba(p, semLer){
+  ['criar','blocos','ajuda'].forEach(function(k){
+    var pn=$('p-'+k), tb=$('t-'+k);
+    if (pn) pn.className='pane'+(k===p?' on':'');
+    if (tb) tb.className='tab'+(k===p?' on':'');
+  });
+  if (p==='blocos' && !semLer) atualizar();
+}
+(function(){ var tabs=document.querySelectorAll('.tab'); for (var i=0;i<tabs.length;i++) (function(t){ t.onclick=function(){ irAba(t.getAttribute('data-p')); }; })(tabs[i]); })();
+
 function marcarInicio(){
   try {
     var nome = limparNome($('nome').value);
     if (!nome) { msg('Informe o título do bloco.', true); $('nome').focus(); return; }
     var id = gerarId();
-    if (inserirMarcador(textoIni(id, nome, gradeNovo ? gradeNovo.get() : 'padrao'), 'ini')) { $('nome').value=''; msg('Início marcado ('+id+'). Agora marque o fim onde o bloco termina.'); }
+    if (inserirMarcador(textoIni(id, nome, gradeNovo ? gradeNovo.get() : 'padrao'), 'ini')) { $('nome').value=''; msg('Início marcado. Agora marque o fim onde o bloco termina.'); irAba('blocos', true); }
+  } catch (e) { msg('Erro: '+(e && e.message || e), true); }
+}
+
+function hexRgb(h){
+  h = String(h || '').replace('#', '');
+  if (h.length === 3) h = h.charAt(0)+h.charAt(0)+h.charAt(1)+h.charAt(1)+h.charAt(2)+h.charAt(2);
+  return [parseInt(h.substr(0,2),16)||0, parseInt(h.substr(2,2),16)||0, parseInt(h.substr(4,2),16)||0];
+}
+/* Moldura do bloco: fundo + borda NA COR DO PRESET nos parágrafos do início (cabeçalho) até o último antes do fim. Só mexe em
+   propriedades do PARÁGRAFO (sombreado e bordas) — texto e formatação dos caracteres ficam como estavam. limpar=true remove. */
+function molduraEntre(id, limpar, cb){
+  var p = api();
+  if (!p || !conectado) { if (cb) cb(); return; }
+  Asc.scope.gId = id; Asc.scope.gLimpar = !!limpar; Asc.scope.pmap = pmapDe();
+  try {
+    p.callCommand(function(){
+      var doc = Api.GetDocument(), n = doc.GetElementsCount();
+      var ini = '[[EXP:' + Asc.scope.gId + '|', fim = '[[/EXP:' + Asc.scope.gId + ']]';
+      var iIni = -1, iFim = -1, preset = 'padrao';
+      for (var i = 0; i < n; i++) {
+        var el = doc.GetElement(i);
+        if (!el || el.GetClassType() !== 'paragraph') continue;
+        var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+        if (iIni < 0 && t.indexOf(ini) === 0) {
+          iIni = i;
+          var m = /^\[\[EXP:[a-z0-9]{8}\|[^\]|]*(?:\|([a-z]*))?\]\]/.exec(t);
+          if (m && m[1]) preset = m[1];
+        } else if (iFim < 0 && t === fim) { iFim = i; }
+      }
+      if (iIni < 0 || iFim < 0 || iFim <= iIni) return 'no';
+      var pr = Asc.scope.pmap[preset] || Asc.scope.pmap['padrao'];
+      var ps = [];
+      var tabs = [];
+      for (var k = iIni; k < iFim; k++) { var e2 = doc.GetElement(k); if (!e2) continue; var ct = e2.GetClassType(); if (ct === 'paragraph') ps.push(e2); else if (ct === 'table') tabs.push(e2); }
+      // Tabela dentro do bloco: NÃO mexe na formatação interna (células, sombreado, texto) — só o contorno externo ganha a cor do bloco.
+      if (!Asc.scope.gLimpar) {
+        for (var tb = 0; tb < tabs.length; tb++) {
+          var tt = tabs[tb];
+          try {
+            if (tt.SetTableBorderTop) tt.SetTableBorderTop('single', 8, 0, pr.bd[0], pr.bd[1], pr.bd[2]);
+            if (tt.SetTableBorderBottom) tt.SetTableBorderBottom('single', 8, 0, pr.bd[0], pr.bd[1], pr.bd[2]);
+            if (tt.SetTableBorderLeft) tt.SetTableBorderLeft('single', 8, 0, pr.bd[0], pr.bd[1], pr.bd[2]);
+            if (tt.SetTableBorderRight) tt.SetTableBorderRight('single', 8, 0, pr.bd[0], pr.bd[1], pr.bd[2]);
+          } catch (e3) {}
+        }
+      }
+      // Posição da borda esquerda de cada parágrafo = recuo à esquerda + deslocamento da 1ª linha (se negativo, ex.: listas).
+      // Compensa pelo AFASTAMENTO da borda, para a borda esquerda cair sempre na mesma coluna (listas ficam alinhadas).
+      function esq(par){ try { var pp = par.GetParaPr(); return (pp.GetIndLeft() || 0) + Math.min(pp.GetIndFirstLine() || 0, 0); } catch (e) { return 0; } }
+      var minL = 1e9;
+      for (var m2 = 0; m2 < ps.length; m2++) { var v = esq(ps[m2]); if (v < minL) minL = v; }
+      for (var j = 0; j < ps.length; j++) {
+        var q = ps[j];
+        var afast = 4 + Math.round((esq(q) - minL) / 20); if (afast > 31) afast = 31; if (afast < 0) afast = 0; // pontos (máx. 31)
+        if (Asc.scope.gLimpar) {
+          q.SetShd('nil');
+          q.SetLeftBorder('none', 0, 0, 0, 0, 0); q.SetRightBorder('none', 0, 0, 0, 0, 0);
+          q.SetTopBorder('none', 0, 0, 0, 0, 0); q.SetBottomBorder('none', 0, 0, 0, 0, 0);
+          if (typeof q.SetBetweenBorder === 'function') q.SetBetweenBorder('none', 0, 0, 0, 0, 0);
+        } else {
+          if (pr.branco) q.SetShd('nil'); else q.SetShd('clear', pr.bg[0], pr.bg[1], pr.bg[2]);
+          // Bordas IDÊNTICAS em todos os parágrafos (o editor então desenha UMA moldura contínua, inclusive no espaçamento).
+          q.SetLeftBorder('single', 8, afast, pr.bd[0], pr.bd[1], pr.bd[2]);
+          q.SetRightBorder('single', 8, 4, pr.bd[0], pr.bd[1], pr.bd[2]);
+          q.SetTopBorder('single', 8, 3, pr.bd[0], pr.bd[1], pr.bd[2]);
+          q.SetBottomBorder('single', 8, 3, pr.bd[0], pr.bd[1], pr.bd[2]);
+          if (typeof q.SetBetweenBorder === 'function') q.SetBetweenBorder('none', 0, 0, 0, 0, 0);
+        }
+      }
+      return 'ok:' + ps.length;
+    }, false, true, function(){ setTimeout(atualizar, 200); if (cb) cb(); });
+  } catch (e) { msg('Erro ao aplicar a moldura: '+(e && e.message || e), true); if (cb) cb(); }
+}
+
+/* "Aplicar na seleção": põe o marcador de início (que é também o CABEÇALHO "▸ Título") ANTES e o de fim DEPOIS dos
+   parágrafos selecionados e aplica a moldura. Texto e formatação dos parágrafos selecionados não mudam. */
+function aplicarSelecao(){
+  try {
+    var nome = limparNome($('nome').value);
+    if (!nome) { msg('Informe o título do bloco.', true); $('nome').focus(); return; }
+    var p = api();
+    if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return; }
+    var id = gerarId(), preset = gradeNovo ? gradeNovo.get() : 'padrao';
+    Asc.scope.aIni = textoIni(id, nome, preset);
+    Asc.scope.aFim = '[[/EXP:' + id + ']]';
+    Asc.scope.aMostrar = faixasVisiveis();
+    Asc.scope.pmap = pmapDe();
+    p.callCommand(function(){
+      var doc = Api.GetDocument();
+      var rng = doc.GetRangeBySelect();
+      if (!rng) return 'sem-selecao';
+      var ps = rng.GetAllParagraphs();
+      if (!ps || !ps.length) return 'sem-selecao';
+      // Posição NO NÍVEL DO DOCUMENTO: parágrafo dentro de tabela sobe até a tabela externa (o marcador nunca entra na célula).
+      function topo(par){
+        var el = par, g = 0;
+        while (g++ < 8) {
+          var tb = null;
+          try { tb = (el.GetParentTable && el.GetParentTable()) || null; } catch (e) { tb = null; }
+          if (!tb) { try { var cel = el.GetParentTableCell && el.GetParentTableCell(); tb = cel && cel.GetParentRow && cel.GetParentRow() && cel.GetParentRow().GetParentTable ? cel.GetParentRow().GetParentTable() : null; } catch (e2) { tb = null; } }
+          if (!tb) break;
+          el = tb;
+        }
+        return el.GetPosInParent();
+      }
+      var pi = 1e9, li = -1;
+      for (var t = 0; t < ps.length; t++) { var pt = topo(ps[t]); if (typeof pt === 'number' && pt >= 0) { if (pt < pi) pi = pt; if (pt > li) li = pt; } }
+      if (li < 0) return 'sem-posicao';
+      if (typeof pi !== 'number' || pi < 0 || typeof li !== 'number' || li < pi) return 'sem-posicao';
+      function marc(texto, ehIni){
+        var par = Api.CreateParagraph();
+        if (ehIni) {
+          var m = /^\[\[EXP:[a-z0-9]{8}\|([^\]|]*)(?:\|([a-z]*))?\]\]$/.exec(texto);
+          var pr = Asc.scope.pmap[(m && m[2]) || 'padrao'] || Asc.scope.pmap['padrao'];
+          var rc = Api.CreateRun(); rc.AddText(texto);
+          if (Asc.scope.aMostrar) { rc.SetFontSize(16); rc.SetColor(146, 64, 14); } else { rc.SetFontSize(2); rc.SetColor(pr.bg[0], pr.bg[1], pr.bg[2]); }
+          par.AddElement(rc);
+          var rh = Api.CreateRun(); rh.AddText('\u25B8 ' + ((m && m[1]) || '')); rh.SetBold(true); rh.SetFontSize(22); rh.SetColor(pr.tx[0], pr.tx[1], pr.tx[2]);
+          par.AddElement(rh);
+          par.SetSpacingBefore(0); par.SetSpacingAfter(0);
+        } else {
+          var run = Api.CreateRun(); run.AddText(texto);
+          if (Asc.scope.aMostrar) { run.SetFontSize(18); run.SetColor(146, 64, 14); par.AddElement(run); par.SetShd('clear', 255, 244, 219); }
+          else { run.SetFontSize(2); run.SetColor(255, 255, 255); par.AddElement(run); par.SetSpacingBefore(0); par.SetSpacingAfter(0); par.SetSpacingLine(20, 'exact'); }
+        }
+        return par;
+      }
+      doc.AddElement(li + 1, marc(Asc.scope.aFim, false));   // fim primeiro: os índices anteriores não deslocam
+      doc.AddElement(pi, marc(Asc.scope.aIni, true));
+      return 'ok:' + ps.length;
+    }, false, true, function(ret){
+      var r = String(ret == null ? '' : ret);
+      if (r.indexOf('ok') === 0) {
+        $('nome').value = '';
+        msg('Bloco criado. Aplicando a moldura…');
+        irAba('blocos', true);
+        setTimeout(function(){ molduraEntre(id, false); }, 500);
+      } else if (r === 'tabela') msg('Selecione parágrafos fora de tabelas.', true);
+      else msg('Selecione o trecho do documento e tente de novo.', true);
+    });
   } catch (e) { msg('Erro: '+(e && e.message || e), true); }
 }
 
@@ -229,7 +443,7 @@ function faixasVisiveis(){ return !!$('sw-faixas').checked; }
 
 function reescreverInicio(id, nome, preset){
   var texto = textoIni(id, nome, preset);
-  Asc.scope.gId = id; Asc.scope.gTexto = texto; Asc.scope.gMostrar = faixasVisiveis();
+  Asc.scope.gId = id; Asc.scope.gTexto = texto; Asc.scope.gTit = nome; Asc.scope.gMostrar = faixasVisiveis(); Asc.scope.gPreset = preset || 'padrao'; Asc.scope.pmap = pmapDe();
   executar(function(){
     var doc = Api.GetDocument(), n = doc.GetElementsCount(), achou = 0;
     var pref = '[[EXP:' + Asc.scope.gId + '|';
@@ -238,23 +452,21 @@ function reescreverInicio(id, nome, preset){
       if (!el || el.GetClassType() !== 'paragraph') continue;
       var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
       if (t.indexOf(pref) !== 0) continue;
-      el.RemoveAllElements();
-      var run = Api.CreateRun();
-      run.AddText(Asc.scope.gTexto);
-      if (Asc.scope.gMostrar) {
-        run.SetFontSize(18); run.SetColor(146, 64, 14);
-        el.AddElement(run); el.SetShd('clear', 255, 244, 219);
-      } else {
-        if (typeof run.SetVanish === 'function') { run.SetVanish(true); }
-        else { run.SetFontSize(2); run.SetColor(255, 255, 255); }
-        el.AddElement(run); el.SetShd('nil');
-      }
+      var pr = Asc.scope.pmap[Asc.scope.gPreset] || Asc.scope.pmap['padrao'];
+      el.RemoveAllElements();   // (remove também o indicador solto de versões antigas)
+      var rc = Api.CreateRun(); rc.AddText(Asc.scope.gTexto);
+      if (Asc.scope.gMostrar) { rc.SetFontSize(16); rc.SetColor(146, 64, 14); } else { rc.SetFontSize(2); rc.SetColor(pr.bg[0], pr.bg[1], pr.bg[2]); }
+      el.AddElement(rc);
+      var rh = Api.CreateRun(); rh.AddText('\u25B8 ' + Asc.scope.gTit); rh.SetBold(true); rh.SetFontSize(22); rh.SetColor(pr.tx[0], pr.tx[1], pr.tx[2]);
+      el.AddElement(rh);
+      el.SetSpacingBefore(0); el.SetSpacingAfter(0); el.SetSpacingLine(240, 'auto');
       achou++; break;
     }
     return String(achou);
-  }, 'Bloco atualizado.');
+  }, 'Bloco atualizado.', function(){ molduraEntre(id, false); });
 }
-function apagarMarcacao(id){
+function apagarMarcacao(id){ molduraEntre(id, true, function(){ apagarMarcacaoRaw(id); }); }
+function apagarMarcacaoRaw(id){
   Asc.scope.gId = id;
   executar(function(){
     var doc = Api.GetDocument(), n = doc.GetElementsCount(), idxs = [];
@@ -295,7 +507,7 @@ function irPara(id){
   }, 'Posicionado no marcador.');
 }
 function marcarFim(id){
-  try { if (inserirMarcador('[[/EXP:'+id+']]', 'fim')) msg('Fim marcado ('+id+').'); }
+  try { if (inserirMarcador('[[/EXP:'+id+']]', 'fim', function(){ setTimeout(function(){ molduraEntre(id, false); }, 500); })) msg('Fim marcado. Aplicando a moldura…'); }
   catch (e) { msg('Erro: '+(e && e.message || e), true); }
 }
 
@@ -322,7 +534,46 @@ function atualizar(){
   } catch (e) { $('lista').innerHTML='<div class="empty">Não foi possível ler o documento.</div>'; msg('Erro: '+(e && e.message || e), true); }
 }
 
-var RE_INI = /^\[\[EXP:([a-z0-9]{8})\|([^\]|]*)(?:\|([a-z]*))?\]\]$/;
+/* Conteúdo REAL do bloco (texto dos parágrafos entre o início e o fim), lido pela API do documento — não altera a seleção. */
+function carregarConteudo(id, box){
+  var p = api();
+  if (!p || !conectado) { box.innerHTML = '<span class="mais">Editor não conectado.</span>'; return; }
+  box.innerHTML = '<span class="mais">Carregando o conteúdo do bloco…</span>';
+  Asc.scope.gId = id;
+  try {
+    p.callCommand(function(){
+      var doc = Api.GetDocument(), n = doc.GetElementsCount();
+      var ini = '[[EXP:' + Asc.scope.gId + '|', fim = '[[/EXP:' + Asc.scope.gId + ']]';
+      var a = -1, b = -1;
+      for (var i = 0; i < n; i++) {
+        var el = doc.GetElement(i);
+        if (!el || el.GetClassType() !== 'paragraph') continue;
+        var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+        if (a < 0 && t.indexOf(ini) === 0) a = i; else if (b < 0 && t === fim) b = i;
+      }
+      if (a < 0 || b < 0 || b <= a + 1) return JSON.stringify({ n: 0, p: [] });
+      var out = [], total = 0;
+      for (var k = a + 1; k < b; k++) {
+        var e = doc.GetElement(k); if (!e) continue;
+        if (e.GetClassType() === 'paragraph') {
+          var tx = (e.GetText() || '').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+          if (tx) { total++; if (out.length < 40) out.push(tx.slice(0, 600)); }
+        } else { total++; if (out.length < 40) out.push('[tabela ou objeto]'); }
+      }
+      return JSON.stringify({ n: total, p: out });
+    }, false, false, function(ret){
+      try {
+        var r = JSON.parse(ret || '{}'), h = '';
+        if (!r.n) { box.innerHTML = '<span class="mais">Sem conteúdo entre o início e o fim ainda. Marque o fim depois do trecho.</span>'; return; }
+        r.p.forEach(function(t){ h += '<p>' + esc(t) + '</p>'; });
+        if (r.n > r.p.length) h += '<p class="mais">… e mais ' + (r.n - r.p.length) + ' parágrafo(s).</p>';
+        box.innerHTML = h;
+      } catch (e) { box.innerHTML = '<span class="mais">Não foi possível ler o conteúdo.</span>'; }
+    });
+  } catch (e) { box.innerHTML = '<span class="mais">Não foi possível ler o conteúdo.</span>'; }
+}
+
+var RE_INI = /^\[\[EXP:([a-z0-9]{8})\|([^\]|]*)(?:\|([a-z]*))?\]\](?:▸.*)?$/;
 var RE_FIM = /^\[\[\/EXP:([a-z0-9]{8})\]\]$/;
 function renderizar(marcas){
   var mapa = {}, ordem = [];
@@ -334,7 +585,7 @@ function renderizar(marcas){
     else mapa[id].fim.push(idx);
   });
   var box = $('lista'); box.innerHTML='';
-  $('cont').textContent = ordem.length + (ordem.length === 1 ? ' bloco' : ' blocos');
+  $('cont').textContent = ordem.length + (ordem.length === 1 ? ' bloco neste documento' : ' blocos neste documento'); if ($('bdg')) $('bdg').textContent = String(ordem.length);
   if (!ordem.length) { box.innerHTML='<div class="empty">Nenhum bloco neste documento.</div>'; return; }
   ordem.forEach(function(id){
     var a = mapa[id], avisos = [], estado;
@@ -350,6 +601,14 @@ function renderizar(marcas){
       + '<div class="row" style="justify-content:flex-start;margin-top:2px"><span class="id">'+esc(id)+'</span>'
       + (a.ini.length ? '<span class="pamo" style="background:'+pr.bg+';border-color:'+pr.bd+'" title="'+esc(pr.nome)+'"></span><span class="id">'+esc(pr.nome)+'</span>' : '')
       + '</div>';
+    if (a.ini.length) {
+      // Previa do bloco como o aluno ve (titulo + seta que expande/recolhe), na cor escolhida.
+      var pv=document.createElement('div'); pv.className='pv'; pv.style.background=pr.bg; pv.style.borderColor=pr.bd; pv.style.color=pr.tx||'#363636';
+      pv.innerHTML='<div class="pvh"><span class="chev">▶</span><span>'+esc(a.nome || '(sem título)')+'</span></div><div class="pvb"></div>';
+      pv.firstChild.onclick=function(){ var aberto = pv.className.indexOf('open')>=0; pv.className = aberto ? 'pv' : 'pv open'; if (!aberto && !pv._ok) { pv._ok = true; carregarConteudo(id, pv.lastChild); } };
+      var lb=document.createElement('div'); lb.className='pvlb'; lb.textContent='Prévia (clique para expandir ou recolher)';
+      c.appendChild(lb); c.appendChild(pv);
+    }
     var acts = document.createElement('div'); acts.className='acts'; c.appendChild(acts);
     var area = document.createElement('div'); c.appendChild(area);
     function btn(txt, fn, cls){ var b=document.createElement('button'); b.className='btn sm sec2'+(cls?' '+cls:''); b.textContent=txt; b.onclick=fn; acts.appendChild(b); return b; }
@@ -383,12 +642,12 @@ function renderizar(marcas){
   });
 }
 
-/* Mostrar/ocultar faixas (ver nota no topo do script). */
+/* Mostrar/ocultar o CÓDIGO dos marcadores. O cabeçalho "▸ Título" do início fica sempre visível. */
 function alternarFaixas(mostrar){
   var p = api();
   if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); $('sw-faixas').checked = !mostrar; return; }
   try {
-    Asc.scope.fMostrar = !!mostrar;
+    Asc.scope.fMostrar = !!mostrar; Asc.scope.pmap = pmapDe();
     p.callCommand(function(){
       var doc = Api.GetDocument();
       var n = doc.GetElementsCount();
@@ -397,30 +656,37 @@ function alternarFaixas(mostrar){
         var el = doc.GetElement(i);
         if (!el || el.GetClassType() !== 'paragraph') continue;
         var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
-        var ehIni = /^\[\[EXP:[a-z0-9]{8}\|[^\]|]*(?:\|[a-z]*)?\]\]$/.test(t);
+        var mi = /^(\[\[EXP:[a-z0-9]{8}\|([^\]|]*)(?:\|([a-z]*))?\]\])(?:▸.*)?$/.exec(t);
         var ehFim = /^\[\[\/EXP:[a-z0-9]{8}\]\]$/.test(t);
-        if (!ehIni && !ehFim) continue;
-        el.RemoveAllElements();
-        var run = Api.CreateRun();
-        run.AddText(t);
-        if (mostrar) {
-          run.SetFontSize(18);
-          if (ehIni) run.SetColor(146, 64, 14); else run.SetColor(146, 64, 14);
-          el.AddElement(run);
-          el.SetShd('clear', 255, 244, 219);
+        if (!mi && !ehFim) continue;
+        if (mi) {
+          var pr = Asc.scope.pmap[mi[3] || 'padrao'] || Asc.scope.pmap['padrao'];
+          el.RemoveAllElements();
+          var rc = Api.CreateRun(); rc.AddText(mi[1]);
+          if (mostrar) { rc.SetFontSize(16); rc.SetColor(146, 64, 14); } else { rc.SetFontSize(2); rc.SetColor(pr.bg[0], pr.bg[1], pr.bg[2]); }
+          el.AddElement(rc);
+          var rh = Api.CreateRun(); rh.AddText('\u25B8 ' + mi[2]); rh.SetBold(true); rh.SetFontSize(22); rh.SetColor(pr.tx[0], pr.tx[1], pr.tx[2]);
+          el.AddElement(rh);
         } else {
-          if (typeof run.SetVanish === 'function') { run.SetVanish(true); }
-          else { run.SetFontSize(2); run.SetColor(255, 255, 255); }
-          el.AddElement(run);
-          el.SetShd('nil');
+          el.RemoveAllElements();
+          var run = Api.CreateRun(); run.AddText(t);
+          if (mostrar) { run.SetFontSize(18); run.SetColor(146, 64, 14); el.AddElement(run); el.SetShd('clear', 255, 244, 219); el.SetSpacingLine(240, 'auto'); }
+          else { run.SetFontSize(2); run.SetColor(255, 255, 255); el.AddElement(run); el.SetShd('nil'); el.SetSpacingBefore(0); el.SetSpacingAfter(0); el.SetSpacingLine(20, 'exact'); }
         }
       }
-    }, false, true, function(){ msg(mostrar ? 'Faixas visíveis.' : 'Faixas ocultas (só visual).'); });
+    }, false, true, function(){ msg(mostrar ? 'Códigos dos marcadores visíveis.' : 'Códigos dos marcadores ocultos.'); setTimeout(atualizar, 200); });
   } catch (e) { msg('Erro: '+(e && e.message || e), true); $('sw-faixas').checked = !mostrar; }
 }
 
 gradeNovo = montarGrade($('pgrid-novo'), 'padrao');
 $('b-ini').onclick = marcarInicio;
+$('b-sel').onclick = aplicarSelecao;
+$('b-leitor').onclick = function(){
+  var id = '';
+  try { id = localStorage.getItem('oo_documento_id') || ''; } catch (e) {}
+  if (!id) { msg('Abra o editor pela Biblioteca para usar este botão.', true); return; }
+  try { window.open(location.origin + '/aluno/biblioteca/' + encodeURIComponent(id), '_blank'); } catch (e2) { msg('Não foi possível abrir o leitor.', true); }
+};
 $('b-att').onclick = atualizar;
 $('nome').addEventListener('keydown', function(e){ if (e.key==='Enter') marcarInicio(); });
 $('sw-faixas').addEventListener('change', function(){ alternarFaixas(this.checked); });

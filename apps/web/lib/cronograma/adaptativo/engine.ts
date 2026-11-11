@@ -73,8 +73,7 @@ export function horasDia(cfg: Cfg, d: DataISO): number {
   return M28.horasDia(cfg as unknown as M28.Cfg28, d)
 }
 export function ehRev(cfg: Cfg, sem: number): boolean {
-  const r = cfg.revisao
-  return !!(r && r.ativa && r.cada && r.cada > 0 && sem > 0 && sem % r.cada === 0)
+  return M28.ehRev(cfg as unknown as M28.Cfg28, sem) // fonte única: revisão obrigatória nos planos 3.x; regra antiga (ativa/cada) no legado
 }
 
 /** Ritmo padrão de leitura (uso interno): 17 páginas por hora. */
@@ -92,9 +91,7 @@ export function semDe(start: DataISO, s: DataISO): number { return Math.round((+
 export function semInicio(start: DataISO, sem: number): DataISO { return dAdd(dMon(start), (sem - 1) * 7) }
 // mesma posição na semana, n semanas "de conteúdo" depois (pula as de revisão)
 export function proxSemConteudo(cfg: Cfg, s: DataISO, n: number): DataISO {
-  let sem = semDe(cfg.start, s), k = 0
-  while (k < n) { sem++; if (!ehRev(cfg, sem)) k++ }
-  return dAdd(semInicio(cfg.start, sem), dDow(s))
+  return M28.proxSemConteudo(cfg as unknown as M28.Cfg28, s, n)
 }
 
 /* Duração das metas, em minutos. PDFULL: páginas ÷ ritmo, em blocos de 30 min. */

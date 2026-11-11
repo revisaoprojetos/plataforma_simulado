@@ -1,66 +1,50 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, CalendarCheck } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { InternaPageRoot } from '@/components/brand/interna/page-shell'
+import { Btn, Card, Col, Muted, PageHeader, IconBox } from '@/components/nova/ui'
 import { listarMinhasEmissoes } from '../emissoes-actions'
 import { MinhasEmissoes } from '../minhas-emissoes'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Todos os cronogramas que o aluno já gerou.
- *
- * Tela própria, irmã do gerador: são duas tarefas diferentes — montar um plano novo e voltar a
- * um que já existe — e misturá-las numa página só fazia a lista competir com o formulário.
- *
- * O segmento é literal ('meus'), então ganha do [emissaoId] vizinho — o Next resolve rota
- * estática antes de dinâmica. Ainda assim `abrirEmissao` recusa id que não seja UUID, para a
- * ordem de resolução não ser a única coisa segurando isso.
+ * Todos os cronogramas Revisão que o aluno já gerou (busca/ordenação/abas no cliente via rota de API).
+ * O segmento é literal ('meus'), então ganha do [emissaoId] vizinho; `abrirEmissao` ainda recusa id que não seja UUID.
  */
 export default async function HistoricoCronogramasPage() {
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
 
+  const it = await resolverInterno()
   // A primeira página vem do servidor; a busca e as seguintes ficam por conta do cliente.
   const r = await listarMinhasEmissoes({ pagina: 0, porPagina: 20 })
   const dados = r.dados
 
   return (
-    <div className="animate-page space-y-6">
-      <div>
-        <Link href="/aluno/cronograma" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Gerar um novo cronograma
-        </Link>
-      </div>
+    <InternaPageRoot brand={it.brand} theme={it.theme}>
+      <Col gap={18} style={{ width: '100%' }}>
+        <div>
+          <Btn kind="secondary" size="sm" icon="back" href="/aluno/cronograma">Voltar</Btn>
+        </div>
 
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <CalendarCheck className="h-6 w-6 text-primary" />
-          Meus cronogramas
-        </h1>
-        <p className="text-muted-foreground">
-          Tudo o que você já gerou, com a data e a hora de cada emissão. Abra qualquer um para ver a
-          grade, marcar as metas concluídas, renomear ou arquivar.
-        </p>
-      </div>
+        <PageHeader
+          eyebrow="Cronograma"
+          title="Meus cronogramas"
+          sub="Tudo o que você já gerou, com a data e a hora de cada emissão. Abra qualquer um para ver a grade, marcar as metas concluídas, renomear ou apagar."
+        />
 
-      {!dados || dados.ativas + dados.arquivadas === 0 ? (
-        <Card className="px-4 py-12 text-center">
-          <CalendarCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-          <p className="font-medium">Você ainda não gerou nenhum cronograma</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Monte o seu no gerador — ele fica salvo aqui e você pode voltar quando quiser.
-          </p>
-          <Link href="/aluno/cronograma" className={`${buttonVariants({})} mt-4`}>
-            Gerar meu cronograma
-          </Link>
-        </Card>
-      ) : (
-        <MinhasEmissoes inicial={dados} />
-      )}
-    </div>
+        {!dados || dados.ativas + dados.arquivadas === 0 ? (
+          <Card pad={28} style={{ alignItems: 'center', textAlign: 'center' }}>
+            <IconBox icon="cal" s={52} />
+            <b style={{ fontSize: 16, color: 'var(--ink)' }}>Você ainda não gerou nenhum cronograma</b>
+            <Muted>Monte o seu no gerador — ele fica salvo aqui e você pode voltar quando quiser.</Muted>
+            <Btn kind="gold" icon="plus" href="/aluno/cronograma?criar">Gerar meu cronograma</Btn>
+          </Card>
+        ) : (
+          <MinhasEmissoes inicial={dados} />
+        )}
+      </Col>
+    </InternaPageRoot>
   )
 }

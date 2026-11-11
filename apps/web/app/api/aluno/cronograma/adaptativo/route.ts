@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
-import { gerarAdaptativo, patchMetaAdaptativo, somarTempoMeta, pausarAdaptativo, carregarDocs, sincronizarDoc, listarPlanosAdaptativo, fixarPlanoAdaptativo, arquivarPlanoAdaptativo, renomearPlanoAdaptativo } from '@/lib/cronograma/adaptativo/dados'
+import { gerarAdaptativo, patchMetaAdaptativo, somarTempoMeta, pausarAdaptativo, carregarDocs, sincronizarDoc, listarPlanosAdaptativo, fixarPlanoAdaptativo, arquivarPlanoAdaptativo, apagarPlanoAdaptativo, renomearPlanoAdaptativo } from '@/lib/cronograma/adaptativo/dados'
 import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
+import { refrescarAposMudarFoco } from '@/lib/cronograma/foco-refresh'
 import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
 import { catalogoIdDoTenant } from '@/lib/cronograma/adaptativo/catalogo-override-db'
@@ -65,11 +66,12 @@ export async function POST(req: NextRequest) {
       const ancora = typeof body.ancora === 'string' && DATA.test(body.ancora) ? (body.ancora as DataISO) : null
       const titulo = typeof body.titulo === 'string' ? body.titulo.trim().slice(0, 80) : undefined
       const novo = body.novo === true
-      const r = await gerarAdaptativo(svc, tenantId, estudanteId, cfg, { titulo, ancora, novo })
+      const fixar = body.fixar === true
+      const r = await gerarAdaptativo(svc, tenantId, estudanteId, cfg, { titulo, ancora, novo, fixar })
       // Snapshot do Painel é PESADO → roda DEPOIS da resposta (after). O "+ Novo cronograma" responde na
       // hora (sem espera longa até a tela de configuração); o painel atualiza no próximo load.
-      if (r.ok) after(async () => { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
-      return r.ok ? NextResponse.json({ ok: true, planoId: r.planoId }) : NextResponse.json({ ok: false, message: r.error }, { status: 500 })
+      if (r.ok) after(async () => { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
+      return r.ok ? NextResponse.json({ ok: true, planoId: r.planoId, fixado: r.fixado ?? true, jaTinhaFixado: r.jaTinhaFixado ?? false }) : NextResponse.json({ ok: false, message: r.error }, { status: 500 })
     }
     if (acao === 'listar') {
       const planos = await listarPlanosAdaptativo(svc, tenantId, estudanteId)
@@ -79,14 +81,22 @@ export async function POST(req: NextRequest) {
       const planoId = String(body.planoId || '')
       if (!planoId) return NextResponse.json({ ok: false, message: 'Plano ausente.' }, { status: 400 })
       const r = await fixarPlanoAdaptativo(svc, tenantId, estudanteId, planoId)
-      if (r.ok) { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
+      if (r.ok) { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'nao_encontrado' ? 404 : 500 })
     }
     if (acao === 'arquivar') {
       const planoId = String(body.planoId || '')
       if (!planoId) return NextResponse.json({ ok: false, message: 'Plano ausente.' }, { status: 400 })
       const r = await arquivarPlanoAdaptativo(svc, tenantId, estudanteId, planoId, body.arquivar !== false)
-      if (r.ok) { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
+      if (r.ok) { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
+      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'nao_encontrado' ? 404 : 500 })
+    }
+    if (acao === 'apagar') {
+      const planoId = String(body.planoId || '')
+      if (!planoId) return NextResponse.json({ ok: false, message: 'Plano ausente.' }, { status: 400 })
+      const r = await apagarPlanoAdaptativo(svc, tenantId, estudanteId, planoId)
+      // Só o plano em FOCO alimenta o snapshot do painel: apagar outro não exige recomputar (resposta imediata).
+      if (r.ok && r.eraFixado) { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'nao_encontrado' ? 404 : 500 })
     }
     if (acao === 'renomear') {
@@ -94,6 +104,7 @@ export async function POST(req: NextRequest) {
       const titulo = String(body.titulo || '')
       if (!planoId) return NextResponse.json({ ok: false, message: 'Plano ausente.' }, { status: 400 })
       const r = await renomearPlanoAdaptativo(svc, tenantId, estudanteId, planoId, titulo)
+      if (r.ok) { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } } // o nome do plano em foco aparece no painel
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: 500 })
     }
     if (acao === 'meta') {

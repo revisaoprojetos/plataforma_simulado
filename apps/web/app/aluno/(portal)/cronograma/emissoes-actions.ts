@@ -17,12 +17,10 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
-import { gerarGrade } from '@/lib/cronograma/gerador'
-import { contarQuestoesPorMeta, aplicarQtdQuestoes } from '@/lib/cronograma/questoes-meta'
-import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
-import { indexarLinks } from '@/lib/cronograma/formato-meta'
-import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
+import { emissaoEhFixada, promoverProximoFixado } from '@/lib/cronograma/fixar'
+import { montarEmissao } from '@/lib/cronograma/montar-emissao'
+import { regenerarEmissaoDoAluno } from '@/lib/cronograma/regenerar-emissao'
+import { lerProgressoReencaixado } from '@/lib/cronograma/progresso-emissao'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -97,104 +95,13 @@ export async function listarMinhasEmissoes(
 }
 
 /**
- * Reabre uma emissão: recalcula a grade a partir do formulário salvo.
+ * Reabre uma emissão: recalcula a grade a partir do formulário salvo (miolo em lib/cronograma/montar-emissao.ts,
+ * compartilhado com a rota do iframe — que já tem a sessão e não precisa reabrir tudo via server action).
  *
  * Se o cronograma tiver sido despublicado ou o acesso revogado, o histórico continua
  * visível mas marcado como indisponível — o aluno não perde o registro do que fez, que é
  * o mesmo princípio do detalhe de simulado concluído.
  */
-/**
- * Remonta a grade de uma emissão. É o miolo compartilhado por dois caminhos de entrada:
- * o aluno abrindo a própria emissão (sessão) e o Gotenberg renderizando a página de
- * impressão (token assinado, sem cookie).
- *
- * Fica numa função só de propósito: uma segunda remontagem seria um segundo lugar para o
- * PDF divergir do que o aluno viu na tela.
- *
- * `estudanteIdEsperado` só é passado no caminho da sessão; no do token, a autorização já
- * foi feita pela assinatura e o dono sai da própria linha.
- */
-async function montarEmissao(
-  emissaoId: string,
-  tenantId: string,
-  estudanteIdEsperado?: string,
-): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
-  if (!UUID_RE.test(emissaoId)) return { ok: false, error: 'Cronograma não encontrado.' }
-  const svc = createAdminClient()
-
-  let q = svc
-    .from('simulado_cronograma_emissoes')
-    .select('id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario, estudante_id, estudante_nome, preferencias')
-    .eq('id', emissaoId)
-    .eq('tenant_id', tenantId)
-  if (estudanteIdEsperado) q = q.eq('estudante_id', estudanteIdEsperado) // só as próprias
-
-  const { data: emissao } = await q.maybeSingle()
-  if (!emissao) return { ok: false, error: 'Cronograma não encontrado.' }
-
-  const dono = (emissao as { estudante_id: string }).estudante_id
-  const acesso = await verificarAcessoCronograma(svc, tenantId, dono, (emissao as any).cronograma_id)
-
-  const { data: cron } = await svc
-    .from('simulado_cronogramas')
-    .select('id, slug, nome, total_semanas, dias_curso, dias_nome, semanas_revisao, carga_horaria')
-    .eq('id', (emissao as any).cronograma_id)
-    .eq('tenant_id', tenantId)
-    .eq('deletado', false)
-    .maybeSingle()
-
-  if (!cron || !acesso.permitido) {
-    return { ok: true, dados: { emissao: emissao as EmissaoResumo, grade: gradeVazia(), cargaHoraria: null, indisponivel: true } }
-  }
-
-  const metas = await fetchAll<MetaFonte>(() =>
-    svc
-      .from('simulado_cronograma_metas')
-      .select('id, semana, dia, tipo, disciplina, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
-      .eq('tenant_id', tenantId)
-      .eq('cronograma_id', (emissao as any).cronograma_id)
-      .order('semana')
-      .order('dia')
-      .order('ordem')
-      .order('id') as any,
-  )
-
-  const f = ((emissao as any).formulario ?? {}) as Record<string, any>
-  const opcoes: OpcoesGeracao = {
-    inicio: f.inicio,
-    revisao: f.revisao ?? { ativo: false, cada: 12 },
-    recesso: f.recesso ?? { modo: 'nenhum' },
-  }
-
-  const r = gerarGrade(
-    {
-      ...(cron as any),
-      carga_horaria: Number((cron as any).carga_horaria),
-      dias_curso: (cron as any).dias_curso ?? [],
-      dias_nome: (cron as any).dias_nome ?? [],
-      semanas_revisao: (cron as any).semanas_revisao ?? [],
-    },
-    metas,
-    await mapaTiposMeta(tenantId),
-    await carregarLinks(svc, tenantId),
-    opcoes,
-  )
-  if (!r.ok) return { ok: false, error: r.erro }
-
-  // Chip "N questões": referências copiadas do banco de conteúdos ao compor.
-  aplicarQtdQuestoes(r.grade, await contarQuestoesPorMeta(svc, tenantId, metas.map((m) => m.id)))
-
-  return {
-    ok: true,
-    dados: {
-      emissao: emissao as EmissaoResumo,
-      grade: r.grade,
-      cargaHoraria: Number((cron as { carga_horaria: number }).carga_horaria),
-      indisponivel: false,
-    },
-  }
-}
-
 export async function abrirEmissao(emissaoId: string): Promise<{ ok: boolean; dados?: EmissaoAberta; error?: string }> {
   const sessao = await getSessaoAluno()
   if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
@@ -216,17 +123,28 @@ export async function abrirEmissaoParaRender(
 /** Metas concluídas de uma emissão, para o render por token (sem sessão do aluno). */
 export async function checksParaRender(emissaoId: string, tenantId: string): Promise<Record<string, string>> {
   const svc = createAdminClient()
-  const linhas = await fetchAll<{ meta_id: string; marcada_em: string }>(() =>
-    svc
-      .from('simulado_cronograma_meta_checks')
-      .select('meta_id, marcada_em')
-      .eq('tenant_id', tenantId)
-      .eq('emissao_id', emissaoId)
-      .order('meta_id') as never,
-  )
+  const { data: em } = await svc.from('simulado_cronograma_emissoes').select('cronograma_id').eq('id', emissaoId).eq('tenant_id', tenantId).maybeSingle()
+  const cronogramaId = (em as { cronograma_id?: string } | null)?.cronograma_id
+  if (!cronogramaId) return {}
+  // Reencaixa por chave estável (metas recriadas) — mesma leitura de listarChecks.
+  const linhas = await lerProgressoReencaixado<{ marcada_em: string }>(svc, tenantId, cronogramaId, emissaoId, 'simulado_cronograma_meta_checks', 'marcada_em')
   const mapa: Record<string, string> = {}
   for (const l of linhas) mapa[l.meta_id] = l.marcada_em
   return mapa
+}
+
+/**
+ * Gera de novo uma emissão marcada como `desatualizada`: cria uma NOVA emissão a partir do mesmo
+ * formulário (grade e calendário frescos) e migra checks/notas — pela meta_id quando ela ainda
+ * existe, ou pela chave estável (`chave_meta`) quando a meta foi recriada. A emissão antiga é
+ * mantida intacta (o aluno pode arquivá-la). Nada é alterado em silêncio: só roda por ação explícita.
+ */
+export async function regenerarEmissao(emissaoId: string): Promise<{ ok: boolean; emissaoId?: string; reaproveitada?: boolean; migradas?: { checks: number; notas: number }; error?: string }> {
+  const sessao = await getSessaoAluno()
+  if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
+  const r = await regenerarEmissaoDoAluno(sessao, emissaoId)
+  if (r.ok) revalidatePath('/aluno/cronograma')
+  return r
 }
 
 export async function renomearEmissao(emissaoId: string, titulo: string): Promise<{ ok: boolean; error?: string }> {
@@ -249,62 +167,37 @@ export async function arquivarEmissao(emissaoId: string, arquivada: boolean): Pr
   const sessao = await getSessaoAluno()
   if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
   const svc = createAdminClient()
+  // Arquivar a emissão FIXADA tira o foco dela e promove a mais recente restante (qualquer tipo).
+  const eraFixada = arquivada && UUID_RE.test(emissaoId) ? await emissaoEhFixada(svc, sessao.tenantId, emissaoId) : false
   const { error } = await svc
     .from('simulado_cronograma_emissoes')
-    .update({ arquivada, atualizado_em: new Date().toISOString() })
+    .update({ arquivada, ...(eraFixada ? { fixado: false } : {}), atualizado_em: new Date().toISOString() })
     .eq('id', emissaoId)
     .eq('tenant_id', sessao.tenantId)
     .eq('estudante_id', sessao.estudanteId)
   if (error) return { ok: false, error: error.message }
+  if (eraFixada) await promoverProximoFixado(svc, sessao.tenantId, sessao.estudanteId)
   revalidatePath('/aluno/cronograma')
   return { ok: true }
 }
 
-function gradeVazia(): Grade {
-  return {
-    semanas: [],
-    resumo: {
-      totalSemanas: 0,
-      semanasConteudo: 0,
-      semanasRevisao: 0,
-      semanasRecesso: 0,
-      diasPorSemana: 0,
-      atividades: 0,
-      conclusao: '',
-      subtitulo: '',
-    },
-    avisos: [],
-  }
-}
-
-async function carregarLinks(svc: any, tenantId: string) {
-  const [aulas, urls, plataformas] = await Promise.all([
-    fetchAll<{ id: string; disciplina: string; aula: string; tema: string | null }>(() =>
-      svc.from('simulado_cronograma_links').select('id, disciplina, aula, tema').eq('tenant_id', tenantId).order('id') as any,
-    ),
-    fetchAll<{ link_id: string; plataforma_id: string; url: string }>(() =>
-      svc.from('simulado_cronograma_aula_links').select('link_id, plataforma_id, url').eq('tenant_id', tenantId).order('id') as any,
-    ),
-    fetchAll<{ id: string; nome: string; slug: string; cor: string | null; ordem: number }>(() =>
-      svc.from('simulado_cronograma_plataformas').select('id, nome, slug, cor, ordem').eq('tenant_id', tenantId).eq('ativo', true).order('ordem') as any,
-    ),
-  ])
-
-  const porId = new Map(plataformas.map((p) => [p.id, p]))
-  const urlsPorLink = new Map<string, { plataforma: any; url: string }[]>()
-  for (const u of urls) {
-    const p = porId.get(u.plataforma_id)
-    if (!p) continue
-    const lista = urlsPorLink.get(u.link_id)
-    if (lista) lista.push({ plataforma: p, url: u.url })
-    else urlsPorLink.set(u.link_id, [{ plataforma: p, url: u.url }])
-  }
-
-  const lista: LinkAula[] = aulas.map((a) => ({
-    disciplina: a.disciplina,
-    aula: a.aula,
-    tema: a.tema,
-    urls: urlsPorLink.get(a.id) ?? [],
-  }))
-  return indexarLinks(lista)
+/** APAGA de vez a emissão (marcações e notas caem por ON DELETE CASCADE). Sem volta. Se era a fixada, promove outro plano. */
+export async function apagarEmissao(emissaoId: string): Promise<{ ok: boolean; error?: string; eraFixada?: boolean }> {
+  const sessao = await getSessaoAluno()
+  if (!sessao) return { ok: false, error: 'Sua sessão expirou.' }
+  if (!UUID_RE.test(emissaoId)) return { ok: false, error: 'Cronograma inválido.' }
+  const svc = createAdminClient()
+  const eraFixada = await emissaoEhFixada(svc, sessao.tenantId, emissaoId)
+  const { data, error } = await svc
+    .from('simulado_cronograma_emissoes')
+    .delete()
+    .eq('id', emissaoId)
+    .eq('tenant_id', sessao.tenantId)
+    .eq('estudante_id', sessao.estudanteId)
+    .select('id')
+  if (error) return { ok: false, error: error.message }
+  if (!data?.length) return { ok: false, error: 'Cronograma não encontrado.' }
+  if (eraFixada) await promoverProximoFixado(svc, sessao.tenantId, sessao.estudanteId)
+  revalidatePath('/aluno/cronograma')
+  return { ok: true, eraFixada }
 }

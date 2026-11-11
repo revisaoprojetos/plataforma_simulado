@@ -10,6 +10,7 @@ import { VERSAO_MOTOR, type Prog30 } from './motor30'
 import { planoUsaMotorAtual } from './engine'
 import { CATALOGO_HTML, nomeDisciplina } from './catalogo-html'
 import { construirSnapshot, type AdaptativoSnapshot } from './snapshot'
+import { fixarCronograma, temFixado, desfixarEmissoes, promoverProximoFixado } from '@/lib/cronograma/fixar'
 import { lerParamsMotor } from './config-metas'
 import { catalogoIdDoTenant } from './catalogo-override-db'
 import { espelharEmSegundoPlano, lerDetalhesMetas, gravarDetalhesMetas } from './plano-metas'
@@ -293,8 +294,8 @@ export async function carregarAdaptativo(svc: SupabaseClient, tenantId: string, 
 /** Gera (ou recalcula) o plano a partir do cfg e persiste. ancora => redistribui o não-feito a partir dela. */
 export async function gerarAdaptativo(
   svc: SupabaseClient, tenantId: string, estId: string,
-  cfg: Cfg, opc: { titulo?: string; ancora?: DataISO | null; novo?: boolean } = {},
-): Promise<{ ok: boolean; planoId?: string; error?: string }> {
+  cfg: Cfg, opc: { titulo?: string; ancora?: DataISO | null; novo?: boolean; fixar?: boolean } = {},
+): Promise<{ ok: boolean; planoId?: string; error?: string; fixado?: boolean; jaTinhaFixado?: boolean }> {
   const conteudo = await carregarConteudo(svc, tenantId)
   // `novo` => cria OUTRO cronograma (e fixa). Senão => recalcula o plano em FOCO (fixado).
   const alvo = opc.novo ? null : await lerPlanoRow(svc, tenantId, estId)
@@ -325,16 +326,23 @@ export async function gerarAdaptativo(
     espelharEmSegundoPlano(svc, alvo.id) // metas em linhas (espelho da grade)
     return { ok: true, planoId: alvo.id }
   }
-  // Novo plano: desfixa os demais e cria já fixado (vira o foco).
-  await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
+  // Novo plano: o 1º plano do aluno fixa sozinho. Se já existe um plano fixado, o novo NÃO o desfixa
+  // (só vira foco se o chamador pedir `fixar:true` — o aluno confirmou 'Deixar este como principal?').
+  // `jaFixado` considera os DOIS tipos (adaptativo + emissão Revisão): só 1 plano em foco por aluno.
+  const jaFixado = await temFixado(svc, tenantId, estId)
+  const fixarNovo = !jaFixado || opc.fixar === true
+  if (fixarNovo && jaFixado) {
+    await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
+    await desfixarEmissoes(svc, tenantId, estId)
+  }
   const { data, error } = await svc.from(T_PLANO)
-    .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, ...campos })
+    .insert({ tenant_id: tenantId, estudante_id: estId, fixado: fixarNovo, ...campos })
     .select('id').maybeSingle()
   if (error) return { ok: false, error: error.message }
   const novoId = (data as { id?: string } | null)?.id
   if (novoId) await gravarDetalhesMetas(svc, novoId, mesclarDetalhes({}, r.detalhes, r.plano), r.plano)
   espelharEmSegundoPlano(svc, novoId)
-  return { ok: true, planoId: novoId }
+  return { ok: true, planoId: novoId, fixado: fixarNovo, jaTinhaFixado: !!jaFixado }
 }
 
 export interface PlanoResumo {
@@ -345,22 +353,20 @@ export interface PlanoResumo {
   atualizado_em: string
 }
 
-/** Lista os cronogramas (não-arquivados) do aluno — fixado primeiro, depois por recência. */
-export async function listarPlanosAdaptativo(svc: SupabaseClient, tenantId: string, estId: string): Promise<PlanoResumo[]> {
+/** Lista os cronogramas (não-arquivados) do aluno — fixado primeiro, depois por recência. Paginado (.range). */
+export async function listarPlanosAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, opc: { limite?: number; offset?: number } = {}): Promise<PlanoResumo[]> {
+  const limite = Math.min(Math.max(opc.limite ?? 50, 1), 100)
+  const de = Math.max(opc.offset ?? 0, 0)
   const { data } = await svc.from(T_PLANO).select('id,titulo,fixado,criado_em,atualizado_em')
     .eq('tenant_id', tenantId).eq('estudante_id', estId).eq('arquivada', false)
-    .order('fixado', { ascending: false }).order('criado_em', { ascending: false })
+    .order('fixado', { ascending: false }).order('criado_em', { ascending: false }).order('id')
+    .range(de, de + limite - 1)
   return ((data as unknown as PlanoResumo[]) || [])
 }
 
-/** Fixa um plano como foco do aluno (desfixa os demais). */
+/** Fixa um plano como foco do aluno (desfixa os demais, dos DOIS tipos, atomicamente — RPC). */
 export async function fixarPlanoAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, planoId: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: ok } = await svc.from(T_PLANO).select('id')
-    .eq('tenant_id', tenantId).eq('estudante_id', estId).eq('id', planoId).eq('arquivada', false).maybeSingle()
-  if (!ok) return { ok: false, error: 'nao_encontrado' }
-  await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
-  const { error } = await svc.from(T_PLANO).update({ fixado: true, atualizado_em: new Date().toISOString() }).eq('id', planoId)
-  return error ? { ok: false, error: error.message } : { ok: true }
+  return fixarCronograma(svc, tenantId, estId, 'adaptativo', planoId)
 }
 
 /** Arquiva (ou desarquiva) um cronograma. Se arquivar o fixado, promove o mais recente restante. */
@@ -373,13 +379,20 @@ export async function arquivarPlanoAdaptativo(svc: SupabaseClient, tenantId: str
     .update({ arquivada: arquivar, fixado: arquivar ? false : eraFixado, atualizado_em: new Date().toISOString() })
     .eq('id', planoId)
   if (error) return { ok: false, error: error.message }
-  if (arquivar && eraFixado) {
-    const { data: prox } = await svc.from(T_PLANO).select('id')
-      .eq('tenant_id', tenantId).eq('estudante_id', estId).eq('arquivada', false)
-      .order('criado_em', { ascending: false }).limit(1).maybeSingle()
-    if (prox) await svc.from(T_PLANO).update({ fixado: true }).eq('id', (prox as { id: string }).id)
-  }
+  if (arquivar && eraFixado) await promoverProximoFixado(svc, tenantId, estId) // mais recente restante (qualquer tipo)
   return { ok: true }
+}
+
+/** APAGA de vez o cronograma (linha + metas/detalhes/progresso por ON DELETE CASCADE). Sem volta. Se era o fixado, promove o mais recente restante. */
+export async function apagarPlanoAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, planoId: string): Promise<{ ok: boolean; error?: string; eraFixado?: boolean }> {
+  const { data: row } = await svc.from(T_PLANO).select('id,fixado')
+    .eq('tenant_id', tenantId).eq('estudante_id', estId).eq('id', planoId).maybeSingle()
+  if (!row) return { ok: false, error: 'nao_encontrado' }
+  const eraFixado = !!(row as { fixado?: boolean }).fixado
+  const { error } = await svc.from(T_PLANO).delete().eq('tenant_id', tenantId).eq('estudante_id', estId).eq('id', planoId)
+  if (error) return { ok: false, error: error.message }
+  if (eraFixado) await promoverProximoFixado(svc, tenantId, estId)
+  return { ok: true, eraFixado }
 }
 
 /** Renomeia um cronograma. */
@@ -509,6 +522,8 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     if (detalhesDoc === null) return { ok: false, error: 'detalhes_invalidos' }
     // Nome dado na criação (iframe). Vazio => não sobrescreve o título existente num recálculo.
     const tituloDoc = typeof doc.titulo === 'string' ? doc.titulo.trim().slice(0, 80) : ''
+    // Estado de EXEMPLO/vazio nunca persiste no servidor: o plano só nasce no 'Gerar/Salvar' (acao 'gerar').
+    if (doc.exemplo === true) return { ok: true }
     // O alvo é lido ANTES de gravar: preserva a descrição do LegProc antigo e carimba o catálogo quando o plano
     // veio do motor atual do iframe (um iframe antigo em cache não carimba → a correção roda no próximo acesso).
     const alvo = await lerPlanoRow(svc, tenantId, estId)
@@ -531,6 +546,8 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
       if (!error) { if (detalhesDoc !== undefined) await gravarDetalhesMetas(svc, alvo.id, detalhesDoc, campos.plano); espelharEmSegundoPlano(svc, alvo.id) }
       return error ? { ok: false, error: error.message } : { ok: true }
     }
+    // Sem plano: só cria se a grade não for vazia (nada de plano vazio por auto-save). Fixa (é o 1º do aluno).
+    if (Object.keys((doc.plano || {}) as object).length === 0) return { ok: true }
     await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
     const { data: novo, error } = await svc.from(T_PLANO)
       .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, titulo: tituloDoc || 'Meu cronograma', ...campos })

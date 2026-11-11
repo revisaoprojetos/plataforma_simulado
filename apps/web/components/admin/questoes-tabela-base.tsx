@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ChevronRight, ListChecks, ExternalLink } from 'lucide-react'
+import { Search, Check, Trash2, Loader2, GripVertical, ChevronUp, ChevronDown, ChevronRight, ListChecks, ExternalLink, PanelRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DetalheQuestao } from '@/app/admin/banco-questoes/actions-tipos'
@@ -15,7 +15,7 @@ import {carregarDetalheQuestao as carregarDetalhePadrao} from '@/app/admin/banco
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { MarkdownContent } from '@/components/markdown-content'
 import { codigoQuestao } from '@/lib/codigo-questao'
-import { useOrdenacao, SortButton } from '@/components/admin/th-ordenavel'
+import { useOrdenacao, SortButton, type Sort } from '@/components/admin/th-ordenavel'
 import { classificarFormato } from '@/lib/simulado/formato'
 
 const difRank: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
@@ -28,6 +28,36 @@ export interface QuestaoLinha {
   id: string; enunciado: string; tipo?: string | null; formato?: string | null; nivel_dificuldade?: string | null; status?: string | null
   disciplina?: string | null; assunto?: string | null; assuntoDetalhe?: string | null
   banca?: string | null; orgao?: string | null; ano?: number | null
+  /** Só no modo servidor (colunas extras): código persistido, cargo, nº de alternativas, versão, anulada, última atualização (ISO). */
+  codigo?: string | null; cargo?: string | null; nAlternativas?: number | null; versao?: number | null; anulada?: boolean | null; atualizadoEm?: string | null
+}
+
+/**
+ * MODO SERVIDOR (opcional): quando informado, a tabela NÃO filtra/ordena/pagina localmente — o pai (que consulta o servidor) é dono da busca,
+ * dos filtros, da ordenação, da seleção e da página; `questoes` já é a página corrente. Visual, linhas, expandir-detalhe e link "Abrir"
+ * são os MESMOS. Acrescenta as colunas Cargo, Alt., Versão e Atualizada e torna ordenáveis Banca/Órgão/Ano/Tipo.
+ */
+export interface ModoServidor {
+  /** total no servidor (com os filtros) e página corrente (1-based) */
+  total: number; page: number; pp: number; carregando?: boolean
+  busca: string; onBusca: (v: string) => void; placeholder?: string
+  sort: Sort<string>; onSort: (k: string) => void
+  /** selects de filtro server-driven (substituem os filtros locais) */
+  filtros?: React.ReactNode
+  /** seleção controlada (persiste entre páginas) */
+  sel: Set<string>; onSel: (id: string, v: boolean) => void; onSelPagina: (v: boolean) => void
+  /** mensagem do estado vazio (lista sem linhas e sem carregamento em curso) */
+  vazio?: React.ReactNode
+  /** colunas escondidas pelo seletor de colunas (chaves: tipo, disciplina, assunto, detalhe, banca, orgao, cargo, ano, dif, status, alt, versao, atualizado) */
+  colunasOcultas?: Set<string>
+  /** coluna extra à direita (ex.: sugestão de classificação) */
+  colunaExtra?: { titulo: string; largura?: string; render: (q: QuestaoLinha) => React.ReactNode }
+  /** abre a questão num painel lateral em vez de navegar (o link do editor completo continua ao lado) */
+  onAbrir?: (id: string) => void
+  /** pré-carrega o painel ao pairar no "Abrir" */
+  onHoverAbrir?: (id: string) => void
+  /** linha destacada (questão aberta no painel) */
+  destaqueId?: string | null
 }
 
 /** Rótulo curto do tipo da questão: Discursiva, C/E (certo-errado) ou Múltipla (escolha). */
@@ -55,7 +85,7 @@ const statusCfg: Record<string, { label: string; cls: string }> = {
  */
 export function QuestoesTabelaBase({
   questoes, titulo, subtitulo, acao, cor = '#6d28d9', icone, editHrefBase = '/admin/questoes',
-  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar, semCabecalho = false,
+  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar, semCabecalho = false, servidor,
 }: {
   questoes: QuestaoLinha[]
   titulo: string
@@ -69,16 +99,22 @@ export function QuestoesTabelaBase({
   onReordenar?: (ids: string[]) => Promise<{ ok: boolean; error?: string }>
   /** Oculta o cabeçalho da seção (título/contagem) — ex.: quando a página já tem o título. */
   semCabecalho?: boolean
+  servidor?: ModoServidor
 }) {
-  const [busca, setBusca] = useState('')
+  const srv = servidor
+  const [buscaLocal, setBuscaLocal] = useState('')
+  const busca = srv ? srv.busca : buscaLocal
+  const setBusca = (v: string) => (srv ? srv.onBusca(v) : setBuscaLocal(v))
   const [disc, setDisc] = useState('all')
   const [status, setStatus] = useState('all')
   const [dif, setDif] = useState('all')
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [selLocal, setSel] = useState<Set<string>>(new Set())
+  const sel = srv ? srv.sel : selLocal
   const [pending, start] = useTransition()
   const [pagina, setPagina] = useState(0)
 
   const podeRemover = !!onRemover
+  const podeSelecionar = podeRemover || !!srv
   const podeReordenar = !!onReordenar
 
   // Ordem local (reordenar sem recarregar). Sincroniza quando a fonte muda (add/remover no pai / refresh).
@@ -105,10 +141,13 @@ export function QuestoesTabelaBase({
   const statusItems = { all: 'Status', publicada: 'Ativa', rascunho: 'Rascunho', arquivada: 'Arquivada' }
   const difItems = { all: 'Dific.', facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }
 
-  const { sort, ordenarPor } = useOrdenacao<'enunciado' | 'disciplina' | 'assunto' | 'dif' | 'status'>()
+  const { sort: sortLocal, ordenarPor: ordenarLocal } = useOrdenacao<string>()
+  const sort = srv ? srv.sort : sortLocal
+  const ordenarPor = srv ? srv.onSort : ordenarLocal
   const travado = busca.trim() !== '' || disc !== 'all' || status !== 'all' || dif !== 'all' || sort !== null
 
   const filtradas = useMemo(() => {
+    if (srv) return ordered
     const q = busca.toLowerCase().trim()
     return ordered.filter((x) => {
       if (disc !== 'all' && x.disciplina !== disc) return false
@@ -117,10 +156,10 @@ export function QuestoesTabelaBase({
       if (q && !(`${x.enunciado} ${x.disciplina ?? ''} ${x.assunto ?? ''}`.toLowerCase().includes(q))) return false
       return true
     })
-  }, [ordered, busca, disc, status, dif])
+  }, [ordered, busca, disc, status, dif, srv])
 
   const visiveis = useMemo(() => {
-    if (!sort) return filtradas
+    if (!sort || srv) return filtradas
     const dir = sort.dir === 'asc' ? 1 : -1
     const txt = (s?: string | null) => s || ''
     return [...filtradas].sort((a, b) => {
@@ -133,18 +172,24 @@ export function QuestoesTabelaBase({
         default: return 0
       }
     })
-  }, [filtradas, sort])
+  }, [filtradas, sort, srv])
 
   // Paginação (10/página) sobre a lista filtrada/ordenada.
   const totalPag = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA))
-  const pageItens = useMemo(() => visiveis.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [visiveis, pagina])
+  const pageItens = useMemo(() => (srv ? visiveis : visiveis.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA)), [visiveis, pagina, srv])
   useEffect(() => { setPagina(0) }, [busca, disc, status, dif, sort])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
-  const colSpan = 11 + (podeRemover ? 1 : 0) + (podeReordenar ? 1 : 0)
+  // modo servidor: células de texto em no máx. 2 linhas (linhas de altura uniforme; texto completo no tooltip)
+  const cel = (v?: string | null) => (srv ? <span className="line-clamp-2" title={v ?? undefined}>{v ?? '—'}</span> : (v ?? '—'))
+  const oc = srv?.colunasOcultas
+  const ver = (k: string) => !oc || !oc.has(k)
+  const nOcultas = oc ? [...oc].filter((k) => ['tipo', 'disciplina', 'assunto', 'detalhe', 'banca', 'orgao', 'cargo', 'ano', 'dif', 'status', 'alt', 'versao', 'atualizado'].includes(k)).length : 0
+  const colSpan = 11 + (podeSelecionar ? 1 : 0) + (podeReordenar ? 1 : 0) + (srv ? 4 : 0) + (srv?.colunaExtra ? 1 : 0) - nOcultas
 
-  function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
-  function toggleAll() { setSel((p) => (p.size === visiveis.length ? new Set() : new Set(visiveis.map((q) => q.id)))) }
+  function toggle(id: string) { if (srv) { srv.onSel(id, !srv.sel.has(id)); return } setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  const paginaTodaMarcada = visiveis.length > 0 && visiveis.every((q) => sel.has(q.id))
+  function toggleAll() { if (srv) { srv.onSelPagina(!paginaTodaMarcada); return } setSel((p) => (p.size === visiveis.length ? new Set() : new Set(visiveis.map((q) => q.id)))) }
   function remover() {
     if (!onRemover || sel.size === 0) return
     const ids = [...sel]
@@ -165,7 +210,7 @@ export function QuestoesTabelaBase({
   }
 
   return (
-    <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+    <Card className={cn("overflow-hidden", srv && "rounded-2xl p-2 shadow-sm xl:flex xl:h-[calc(100vh-9.5rem)] xl:flex-col")} style={{ ['--card-spacing' as any]: srv ? '8px' : '0px' }}>
       {!semCabecalho && (
         <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}>{icone ?? <ListChecks className="h-5 w-5" />}</span>
@@ -179,7 +224,7 @@ export function QuestoesTabelaBase({
       <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
         <div className="relative min-w-48 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar enunciado, assunto…" className="pl-8" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={srv?.placeholder ?? "Buscar enunciado, assunto…"} className="pl-8" aria-label="Buscar questão" data-busca-questoes />
         </div>
         {savingOrder && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando ordem</span>}
         {podeRemover && sel.size > 0 && (
@@ -190,6 +235,9 @@ export function QuestoesTabelaBase({
         {acao}
       </div>
 
+      {srv ? (
+        srv.filtros ? <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 pt-0">{srv.filtros}</div> : <div className="border-b" />
+      ) : (
       <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 pt-0">
         <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }}>
           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -218,43 +266,50 @@ export function QuestoesTabelaBase({
         </Select>
         {podeReordenar && travado && <span className="text-xs text-muted-foreground">Limpe filtros e ordenação para reordenar.</span>}
       </div>
+      )}
 
-      <CardContent className="p-0">
-        <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full min-w-[1280px] caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-10 bg-background">
+      <CardContent className={cn("p-0", srv && "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col")}>
+        <div className={cn(srv ? "overflow-auto xl:min-h-0 xl:flex-1" : "max-h-[60vh] overflow-auto")}>
+          <table className={cn("w-full caption-bottom text-sm", srv ? "min-w-[1760px]" : "min-w-[1280px]")}>
+            <TableHeader className={cn("sticky top-0 z-10 bg-background", srv && "bg-card [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2.5 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground")}>
               <TableRow>
-                {podeRemover && (
+                {podeSelecionar && (
                   <TableHead className="w-10">
-                    <button type="button" onClick={toggleAll} className={cn('flex h-4 w-4 items-center justify-center rounded border', visiveis.length > 0 && sel.size === visiveis.length ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-                      {visiveis.length > 0 && sel.size === visiveis.length && <Check className="h-3 w-3" />}
+                    <button type="button" onClick={toggleAll} aria-label="Selecionar todas desta página" className={cn('flex h-4 w-4 items-center justify-center rounded border', (srv ? paginaTodaMarcada : visiveis.length > 0 && sel.size === visiveis.length) ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                      {(srv ? paginaTodaMarcada : visiveis.length > 0 && sel.size === visiveis.length) && <Check className="h-3 w-3" />}
                     </button>
                   </TableHead>
                 )}
                 {podeReordenar && <TableHead className="w-14 text-center">Ordem</TableHead>}
                 <TableHead className="w-10">#</TableHead>
                 <TableHead className="min-w-[280px]"><SortButton label="Enunciado" k="enunciado" sort={sort} onSort={ordenarPor} /></TableHead>
-                <TableHead className="w-24 text-center">Tipo</TableHead>
-                <TableHead className="w-40"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>
-                <TableHead className="w-44"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>
-                <TableHead className="w-44">Assunto específico</TableHead>
-                <TableHead className="w-40">Banca</TableHead>
-                <TableHead className="w-40">Órgão</TableHead>
-                <TableHead className="w-16 text-center">Ano</TableHead>
-                <TableHead className="w-12 text-center"><SortButton label="Dif." k="dif" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>
-                <TableHead className="w-20"><SortButton label="Status" k="status" sort={sort} onSort={ordenarPor} /></TableHead>
+                {ver('tipo') && <TableHead className="w-24 text-center">{srv ? <SortButton label="Tipo" k="tipo" sort={sort} onSort={ordenarPor} className="mx-auto" /> : "Tipo"}</TableHead>}
+                {ver('disciplina') && <TableHead className="w-40"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>}
+                {ver('assunto') && <TableHead className="w-44"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>}
+                {ver('detalhe') && <TableHead className="w-44">Assunto específico</TableHead>}
+                {ver('banca') && <TableHead className="w-40">{srv ? <SortButton label="Banca" k="banca" sort={sort} onSort={ordenarPor} /> : "Banca"}</TableHead>}
+                {ver('orgao') && <TableHead className="w-40">{srv ? <SortButton label="Órgão" k="orgao" sort={sort} onSort={ordenarPor} /> : "Órgão"}</TableHead>}
+                {srv && ver('cargo') && <TableHead className="w-40"><SortButton label="Cargo" k="cargo" sort={sort} onSort={ordenarPor} /></TableHead>}
+                {ver('ano') && <TableHead className="w-16 text-center">{srv ? <SortButton label="Ano" k="ano" sort={sort} onSort={ordenarPor} className="mx-auto" /> : "Ano"}</TableHead>}
+                {ver('dif') && <TableHead className="w-12 text-center"><SortButton label="Dif." k="dif" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>}
+                {ver('status') && <TableHead className="w-20"><SortButton label="Status" k="status" sort={sort} onSort={ordenarPor} /></TableHead>}
+                {srv && ver('alt') && <TableHead className="w-14 text-center"><SortButton label="Alt." k="alternativas" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>}
+                {srv && ver('versao') && <TableHead className="w-16 text-center"><SortButton label="Versão" k="versao" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>}
+                {srv && ver('atualizado') && <TableHead className="w-32"><SortButton label="Atualizada" k="atualizado" sort={sort} onSort={ordenarPor} /></TableHead>}
+                {srv?.colunaExtra && <TableHead className={srv.colunaExtra.largura ?? 'w-64'}>{srv.colunaExtra.titulo}</TableHead>}
               </TableRow>
             </TableHeader>
             <tbody>
               {visiveis.length === 0 ? (
-                <TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-muted-foreground">Nenhuma questão.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-muted-foreground">{srv ? (srv.carregando ? "Carregando…" : (srv.vazio ?? "Nenhuma questão.")) : "Nenhuma questão."}</TableCell></TableRow>
               ) : (
                 pageItens.map((q, localIdx) => {
-                  const i = pagina * POR_PAGINA + localIdx
+                  const i = srv ? (srv.page - 1) * srv.pp + localIdx : pagina * POR_PAGINA + localIdx
                   const on = sel.has(q.id)
                   const d = difCfg[q.nivel_dificuldade ?? '']
                   const st = statusCfg[q.status ?? ''] ?? { label: q.status ?? '—', cls: 'bg-muted text-muted-foreground' }
-                  const enun = q.enunciado.length > 70 ? q.enunciado.slice(0, 70) + '…' : q.enunciado
+                  const lim = srv ? 150 : 70
+                  const enun = q.enunciado.length > lim ? q.enunciado.slice(0, lim) + '…' : q.enunciado
                   const open = aberto.has(q.id)
                   const det = detalhes.get(q.id)
                   return (
@@ -265,12 +320,12 @@ export function QuestoesTabelaBase({
                         onDragOver={(e) => { if (podeReordenar && !travado && dragIdx !== null) { e.preventDefault(); setOverIdx(i) } }}
                         onDrop={(e) => { if (podeReordenar && !travado && dragIdx !== null) { e.preventDefault(); mover(dragIdx, i); setDragIdx(null); setOverIdx(null) } }}
                         onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
-                        onClick={() => podeRemover && toggle(q.id)}
-                        className={cn(podeRemover && 'cursor-pointer', on && 'bg-primary/5', overIdx === i && dragIdx !== null && 'border-t-2 border-primary', dragIdx === i && 'opacity-50')}
+                        onClick={() => podeSelecionar && toggle(q.id)}
+                        className={cn(podeSelecionar && 'cursor-pointer', on && 'bg-primary/5', srv?.destaqueId === q.id && 'bg-primary/10 ring-1 ring-inset ring-primary/40', overIdx === i && dragIdx !== null && 'border-t-2 border-primary', dragIdx === i && 'opacity-50')}
                       >
-                        {podeRemover && (
+                        {podeSelecionar && (
                           <TableCell>
-                            <span className={cn('flex h-4 w-4 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                            <span role="checkbox" aria-checked={on} aria-label="Selecionar questão" className={cn('flex h-4 w-4 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
                           </TableCell>
                         )}
                         {podeReordenar && (
@@ -294,28 +349,48 @@ export function QuestoesTabelaBase({
                             <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(q.id) }} className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground" title={open ? 'Recolher' : 'Expandir'} aria-label={open ? 'Recolher' : 'Expandir'}>
                               <ChevronRight className={cn('h-4 w-4 transition-transform', open && 'rotate-90')} />
                             </button>
-                            <div className="min-w-0">
+                            <div className={cn('min-w-0', srv && 'w-[26rem] max-w-[26rem]')}>
                               <div className="mb-1 flex items-center gap-1.5">
-                                <CopiarCodigo codigo={codigoQuestao(q.id)} />
-                                <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} title="Abrir esta questão no editor" className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
-                                  <ExternalLink className="h-3 w-3" /> Abrir
-                                </Link>
+                                <CopiarCodigo codigo={codigoQuestao(q.id, q.codigo)} />
+                                {srv?.onAbrir ? (
+                                  <>
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); srv.onAbrir!(q.id) }} onPointerEnter={() => srv.onHoverAbrir?.(q.id)} title="Abrir no painel lateral" className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                                      <PanelRight className="h-3 w-3" /> Abrir
+                                    </button>
+                                    <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} title="Abrir no editor completo" aria-label="Abrir no editor completo" className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Link>
+                                  </>
+                                ) : (
+                                  <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} title="Abrir esta questão no editor" className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                                    <ExternalLink className="h-3 w-3" /> Abrir
+                                  </Link>
+                                )}
                               </div>
-                              <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} className="block transition-colors hover:text-primary hover:underline">{enun}</Link>
+                              {srv?.onAbrir ? (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); srv.onAbrir!(q.id) }} className="line-clamp-2 w-full whitespace-normal break-words text-left transition-colors hover:text-primary hover:underline" title={q.enunciado}>{enun}</button>
+                              ) : (
+                                <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} className={cn('whitespace-normal break-words transition-colors hover:text-primary hover:underline', srv ? 'line-clamp-2' : 'block')} title={srv ? q.enunciado : undefined}>{enun}</Link>
+                              )}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-center">
+                        {ver('tipo') && <TableCell className="text-center">
                           <span className="inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{tipoLabel(q)}</span>
-                        </TableCell>
-                        <TableCell className="whitespace-normal break-words text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
-                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
-                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assuntoDetalhe ?? '—'}</TableCell>
-                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.banca ?? '—'}</TableCell>
-                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.orgao ?? '—'}</TableCell>
-                        <TableCell className="text-center text-xs text-muted-foreground">{q.ano ?? '—'}</TableCell>
-                        <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>
-                        <TableCell><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>{st.label}</span></TableCell>
+                        </TableCell>}
+                        {ver('disciplina') && <TableCell className="whitespace-normal break-words text-xs font-medium uppercase text-muted-foreground">{cel(q.disciplina)}</TableCell>}
+                        {ver('assunto') && <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{cel(q.assunto)}</TableCell>}
+                        {ver('detalhe') && <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{cel(q.assuntoDetalhe)}</TableCell>}
+                        {ver('banca') && <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{cel(q.banca)}</TableCell>}
+                        {ver('orgao') && <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{cel(q.orgao)}</TableCell>}
+                        {srv && ver('cargo') && <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{cel(q.cargo)}</TableCell>}
+                        {ver('ano') && <TableCell className="text-center text-xs text-muted-foreground">{q.ano ?? '—'}</TableCell>}
+                        {ver('dif') && <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>}
+                        {ver('status') && <TableCell><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>{st.label}</span>{srv && q.anulada && <span className="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">Anulada</span>}</TableCell>}
+                        {srv && ver('alt') && <TableCell className="text-center text-xs tabular-nums text-muted-foreground">{q.nAlternativas ?? '—'}</TableCell>}
+                        {srv && ver('versao') && <TableCell className="text-center text-xs tabular-nums text-muted-foreground">v{q.versao ?? 1}</TableCell>}
+                        {srv && ver('atualizado') && <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{q.atualizadoEm ? new Date(q.atualizadoEm).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'}</TableCell>}
+                        {srv?.colunaExtra && <TableCell className="whitespace-normal align-top text-xs" onClick={(e) => e.stopPropagation()}>{srv.colunaExtra.render(q)}</TableCell>}
                       </TableRow>
                       {open && (
                         <TableRow className="bg-muted/20 hover:bg-muted/20">
@@ -351,7 +426,7 @@ export function QuestoesTabelaBase({
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+        {!srv && <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
           <span>{visiveis.length.toLocaleString('pt-BR')} de {ordered.length.toLocaleString('pt-BR')} {ordered.length === 1 ? 'questão' : 'questões'}</span>
           {totalPag > 1 && (
             <div className="flex items-center gap-1.5">
@@ -360,7 +435,7 @@ export function QuestoesTabelaBase({
               <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
             </div>
           )}
-        </div>
+        </div>}
       </CardContent>
     </Card>
   )

@@ -56,6 +56,9 @@ function CursoCard({ c, i }: { c: CursoReal; i: number }) {
 }
 
 // Atalhos para a Central de Estudos (navegação — não são cursos).
+// Grade compartilhada (Central de Estudos + Meus cursos): 5 por linha em tela larga, mín. 170px; mesmo tamanho nas duas seções.
+const GRADE_CARDS = 'repeat(auto-fill, minmax(max(170px, calc((100% - 64px) / 5)), 1fr))'
+
 const ATALHOS_FIXOS = [
   { line: 'JURISCLUB', sigla: 'JurisClub', grad: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-5b3fd0,#5B3FD0))', titulo: 'JurisClub', sub: 'Julgados do mês', href: R.jurisclub, img: '/nova/jurisclub-capa.png' },
   { line: 'QUESTÕES', sigla: 'Questões e Simulados', grad: 'linear-gradient(135deg,var(--pn-1e2a5c,#1E2A5C),var(--pn-3f5bd0,#3F5BD0))', titulo: 'Questões e Simulados', sub: 'Banco e provas', href: R.questoes },
@@ -74,7 +77,7 @@ export default async function CursosPage() {
     : [[] as CursoReal[], false, null]
   // Extensivo só aparece se o aluno TEM extensivo (real); 1 → abre direto, 2+ → lista.
   const ATALHOS = [
-    ...(extensivo ? [{ line: 'EXTENSIVO', sigla: extensivo.qtd > 1 ? 'Extensivos' : extensivo.titulo.slice(0, 22), grad: GR.EXT, titulo: extensivo.titulo, sub: extensivo.sub, href: extensivo.href, img: '/nova/extensivo-capa.jpg' }] : []),
+    ...(extensivo ? [{ line: 'EXTENSIVO', sigla: extensivo.qtd > 1 ? 'Extensivos' : extensivo.titulo.slice(0, 22), grad: GR.EXT, titulo: extensivo.titulo, sub: extensivo.sub, href: extensivo.href, img: extensivo.capa ?? '/nova/extensivo-capa.jpg' }] : []),
     ...ATALHOS_FIXOS,
   ]
   const primeiroNome = (sessao?.nome || 'Aluno').split(' ')[0]
@@ -87,6 +90,8 @@ export default async function CursosPage() {
         sub="A Central de Estudos e os cursos que você tem acesso, num lugar só."
       />
 
+      {/* Cronograma: gerar (sem plano) ou resumo + abrir (com plano). */}
+
       {/* Central de Estudos (navegação — materiais e ferramentas que acompanham os cursos).
           Sub-regra 'nova_cursos_central': só aparece p/ quem tem acesso liberado; caso contrário some
           por completo (junto com o botão do aviso abaixo) p/ não deixar caminho para uma área bloqueada. */}
@@ -94,7 +99,7 @@ export default async function CursosPage() {
         <Col gap={14}>
           <SecHead title="Central de Estudos" sub="Materiais e ferramentas que acompanham os seus cursos." right={<Btn kind="link" href={R.central}>Abrir a Central de Estudos</Btn>} />
           {/* 5 por linha em tela larga (cai p/ menos em telas estreitas) */}
-          <Grid gap={16} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(max(170px, calc((100% - 64px) / 5)), 1fr))' }}>
+          <Grid gap={16} style={{ gridTemplateColumns: GRADE_CARDS }}>
             {ATALHOS.map((a) => (
               <Link key={a.titulo} href={a.href} style={{ display: 'block' }}>
                 <Card pad={0} style={{ overflow: 'hidden', gap: 0, height: '100%' }}>
@@ -123,8 +128,8 @@ export default async function CursosPage() {
       ) : (
         <Col gap={14}>
           <H2>Meus cursos</H2>
-          {/* Grade padrão da área de Cursos: ~4 colunas, adaptando ao monitor (auto-fill por largura mín.). */}
-          <Grid min={280} gap={16}>
+          {/* Mesma grade da Central de Estudos: os cards de Meus cursos NUNCA ficam maiores que os da Central (nem com zoom). */}
+          <Grid gap={16} style={{ gridTemplateColumns: GRADE_CARDS }}>
             {cursos.map((c, i) => <CursoCard key={c.id} c={c} i={i} />)}
           </Grid>
         </Col>

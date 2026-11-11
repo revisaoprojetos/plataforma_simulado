@@ -11,6 +11,8 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { carregarLeitura, urlDownloadAluno } from '@/lib/conteudo/leitor'
 import { minhaAvaliacao } from '@/lib/demandas/demandas'
 import { createAdminClient } from '@/lib/supabase/server'
+import { novidadesDoDocumento } from '@/lib/admin-revisao/atualizacoes'
+import { formatBrt } from '@/lib/brt'
 import { redirect } from 'next/navigation'
 import { ConcluirLeituraButton, ReportarButton } from './_leitor-modais'
 
@@ -78,6 +80,10 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
     avaliacaoAtual = null
   }
 
+  // Selo "Atualizado em" + "Novidades da versão": registros da Central de Atualizações (admin). Sem registro → não mostra.
+  const nov = await novidadesDoDocumento(createAdminClient(), sessao.tenantId, materialId)
+  const dia = (iso: string) => (formatBrt(iso) ?? '').slice(0, 10)
+
   return (
     <>
       <Crumbs items={[['Meu painel', R.painel], [`Leitor · ${leitura.titulo}`, R.painelLeitor(materialId)]]} />
@@ -88,9 +94,7 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
           <Col gap={8} style={{ minWidth: 0 }}>
             <H2>{leitura.titulo}</H2>
             <Row gap={10}>
-              {/* TODO(dados): data de atualização e disciplina/curso do material (sem loader hoje) */}
-              <Tag kind="green" icon="cal">Atualizado em 10/10/2026</Tag>
-              <Muted size={12.5}>Direito Administrativo · Extensivo Advocacia Pública</Muted>
+              {nov.atualizadoEm && <Tag kind="green" icon="cal">Atualizado em {dia(nov.atualizadoEm)}</Tag>}
             </Row>
           </Col>
           {/* Concluir leitura → abre a avaliação 0 a 5 (pré-preenchida com a nota atual do aluno) */}
@@ -139,11 +143,12 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
               </a>
             ))}
           </Col>
-          {/* TODO(dados): novidades da versão atual (changelog por versão — sem loader hoje) */}
-          <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Row gap={8}><Icon n="spark" size={14} style={{ color: 'var(--accentInk)' }} /><b style={{ fontSize: 13, color: 'var(--ink)' }}>Novidades da versão</b></Row>
-            <Muted size={12}>10/10/2026 · incluído o Tema 1.199 do STF no item 4.</Muted>
-          </div>
+          {nov.novidades.length > 0 && (
+            <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Row gap={8}><Icon n="info" size={14} style={{ color: 'var(--accentInk)' }} /><b style={{ fontSize: 13, color: 'var(--ink)' }}>Novidades da versão</b></Row>
+              {nov.novidades.map((n, i) => <Muted key={i} size={12}>{dia(n.quando)} · {n.texto}</Muted>)}
+            </div>
+          )}
           {/* TODO(dados): tempo de leitura real do aluno neste material (sem loader hoje) */}
           <Row style={{ justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'var(--surface2)' }}>
             <Muted size={12}>Tempo de leitura na meta</Muted>

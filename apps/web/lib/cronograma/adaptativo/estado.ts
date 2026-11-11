@@ -4,7 +4,7 @@
 
 import {
   type Cfg, type Plano, type Notas, type DataISO,
-  gerarPlano, descrever, semInicio, semDe, horasDia, ehRev, dAdd, dISO,
+  gerarPlano, planoUsaMotorAtual, descrever, semInicio, semDe, horasDia, ehRev, dAdd, dISO,
   planoRevisao, rankingRevisao, rankingRevisao218, resolverParams, DUR_REVISAO, ORDEM, diaConcentrado,
 } from './engine'
 import type { Conteudo as _C } from './conteudo'
@@ -73,6 +73,7 @@ export function indexar(st: Estado, conteudo: _C, hoje: DataISO = hojeISO()): In
   for (let sem = 1; sem <= (st.fim || 1); sem++) {
     if (!ehRev(st.cfg, sem)) continue
     let lista = revs[sem]
+    if (!lista && planoUsaMotorAtual((st.cfg as { motor?: unknown }).motor)) continue // plano novo: as metas da semana de revisão já estão no próprio plano
     if (!lista) {
       lista = montarRevisao({ ...st, revs }, conteudo, sem)
       if (semInicio(st.cfg.start, sem) <= hoje && !st.exemplo) { revs[sem] = lista; congelou = true }

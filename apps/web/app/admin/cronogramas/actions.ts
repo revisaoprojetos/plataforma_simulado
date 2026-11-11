@@ -1,4 +1,5 @@
 'use server'
+import { contarEmissoesDoCronograma, mensagemImpacto, renumeraCalendario } from '@/lib/cronograma/impacto-emissoes'
 import type { CategoriaRow, CronogramaLista, EntradaCronograma } from './actions-tipos'
 
 /**
@@ -13,6 +14,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
+import { fetchAll } from '@/lib/supabase/fetch-all'
+import { conflitoRevisaoComMetas, metasForaDoLimite } from '@/lib/cronograma/integridade'
 
 
 
@@ -157,7 +160,11 @@ export async function criarCronograma(e: EntradaCronograma): Promise<{ ok: boole
   return { ok: true, id: (data as any).id }
 }
 
-export async function atualizarCronograma(id: string, e: EntradaCronograma): Promise<{ ok: boolean; error?: string }> {
+export async function atualizarCronograma(
+  id: string,
+  e: EntradaCronograma,
+  opcoes: { confirmarEmissoes?: boolean } = {},
+): Promise<{ ok: boolean; error?: string; requerConfirmacao?: boolean; emissoesAfetadas?: number }> {
   const g = await guard('cronogramas:update')
   if (!g.ok) return { ok: false, error: g.error }
   const erro = validarMetadados(e)
@@ -172,23 +179,28 @@ export async function atualizarCronograma(id: string, e: EntradaCronograma): Pro
     .maybeSingle()
   if (!antes) return { ok: false, error: 'Cronograma não encontrado.' }
 
-  // Invariante da spec §8: reduzir total_semanas exige decidir o que fazer com as metas
-  // órfãs. Em vez de apagá-las em silêncio, o CRUD recusa e diz quantas são.
-  if (e.total_semanas < (antes as any).total_semanas) {
-    const { data: orfas } = await svc
-      .from('simulado_cronograma_metas')
-      .select('id')
-      .eq('tenant_id', g.tenantId)
-      .eq('cronograma_id', id)
-      .gt('semana', e.total_semanas)
-      .limit(1000)
-    const n = (orfas ?? []).length
-    if (n > 0) {
-      return {
-        ok: false,
-        error: `Reduzir para ${e.total_semanas} semanas deixaria ${n === 1000 ? '1000+' : n} meta(s) fora da grade. Remova ou remaneje essas metas antes.`,
-      }
-    }
+  // Invariantes da spec §8, sem apagar nem esconder metas em silêncio:
+  //  - reduzir total_semanas ou o nº de dias_curso exige decidir o que fazer com as metas que ficariam fora;
+  //  - uma semana NOVA em semanas_revisao não pode ter metas (o gerador as descarta da grade do aluno).
+  // Só checa o que MUDOU: dado legado já inconsistente não pode bloquear edição de nome/ordem.
+  const a = antes as { total_semanas: number; dias_curso: number[]; semanas_revisao: number[] }
+  const reduziuSemanas = e.total_semanas < a.total_semanas
+  const reduziuDias = e.dias_curso.length < (a.dias_curso ?? []).length
+  const revisaoNova = e.semanas_revisao.filter((s) => !(a.semanas_revisao ?? []).includes(s))
+  if (reduziuSemanas || reduziuDias || revisaoNova.length) {
+    const metas = await fetchAll<{ semana: number; dia: number }>(() =>
+      svc.from('simulado_cronograma_metas').select('semana, dia').eq('tenant_id', g.tenantId).eq('cronograma_id', id).order('id') as never,
+    )
+    const erroLimite = reduziuSemanas || reduziuDias ? metasForaDoLimite(metas, { total_semanas: e.total_semanas, nDias: e.dias_curso.length }) : null
+    if (erroLimite) return { ok: false, error: erroLimite }
+    const erroRevisao = revisaoNova.length ? conflitoRevisaoComMetas(metas, revisaoNova) : null
+    if (erroRevisao) return { ok: false, error: erroRevisao }
+  }
+
+  // Renumeração destrutiva (semanas de revisão no meio / dias do curso trocados) com emissões de alunos → confirmar.
+  if (!opcoes.confirmarEmissoes && renumeraCalendario(a, { total_semanas: e.total_semanas, dias_curso: e.dias_curso, semanas_revisao: e.semanas_revisao })) {
+    const n = await contarEmissoesDoCronograma(svc, g.tenantId, id)
+    if (n > 0) return { ok: false, requerConfirmacao: true, emissoesAfetadas: n, error: mensagemImpacto(n, 'Esta alteração muda a numeração/posição das semanas do cronograma.') }
   }
 
   const patch = {

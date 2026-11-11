@@ -112,8 +112,10 @@ export function Btn({ children, kind = 'primary', icon, href = '#', size = 'md',
   const i = icon ? <Icon n={icon} size={size === 'xs' ? 13 : 15} /> : null
   const base: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: BTN_H[size], padding: `0 ${BTN_PAD[size]}px`, borderRadius: BTN_R[size], fontSize: BTN_FS[size], whiteSpace: 'nowrap', cursor: 'pointer' }
   let s: React.CSSProperties
-  if (kind === 'primary') s = { ...base, background: 'var(--btnPrimary)', color: '#FFFFFF', fontWeight: 800 }
-  else if (kind === 'gold') s = { ...base, background: 'var(--gold)', color: 'var(--goldInk)', fontWeight: 800, boxShadow: '0 10px 20px -14px color-mix(in srgb,var(--pn-a07800,#A07800) 90%,transparent)' }
+  // Fallbacks: fora do escopo .novaplat (ex.: telas no shell interno do cronograma) --btnPrimary/--gold não existem e o
+  // botão ficava transparente (texto branco sobre fundo branco = invisível).
+  if (kind === 'primary') s = { ...base, background: 'var(--btnPrimary, var(--brand))', color: '#FFFFFF', fontWeight: 800 }
+  else if (kind === 'gold') s = { ...base, background: 'var(--gold, var(--pn-dourado))', color: 'var(--goldInk, var(--pn-2a1a55,#2A1A55))', fontWeight: 800, boxShadow: '0 10px 20px -14px color-mix(in srgb,var(--pn-a07800,#A07800) 90%,transparent)' }
   else if (kind === 'ghostdark') s = { ...base, border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: '#FFFFFF', fontWeight: 700 }
   else if (kind === 'link') s = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: 'var(--brand)', whiteSpace: 'nowrap', cursor: 'pointer' }
   else s = { ...base, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontWeight: 700 }

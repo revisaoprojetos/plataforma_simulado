@@ -54,16 +54,29 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const [base, tenantBundle] = await Promise.all([
     carregarCatalogoLegado(svc, sessao!.tenantId, estId),
     remember(`aluno-home-tenant:${sessao!.tenantId}`, 120, async () => {
-      const [{ data: banRows }, { data: tenantRow }] = await Promise.all([
+      const [banRes, { data: tenantRow }] = await Promise.all([
         // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
-        svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
+        svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor, grupo_id, ate').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
         svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
       ])
+      // CS › Avisos (grupo_id/ate, migração 20261112040000): se a coluna não existir, relê no formato antigo.
+      let banRows: any[] | null = banRes.data as any[] | null
+      if (banRes.error) banRows = (await svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false })).data as any[] | null
       return { banRows: banRows ?? [], tema: (tenantRow?.tema ?? null) as any }
     }),
   ])
   const { acs, sessAll, sims, visual, grupoPorSimAll } = base
-  const banRows = tenantBundle.banRows
+  // Avisos: "sai do ar" (ate) e "para quem" (grupo_id). Vale também para o pop-up (BannersPortal recebe estes mesmos itens).
+  let banRows = tenantBundle.banRows as any[]
+  {
+    const agoraMs = Date.now()
+    banRows = banRows.filter((b) => !b.ate || new Date(b.ate).getTime() >= agoraMs)
+    if (banRows.some((b) => b.grupo_id)) {
+      const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', sessao!.tenantId).eq('estudante_id', estId).limit(500)
+      const meus = new Set(((gm ?? []) as { grupo_id: string }[]).map((x) => x.grupo_id))
+      banRows = banRows.filter((b) => !b.grupo_id || meus.has(b.grupo_id))
+    }
+  }
   const tenantRow = { tema: tenantBundle.tema } as { tema: any }
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true

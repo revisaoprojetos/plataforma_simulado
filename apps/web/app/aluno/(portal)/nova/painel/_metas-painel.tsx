@@ -1,7 +1,7 @@
 'use client'
-// Metas de hoje do Meu painel de estudos — dado REAL do CRONOGRAMA ADAPTATIVO FIXADO. "Concluir"
-// marca a meta de verdade via POST /api/aluno/cronograma/adaptativo (acao:'meta', estado 'done'|null),
-// igual ao wrapper do iframe. Usamos ROTA DE API (não server action) por causa do landmine conhecido:
+// Metas de hoje do Meu painel de estudos — dado REAL do cronograma FIXADO (Adaptativo OU Cronograma Revisão).
+// "Concluir": Adaptativo → POST /api/aluno/cronograma/adaptativo (acao:'meta'); Revisão → POST
+// /api/aluno/cronograma/check (meta_checks da emissão), igual às telas de cada tipo. Usamos ROTA DE API (não server action) por causa do landmine conhecido:
 // server actions do Next são rejeitadas em domínio custom atrás do Traefik.
 // A marcação é OTIMISTA (overrides locais que sobrevivem ao router.refresh), pois o snapshot do Painel
 // só recomputa quando o dia vira — ver ressalva no relato.
@@ -10,16 +10,19 @@ import { useRouter } from 'next/navigation'
 import { Tag, Muted, Btn, H3, Row } from '@/components/nova/ui'
 import { Icon } from '@/components/nova/icons'
 
-const CRONOGRAMA = '/aluno/cronograma'
+const CRONOGRAMA = '/aluno/cronograma?ver=adaptativo'
 
 export type MetaPainel = {
   id: string
   sel: string; selKind: 'brand' | 'gold' | 'green'
   dur: string; titulo: string; sub: string
   concluida: boolean; data?: string | null
+  /** Origem da meta (padrão: adaptativo). Revisão traz o emissaoId. */
+  fonte?: 'adaptativo' | 'revisao'
+  emissaoId?: string
 }
 
-export function MetasPainel({ metas }: { metas: MetaPainel[] }) {
+export function MetasPainel({ metas, hrefAbrir = CRONOGRAMA }: { metas: MetaPainel[]; hrefAbrir?: string }) {
   const router = useRouter()
   // Overrides otimistas por meta (id -> concluida). Persistem entre re-renders/refresh (o snapshot
   // do Painel pode servir estado antigo até recomputar), então NÃO são sobrescritos pelas props.
@@ -31,11 +34,15 @@ export function MetasPainel({ metas }: { metas: MetaPainel[] }) {
     const next = !concluidaDe(m)
     setOver((o) => ({ ...o, [m.id]: next })) // otimista
     setBusy(m.id)
-    fetch('/api/aluno/cronograma/adaptativo', {
+    // Revisão → meta_checks da emissão (rota /check); Adaptativo → patch da meta do plano. Chave estável = m.id.
+    const rev = m.fonte === 'revisao' && !!m.emissaoId
+    fetch(rev ? '/api/aluno/cronograma/check' : '/api/aluno/cronograma/adaptativo', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ acao: 'meta', metaId: m.id, patch: { estado: next ? 'done' : null } }),
+      body: JSON.stringify(rev
+        ? { emissaoId: m.emissaoId, metaId: m.id, marcar: next, data: m.data ?? undefined, titulo: m.titulo }
+        : { acao: 'meta', metaId: m.id, patch: { estado: next ? 'done' : null } }),
     })
       .then((r) => r.json())
       .then((j) => {
@@ -69,7 +76,7 @@ export function MetasPainel({ metas }: { metas: MetaPainel[] }) {
             </Row>
           ) : (
             <Row gap={8}>
-              <Btn kind="primary" size="sm" icon="play" href={CRONOGRAMA}>Continuar meta</Btn>
+              <Btn kind="primary" size="sm" icon="play" href={hrefAbrir}>Continuar meta</Btn>
               <button type="button" onClick={() => toggle(m)} disabled={pending} style={{ ...btnRaw, opacity: pending ? 0.6 : 1 }}><Icon n="check" size={15} />Concluir</button>
             </Row>
           )}

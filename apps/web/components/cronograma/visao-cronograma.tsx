@@ -1,16 +1,28 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import { CalendarRange, List } from 'lucide-react'
 import { toast } from 'sonner'
-import { Card } from '@/components/ui/card'
+import { Bar, Card } from '@/components/nova/ui'
 import { GradeCronograma } from '@/components/cronograma/grade-cronograma'
 import { CalendarioCronograma } from '@/components/cronograma/calendario-cronograma'
 import type { ChecksDaEmissao } from '@/app/aluno/(portal)/cronograma/checks-actions-tipos'
-import {alternarCheckMeta} from '@/app/aluno/(portal)/cronograma/checks-actions'
 import type { NotasDaEmissao } from '@/app/aluno/(portal)/cronograma/notas-actions-tipos'
 import { PREFERENCIAS_PADRAO, type PreferenciasEmissao } from '@/lib/cronograma/preferencias'
+import type { ProgressoEmissao } from '@/lib/cronograma/progresso-tipos'
 import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
+
+/** Marca/desmarca via rota de API (server action não funciona em domínio custom / iframe Curseduca). */
+async function postarCheck(corpo: { emissaoId: string; metaId: string; marcar: boolean; data?: string; titulo?: string }): Promise<{ ok: boolean; error?: string; marcadaEm?: string | null; progresso?: ProgressoEmissao | null }> {
+  try {
+    const res = await fetch('/api/aluno/cronograma/check', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+    const j = await res.json().catch(() => null)
+    if (j?.ok) return { ok: true, marcadaEm: j.marcadaEm ?? null, progresso: j.progresso ?? null }
+    return { ok: false, error: j?.message ?? 'Não foi possível salvar a marcação.' }
+  } catch {
+    return { ok: false, error: 'Sem conexão. Tente de novo.' }
+  }
+}
 
 /**
  * O plano do aluno, em lista ou em calendário, com a marcação de concluídas.
@@ -18,7 +30,8 @@ import type { Grade, MetaDatada } from '@/lib/cronograma/tipos'
  * As duas visões leem a MESMA grade e o MESMO mapa de checks — não há segundo cálculo, e
  * portanto não há como divergirem. Marcar numa aparece na outra sem recarregar.
  *
- * A marcação é OTIMISTA: o check aparece na hora e é desfeito se o servidor recusar.
+ * A marcação é OTIMISTA só no check visual (desfeito se o servidor recusar). O PERCENTUAL exibido vem
+ * sempre do servidor (progresso recalculado na resposta da rota) — nada é calculado aqui.
  * Numa lista de centenas de metas, esperar a ida e volta a cada clique tornaria marcar uma
  * semana inteira insuportável.
  */
@@ -33,6 +46,7 @@ export function VisaoCronograma({
   aoDefinirSemanas,
   aoAlternarContagem,
   ocultarDatas,
+  progressoInicial,
 }: {
   grade: Grade
   paletaSlug: string
@@ -40,6 +54,8 @@ export function VisaoCronograma({
   emissaoId: string | null
   /** Plano "só semanas": esconde datas e a visão Calendário (que é baseada em datas). */
   ocultarDatas?: boolean
+  /** Progresso calculado no servidor (contagem agregada). */
+  progressoInicial?: ProgressoEmissao | null
   checksIniciais?: ChecksDaEmissao
   notasIniciais?: NotasDaEmissao
   /* As preferências vêm de fora: os cartões do resumo são IRMÃOS desta lista na tela, e
@@ -54,17 +70,8 @@ export function VisaoCronograma({
   const [checks, setChecks] = useState<ChecksDaEmissao>(checksIniciais ?? {})
   const [notas, setNotas] = useState<NotasDaEmissao>(notasIniciais ?? {})
 
-  const total = useMemo(
-    () => grade.semanas.reduce((n, s) => n + (s.kind === 'conteudo' ? s.metas.length : 0), 0),
-    [grade],
-  )
-  const feitas = useMemo(() => {
-    const ids = new Set<string>()
-    for (const s of grade.semanas) if (s.kind === 'conteudo') for (const m of s.metas) if (checks[m.id]) ids.add(m.id)
-    return ids.size
-  }, [grade, checks])
-  const pct = total ? Math.round((feitas / total) * 100) : 0
-  const pctRotulo = feitas > 0 && pct === 0 ? '<1%' : `${pct}%`
+  const [progresso, setProgresso] = useState<ProgressoEmissao | null>(progressoInicial ?? null)
+  const seq = useRef(0) // respostas fora de ordem (cliques rápidos): só a mais recente vale
 
   /* Nota e check vivem no MESMO nível: lista e calendário leem o mesmo estado, então marcar
      ou escrever numa visão aparece na outra sem recarregar. */
@@ -87,9 +94,11 @@ export function VisaoCronograma({
       return n
     })
 
+    const minha = ++seq.current
     void (async () => {
-      const r = await alternarCheckMeta(emissaoId, meta.id, marcar, { data: meta.data, titulo: meta.titulo })
+      const r = await postarCheck({ emissaoId, metaId: meta.id, marcar, data: meta.data, titulo: meta.titulo })
       if (r.ok) {
+        if (r.progresso && minha === seq.current) setProgresso(r.progresso)
         // O instante que vale é o do SERVIDOR — o relógio do navegador pode estar errado, e é
         // esse carimbo que vai para a auditoria.
         if (marcar && r.marcadaEm) setChecks((c) => ({ ...c, [meta.id]: r.marcadaEm as string }))
@@ -109,33 +118,30 @@ export function VisaoCronograma({
 
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <div className="flex flex-row flex-wrap items-center gap-4">
-          {emissaoId ? (
-            <div className="min-w-0 flex-1">
-              <p className="text-sm">
-                <span className="font-semibold tabular-nums">{feitas.toLocaleString('pt-BR')}</span>
-                <span className="text-muted-foreground">
-                  {' '}de {total.toLocaleString('pt-BR')} metas concluídas
+      <Card pad={16} style={{ gap: 12 }}>
+        <div className="flex flex-row flex-wrap items-center gap-x-4 gap-y-3">
+          {emissaoId && progresso ? (
+            <div className="min-w-0 flex-1" style={{ minWidth: 220 }}>
+              <p className="text-sm" style={{ color: 'var(--ink)' }}>
+                <span className="font-extrabold tabular-nums">{progresso?.feitas.toLocaleString('pt-BR')}</span>
+                <span style={{ color: 'var(--sub)' }}>
+                  {' '}de {progresso?.total.toLocaleString('pt-BR')} metas concluídas
                 </span>
-                <span className="ml-2 font-medium tabular-nums text-primary">{pctRotulo}</span>
+                <span className="ml-2 font-bold tabular-nums" style={{ color: 'var(--brand)' }}>{progresso?.pctRotulo}</span>
               </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  // Um fio de barra em vez de nada: com 2 de 581 o progresso existe e some se
-                  // a largura for só a porcentagem arredondada.
-                  style={{ width: feitas > 0 ? `max(3px, ${pct}%)` : '0%' }}
-                />
-              </div>
+              {/* Um fio de barra em vez de nada: com 2 de 581 o progresso existe e some se a largura for só a % arredondada. */}
+              <Bar pct={progresso && progresso.feitas > 0 ? Math.max(0.6, progresso.pct) : 0} style={{ marginTop: 8 }} />
             </div>
+          ) : emissaoId ? (
+            <div className="min-w-0 flex-1" />
           ) : (
-            <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            <p className="min-w-0 flex-1 text-sm" style={{ color: 'var(--sub)' }}>
               Abra este cronograma em &quot;Meus cronogramas&quot; para marcar as metas concluídas.
             </p>
           )}
 
-          <div className={`flex shrink-0 overflow-hidden rounded-lg border ${ocultarDatas ? 'hidden' : ''}`}>
+          {/* Abas sublinhadas (padrão Revisão) */}
+          <div role="tablist" className={`flex shrink-0 gap-4 ${ocultarDatas ? 'hidden' : ''}`} style={{ borderBottom: '1px solid var(--line)' }}>
             {(
               [
                 ['lista', 'Lista', List],
@@ -144,10 +150,11 @@ export function VisaoCronograma({
             ).map(([chave, rotulo, Icone]) => (
               <button
                 key={chave}
+                role="tab"
+                aria-selected={visao === chave}
                 onClick={() => setVisao(chave)}
-                className={`flex h-8 items-center gap-1.5 px-3 text-xs transition ${
-                  visao === chave ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                }`}
+                className="flex h-9 items-center gap-1.5 border-b-2 text-[13px] font-bold transition"
+                style={{ borderColor: visao === chave ? 'var(--brand)' : 'transparent', color: visao === chave ? 'var(--brand)' : 'var(--sub)', marginBottom: -1 }}
               >
                 <Icone className="h-3.5 w-3.5" />
                 {rotulo}

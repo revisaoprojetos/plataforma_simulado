@@ -4,6 +4,7 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEntitlement } from '@/lib/integracoes/tipos'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 /**
  * Observabilidade: escritas de domínio (classificação/grupo/pasta/matrícula) eram engolidas
@@ -114,7 +115,7 @@ export async function resolverEstudante(svc: any, tenantId: string, provider: Pr
 
   if (!id) {
     const row: Record<string, unknown> = {
-      tenant_id: tenantId, nome: p.nome || email || 'Aluno', email, cpf, telefone: p.telefone ?? null,
+      tenant_id: tenantId, nome: p.nome || email || 'Aluno', email, cpf, ...colunasCpfCripto(cpf), telefone: p.telefone ?? null,
       matricula_externa: p.externalId, origem_provider: provider,
     }
     const { data, error } = await svc.from('simulado_estudantes').insert(row).select('id').single()
@@ -139,7 +140,7 @@ export async function resolverEstudante(svc: any, tenantId: string, provider: Pr
 async function backfill(svc: any, tenantId: string, estudanteId: string, cpf: string | null, telefone?: string | null, email?: string | null, provider?: Provider) {
   const patch: Record<string, unknown> = {}
   const { data } = await svc.from('simulado_estudantes').select('cpf, telefone').eq('id', estudanteId).maybeSingle()
-  if (cpf && !data?.cpf) patch.cpf = cpf
+  if (cpf && !data?.cpf) { patch.cpf = cpf; Object.assign(patch, colunasCpfCripto(cpf)) }
   if (telefone && !data?.telefone) patch.telefone = telefone
   if (Object.keys(patch).length) { try { await svc.from('simulado_estudantes').update(patch).eq('id', estudanteId).eq('tenant_id', tenantId) } catch (e) { logIntegracao(e) } }
   if (email) await promoverEmailDaCompra(svc, tenantId, estudanteId, email, provider)

@@ -1,0 +1,780 @@
+apps/web/app/admin/administradores/actions.ts(118,118): error TS2304: Cannot find name 'AdminMembro'.
+apps/web/app/admin/administradores/actions.ts(118,142): error TS2304: Cannot find name 'CargoOpcao'.
+apps/web/app/admin/administradores/actions.ts(147,18): error TS2304: Cannot find name 'AdminMembro'.
+apps/web/app/admin/administradores/actions.ts(181,17): error TS2304: Cannot find name 'CargoOpcao'.
+apps/web/app/admin/administradores/actions.ts(191,19): error TS2304: Cannot find name 'AdminMembro'.
+apps/web/app/admin/administradores/actions.ts(191,35): error TS2304: Cannot find name 'AdminMembro'.
+apps/web/app/admin/atendimento/actions.ts(49,52): error TS2304: Cannot find name 'ThreadDuvida'.
+apps/web/app/admin/atendimento/atendimento-client.tsx(35,8): error TS2305: Module '"./actions"' has no exported member 'ThreadDuvida'.
+apps/web/app/admin/atendimento/atendimento-client.tsx(289,35): error TS7006: Parameter 'm' implicitly has an 'any' type.
+apps/web/app/admin/banco-questoes/[id]/page.tsx(27,15): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'GrupoBanco' locally, but it is not exported.
+apps/web/app/admin/biblioteca/actions.ts(843,121): error TS2304: Cannot find name 'NoAcesso'.
+apps/web/app/admin/biblioteca/actions.ts(890,16): error TS2304: Cannot find name 'NoAcesso'.
+apps/web/app/admin/biblioteca/actions.ts(918,27): error TS2304: Cannot find name 'ModoAcessoDTO'.
+apps/web/app/admin/biblioteca/actions.ts(919,29): error TS2304: Cannot find name 'OrigemDTO'.
+apps/web/app/admin/biblioteca/actions.ts(920,30): error TS2304: Cannot find name 'PermsDTO'.
+apps/web/app/admin/biblioteca/actions.ts(933,129): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(974,102): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(975,16): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(980,31): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(985,30): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(987,33): error TS2304: Cannot find name 'DriveNodeDTO'.
+apps/web/app/admin/biblioteca/actions.ts(1002,58): error TS2304: Cannot find name 'OrigemDTO'.
+apps/web/app/admin/biblioteca/actions.ts(1002,77): error TS2304: Cannot find name 'PermsDTO'.
+apps/web/app/admin/biblioteca/actions.ts(1006,10): error TS2304: Cannot find name 'ModoAcessoDTO'.
+apps/web/app/admin/biblioteca/actions.ts(1105,16): error TS2304: Cannot find name 'PermissoesAluno'.
+apps/web/app/admin/biblioteca/actions.ts(1107,44): error TS2304: Cannot find name 'AcessoLinhaSidebar'.
+apps/web/app/admin/biblioteca/actions.ts(1107,78): error TS2304: Cannot find name 'AcessoLinhaSidebar'.
+apps/web/app/admin/biblioteca/actions.ts(1108,14): error TS2304: Cannot find name 'VinculoLeitor'.
+apps/web/app/admin/biblioteca/actions.ts(1109,15): error TS2304: Cannot find name 'EventoHistorico'.
+apps/web/app/admin/biblioteca/actions.ts(1121,21): error TS2304: Cannot find name 'PermissoesAluno'.
+apps/web/app/admin/biblioteca/actions.ts(1153,17): error TS2304: Cannot find name 'AcessoLinhaSidebar'.
+apps/web/app/admin/biblioteca/actions.ts(1154,21): error TS2304: Cannot find name 'AcessoLinhaSidebar'.
+apps/web/app/admin/biblioteca/actions.ts(1156,19): error TS2304: Cannot find name 'VinculoLeitor'.
+apps/web/app/admin/biblioteca/actions.ts(1156,74): error TS2304: Cannot find name 'VinculoLeitor'.
+apps/web/app/admin/biblioteca/actions.ts(1157,20): error TS2304: Cannot find name 'EventoHistorico'.
+apps/web/app/admin/biblioteca/actions.ts(1166,75): error TS2304: Cannot find name 'PermissoesAluno'.
+apps/web/app/admin/biblioteca/areas-actions.ts(29,73): error TS2304: Cannot find name 'DadosAreas'.
+apps/web/app/admin/biblioteca/areas-actions.ts(54,73): error TS2304: Cannot find name 'EntradaRegra'.
+apps/web/app/admin/biblioteca/biblioteca-client.tsx(14,15): error TS2305: Module '"./capa-actions"' has no exported member 'AlvoCP'.
+apps/web/app/admin/biblioteca/biblioteca-client.tsx(44,8): error TS2459: Module '"./actions"' declares 'PastaConteudo' locally, but it is not exported.
+apps/web/app/admin/biblioteca/biblioteca-client.tsx(44,28): error TS2459: Module '"./actions"' declares 'Categoria' locally, but it is not exported.
+apps/web/app/admin/biblioteca/biblioteca-client.tsx(44,44): error TS2305: Module '"./actions"' has no exported member 'NoAcesso'.
+apps/web/app/admin/biblioteca/biblioteca-client.tsx(237,19): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/capa-actions.ts(19,14): error TS2304: Cannot find name 'DadosCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(20,103): error TS2304: Cannot find name 'EstadoCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(42,45): error TS2304: Cannot find name 'AlvoCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(42,62): error TS2304: Cannot find name 'EstadoCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(44,15): error TS2304: Cannot find name 'EstadoCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(86,46): error TS2304: Cannot find name 'AlvoCP'.
+apps/web/app/admin/biblioteca/capa-actions.ts(86,69): error TS2304: Cannot find name 'DadosCP'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(15,8): error TS2305: Module '"@/app/admin/biblioteca/areas-actions"' has no exported member 'DadosAreas'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(15,25): error TS2305: Module '"@/app/admin/biblioteca/areas-actions"' has no exported member 'EntradaRegra'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(37,73): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(40,72): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(41,63): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(65,28): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(70,31): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(70,60): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(71,45): error TS7006: Parameter 'r' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(92,28): error TS7006: Parameter 'r' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(140,32): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(158,28): error TS7006: Parameter 'o' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(212,32): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(311,38): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/areas-tab.tsx(335,23): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/flashcards-tab.tsx(22,63): error TS2305: Module '"@/app/admin/biblioteca/flashcards-actions"' has no exported member 'FlashcardAdmin'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(11,60): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoDados'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(11,78): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'OrigemAcesso'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(11,97): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'AlunoAcesso'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(11,115): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'EventoRegistro'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(322,38): error TS7006: Parameter 'e' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(322,41): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(508,59): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(509,55): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(516,91): error TS2322: Type 'unknown' is not assignable to type 'Key | null | undefined'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(516,160): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'SetStateAction<string>'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(516,187): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(516,282): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(518,19): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(548,25): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(563,26): error TS7006: Parameter 'h' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/conteudo/[id]/gerenciar/gerenciar-conteudo-client.tsx(563,29): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/biblioteca/flashcards-actions.ts(34,66): error TS2304: Cannot find name 'FlashcardAdmin'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(59,75): error TS2304: Cannot find name 'GestaoDados'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(95,19): error TS2304: Cannot find name 'ProtecaoConteudo'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(100,15): error TS2304: Cannot find name 'GestaoBase'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(117,22): error TS2304: Cannot find name 'VersaoHistorico'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(126,120): error TS2304: Cannot find name 'AlunoAcesso'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(134,100): error TS2304: Cannot find name 'OrigemAcesso'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(135,18): error TS2304: Cannot find name 'OrigemAcesso'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(180,98): error TS2304: Cannot find name 'AlunoAcesso'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(220,18): error TS2304: Cannot find name 'AlunoAcesso'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(237,165): error TS2304: Cannot find name 'EventoRegistro'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(240,18): error TS2304: Cannot find name 'EventoRegistro'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(262,155): error TS2304: Cannot find name 'VinculoConteudo'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(272,97): error TS2304: Cannot find name 'VinculoConteudo'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(288,91): error TS2304: Cannot find name 'EventoEntrega'.
+apps/web/app/admin/biblioteca/gestao-actions.ts(296,82): error TS2304: Cannot find name 'ProtecaoConteudo'.
+apps/web/app/admin/cadernos-teste/actions.ts(21,92): error TS2304: Cannot find name 'QuestaoMeta'.
+apps/web/app/admin/cadernos-teste/actions.ts(34,19): error TS2304: Cannot find name 'QuestaoMeta'.
+apps/web/app/admin/cadernos-teste/actions.ts(74,137): error TS2304: Cannot find name 'RegistroTeste'.
+apps/web/app/admin/cadernos-teste/actions.ts(74,167): error TS2304: Cannot find name 'DiscBancoTeste'.
+apps/web/app/admin/cadernos-teste/actions.ts(83,76): error TS2304: Cannot find name 'CadernoTesteResumo'.
+apps/web/app/admin/cadernos-teste/actions.ts(94,20): error TS2304: Cannot find name 'CadernoTesteGrupo'.
+apps/web/app/admin/cadernos-teste/actions.ts(99,21): error TS2304: Cannot find name 'CadernoTesteGrupo'.
+apps/web/app/admin/cadernos-teste/actions.ts(174,77): error TS2304: Cannot find name 'EntregaSlots'.
+apps/web/app/admin/cadernos-teste/actions.ts(174,99): error TS2304: Cannot find name 'MontagemGrupo'.
+apps/web/app/admin/cadernos-teste/actions.ts(174,122): error TS2304: Cannot find name 'MontagemPdf'.
+apps/web/app/admin/cadernos-teste/actions.ts(179,17): error TS2304: Cannot find name 'MontagemGrupo'.
+apps/web/app/admin/cadernos-teste/actions.ts(180,15): error TS2304: Cannot find name 'MontagemPdf'.
+apps/web/app/admin/cadernos-teste/actions.ts(195,16): error TS2304: Cannot find name 'EntregaSlots'.
+apps/web/app/admin/cadernos-teste/actions.ts(199,59): error TS2304: Cannot find name 'EntregaSlots'.
+apps/web/app/admin/cadernos-teste/actions.ts(217,64): error TS2304: Cannot find name 'EntregaSlots'.
+apps/web/app/admin/cadernos-teste/actions.ts(234,76): error TS2304: Cannot find name 'DocOffice'.
+apps/web/app/admin/cadernos-teste/actions.ts(249,24): error TS2304: Cannot find name 'PastaModelo'.
+apps/web/app/admin/cadernos-teste/actions.ts(249,45): error TS2304: Cannot find name 'DocOffice'.
+apps/web/app/admin/cadernos-teste/actions.ts(249,70): error TS2304: Cannot find name 'PastaModelo'.
+apps/web/app/admin/cadernos-teste/actions.ts(261,17): error TS2304: Cannot find name 'PastaModelo'.
+apps/web/app/admin/cadernos-teste/actions.ts(264,21): error TS2304: Cannot find name 'PastaModelo'.
+apps/web/app/admin/cadernos-teste/actions.ts(275,15): error TS2304: Cannot find name 'DocOffice'.
+apps/web/app/admin/cadernos-teste/actions.ts(296,124): error TS2304: Cannot find name 'TrechoPrevia'.
+apps/web/app/admin/cadernos/actions.ts(54,12): error TS2304: Cannot find name 'CadernoRow'.
+apps/web/app/admin/cadernos/actions.ts(80,101): error TS2304: Cannot find name 'CadernoRow'.
+apps/web/app/admin/cadernos/actions.ts(131,63): error TS2304: Cannot find name 'CadernoConfig'.
+apps/web/app/admin/cadernos/actions.ts(151,11): error TS2304: Cannot find name 'TabelaCaderno'.
+apps/web/app/admin/cadernos/actions.ts(206,141): error TS2304: Cannot find name 'TabelaCaderno'.
+apps/web/app/admin/configuracoes/banners/actions.ts(18,14): error TS2304: Cannot find name 'BannerInput'.
+apps/web/app/admin/configuracoes/banners/actions.ts(81,47): error TS2304: Cannot find name 'BannerInput'.
+apps/web/app/admin/configuracoes/banners/actions.ts(103,63): error TS2304: Cannot find name 'BannerInput'.
+apps/web/app/admin/configuracoes/novidades/actions.ts(39,110): error TS2304: Cannot find name 'NovidadeAdmin'.
+apps/web/app/admin/configuracoes/novidades/actions.ts(54,50): error TS2304: Cannot find name 'NovidadeInput'.
+apps/web/app/admin/configuracoes/novidades/actions.ts(83,66): error TS2304: Cannot find name 'NovidadeInput'.
+apps/web/app/admin/configuracoes/novidades/novidades-client.tsx(29,8): error TS2305: Module '"./actions"' has no exported member 'NovidadeAdmin'.
+apps/web/app/admin/configuracoes/novidades/novidades-client.tsx(29,28): error TS2305: Module '"./actions"' has no exported member 'NovidadeInput'.
+apps/web/app/admin/configuracoes/novidades/novidades-client.tsx(175,49): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<CategoriaNovidade, string>'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(21,17): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(23,22): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(24,13): error TS7053: Element implicitly has an 'any' type because expression of type 'TipoEntidade' can't be used to index type 'Record<TipoTaxonomia, CfgEntidade | CfgValor>'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(39,49): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(52,9): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(88,51): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/actions.ts(128,50): error TS2304: Cannot find name 'TipoEntidade'.
+apps/web/app/admin/conteudos/classificacao/classificacao-client.tsx(25,92): error TS2305: Module '"./actions"' has no exported member 'TipoEntidade'.
+apps/web/app/admin/conteudos/grupos/[id]/vincular-grupo-modal.tsx(8,61): error TS2305: Module '"@/app/admin/conteudos/grupos/actions"' has no exported member 'BancoVinculavel'.
+apps/web/app/admin/conteudos/grupos/actions.ts(136,143): error TS2304: Cannot find name 'BancoVinculavel'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(15,14): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(27,80): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(33,72): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(39,30): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(44,76): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(63,72): error TS2304: Cannot find name 'RefClass'.
+apps/web/app/admin/conteudos/materiais/questoes/actions.ts(68,15): error TS2304: Cannot find name 'ClassificacaoPadrao'.
+apps/web/app/admin/conteudos/produtos/[id]/aba-visibilidade.tsx(37,8): error TS2305: Module '"./visibilidade-actions"' has no exported member 'SegmentoAdmin'.
+apps/web/app/admin/conteudos/produtos/[id]/aba-visibilidade.tsx(37,28): error TS2305: Module '"./visibilidade-actions"' has no exported member 'AlvosProduto'.
+apps/web/app/admin/conteudos/produtos/[id]/aba-visibilidade.tsx(37,47): error TS2305: Module '"./visibilidade-actions"' has no exported member 'AlvoNome'.
+apps/web/app/admin/conteudos/produtos/[id]/aba-visibilidade.tsx(264,44): error TS7006: Parameter 'm' implicitly has an 'any' type.
+apps/web/app/admin/conteudos/produtos/[id]/produto-estudio-client.tsx(24,86): error TS2305: Module '"@/app/admin/produtos/actions"' has no exported member 'EstadoProduto'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(58,168): error TS2304: Cannot find name 'AlvoNome'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(62,29): error TS2304: Cannot find name 'AlvoNome'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(80,49): error TS2304: Cannot find name 'SegmentoAdmin'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(80,122): error TS2304: Cannot find name 'AlvoNome'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(97,20): error TS2304: Cannot find name 'SegmentoAdmin'.
+apps/web/app/admin/conteudos/produtos/[id]/visibilidade-actions.ts(112,98): error TS2304: Cannot find name 'AlvosProduto'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(41,16): error TS2304: Cannot find name 'CronogramaDetalhe'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(46,17): error TS2304: Cannot find name 'Diagnostico'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(106,8): error TS2304: Cannot find name 'CronogramaDetalhe'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(142,26): error TS2304: Cannot find name 'CronogramaDetalhe'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(142,88): error TS2304: Cannot find name 'Diagnostico'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(189,25): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(205,36): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(238,58): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(278,10): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(334,11): error TS2304: Cannot find name 'OpcoesRepetir'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(362,39): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(419,101): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(445,78): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(520,65): error TS2304: Cannot find name 'ComposicaoBanco'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(548,53): error TS7006: Parameter 'id' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(548,57): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(549,24): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(549,64): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(746,24): error TS2304: Cannot find name 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-actions.ts(770,97): error TS2304: Cannot find name 'PacotesDoCronograma'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(40,8): error TS2724: '"./metas-actions"' has no exported member named 'PacotesDoCronograma'. Did you mean 'pacotesDoCronograma'?
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(41,8): error TS2305: Module '"./metas-actions"' has no exported member 'CronogramaDetalhe'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(42,8): error TS2305: Module '"./metas-actions"' has no exported member 'Diagnostico'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(43,8): error TS2305: Module '"./metas-actions"' has no exported member 'EntradaMeta'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(50,8): error TS2305: Module '"../conteudos/actions"' has no exported member 'BancoAulaRef'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(51,8): error TS2305: Module '"../conteudos/actions"' has no exported member 'PropagacaoAlvo'.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(212,17): error TS7006: Parameter 'q' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(233,15): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(235,62): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(236,40): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(689,75): error TS7006: Parameter 'n' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(689,78): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(708,30): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(747,47): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(752,83): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(757,41): error TS7006: Parameter 'nome' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(757,47): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(770,47): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(795,80): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(806,80): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(816,49): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(822,94): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(826,81): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(889,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/metas-client.tsx(920,29): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/[id]/montar-semana.tsx(19,15): error TS2305: Module '"./metas-actions"' has no exported member 'EntradaMeta'.
+apps/web/app/admin/cronogramas/actions.ts(62,75): error TS2304: Cannot find name 'CronogramaLista'.
+apps/web/app/admin/cronogramas/actions.ts(111,10): error TS2304: Cannot find name 'CronogramaLista'.
+apps/web/app/admin/cronogramas/actions.ts(118,42): error TS2304: Cannot find name 'EntradaCronograma'.
+apps/web/app/admin/cronogramas/actions.ts(159,58): error TS2304: Cannot find name 'EntradaCronograma'.
+apps/web/app/admin/cronogramas/actions.ts(346,74): error TS2304: Cannot find name 'CategoriaRow'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(30,95): error TS2304: Cannot find name 'PainelLiberacao'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(41,24): error TS2304: Cannot find name 'PainelLiberacao'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(84,94): error TS2304: Cannot find name 'EditorCatalogo'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(108,60): error TS2304: Cannot find name 'EditorAulaBase'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(109,56): error TS2304: Cannot find name 'EditorAulaBase'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(110,18): error TS2304: Cannot find name 'EditorAulaBase'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(119,15): error TS2304: Cannot find name 'EditorLpBase'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(167,91): error TS2304: Cannot find name 'PainelMetas'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(209,108): error TS2304: Cannot find name 'SimulacaoAluno'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(221,53): error TS2304: Cannot find name 'EstadoEspelho'.
+apps/web/app/admin/cronogramas/adaptativo/actions.ts(222,16): error TS2304: Cannot find name 'EstadoEspelho'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(15,37): error TS2305: Module '"../actions"' has no exported member 'EditorCatalogo'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(15,58): error TS2305: Module '"../actions"' has no exported member 'EditorAulaBase'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(15,79): error TS2305: Module '"../actions"' has no exported member 'EditorLpBase'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(39,68): error TS7006: Parameter 'n' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(40,61): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(41,56): error TS7006: Parameter 'l' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(46,60): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(50,29): error TS2339: Property 'ativaBase' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(53,54): error TS2339: Property 'disc' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(61,29): error TS2339: Property 'disc' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(62,39): error TS2339: Property 'num' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(62,78): error TS2339: Property 'tema' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(62,118): error TS2339: Property 'pags' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(63,36): error TS2339: Property 'qc' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(63,71): error TS2339: Property 'tec' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(64,23): error TS2339: Property 'mat' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(74,53): error TS7006: Parameter 'l' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(76,62): error TS7006: Parameter 'l' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(77,52): error TS2339: Property 'disc' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(82,28): error TS2339: Property 'disc' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(82,106): error TS2339: Property 'leiNome' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(82,137): error TS2339: Property 'trecho' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(107,107): error TS7053: Element implicitly has an 'any' type because expression of type '"tema" | "num" | "pags" | "qc" | "tec"' can't be used to index type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(109,29): error TS2339: Property 'ativaBase' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(111,65): error TS2339: Property 'mat' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(147,31): error TS2339: Property 'leiNome' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(148,30): error TS2339: Property 'trecho' does not exist on type '{}'.
+apps/web/app/admin/cronogramas/adaptativo/catalogo/catalogo-editor.tsx(197,41): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(9,84): error TS2724: '"./actions"' has no exported member named 'PainelLiberacao'. Did you mean 'obterPainelLiberacao'?
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(9,106): error TS2305: Module '"./actions"' has no exported member 'SimulacaoAluno'.
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(83,35): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(180,54): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(180,57): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/liberacao-client.tsx(212,37): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/adaptativo/metas/metas-client.tsx(9,34): error TS2305: Module '"../actions"' has no exported member 'PainelMetas'.
+apps/web/app/admin/cronogramas/conteudo/conteudo-client.tsx(25,8): error TS2305: Module '"../[id]/metas-actions"' has no exported member 'CronogramaDetalhe'.
+apps/web/app/admin/cronogramas/conteudo/conteudo-client.tsx(26,8): error TS2305: Module '"../[id]/metas-actions"' has no exported member 'Diagnostico'.
+apps/web/app/admin/cronogramas/conteudo/conteudo-client.tsx(27,8): error TS2724: '"../[id]/metas-actions"' has no exported member named 'PacotesDoCronograma'. Did you mean 'pacotesDoCronograma'?
+apps/web/app/admin/cronogramas/conteudo/conteudo-client.tsx(29,15): error TS2305: Module '"../actions"' has no exported member 'CronogramaLista'.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(29,8): error TS2305: Module '"../actions"' has no exported member 'AulaBanco'.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(30,8): error TS2305: Module '"../actions"' has no exported member 'ConjuntoDetalhe'.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(31,8): error TS2305: Module '"../actions"' has no exported member 'PropagacaoAlvo'.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(101,39): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(103,62): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(104,58): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(105,114): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(106,106): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(203,43): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(455,38): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(635,42): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(643,60): error TS7006: Parameter 'q' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(651,43): error TS7006: Parameter 'q' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(726,49): error TS7006: Parameter 'q' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/[id]/conjunto-editor-client.tsx(734,35): error TS7006: Parameter 'q' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(35,39): error TS2304: Cannot find name 'ConjuntoLista'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(35,65): error TS2304: Cannot find name 'PastaLista'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(68,17): error TS2304: Cannot find name 'PastaLista'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(120,20): error TS2304: Cannot find name 'ConjuntoLista'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(155,35): error TS2304: Cannot find name 'ConjuntoParaCompor'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(187,16): error TS2304: Cannot find name 'ConjuntoParaCompor'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(202,108): error TS2304: Cannot find name 'ConteudoBanco'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(249,20): error TS2304: Cannot find name 'ConteudoBanco'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(446,84): error TS2304: Cannot find name 'ConjuntoDetalhe'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(499,16): error TS2304: Cannot find name 'AulaBanco'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(534,56): error TS2304: Cannot find name 'EntradaAula'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(553,56): error TS2304: Cannot find name 'EntradaAula'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(679,35): error TS2304: Cannot find name 'PropagacaoAlvo'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(693,16): error TS2304: Cannot find name 'PropagacaoAlvo'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(740,12): error TS2304: Cannot find name 'BancoAulaRef'.
+apps/web/app/admin/cronogramas/conteudos/actions.ts(756,35): error TS2304: Cannot find name 'BancoAulaRef'.
+apps/web/app/admin/cronogramas/conteudos/conteudos-client.tsx(18,89): error TS2305: Module '"./actions"' has no exported member 'ConjuntoLista'.
+apps/web/app/admin/cronogramas/conteudos/conteudos-client.tsx(18,109): error TS2305: Module '"./actions"' has no exported member 'PastaLista'.
+apps/web/app/admin/cronogramas/criar/criar-context.tsx(4,15): error TS2305: Module '"../conteudos/actions"' has no exported member 'ConjuntoParaCompor'.
+apps/web/app/admin/cronogramas/criar/criar-context.tsx(4,35): error TS2305: Module '"../conteudos/actions"' has no exported member 'ConteudoBanco'.
+apps/web/app/admin/cronogramas/criar/previa-viva.tsx(47,11): error TS2322: Type '{ disciplina: string; disciplina_id: string | null; semInicio: number; semFim: number; aulas: unknown[]; dados: Record<string, Record<string, { aulaReal: string; conteudo: string | null; tema: string | null; urls: Record<...>; questaoIds: string[]; videoUrl: string | null; }>>; }[]' is not assignable to type 'ConteudoMontagem[]'.
+apps/web/app/admin/cronogramas/criar/previa-viva.tsx(53,54): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/previa-viva.tsx(53,102): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/previa-viva.tsx(54,67): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/previa-viva.tsx(55,68): error TS18046: 'x' is of type 'unknown'.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(18,69): error TS2305: Module '"../conteudos/actions"' has no exported member 'ConjuntoParaCompor'.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(139,52): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(139,84): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(140,63): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(160,11): error TS2322: Type '{ disciplina: string; disciplina_id: string | null; semInicio: number; semFim: number; aulas: unknown[]; dados: Record<string, Record<string, { aulaReal: string; conteudo: string | null; tema: string | null; urls: Record<...>; questaoIds: string[]; videoUrl: string | null; }>>; }[]' is not assignable to type 'ConteudoMontagem[]'.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(166,54): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(166,93): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(167,67): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(168,68): error TS18046: 'x' is of type 'unknown'.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(221,40): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(222,38): error TS7006: Parameter 'n' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/criar/secao-montagem.tsx(222,41): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(38,8): error TS2305: Module '"./actions"' has no exported member 'CategoriaRow'.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(39,8): error TS2305: Module '"./actions"' has no exported member 'CronogramaLista'.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(40,8): error TS2305: Module '"./actions"' has no exported member 'EntradaCronograma'.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(93,54): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(306,14): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(308,47): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(983,43): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(996,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(1005,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(1013,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(1047,28): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/cronogramas-client.tsx(1072,48): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/importar/actions.ts(36,78): error TS2304: Cannot find name 'EstadoAtual'.
+apps/web/app/admin/cronogramas/importar/importar-client.tsx(24,71): error TS2305: Module '"./actions"' has no exported member 'EstadoAtual'.
+apps/web/app/admin/cronogramas/importar/importar-client.tsx(105,60): error TS2345: Argument of type '{ cronogramas: any; linksChaves: Set<unknown>; }' is not assignable to parameter of type '{ cronogramas: { slug: string; nome: string; status: string; metas: number; }[]; linksChaves: Set<string>; }'.
+apps/web/app/admin/cronogramas/lei-seca/actions.ts(22,73): error TS2304: Cannot find name 'SemanaLegproc'.
+apps/web/app/admin/cronogramas/lei-seca/lei-seca-editor.tsx(9,66): error TS2305: Module '"./actions"' has no exported member 'SemanaLegproc'.
+apps/web/app/admin/cronogramas/lei-seca/lei-seca-editor.tsx(63,81): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/actions.ts(43,11): error TS2304: Cannot find name 'LinkAulaRow'.
+apps/web/app/admin/cronogramas/links/actions.ts(44,17): error TS2304: Cannot find name 'PlataformaRow'.
+apps/web/app/admin/cronogramas/links/actions.ts(213,21): error TS2304: Cannot find name 'EntradaLink'.
+apps/web/app/admin/cronogramas/links/actions.ts(228,77): error TS2304: Cannot find name 'EntradaLink'.
+apps/web/app/admin/cronogramas/links/actions.ts(229,32): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/actions.ts(233,20): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/actions.ts(238,36): error TS2304: Cannot find name 'EntradaLink'.
+apps/web/app/admin/cronogramas/links/actions.ts(258,77): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/actions.ts(265,52): error TS2304: Cannot find name 'EntradaLink'.
+apps/web/app/admin/cronogramas/links/actions.ts(299,77): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(31,8): error TS2305: Module '"./actions"' has no exported member 'EntradaLink'.
+apps/web/app/admin/cronogramas/links/links-client.tsx(32,8): error TS2305: Module '"./actions"' has no exported member 'LinkAulaRow'.
+apps/web/app/admin/cronogramas/links/links-client.tsx(33,8): error TS2305: Module '"./actions"' has no exported member 'PlataformaRow'.
+apps/web/app/admin/cronogramas/links/links-client.tsx(92,65): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(104,87): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(110,14): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(122,44): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(200,68): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(295,36): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(342,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(348,68): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(356,43): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(369,31): error TS7006: Parameter 'u' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(369,34): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(379,34): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(381,45): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(381,48): error TS7006: Parameter 'j' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(389,47): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(389,83): error TS7006: Parameter '_' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/links/links-client.tsx(389,86): error TS7006: Parameter 'j' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/metas/actions.ts(34,79): error TS2304: Cannot find name 'VarianteAula'.
+apps/web/app/admin/cronogramas/metas/actions.ts(47,28): error TS2304: Cannot find name 'FormaAula'.
+apps/web/app/admin/cronogramas/metas/actions.ts(48,38): error TS2304: Cannot find name 'CronDaAula'.
+apps/web/app/admin/cronogramas/metas/actions.ts(53,74): error TS2304: Cannot find name 'DuracaoDivergente'.
+apps/web/app/admin/cronogramas/metas/actions.ts(79,35): error TS2304: Cannot find name 'GrupoMeta'.
+apps/web/app/admin/cronogramas/metas/actions.ts(101,36): error TS2304: Cannot find name 'OndeEsta'.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(34,8): error TS2305: Module '"./actions"' has no exported member 'DuracaoDivergente'.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(35,8): error TS2305: Module '"./actions"' has no exported member 'GrupoMeta'.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(36,8): error TS2305: Module '"./actions"' has no exported member 'VarianteAula'.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(394,123): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(469,33): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(569,56): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/metas/metas-auditoria-client.tsx(685,41): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(28,8): error TS2305: Module '"../actions"' has no exported member 'PacoteDetalhe'.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(85,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(88,66): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(97,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(99,44): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(110,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(113,56): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(144,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(146,34): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(161,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(163,41): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(169,39): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(169,75): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(175,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(177,41): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(203,68): error TS7006: Parameter 'e' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(219,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(228,13): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(228,61): error TS7006: Parameter 'y' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(253,73): error TS7006: Parameter 'e2' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(254,15): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(263,45): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(268,39): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(269,48): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(277,34): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(278,43): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(343,57): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/[id]/pacote-client.tsx(478,36): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/pacotes/actions.ts(38,71): error TS2304: Cannot find name 'PacoteLista'.
+apps/web/app/admin/cronogramas/pacotes/actions.ts(78,43): error TS2304: Cannot find name 'PacoteLista'.
+apps/web/app/admin/cronogramas/pacotes/actions.ts(82,82): error TS2304: Cannot find name 'PacoteDetalhe'.
+apps/web/app/admin/cronogramas/pacotes/actions.ts(279,114): error TS2304: Cannot find name 'PreviaDesvinculo'.
+apps/web/app/admin/cronogramas/pacotes/pacotes-client.tsx(12,60): error TS2305: Module '"./actions"' has no exported member 'PacoteLista'.
+apps/web/app/admin/cronogramas/relatorios/actions.ts(27,13): error TS2304: Cannot find name 'Geral'.
+apps/web/app/admin/cronogramas/relatorios/actions.ts(37,84): error TS2304: Cannot find name 'DadosRelatorio'.
+apps/web/app/admin/cronogramas/relatorios/actions.ts(101,35): error TS2304: Cannot find name 'LinhaAluno'.
+apps/web/app/admin/cronogramas/relatorios/relatorios-client.tsx(12,38): error TS2305: Module '"./actions"' has no exported member 'DadosRelatorio'.
+apps/web/app/admin/cronogramas/relatorios/relatorios-client.tsx(12,59): error TS2305: Module '"./actions"' has no exported member 'LinhaAluno'.
+apps/web/app/admin/cronogramas/relatorios/relatorios-client.tsx(81,63): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/relatorios/relatorios-client.tsx(115,28): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/relatorios/relatorios-client.tsx(149,37): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/tipos-actions.ts(36,69): error TS2304: Cannot find name 'TipoComUso'.
+apps/web/app/admin/cronogramas/tipos-actions.ts(52,36): error TS2304: Cannot find name 'EntradaTipo'.
+apps/web/app/admin/cronogramas/tipos-actions.ts(103,52): error TS2304: Cannot find name 'EntradaTipo'.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(30,8): error TS2305: Module '"../tipos-actions"' has no exported member 'EntradaTipo'.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(31,8): error TS2305: Module '"../tipos-actions"' has no exported member 'TipoComUso'.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(265,68): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(271,45): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(287,22): error TS2322: Type 'string | number | symbol' is not assignable to type 'Key | null | undefined'.
+apps/web/app/admin/cronogramas/tipos/tipos-client.tsx(290,54): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/app/admin/curseduca/actions.ts(20,65): error TS2304: Cannot find name 'GrupoSistema'.
+apps/web/app/admin/curseduca/actions.ts(34,95): error TS2304: Cannot find name 'GrupoSistema'.
+apps/web/app/admin/curseduca/actions.ts(52,96): error TS2304: Cannot find name 'GrupoCurseducaDTO'.
+apps/web/app/admin/curseduca/actions.ts(52,127): error TS2304: Cannot find name 'GrupoSistema'.
+apps/web/app/admin/curseduca/actions.ts(94,93): error TS2304: Cannot find name 'CurseducaConfigDTO'.
+apps/web/app/admin/curseduca/actions.ts(101,21): error TS2304: Cannot find name 'CurseducaConfigDTO'.
+apps/web/app/admin/curseduca/actions.ts(195,110): error TS2304: Cannot find name 'MembroPreview'.
+apps/web/app/admin/curseduca/actions.ts(249,95): error TS2304: Cannot find name 'ResultadoPorCanal'.
+apps/web/app/admin/curseduca/actions.ts(269,14): error TS2304: Cannot find name 'ResultadoPorCanal'.
+apps/web/app/admin/curseduca/actions.ts(355,91): error TS2304: Cannot find name 'RegraSyncDTO'.
+apps/web/app/admin/curseduca/actions.ts(376,19): error TS2304: Cannot find name 'RegraSyncDTO'.
+apps/web/app/admin/curseduca/actions.ts(502,26): error TS2304: Cannot find name 'AutoVinculoDTO'.
+apps/web/app/admin/curseduca/actions.ts(504,98): error TS2304: Cannot find name 'AutoVinculoDTO'.
+apps/web/app/admin/entrada/actions.ts(14,49): error TS2304: Cannot find name 'ConfigGlobalInput'.
+apps/web/app/admin/estudantes/[id]/page.tsx(30,15): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'GrupoBanco' locally, but it is not exported.
+apps/web/app/admin/estudantes/actions.ts(38,41): error TS2304: Cannot find name 'FiltroEstudante'.
+apps/web/app/admin/estudantes/actions.ts(49,113): error TS2304: Cannot find name 'SortEstudante'.
+apps/web/app/admin/estudantes/actions.ts(49,137): error TS2304: Cannot find name 'FiltroEstudante'.
+apps/web/app/admin/estudantes/actions.ts(49,197): error TS2304: Cannot find name 'EstudanteBase'.
+apps/web/app/admin/estudantes/actions.ts(78,15): error TS2304: Cannot find name 'EstudanteBase'.
+apps/web/app/admin/estudantes/actions.ts(86,64): error TS2304: Cannot find name 'EstudanteBase'.
+apps/web/app/admin/estudantes/actions.ts(121,49): error TS2304: Cannot find name 'KpisEstudantes'.
+apps/web/app/admin/estudantes/actions.ts(145,58): error TS2304: Cannot find name 'EstudanteBase'.
+apps/web/app/admin/etiquetas/actions.ts(10,28): error TS2304: Cannot find name 'FuncaoEtiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(20,43): error TS2304: Cannot find name 'FuncaoEtiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(27,58): error TS2304: Cannot find name 'FuncaoEtiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(80,73): error TS2304: Cannot find name 'Etiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(140,93): error TS2304: Cannot find name 'Etiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(157,94): error TS2304: Cannot find name 'QuestaoDaEtiqueta'.
+apps/web/app/admin/etiquetas/actions.ts(198,36): error TS2304: Cannot find name 'SimuladoDaQuestao'.
+apps/web/app/admin/etiquetas/actions.ts(207,16): error TS2304: Cannot find name 'QuestaoDaEtiqueta'.
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(10,86): error TS2305: Module '"./actions"' has no exported member 'Etiqueta'.
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(10,101): error TS2305: Module '"./actions"' has no exported member 'FuncaoEtiqueta'.
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(10,122): error TS2724: '"./actions"' has no exported member named 'QuestaoDaEtiqueta'. Did you mean 'questoesDaEtiqueta'?
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(226,120): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(228,34): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/etiquetas/etiquetas-client.tsx(282,39): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/app/admin/gamificacao/actions.ts(14,15): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'EstudanteAcessoLinha'.
+apps/web/app/admin/gamificacao/actions.ts(110,97): error TS2304: Cannot find name 'GrupoPublicoOpc'.
+apps/web/app/admin/gamificacao/actions.ts(138,45): error TS2304: Cannot find name 'GrupoPublicoOpc'.
+apps/web/app/admin/gamificacao/forms/publico-gamificacao-form.tsx(11,15): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'EstudanteAcessoLinha'.
+apps/web/app/admin/grupos/actions.ts(27,117): error TS2304: Cannot find name 'EstBusca'.
+apps/web/app/admin/impersonation/actions.ts(11,96): error TS2304: Cannot find name 'AlunoBusca'.
+apps/web/app/admin/impersonation/actions.ts(21,17): error TS2304: Cannot find name 'AlunoBusca'.
+apps/web/app/admin/impersonation/actions.ts(34,84): error TS2304: Cannot find name 'PapelImpersonacao'.
+apps/web/app/admin/impersonation/actions.ts(43,16): error TS2304: Cannot find name 'PapelImpersonacao'.
+apps/web/app/admin/leitura/[id]/page.tsx(14,15): error TS2305: Module '"../actions"' has no exported member 'Documento'.
+apps/web/app/admin/leitura/actions-tipos.ts(51,216): error TS2304: Cannot find name 'PontuacaoLeitura'.
+apps/web/app/admin/leitura/actions-tipos.ts(51,244): error TS2304: Cannot find name 'DesafioModulo'.
+apps/web/app/admin/leitura/actions-tipos.ts(51,268): error TS2304: Cannot find name 'IntroConfig'.
+apps/web/app/admin/leitura/actions-tipos.ts(51,294): error TS2304: Cannot find name 'RegulamentoConfig'.
+apps/web/app/admin/leitura/actions-tipos.ts(51,330): error TS2304: Cannot find name 'TrilhaAparencia'.
+apps/web/app/admin/leitura/actions.ts(32,57): error TS2304: Cannot find name 'DocPublicacao'.
+apps/web/app/admin/leitura/actions.ts(34,14): error TS2304: Cannot find name 'DocEstado'.
+apps/web/app/admin/leitura/actions.ts(91,23): error TS2304: Cannot find name 'Documento'.
+apps/web/app/admin/leitura/actions.ts(132,79): error TS2304: Cannot find name 'DocEstado'.
+apps/web/app/admin/leitura/actions.ts(137,17): error TS2304: Cannot find name 'DocEstado'.
+apps/web/app/admin/leitura/actions.ts(139,21): error TS2304: Cannot find name 'DocPublicacao'.
+apps/web/app/admin/leitura/actions.ts(140,19): error TS2304: Cannot find name 'SituacaoEditorial'.
+apps/web/app/admin/leitura/actions.ts(147,83): error TS2304: Cannot find name 'DocEstado'.
+apps/web/app/admin/leitura/actions.ts(331,104): error TS2304: Cannot find name 'EstudanteRef'.
+apps/web/app/admin/leitura/actions.ts(357,94): error TS2304: Cannot find name 'EstudanteRef'.
+apps/web/app/admin/leitura/actions.ts(370,80): error TS2304: Cannot find name 'EstudanteLinha'.
+apps/web/app/admin/leitura/actions.ts(382,112): error TS2304: Cannot find name 'AnotacaoBase'.
+apps/web/app/admin/leitura/actions.ts(428,116): error TS2304: Cannot find name 'QuestaoDoc'.
+apps/web/app/admin/leitura/actions.ts(445,92): error TS2304: Cannot find name 'QuestaoBuscaLeitura'.
+apps/web/app/admin/leitura/actions.ts(519,79): error TS2304: Cannot find name 'Documento'.
+apps/web/app/admin/leitura/actions.ts(543,26): error TS2304: Cannot find name 'PublicacaoModulo'.
+apps/web/app/admin/leitura/actions.ts(544,34): error TS2304: Cannot find name 'PublicacaoModulo'.
+apps/web/app/admin/leitura/actions.ts(570,129): error TS2304: Cannot find name 'BancoAulas'.
+apps/web/app/admin/leitura/actions.ts(602,17): error TS2304: Cannot find name 'ModuloLeitura'.
+apps/web/app/admin/leitura/actions.ts(635,22): error TS2304: Cannot find name 'ModuloLeitura'.
+apps/web/app/admin/leitura/actions.ts(893,116): error TS2304: Cannot find name 'DetalheRankingAluno'.
+apps/web/app/admin/leitura/actions.ts(959,16): error TS2304: Cannot find name 'DetalheAulaRanking'.
+apps/web/app/admin/leitura/actions.ts(1041,68): error TS2304: Cannot find name 'PublicacaoModulo'.
+apps/web/app/admin/leitura/actions.ts(1044,14): error TS2304: Cannot find name 'PublicacaoModulo'.
+apps/web/app/admin/leitura/actions.ts(1123,96): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1130,52): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1157,100): error TS2304: Cannot find name 'ControleAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1174,25): error TS2304: Cannot find name 'ControleAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1200,23): error TS2304: Cannot find name 'ControleAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1214,96): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1233,123): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1237,25): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1252,20): error TS2304: Cannot find name 'QuizConfig'.
+apps/web/app/admin/leitura/actions.ts(1257,118): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1279,10): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1280,25): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1283,95): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1283,117): error TS2304: Cannot find name 'QuizConfig'.
+apps/web/app/admin/leitura/actions.ts(1297,137): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1330,153): error TS2304: Cannot find name 'QuizLinha'.
+apps/web/app/admin/leitura/actions.ts(1340,77): error TS2304: Cannot find name 'QuizConfig'.
+apps/web/app/admin/leitura/actions.ts(1500,100): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1509,26): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1517,66): error TS2304: Cannot find name 'RankingOcultosCfg'.
+apps/web/app/admin/leitura/actions.ts(1533,106): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/actions.ts(1540,26): error TS2304: Cannot find name 'EstudanteAcessoLinha'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(17,20): error TS2304: Cannot find name 'Tipo'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(27,48): error TS2304: Cannot find name 'Tipo'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(27,85): error TS2304: Cannot find name 'BibItem'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(27,104): error TS2304: Cannot find name 'BibPasta'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(32,34): error TS2304: Cannot find name 'BibItem'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(36,38): error TS2304: Cannot find name 'BibPasta'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(48,40): error TS2304: Cannot find name 'Tipo'.
+apps/web/app/admin/leitura/biblioteca/actions.ts(126,43): error TS2304: Cannot find name 'Tipo'.
+apps/web/app/admin/leitura/page.tsx(46,32): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/app/admin/lgpd/actions.ts(13,100): error TS2304: Cannot find name 'SolicitacaoLgpd'.
+apps/web/app/admin/lgpd/lgpd-client.tsx(10,103): error TS2305: Module '"./actions"' has no exported member 'SolicitacaoLgpd'.
+apps/web/app/admin/liberacao/actions-tipos.ts(8,12): error TS2304: Cannot find name 'RegraFiltros'.
+apps/web/app/admin/liberacao/actions-tipos.ts(9,11): error TS2304: Cannot find name 'InicioConfig'.
+apps/web/app/admin/liberacao/actions-tipos.ts(10,8): error TS2304: Cannot find name 'FimConfig'.
+apps/web/app/admin/liberacao/actions.ts(26,48): error TS2304: Cannot find name 'SalvarRegraInput'.
+apps/web/app/admin/liberacao/actions.ts(50,109): error TS7006: Parameter 'pid' implicitly has an 'any' type.
+apps/web/app/admin/liberacao/regra-editor.tsx(10,15): error TS2305: Module '"./actions"' has no exported member 'SalvarRegraInput'.
+apps/web/app/admin/lixeira/actions-tipos.ts(4,11): error TS2304: Cannot find name 'SoftDeleteTabela'.
+apps/web/app/admin/lixeira/actions.ts(40,48): error TS2304: Cannot find name 'LixeiraItem'.
+apps/web/app/admin/lixeira/actions.ts(47,14): error TS2304: Cannot find name 'LixeiraItem'.
+apps/web/app/admin/modelos-caderno/actions.ts(33,78): error TS2304: Cannot find name 'ModeloRow'.
+apps/web/app/admin/modelos-caderno/actions.ts(33,99): error TS2304: Cannot find name 'PastaModeloRow'.
+apps/web/app/admin/modelos-caderno/actions.ts(41,41): error TS2304: Cannot find name 'ModeloRow'.
+apps/web/app/admin/modelos-caderno/actions.ts(47,40): error TS2304: Cannot find name 'PastaModeloRow'.
+apps/web/app/admin/produtos/actions.ts(267,77): error TS2304: Cannot find name 'EstadoProduto'.
+apps/web/app/admin/questoes/actions.ts(401,91): error TS2304: Cannot find name 'UsoQuestao'.
+apps/web/app/admin/questoes/actions.ts(433,16): error TS2304: Cannot find name 'UsoQuestao'.
+apps/web/app/admin/questoes/disciplinas-actions.ts(25,83): error TS2304: Cannot find name 'DisciplinaContagem'.
+apps/web/app/admin/questoes/disciplinas-actions.ts(110,83): error TS2304: Cannot find name 'UnificacaoRecente'.
+apps/web/app/admin/questoes/disciplinas-actions.ts(136,88): error TS2304: Cannot find name 'DisciplinaClass'.
+apps/web/app/admin/questoes/disciplinas-actions.ts(172,78): error TS2304: Cannot find name 'PastaConteudo'.
+apps/web/app/admin/questoes/importar-plataforma-actions.ts(42,12): error TS2304: Cannot find name 'FiltrosOrigem'.
+apps/web/app/admin/questoes/importar-plataforma-actions.ts(43,55): error TS2304: Cannot find name 'QuestaoOrigem'.
+apps/web/app/admin/questoes/importar-plataforma-actions.ts(86,19): error TS2304: Cannot find name 'QuestaoOrigem'.
+apps/web/app/admin/rbac/actions.ts(135,190): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(135,221): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(150,18): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(151,22): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(154,17): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(158,19): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/rbac/actions.ts(158,37): error TS2304: Cannot find name 'UsuarioPerfil'.
+apps/web/app/admin/relatorios/estudantes/estudantes-lista.tsx(10,39): error TS2305: Module '"@/app/admin/estudantes/actions"' has no exported member 'EstudanteBase'.
+apps/web/app/admin/relatorios/estudantes/page.tsx(9,39): error TS2305: Module '"@/app/admin/estudantes/actions"' has no exported member 'EstudanteBase'.
+apps/web/app/admin/simulados/actions.ts(180,122): error TS2304: Cannot find name 'EstudanteLinkado'.
+apps/web/app/admin/simulados/actions.ts(195,23): error TS2304: Cannot find name 'EstudanteLinkado'.
+apps/web/app/admin/simulados/actions.ts(203,116): error TS2304: Cannot find name 'EstudanteLinkado'.
+apps/web/app/admin/simulados/actions.ts(233,21): error TS2304: Cannot find name 'EstudanteLinkado'.
+apps/web/app/admin/simulados/actions.ts(238,21): error TS2304: Cannot find name 'EstudanteLinkado'.
+apps/web/app/admin/simulados/actions.ts(317,141): error TS2304: Cannot find name 'ProgressoEstudante'.
+apps/web/app/admin/simulados/actions.ts(360,21): error TS2304: Cannot find name 'ProgressoEstudante'.
+apps/web/app/admin/simulados/actions.ts(367,19): error TS2304: Cannot find name 'SituacaoAoVivo'.
+apps/web/app/admin/simulados/actions.ts(539,114): error TS2304: Cannot find name 'Testador'.
+apps/web/app/admin/simulados/actions.ts(593,116): error TS2304: Cannot find name 'SessaoLinkada'.
+apps/web/app/admin/simulados/actions.ts(610,18): error TS2304: Cannot find name 'SessaoLinkada'.
+apps/web/app/admin/simulados/actions.ts(661,108): error TS2304: Cannot find name 'EstudanteBuscaItem'.
+apps/web/app/admin/simulados/actions.ts(741,156): error TS2304: Cannot find name 'QuestaoWizardItem'.
+apps/web/app/admin/simulados/criar/acoes.ts(37,83): error TS2304: Cannot find name 'PastaSalvar'.
+apps/web/app/admin/simulados/criar/acoes.ts(37,106): error TS2304: Cannot find name 'PastaSalvar'.
+apps/web/app/admin/simulados/criar/acoes.ts(60,25): error TS2304: Cannot find name 'PastaSalvar'.
+apps/web/app/admin/simulados/criar/acoes.ts(89,112): error TS2304: Cannot find name 'MembroGrupo'.
+apps/web/app/admin/simulados/criar/acoes.ts(102,31): error TS2304: Cannot find name 'MembroGrupo'.
+apps/web/app/admin/simulados/criar/acoes.ts(103,29): error TS2304: Cannot find name 'MembroGrupo'.
+apps/web/app/admin/simulados/criar/questoes/page.tsx(9,40): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoBancoBuscaItem' locally, but it is not exported.
+apps/web/app/admin/simulados/desafios-actions-tipos.ts(19,32): error TS2304: Cannot find name 'MaratonaConfig'.
+apps/web/app/admin/simulados/desafios-actions.ts(29,63): error TS2304: Cannot find name 'ContagemDesafio'.
+apps/web/app/admin/simulados/desafios-actions.ts(46,67): error TS2304: Cannot find name 'ConfigDesafioSim'.
+apps/web/app/admin/simulados/desafios-actions.ts(47,15): error TS2304: Cannot find name 'ConfigDesafioSim'.
+apps/web/app/admin/simulados/desafios-actions.ts(60,76): error TS2304: Cannot find name 'ConfigDesafioSim'.
+apps/web/app/admin/simulados/desafios-actions.ts(65,20): error TS2304: Cannot find name 'ConfigDesafioSim'.
+apps/web/app/admin/sistema/actions.ts(129,67): error TS2304: Cannot find name 'PessoaLiberada'.
+apps/web/app/admin/sistema/actions.ts(140,73): error TS2304: Cannot find name 'PessoaLiberada'.
+apps/web/app/admin/sistema/actions.ts(154,71): error TS2304: Cannot find name 'PessoaLiberada'.
+apps/web/app/admin/sistema/actions.ts(175,56): error TS2304: Cannot find name 'WorkspaceGrupo'.
+apps/web/app/admin/sistema/sistema-tabs.tsx(13,15): error TS2305: Module '"./actions"' has no exported member 'WorkspaceGrupo'.
+apps/web/app/admin/tenants/actions.ts(104,69): error TS2304: Cannot find name 'VisibilidadeModo'.
+apps/web/app/admin/tenants/actions.ts(203,64): error TS2304: Cannot find name 'AparenciaInput'.
+apps/web/app/admin/tenants/actions.ts(241,72): error TS2304: Cannot find name 'EmbedConfigInput'.
+apps/web/app/admin/tenants/actions.ts(246,88): error TS7006: Parameter 'x' implicitly has an 'any' type.
+apps/web/app/admin/tenants/actions.ts(267,45): error TS2304: Cannot find name 'RbacCategoria'.
+apps/web/app/admin/tenants/actions.ts(274,129): error TS2304: Cannot find name 'RbacCategoria'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(17,118): error TS2304: Cannot find name 'DisciplinaAtual'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(17,151): error TS2304: Cannot find name 'DisciplinaDisponivel'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(17,189): error TS2304: Cannot find name 'PlataformaCol'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(17,214): error TS2304: Cannot find name 'DisciplinaTodas'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(26,40): error TS2304: Cannot find name 'DisciplinaAtual'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(27,17): error TS2304: Cannot find name 'DisciplinaAtual'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(30,40): error TS2304: Cannot find name 'DisciplinaAtual'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(36,22): error TS2304: Cannot find name 'DisciplinaDisponivel'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(52,22): error TS2304: Cannot find name 'PlataformaCol'.
+apps/web/app/admin/tenants/disciplinas-actions.ts(54,19): error TS2304: Cannot find name 'DisciplinaTodas'.
+apps/web/app/aluno/(portal)/cronograma/emissoes-actions.ts(46,35): error TS2304: Cannot find name 'PaginaEmissoes'.
+apps/web/app/super/plataformas/[id]/rbac/page.tsx(8,15): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'RbacCategoria'.
+apps/web/components/admin/adicionar-do-banco-dialog.tsx(13,42): error TS2305: Module '"@/app/admin/cronogramas/conteudos/actions"' has no exported member 'ConjuntoParaCompor'.
+apps/web/components/admin/adicionar-questoes-dialog.tsx(17,80): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoBancoBuscaItem' locally, but it is not exported.
+apps/web/components/admin/adicionar-questoes-dialog.tsx(17,108): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoDetalheBanco' locally, but it is not exported.
+apps/web/components/admin/adicionar-questoes-dialog.tsx(286,137): error TS7006: Parameter 'e' implicitly has an 'any' type.
+apps/web/components/admin/adicionar-questoes-dialog.tsx(286,140): error TS7006: Parameter 'k' implicitly has an 'any' type.
+apps/web/components/admin/adicionar-questoes-dialog.tsx(300,58): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/administradores-lista.tsx(14,8): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'AdminMembro'.
+apps/web/components/admin/administradores-lista.tsx(14,26): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'CargoOpcao'.
+apps/web/components/admin/administradores-lista.tsx(237,125): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(33,8): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'BancoAulas'.
+apps/web/components/admin/banco-aulas-grid.tsx(33,25): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'ModuloLeitura'.
+apps/web/components/admin/banco-aulas-grid.tsx(33,45): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'DocEstado'.
+apps/web/components/admin/banco-aulas-grid.tsx(72,33): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(75,50): error TS7006: Parameter 'id' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(92,120): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(137,28): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(150,30): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(170,28): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(219,198): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(295,60): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(506,18): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/banco-aulas-grid.tsx(506,21): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,98): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'EntregaSlots'.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,117): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'EntregaRef'.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,134): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'MontagemGrupo'.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,154): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'DocOffice'.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,170): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'PastaModelo'.
+apps/web/components/admin/banco-caderno-montagem.tsx(10,188): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'TrechoPrevia'.
+apps/web/components/admin/banco-caderno-teste-client.tsx(11,35): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'CadernoTesteResumo'.
+apps/web/components/admin/banco-caderno-teste-client.tsx(11,60): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'CadernoTesteGrupo'.
+apps/web/components/admin/banco-caderno-teste-client.tsx(107,29): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/components/admin/banco-grupos.tsx(5,34): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'GrupoBanco' locally, but it is not exported.
+apps/web/components/admin/banco-grupos.tsx(61,65): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/components/admin/banco-grupos.tsx(63,57): error TS7006: Parameter 'd' implicitly has an 'any' type.
+apps/web/components/admin/biblioteca-client.tsx(12,8): error TS2305: Module '"@/app/admin/leitura/biblioteca/actions"' has no exported member 'Tipo'.
+apps/web/components/admin/biblioteca-client.tsx(12,19): error TS2305: Module '"@/app/admin/leitura/biblioteca/actions"' has no exported member 'BibItem'.
+apps/web/components/admin/biblioteca-client.tsx(12,33): error TS2305: Module '"@/app/admin/leitura/biblioteca/actions"' has no exported member 'BibPasta'.
+apps/web/components/admin/biblioteca-client.tsx(197,16): error TS7006: Parameter 'h' implicitly has an 'any' type.
+apps/web/components/admin/biblioteca-doc-sidebar.tsx(20,8): error TS2305: Module '"@/app/admin/biblioteca/actions"' has no exported member 'PermissoesAluno'.
+apps/web/components/admin/biblioteca-doc-sidebar.tsx(20,30): error TS2305: Module '"@/app/admin/biblioteca/actions"' has no exported member 'VinculoLeitor'.
+apps/web/components/admin/biblioteca-doc-sidebar.tsx(20,50): error TS2305: Module '"@/app/admin/biblioteca/actions"' has no exported member 'AcessoLinhaSidebar'.
+apps/web/components/admin/biblioteca-doc-sidebar.tsx(20,75): error TS2305: Module '"@/app/admin/biblioteca/actions"' has no exported member 'EventoHistorico'.
+apps/web/components/admin/caderno-teste/builder.tsx(15,49): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'ModeloRow'.
+apps/web/components/admin/caderno-teste/builder.tsx(15,65): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'PastaModeloRow'.
+apps/web/components/admin/caderno-teste/builder.tsx(24,93): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'RegistroTeste'.
+apps/web/components/admin/caderno-teste/builder.tsx(24,113): error TS2724: '"@/app/admin/cadernos-teste/actions"' has no exported member named 'DiscBancoTeste'. Did you mean 'dadosBancoTeste'?
+apps/web/components/admin/caderno-teste/builder.tsx(24,134): error TS2305: Module '"@/app/admin/cadernos-teste/actions"' has no exported member 'QuestaoMeta'.
+apps/web/components/admin/caderno-teste/modelo-picker.tsx(10,36): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'ModeloRow'.
+apps/web/components/admin/caderno-teste/modelo-picker.tsx(10,52): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'PastaModeloRow'.
+apps/web/components/admin/correcao-sessao.tsx(15,171): error TS2459: Module '"@/app/admin/correcao/actions"' declares 'QuesitoPatch' locally, but it is not exported.
+apps/web/components/admin/curseduca-auto-vinculo.tsx(8,103): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'AutoVinculoDTO'.
+apps/web/components/admin/curseduca-auto-vinculo.tsx(53,59): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/components/admin/curseduca-config.tsx(7,58): error TS2724: '"@/app/admin/curseduca/actions"' has no exported member named 'CurseducaConfigDTO'. Did you mean 'curseducaConfigurado'?
+apps/web/components/admin/curseduca-import.tsx(9,204): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoCurseducaDTO'.
+apps/web/components/admin/curseduca-import.tsx(9,228): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoSistema'.
+apps/web/components/admin/curseduca-import.tsx(9,247): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'MembroPreview'.
+apps/web/components/admin/curseduca-sync-card.tsx(10,15): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoCurseducaDTO'.
+apps/web/components/admin/curseduca-sync-card.tsx(10,34): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoSistema'.
+apps/web/components/admin/curseduca-sync.tsx(9,87): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoCurseducaDTO'.
+apps/web/components/admin/curseduca-sync.tsx(9,111): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'GrupoSistema'.
+apps/web/components/admin/curseduca-sync.tsx(9,130): error TS2305: Module '"@/app/admin/curseduca/actions"' has no exported member 'RegraSyncDTO'.
+apps/web/components/admin/curseduca-sync.tsx(88,44): error TS7006: Parameter 'gid' implicitly has an 'any' type.
+apps/web/components/admin/desafios-simulado-admin.tsx(26,111): error TS2305: Module '"@/app/admin/simulados/desafios-actions"' has no exported member 'ConfigDesafioSim'.
+apps/web/components/admin/desafios-simulado-admin.tsx(26,134): error TS2724: '"@/app/admin/simulados/desafios-actions"' has no exported member named 'ContagemDesafio'. Did you mean 'contarDesafio'?
+apps/web/components/admin/desafios-simulado-admin.tsx(26,156): error TS2305: Module '"@/app/admin/simulados/desafios-actions"' has no exported member 'EtapaMaratona'.
+apps/web/components/admin/disciplinas-classificacao.tsx(10,74): error TS2305: Module '"@/app/admin/questoes/disciplinas-actions"' has no exported member 'DisciplinaClass'.
+apps/web/components/admin/disciplinas-classificacao.tsx(10,96): error TS2305: Module '"@/app/admin/questoes/disciplinas-actions"' has no exported member 'PastaConteudo'.
+apps/web/components/admin/documento-acesso.tsx(9,78): error TS2459: Module '"@/app/admin/biblioteca/actions"' declares 'EstudanteAcessoLinha' locally, but it is not exported.
+apps/web/components/admin/documento-acesso.tsx(9,105): error TS2459: Module '"@/app/admin/biblioteca/actions"' declares 'GrupoAtribuido' locally, but it is not exported.
+apps/web/components/admin/espelho-metas.tsx(6,55): error TS2305: Module '"@/app/admin/cronogramas/adaptativo/actions"' has no exported member 'EstadoEspelho'.
+apps/web/components/admin/estudantes-lista.tsx(11,82): error TS2305: Module '"@/app/admin/estudantes/actions"' has no exported member 'EstudanteBase'.
+apps/web/components/admin/estudantes-lista.tsx(11,102): error TS2305: Module '"@/app/admin/estudantes/actions"' has no exported member 'SortEstudante'.
+apps/web/components/admin/estudantes-lista.tsx(11,122): error TS2305: Module '"@/app/admin/estudantes/actions"' has no exported member 'FiltroEstudante'.
+apps/web/components/admin/etiqueta-picker.tsx(10,58): error TS2305: Module '"@/app/admin/etiquetas/actions"' has no exported member 'Etiqueta'.
+apps/web/components/admin/file-picker.tsx(56,87): error TS2459: Module '"@/app/admin/biblioteca/actions"' declares 'Categoria' locally, but it is not exported.
+apps/web/components/admin/impersonation/impersonation-config.tsx(7,75): error TS2305: Module '"@/app/admin/impersonation/actions"' has no exported member 'PapelImpersonacao'.
+apps/web/components/admin/impersonation/impersonation-dock.tsx(10,41): error TS2305: Module '"@/app/admin/impersonation/actions"' has no exported member 'AlunoBusca'.
+apps/web/components/admin/impersonation/impersonation-launcher.tsx(6,15): error TS2305: Module '"@/app/admin/impersonation/actions"' has no exported member 'AlunoBusca'.
+apps/web/components/admin/importar-de-plataforma-tab.tsx(22,8): error TS2305: Module '"@/app/admin/questoes/importar-plataforma-actions"' has no exported member 'QuestaoOrigem'.
+apps/web/components/admin/jurisprudencia-dias-editor.tsx(19,46): error TS2459: Module '"@/app/admin/jurisprudencia/actions"' declares 'DiaEstado' locally, but it is not exported.
+apps/web/components/admin/leitura-acesso.tsx(10,8): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'EstudanteAcessoLinha'.
+apps/web/components/admin/leitura-autor-anotacoes.tsx(8,99): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'AnotacaoBase'.
+apps/web/components/admin/leitura-autor-anotacoes.tsx(140,36): error TS18047: 'notaEdit' is possibly 'null'.
+apps/web/components/admin/leitura-autor-anotacoes.tsx(143,70): error TS18047: 'notaEdit' is possibly 'null'.
+apps/web/components/admin/leitura-card.tsx(11,52): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'Documento'.
+apps/web/components/admin/leitura-editor.tsx(19,98): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'Documento'.
+apps/web/components/admin/leitura-editor.tsx(19,114): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'SituacaoEditorial'.
+apps/web/components/admin/leitura-editor.tsx(551,50): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/components/admin/leitura-preview-grifos.tsx(14,40): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'QuestaoDoc'.
+apps/web/components/admin/leitura-questoes-admin.tsx(9,40): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoBancoBuscaItem' locally, but it is not exported.
+apps/web/components/admin/leitura-questoes-admin.tsx(13,8): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'QuestaoDoc'.
+apps/web/components/admin/lixeira-client.tsx(15,49): error TS2305: Module '"@/app/admin/lixeira/actions"' has no exported member 'LixeiraItem'.
+apps/web/components/admin/modelos-caderno/modelo-card.tsx(15,62): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'ModeloRow'.
+apps/web/components/admin/modelos-caderno/modelos-grid.tsx(14,48): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'ModeloRow'.
+apps/web/components/admin/modelos-caderno/modelos-grid.tsx(14,64): error TS2305: Module '"@/app/admin/modelos-caderno/actions"' has no exported member 'PastaModeloRow'.
+apps/web/components/admin/modelos-caderno/modelos-grid.tsx(296,29): error TS7006: Parameter 'f' implicitly has an 'any' type.
+apps/web/components/admin/modelos-caderno/modelos-grid.tsx(296,32): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/components/admin/modulo-acesso.tsx(20,8): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'EstudanteAcessoLinha'.
+apps/web/components/admin/modulo-acesso.tsx(20,35): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'ControleAcessoLinha'.
+apps/web/components/admin/modulo-acesso.tsx(105,87): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/components/admin/modulo-acesso.tsx(292,42): error TS7006: Parameter 'g' implicitly has an 'any' type.
+apps/web/components/admin/novo-administrador-form.tsx(13,41): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'CargoOpcao'.
+apps/web/components/admin/publicar-modulo-botao.tsx(10,39): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'PublicacaoModulo'.
+apps/web/components/admin/questoes-tabela-base.tsx(13,64): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'DetalheQuestao' locally, but it is not exported.
+apps/web/components/admin/questoes-tabela-base.tsx(330,58): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/admin/questoes-tabela.tsx(14,54): error TS2305: Module '"@/app/admin/questoes/actions"' has no exported member 'UsoQuestao'.
+apps/web/components/admin/questoes-tabela.tsx(198,36): error TS7006: Parameter 'b' implicitly has an 'any' type.
+apps/web/components/admin/questoes-tabela.tsx(199,39): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/components/admin/quiz-conteudo-admin.tsx(9,40): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoBancoBuscaItem' locally, but it is not exported.
+apps/web/components/admin/quiz-conteudo-admin.tsx(13,8): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'QuizLinha'.
+apps/web/components/admin/quiz-conteudo-admin.tsx(13,24): error TS2305: Module '"@/app/admin/leitura/actions"' has no exported member 'QuizConfig'.
+apps/web/components/admin/quiz-conteudo-admin.tsx(81,16): error TS7006: Parameter 'c' implicitly has an 'any' type.
+apps/web/components/admin/ranking-admin.tsx(14,15): error TS2724: '"@/app/admin/leitura/actions"' has no exported member named 'DetalheRankingAluno'. Did you mean 'detalheRankingAluno'?
+apps/web/components/admin/rbac-perfil-usuarios.tsx(8,48): error TS2724: '"@/app/admin/rbac/actions"' has no exported member named 'UsuarioPerfil'. Did you mean 'usuariosDoPerfil'?
+apps/web/components/admin/simulado-estudantes.tsx(11,101): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'EstudanteLinkado'.
+apps/web/components/admin/simulado-progresso.tsx(8,44): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'ProgressoEstudante'.
+apps/web/components/admin/simulado-progresso.tsx(8,69): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'SituacaoAoVivo'.
+apps/web/components/admin/simulado-questoes-table.tsx(9,15): error TS2459: Module '"@/app/admin/banco-questoes/actions"' declares 'QuestaoBancoBuscaItem' locally, but it is not exported.
+apps/web/components/admin/simulado-sessoes.tsx(9,15): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'SessaoLinkada'.
+apps/web/components/admin/simulado-testadores.tsx(8,52): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'Testador'.
+apps/web/components/admin/simulado-wizard.tsx(16,134): error TS2305: Module '"@/app/admin/simulados/actions"' has no exported member 'QuestaoWizardItem'.
+apps/web/components/admin/taxonomia-unificacao.tsx(13,35): error TS2305: Module '"@/app/admin/questoes/disciplinas-actions"' has no exported member 'UnificacaoRecente'.
+apps/web/components/admin/workspace-form.tsx(9,32): error TS2305: Module '"@/app/admin/sistema/actions"' has no exported member 'WorkspaceGrupo'.
+apps/web/components/aluno/leitura-ranking.tsx(11,59): error TS2724: '"@/app/admin/leitura/actions"' has no exported member named 'DetalheRankingAluno'. Did you mean 'detalheRankingAluno'?
+apps/web/components/aluno/leitura-ranking.tsx(464,35): error TS7006: Parameter 'a' implicitly has an 'any' type.
+apps/web/components/aluno/leitura-ranking.tsx(464,38): error TS7006: Parameter 'i' implicitly has an 'any' type.
+apps/web/components/biblioteca/capa-pagina-dialog.tsx(8,50): error TS2305: Module '"@/app/admin/biblioteca/capa-actions"' has no exported member 'AlvoCP'.
+apps/web/components/biblioteca/capa-pagina-dialog.tsx(8,63): error TS2305: Module '"@/app/admin/biblioteca/capa-actions"' has no exported member 'EstadoCP'.
+apps/web/components/biblioteca/gestao/aba-alunos.tsx(8,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'AlunoAcesso'.
+apps/web/components/biblioteca/gestao/aba-alunos.tsx(8,28): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'EventoRegistro'.
+apps/web/components/biblioteca/gestao/aba-alunos.tsx(8,44): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-configuracoes.tsx(10,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-configuracoes.tsx(10,27): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'ProtecaoConteudo'.
+apps/web/components/biblioteca/gestao/aba-configuracoes.tsx(50,14): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/components/biblioteca/gestao/aba-configuracoes.tsx(52,71): error TS7006: Parameter 'p' implicitly has an 'any' type.
+apps/web/components/biblioteca/gestao/aba-fonte-link.tsx(9,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-historico.tsx(8,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-historico.tsx(8,27): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'VersaoHistorico'.
+apps/web/components/biblioteca/gestao/aba-historico.tsx(8,44): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'EventoEntrega'.
+apps/web/components/biblioteca/gestao/aba-quem-tem-acesso.tsx(8,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-quem-tem-acesso.tsx(8,27): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'OrigemAcesso'.
+apps/web/components/biblioteca/gestao/aba-utilizado-em.tsx(7,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'VinculoConteudo'.
+apps/web/components/biblioteca/gestao/aba-visao-geral.tsx(6,15): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoBase'.
+apps/web/components/biblioteca/gestao/aba-visao-geral.tsx(6,27): error TS2305: Module '"@/app/admin/biblioteca/gestao-actions"' has no exported member 'GestaoDados'.
+apps/web/components/biblioteca/gestao/aba-visao-geral.tsx(23,38): error TS7006: Parameter 'v' implicitly has an 'any' type.
+apps/web/components/biblioteca/gestao/aba-visao-geral.tsx(24,39): error TS7006: Parameter 'e' implicitly has an 'any' type.
+apps/web/components/super/gerenciar-cargos.tsx(11,101): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'RbacCategoria'.
+apps/web/components/super/plataforma-acessos.tsx(11,15): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'AdminMembro'.
+apps/web/components/super/plataforma-acessos.tsx(11,28): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'CargoOpcao'.
+apps/web/components/super/plataforma-disciplinas.tsx(6,76): error TS2305: Module '"@/app/admin/tenants/disciplinas-actions"' has no exported member 'DisciplinaAtual'.
+apps/web/components/super/plataforma-disciplinas.tsx(6,98): error TS2305: Module '"@/app/admin/tenants/disciplinas-actions"' has no exported member 'DisciplinaDisponivel'.
+apps/web/components/super/plataforma-disciplinas.tsx(6,125): error TS2305: Module '"@/app/admin/tenants/disciplinas-actions"' has no exported member 'PlataformaCol'.
+apps/web/components/super/plataforma-disciplinas.tsx(6,145): error TS2305: Module '"@/app/admin/tenants/disciplinas-actions"' has no exported member 'DisciplinaTodas'.
+apps/web/components/super/plataforma-embed.tsx(11,15): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'EmbedConfigInput'.
+apps/web/components/super/plataforma-embed.tsx(35,46): error TS7006: Parameter 's' implicitly has an 'any' type.
+apps/web/components/super/plataforma-gerenciar.tsx(13,84): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'VisibilidadeModo'.
+apps/web/components/super/plataforma-tabs.tsx(14,15): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'AdminMembro'.
+apps/web/components/super/plataforma-tabs.tsx(14,28): error TS2305: Module '"@/app/admin/administradores/actions"' has no exported member 'CargoOpcao'.
+apps/web/components/super/plataforma-tabs.tsx(15,15): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'EmbedConfigInput'.
+apps/web/components/super/rbac-cargos-controles.tsx(9,15): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'RbacCategoria'.
+apps/web/components/super/rbac-matriz.tsx(9,15): error TS2305: Module '"@/app/admin/tenants/actions"' has no exported member 'RbacCategoria'.
+apps/web/lib/cronograma/nova-dados.ts(82,43): error TS7006: Parameter 'e' implicitly has an 'any' type.
+apps/web/lib/cronograma/nova-dados.ts(82,81): error TS7006: Parameter 'e' implicitly has an 'any' type.

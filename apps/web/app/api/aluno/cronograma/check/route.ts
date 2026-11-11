@@ -14,6 +14,6 @@ export async function POST(req: NextRequest) {
   const { emissaoId, metaId } = body
   if (!emissaoId || !metaId) return NextResponse.json({ ok: false, message: 'Dados obrigatórios ausentes.' }, { status: 400 })
   const r = await alternarCheckMeta(emissaoId, metaId, !!body.marcar, { data: body.data, titulo: body.titulo })
-  if (!r.ok) return NextResponse.json({ ok: false, message: r.error ?? 'Falha ao marcar.' }, { status: 500 })
-  return NextResponse.json({ ok: true, marcadaEm: r.marcadaEm ?? null })
+  if (!r.ok) return NextResponse.json({ ok: false, message: r.error ?? 'Falha ao marcar.' }, { status: /inválida|pertence|não encontrado/i.test(r.error ?? '') ? 400 : 500 })
+  return NextResponse.json({ ok: true, marcadaEm: r.marcadaEm ?? null, progresso: r.progresso ?? null })
 }

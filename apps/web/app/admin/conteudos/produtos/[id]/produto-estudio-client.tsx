@@ -28,6 +28,7 @@ import { AbaInformacoes } from './aba-informacoes'
 import { AbaConteudos } from './aba-conteudos'
 import { AbaGrupos } from './aba-grupos'
 import { AbaVitrine } from './aba-vitrine'
+import { AbaPaginaEntrada } from './aba-pagina-entrada'
 import { AbaVisibilidade } from './aba-visibilidade'
 import { listarPastasProdutoAction } from './lazy-actions'
 
@@ -39,7 +40,7 @@ function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<P
     id: p.id, nome: p.nome, tipo: p.tipo, descricao: p.descricao, tier: p.tier, ativo: p.ativo,
     cor: p.cor, cor_secundaria: p.cor_secundaria, tema: p.tema, logo_url: p.logo_url, capa_url: p.capa_url,
     banner_url: p.banner_url, banner_mobile_url: p.banner_mobile_url, gamificacao: p.gamificacao,
-    vitrine_layout: p.vitrine_layout, validade_tipo: p.validade_tipo, validade_dias: p.validade_dias, validade_data: p.validade_data, ...over,
+    vitrine_layout: p.vitrine_layout, modulo_layout: p.modulo_layout, validade_tipo: p.validade_tipo, validade_dias: p.validade_dias, validade_data: p.validade_data, ...over,
   }
 }
 
@@ -135,7 +136,7 @@ export function ProdutoEstudioClient({
   const abas: [Aba, string, number | null][] = [
     ['informacoes', 'Informações', null],
     ['conteudos', 'Conteúdos', resumo.conteudos],
-    ['vitrine', 'Vitrine', produto.secoes.length],
+    ['vitrine', 'Página do extensivo', null],
     ['grupos', 'Grupos de acesso', resumo.grupos],
     ['visibilidade', 'Visibilidade', null],
   ]
@@ -249,7 +250,7 @@ export function ProdutoEstudioClient({
         <AbaInformacoes
           produto={produto} instrutores={instrutores} resumo={resumo} podeEditar={podeEditar}
           criadoEm={criadoEm} atualizadoEm={atualizadoEm} mesmoNome={mesmoNome}
-          onIrConteudos={() => trocarAba('conteudos')} onIrGrupos={() => trocarAba('grupos')}
+          onIrConteudos={() => trocarAba('conteudos')} onIrGrupos={() => trocarAba('grupos')} onIrPagina={() => trocarAba('vitrine')}
           onDuplicar={() => setDuplicar(true)} onMover={abrirMover} onExcluir={excluir}
           onManutencao={() => toast.message('Modo de manutenção do produto — em breve.')}
           registerPublicar={(fn) => { publicarRef.current = fn }}
@@ -259,7 +260,7 @@ export function ProdutoEstudioClient({
         <div hidden={aba !== 'conteudos'}><AbaConteudos tipoProduto={produto.tipo} produtoId={produto.id} podeEditar={podeEditar} tenantId={tenantId} /></div>
       )}
       {visitadas.has('vitrine') && (
-        <div hidden={aba !== 'vitrine'}><AbaVitrine produtoId={produto.id} secoesIniciais={produto.secoes} podeEditar={podeEditar} /></div>
+        <div hidden={aba !== 'vitrine'}><AbaPaginaEntrada produtoId={produto.id} podeEditar={podeEditar}><AbaVitrine produtoId={produto.id} secoesIniciais={produto.secoes} podeEditar={podeEditar} /></AbaPaginaEntrada></div>
       )}
       {visitadas.has('grupos') && (
         <div hidden={aba !== 'grupos'}><AbaGrupos produtoId={produto.id} podeEditar={podeEditar} /></div>

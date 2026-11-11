@@ -2,9 +2,10 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverVisualSimulados, type VisualSim } from '@/lib/aluno/simulado-visual'
-import type { Disponibilidade, ItemRow, ModuloRow, TipoRef } from './curriculo'
+import type { Disponibilidade, ItemRow, ModuloRow, TipoRef, ModuloCard, MaterialChave, OrdemModulos, FiltroModulos } from './curriculo'
 import type { Produto, ProdutoLeve, ProdutoSecao } from './tipos'
-import { DISPONIBILIDADE_PADRAO } from './curriculo'
+import { ehModuloLayout } from './tipos'
+import { DISPONIBILIDADE_PADRAO, materialDoItem } from './curriculo'
 
 // Leituras server-side do bloco PRODUTOS do Estúdio (pastas + currículo + instrutores + resumo).
 // Backend-first: a lista é paginada no banco (.range + count). Tudo filtra por tenant_id
@@ -419,7 +420,7 @@ function normDisponibilidade(j: any): Disponibilidade {
 /** Filtro de tipo da aba Conteúdos (aplicado NO BANCO). */
 export type FiltroCurriculo = 'todos' | 'arquivo' | 'video' | 'outros'
 const TIPOS_REF_FILTRO: Record<Exclude<FiltroCurriculo, 'todos'>, string[]> = {
-  arquivo: ['documento_biblioteca'], video: ['video_url'], outros: ['simulado', 'quiz', 'link'],
+  arquivo: ['documento_biblioteca'], video: ['video_url'], outros: ['simulado', 'quiz', 'link', 'cronograma'],
 }
 
 /**
@@ -463,6 +464,164 @@ export async function getProdutoCurriculo(
     }))
     return { modulos, itens }
   } catch { return { modulos: [], itens: [] } }
+}
+
+function rowItem(i: any): ItemRow {
+  return {
+    id: i.id, produto_id: i.produto_id, modulo_id: i.modulo_id, ordem: i.ordem ?? 0,
+    tipo_ref: (i.tipo_ref ?? 'link') as TipoRef, subtipo: i.subtipo ?? null,
+    ref_id: i.ref_id ?? null, ref_url: i.ref_url ?? null, titulo: i.titulo,
+    visibilidade: i.visibilidade === 'publico' ? 'publico' : 'privado',
+    situacao: i.situacao === 'rascunho' ? 'rascunho' : 'ativo',
+    meta: (i.meta ?? {}) as Record<string, unknown>, disponibilidade: normDisponibilidade(i.disponibilidade),
+  }
+}
+function rowModulo(m: any): ModuloRow {
+  return {
+    id: m.id, produto_id: m.produto_id, pai_id: m.pai_id ?? null, titulo: m.titulo,
+    imagem_url: m.imagem_url ?? null, ocultar_titulo: !!m.ocultar_titulo, descricao: m.descricao ?? null, ordem: m.ordem ?? 0,
+    exibicao: m.exibicao === 'recolhido' ? 'recolhido' : 'aberto', disponibilidade: normDisponibilidade(m.disponibilidade),
+  }
+}
+const COLS_ITEM = 'id, produto_id, modulo_id, ordem, tipo_ref, subtipo, ref_id, ref_url, titulo, visibilidade, situacao, meta, disponibilidade'
+
+/** Todos os módulos do produto (árvore pequena e limitada) — usado nos seletores/diálogos e p/ montar os cards. */
+export async function listarModulosProduto(tenantId: string, produtoId: string): Promise<ModuloRow[]> {
+  const svc = createAdminClient()
+  try {
+    const rows = await fetchAll<any>(() => svc.from('simulado_produto_modulos').select('*')
+      .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false)
+      .order('ordem', { ascending: true }).order('id', { ascending: true }) as any, 1000, 'produto_modulos')
+    return rows.map(rowModulo)
+  } catch { return [] }
+}
+
+export interface PaginaModulos {
+  cards: ModuloCard[]; total: number; page: number
+  /** todos os módulos (id/título/pai) p/ diálogos de mover/novo conteúdo */
+  modulos: ModuloRow[]
+  totalAulas: number; totalModulos: number
+  /** cards de TODOS os módulos (sem filtro/paginação) — p/ cabeçalho, irmãos e breadcrumb da visão interna */
+  todos: ModuloCard[]
+}
+
+/**
+ * Cards dos módulos com AGREGADOS (aulas, submódulos, materiais, liberação, rascunho). As aulas são lidas só nas colunas
+ * leves e agregadas AQUI — o cliente recebe apenas os cards da página. `paiId` null = módulos de topo; senão, submódulos daquele pai.
+ */
+export async function moduloCardsProduto(tenantId: string, produtoId: string, o: {
+  paiId?: string | null; q?: string; filtro?: FiltroModulos; material?: MaterialChave | 'todos'; ordem?: OrdemModulos; page?: number; pp?: number
+}): Promise<PaginaModulos> {
+  const svc = createAdminClient()
+  try {
+    const [modulos, itens] = await Promise.all([
+      listarModulosProduto(tenantId, produtoId),
+      fetchAll<any>(() => svc.from('simulado_produto_modulo_itens')
+        .select('id, modulo_id, tipo_ref, subtipo, titulo, situacao, disponibilidade')
+        .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false)
+        .order('id', { ascending: true }) as any, 1000, 'produto_itens_agg'),
+    ])
+    const agora = Date.now()
+    type Agg = { aulas: number; materiais: Partial<Record<MaterialChave, number>>; programadas: number; proxData: number | null; rascunhos: number }
+    const novoAgg = (): Agg => ({ aulas: 0, materiais: {}, programadas: 0, proxData: null, rascunhos: 0 })
+    const direto = new Map<string, Agg>()
+    for (const it of itens) {
+      const a = direto.get(it.modulo_id) ?? novoAgg(); direto.set(it.modulo_id, a)
+      a.aulas++
+      const mat = materialDoItem(it.subtipo, (it.tipo_ref ?? 'link') as TipoRef, String(it.titulo ?? ''))
+      a.materiais[mat] = (a.materiais[mat] ?? 0) + 1
+      if (it.situacao === 'rascunho') a.rascunhos++
+      const d = normDisponibilidade(it.disponibilidade)
+      if (d.tipo !== 'na_matricula') {
+        const t = d.data ? Date.parse(d.data) : NaN
+        const liberada = d.tipo === 'data' && Number.isFinite(t) && t <= agora
+        if (!liberada) a.programadas++
+        if ((d.tipo === 'data' || d.tipo === 'data_e_intervalo') && Number.isFinite(t) && t > agora) a.proxData = a.proxData === null ? t : Math.min(a.proxData, t)
+      }
+    }
+    const filhos = new Map<string, string[]>()
+    for (const m of modulos) if (m.pai_id) { const arr = filhos.get(m.pai_id) ?? []; arr.push(m.id); filhos.set(m.pai_id, arr) }
+    const rollup = (id: string): Agg => {
+      const d = direto.get(id)
+      const r: Agg = d ? { ...d, materiais: { ...d.materiais } } : novoAgg()
+      for (const f of filhos.get(id) ?? []) {
+        const c = rollup(f); r.aulas += c.aulas; r.programadas += c.programadas; r.rascunhos += c.rascunhos
+        for (const [k, v] of Object.entries(c.materiais)) r.materiais[k as MaterialChave] = (r.materiais[k as MaterialChave] ?? 0) + (v ?? 0)
+        if (c.proxData !== null) r.proxData = r.proxData === null ? c.proxData : Math.min(r.proxData, c.proxData)
+      }
+      return r
+    }
+    const todos: ModuloCard[] = modulos.map((m) => {
+      const ag = rollup(m.id)
+      return {
+        id: m.id, pai_id: m.pai_id, titulo: m.titulo, imagem_url: m.imagem_url, ocultar_titulo: !!m.ocultar_titulo, descricao: m.descricao, ordem: m.ordem,
+        aulas: ag.aulas, aulasDiretas: direto.get(m.id)?.aulas ?? 0, submodulos: (filhos.get(m.id) ?? []).length,
+        materiais: ag.materiais, programadas: ag.programadas, proxData: ag.proxData !== null ? new Date(ag.proxData).toISOString() : null, rascunhos: ag.rascunhos,
+      }
+    })
+    let cards = todos.filter((c) => (c.pai_id ?? null) === (o.paiId ?? null))
+    const q = termo(o.q).toLowerCase()
+    if (q) cards = cards.filter((c) => c.titulo.toLowerCase().includes(q))
+    if (o.filtro === 'com_sub') cards = cards.filter((c) => c.submodulos > 0)
+    else if (o.filtro === 'programadas') cards = cards.filter((c) => c.programadas > 0)
+    else if (o.filtro === 'rascunho') cards = cards.filter((c) => c.rascunhos > 0)
+    if (o.material && o.material !== 'todos') cards = cards.filter((c) => (c.materiais[o.material as MaterialChave] ?? 0) > 0)
+    const ordem = o.ordem ?? 'ordem'
+    const porOrdem = (a: ModuloCard, b: ModuloCard) => a.ordem - b.ordem || a.id.localeCompare(b.id)
+    const nm = (a: ModuloCard, b: ModuloCard) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true })
+    const cmp: Record<string, (a: ModuloCard, b: ModuloCard) => number> = {
+      nome: nm, nome_desc: (a, b) => nm(b, a),
+      aulas: (a, b) => b.aulas - a.aulas || porOrdem(a, b), aulas_asc: (a, b) => a.aulas - b.aulas || porOrdem(a, b),
+      sub: (a, b) => b.submodulos - a.submodulos || porOrdem(a, b), sub_asc: (a, b) => a.submodulos - b.submodulos || porOrdem(a, b),
+      rascunhos: (a, b) => b.rascunhos - a.rascunhos || porOrdem(a, b), rascunhos_asc: (a, b) => a.rascunhos - b.rascunhos || porOrdem(a, b),
+    }
+    cards.sort(cmp[ordem] ?? porOrdem)
+    const pp = Math.min(60, Math.max(1, Math.floor(o.pp ?? 12)))
+    const total = cards.length
+    const page = Math.min(Math.max(1, Math.floor(o.page ?? 1)), Math.max(1, Math.ceil(total / pp)))
+    return { cards: cards.slice((page - 1) * pp, page * pp), total, page, modulos, totalAulas: itens.length, totalModulos: modulos.length, todos }
+  } catch { return { cards: [], total: 0, page: 1, modulos: [], totalAulas: 0, totalModulos: 0, todos: [] } }
+}
+
+export interface PaginaAulas {
+  itens: ItemRow[]; total: number; page: number
+  /** ids de TODAS as aulas do filtro (p/ "selecionar todas do módulo") — limitado ao módulo */
+  ids: string[]
+  materiais: Partial<Record<MaterialChave, number>>
+}
+
+/** Aulas DIRETAS de um módulo (busca por título no banco, filtro de material, paginado). Só o módulo aberto é carregado. */
+export async function aulasDoModulo(tenantId: string, produtoId: string, moduloId: string, o: { q?: string; material?: MaterialChave | 'todos'; page?: number; pp?: number }): Promise<PaginaAulas> {
+  const svc = createAdminClient()
+  const q = termo(o.q)
+  try {
+    const rows = await fetchAll<any>(() => {
+      let iq = svc.from('simulado_produto_modulo_itens').select(COLS_ITEM)
+        .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('modulo_id', moduloId).eq('deletado', false)
+      if (q) iq = iq.ilike('titulo', `%${q}%`)
+      return iq.order('ordem', { ascending: true }).order('id', { ascending: true }) as any
+    }, 1000, 'produto_itens_modulo')
+    let itens = rows.map(rowItem)
+    const materiais: Partial<Record<MaterialChave, number>> = {}
+    for (const it of itens) { const m = materialDoItem(it.subtipo, it.tipo_ref, it.titulo); materiais[m] = (materiais[m] ?? 0) + 1 }
+    if (o.material && o.material !== 'todos') itens = itens.filter((it) => materialDoItem(it.subtipo, it.tipo_ref, it.titulo) === o.material)
+    const pp = Math.min(100, Math.max(1, Math.floor(o.pp ?? 25)))
+    const total = itens.length
+    const page = Math.min(Math.max(1, Math.floor(o.page ?? 1)), Math.max(1, Math.ceil(total / pp)))
+    return { itens: itens.slice((page - 1) * pp, page * pp), total, page, ids: itens.map((i) => i.id), materiais }
+  } catch { return { itens: [], total: 0, page: 1, ids: [], materiais: {} } }
+}
+
+/** Busca global de aulas do produto (ilike + count + .range) — resultados limitados; o cliente agrupa pelo módulo de origem. */
+export async function buscarAulasProduto(tenantId: string, produtoId: string, q: string, limite = 60): Promise<{ itens: ItemRow[]; total: number }> {
+  const svc = createAdminClient()
+  const t = termo(q); if (!t) return { itens: [], total: 0 }
+  try {
+    const { data, count } = await svc.from('simulado_produto_modulo_itens').select(COLS_ITEM, { count: 'exact' })
+      .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false).ilike('titulo', `%${t}%`)
+      .order('modulo_id', { ascending: true }).order('ordem', { ascending: true }).order('id', { ascending: true }).range(0, limite - 1)
+    return { itens: ((data ?? []) as any[]).map(rowItem), total: count ?? 0 }
+  } catch { return { itens: [], total: 0 } }
 }
 
 function termo(q: string | undefined | null) { return (q ?? '').trim().replace(/[%,()]/g, ' ').trim() }
@@ -601,8 +760,14 @@ export async function getProdutoEditorLeve(tenantId: string, id: string): Promis
     const vl: any = await svc.from('simulado_produtos').select('vitrine_layout').eq('tenant_id', tenantId).eq('id', id).maybeSingle()
     if (!vl.error && vl.data?.vitrine_layout) vitrineLayout = vl.data.vitrine_layout
   } catch { /* coluna ausente → netflix */ }
+  // Formato da página do módulo (migr 20261113070000) — leitura tolerante.
+  let moduloLayout: Produto['modulo_layout'] = 'cards_lista'
+  try {
+    const ml: any = await svc.from('simulado_produtos').select('modulo_layout').eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+    if (!ml.error && ehModuloLayout(ml.data?.modulo_layout)) moduloLayout = ml.data.modulo_layout
+  } catch { /* coluna ausente → cards_lista */ }
   return {
-    produto: { ...(resto as Produto), vitrine_layout: vitrineLayout, acesso_bloqueado: !!(resto as any).acesso_bloqueado, secoes: ((secoes.data ?? []) as ProdutoSecao[]) },
+    produto: { ...(resto as Produto), vitrine_layout: vitrineLayout, modulo_layout: moduloLayout, acesso_bloqueado: !!(resto as any).acesso_bloqueado, secoes: ((secoes.data ?? []) as ProdutoSecao[]) },
     criadoEm: criado_em ?? null, atualizadoEm: atualizado_em ?? null, pastaId: pasta_id ?? null,
     mesmoNome: ((homonimos.data ?? []) as { id: string; nome: string }[]),
   }

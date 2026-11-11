@@ -26,7 +26,7 @@ import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
-import { PRODUTO_TIPOS, VITRINE_LAYOUTS, type ProdutoLeve, type ProdutoTipo, type VitrineLayout } from '@/lib/produtos/tipos'
+import { PRODUTO_TIPOS, VITRINE_LAYOUTS, MODULO_LAYOUTS, type ProdutoLeve, type ProdutoTipo, type VitrineLayout, type ModuloLayout } from '@/lib/produtos/tipos'
 import type { InstrutorRow, ResumoProduto } from '@/lib/produtos/estudio'
 import { salvarProdutoAction } from '@/app/admin/produtos/actions'
 import { PreviaFormatoVitrine } from '@/components/admin/previa-formato-vitrine'
@@ -62,11 +62,11 @@ function LinkEmbed({ slug }: { slug: string }) {
 
 export function AbaInformacoes({
   produto, instrutores: instrIniciais, resumo, podeEditar, criadoEm, atualizadoEm, mesmoNome,
-  onIrConteudos, onIrGrupos, onDuplicar, onMover, onExcluir, onManutencao, registerPublicar,
+  onIrConteudos, onIrGrupos, onIrPagina, onDuplicar, onMover, onExcluir, onManutencao, registerPublicar,
 }: {
   produto: ProdutoLeve; instrutores: InstrutorRow[]; resumo: ResumoProduto; podeEditar: boolean
   criadoEm: string | null; atualizadoEm: string | null; mesmoNome: { id: string; nome: string }[]
-  onIrConteudos: () => void; onIrGrupos: () => void
+  onIrConteudos: () => void; onIrGrupos: () => void; onIrPagina: () => void
   onDuplicar: () => void; onMover: () => void; onExcluir: () => void; onManutencao: () => void
   registerPublicar: (fn: () => void) => void
 }) {
@@ -82,6 +82,7 @@ export function AbaInformacoes({
   const [bannerUrl, setBannerUrl] = useState(produto.banner_url ?? '')        // Banner 1920×600
   const [logoUrl, setLogoUrl] = useState(produto.logo_url ?? '')
   const [vitrineLayout, setVitrineLayout] = useState<VitrineLayout>(produto.vitrine_layout ?? 'netflix')
+  const [moduloLayout, setModuloLayout] = useState<ModuloLayout>(produto.modulo_layout ?? 'cards_lista')
   const [previa, setPrevia] = useState<VitrineLayout | null>(null)
 
   const [instrutores, setInstrutores] = useState<InstrutorRow[]>(instrIniciais)
@@ -101,6 +102,7 @@ export function AbaInformacoes({
         banner_url: bannerUrl || null, banner_mobile_url: posterUrl || null,
         // formato de exibição do conteúdo pro aluno
         vitrine_layout: vitrineLayout,
+        modulo_layout: moduloLayout,
       })
       if ('error' in r && r.error) { toast.error(r.error); return }
       toast.success('Alterações publicadas.'); router.refresh()
@@ -182,6 +184,15 @@ export function AbaInformacoes({
           </div>
         </div>
 
+        {/* Cronograma / elementos da página do aluno */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold tracking-tight">Cronograma e elementos da página</h2>
+            <p className="text-sm text-muted-foreground">Adicione o plano de estudo (cronograma), banners e seções de módulos à página do produto, escolhendo o design e o que cada um mostra.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onIrPagina}>Adicionar cronograma à página</Button>
+        </div>
+
         {/* Outras configurações */}
         <div>
           <h2 className="text-lg font-bold tracking-tight">Outras configurações</h2>
@@ -230,6 +241,26 @@ export function AbaInformacoes({
                       <Eye className="h-3.5 w-3.5" />Prévia
                     </button>
                   </div>
+                )
+              })}
+            </div>
+          </CardConfig>
+
+          {/* Formato da PÁGINA DO MÓDULO (REAL — persiste em simulado_produtos.modulo_layout) */}
+          <CardConfig icon={<LayoutGrid className="h-4 w-4" />} titulo="Formato da página do módulo">
+            <p className="-mt-1 text-xs text-muted-foreground">Como as aulas de cada módulo são organizadas por tipo de material (PDFull, PDFlash, LegProc, Questões…) para o aluno.</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {MODULO_LAYOUTS.map((l) => {
+                const on = moduloLayout === l.v
+                return (
+                  <button key={l.v} type="button" disabled={!podeEditar} onClick={() => setModuloLayout(l.v)} aria-pressed={on}
+                    className={cn('flex min-w-0 flex-col gap-2 rounded-xl border p-3 text-left transition-colors', on ? 'border-primary bg-primary/10' : 'hover:bg-muted/50', !podeEditar && 'cursor-not-allowed opacity-60')}>
+                    <MiniModuloLayout v={l.v} />
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      {on ? <Check className="h-4 w-4 shrink-0 text-primary" /> : <span className="h-4 w-4 shrink-0 rounded-full border" />}{l.label}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">{l.descricao}</span>
+                  </button>
                 )
               })}
             </div>
@@ -465,4 +496,33 @@ function LinhaInfo({ k, v }: { k: string; v: string }) {
 }
 function Linha({ k, v }: { k: string; v: string }) {
   return <div className="flex items-center justify-between gap-2 py-2"><dt className="text-muted-foreground">{k}</dt><dd className="truncate font-medium">{v}</dd></div>
+}
+
+/** Miniatura esquemática de cada formato da página do módulo (só tokens do tema). */
+function MiniModuloLayout({ v }: { v: ModuloLayout }) {
+  const bar = 'rounded-sm bg-primary/30'
+  const linha = 'h-1.5 rounded-sm bg-muted-foreground/25'
+  return (
+    <div aria-hidden className="h-20 w-full overflow-hidden rounded-lg border bg-background p-2">
+      {v === 'cards_lista' && (
+        <div className="flex h-full flex-col gap-1.5">
+          <div className="grid grid-cols-4 gap-1.5">{[0, 1, 2, 3].map((i) => <div key={i} className={`h-5 ${bar} ${i === 0 ? '!bg-primary/60' : ''}`} />)}</div>
+          <div className={linha} /><div className={linha} /><div className={`${linha} w-2/3`} />
+        </div>
+      )}
+      {v === 'colunas' && (
+        <div className="grid h-full grid-cols-3 gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-1.5"><div className={`h-3 ${bar}`} /><div className={linha} /><div className={linha} /><div className={`${linha} w-2/3`} /></div>
+          ))}
+        </div>
+      )}
+      {v === 'abas' && (
+        <div className="flex h-full flex-col gap-1.5">
+          <div className="flex gap-2 border-b pb-0.5">{[0, 1, 2, 3].map((i) => <div key={i} className={`h-2 w-6 rounded-sm ${i === 0 ? 'border-b-2 border-primary bg-primary/30' : 'bg-muted-foreground/25'}`} />)}</div>
+          <div className={linha} /><div className={linha} /><div className={`${linha} w-2/3`} />
+        </div>
+      )}
+    </div>
+  )
 }

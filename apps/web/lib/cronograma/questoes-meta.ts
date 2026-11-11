@@ -1,3 +1,4 @@
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { Grade } from './tipos'
 
 /**
@@ -8,15 +9,13 @@ import type { Grade } from './tipos'
 export async function contarQuestoesPorMeta(svc: any, tenantId: string, metaIds: string[]): Promise<Map<string, number>> {
   const mapa = new Map<string, number>()
   if (!metaIds.length) return mapa
-  for (let i = 0; i < metaIds.length; i += 300) {
-    const chunk = metaIds.slice(i, i + 300)
-    const { data } = await svc
-      .from('simulado_cronograma_meta_questoes')
-      .select('meta_id')
-      .eq('tenant_id', tenantId)
-      .in('meta_id', chunk)
-    for (const r of (data ?? []) as { meta_id: string }[]) mapa.set(r.meta_id, (mapa.get(r.meta_id) ?? 0) + 1)
-  }
+  // fetchAllByIn: lote de 80 ids (URL curta) + paginação — um meta com várias questões fazia o
+  // select cru de 300 ids passar de 1.000 linhas e a contagem truncava em silêncio.
+  const linhas = await fetchAllByIn<{ id: string; meta_id: string }>(metaIds, (chunk) =>
+    svc.from('simulado_cronograma_meta_questoes').select('id, meta_id').eq('tenant_id', tenantId).in('meta_id', chunk).order('id') as any,
+    { concorrencia: 4 }, // 743 metas = 10 lotes: em ondas de 4 (antes 10 round-trips em série)
+  )
+  for (const r of linhas) mapa.set(r.meta_id, (mapa.get(r.meta_id) ?? 0) + 1)
   return mapa
 }
 

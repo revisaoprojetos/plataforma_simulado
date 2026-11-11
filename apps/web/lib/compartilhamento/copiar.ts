@@ -1,6 +1,7 @@
 import 'server-only'
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 /**
  * Motor de CÓPIA cross-tenant (Fase 3). Duplica conteúdo de uma plataforma (origem) para
@@ -188,7 +189,7 @@ export async function copiarEstudante(svc: SupabaseClient, origem: string, desti
   }
   if (!destinoId) {
     const { data: novo, error } = await svc.from('simulado_estudantes').insert({
-      tenant_id: destino, nome: (e as any).nome ?? 'Estudante', email, cpf: (e as any).cpf ?? null,
+      tenant_id: destino, nome: (e as any).nome ?? 'Estudante', email, cpf: (e as any).cpf ?? null, ...colunasCpfCripto((e as any).cpf ?? null),
       telefone: (e as any).telefone ?? null, data_nascimento: (e as any).data_nascimento ?? null,
       classificacao: (e as any).classificacao ?? 'normal', created_at: nowIso(),
     }).select('id').single()

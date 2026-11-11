@@ -3,6 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { hojeISO } from '@/lib/cronograma/datas'
 import { carregarAdaptativo } from '@/lib/cronograma/adaptativo/dados'
 import { tipoBase, type AdaptativoSnapshot } from '@/lib/cronograma/adaptativo/snapshot'
+import { planoFixado } from '@/lib/cronograma/fixar'
+import { abrirEmissaoParaRender, checksParaRender } from '@/app/aluno/(portal)/cronograma/emissoes-actions'
+import { duracaoEmMinutos, fmtFaixa, somarDuracoes } from '@/lib/cronograma/duracao'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
 
@@ -16,13 +19,16 @@ import { resumoGamificacao } from '@/lib/gamificacao/leitura'
 const T = 'simulado_painel_snapshot'
 // Versão do shape/fonte do snapshot. BUMP ao trocar a fonte (ex.: EMISSÕES → ADAPTATIVO): linhas
 // antigas (dia=hoje, shape velho) viram MISS e recomputam — evita servir metas do motor anterior.
-const VERSAO = 2
+const VERSAO = 3 // v3: fonte = plano FIXADO de qualquer tipo (Adaptativo ou Cronograma Revisão) + campo `foco`
 
 export type PainelMeta = {
   id: string
   sel: string; selKind: 'brand' | 'gold' | 'green'
   dur: string; titulo: string; sub: string
   concluida: boolean; data: string | null
+  /** De onde a meta vem — define a rota de "concluir" no cliente. Chave estável: `id` (meta do plano/catálogo). */
+  fonte?: 'adaptativo' | 'revisao'
+  emissaoId?: string
 }
 export type PainelContinue = { docId: string; titulo: string; cursoNome: string | null; thumb: string | null } | null
 export type PainelDados = {
@@ -33,9 +39,11 @@ export type PainelDados = {
   streak: number
   metas: PainelMeta[]
   continue: PainelContinue
+  /** Plano em foco (fixado), de qualquer tipo; `href` = onde abrir. */
+  foco: { tipo: 'adaptativo' | 'revisao'; id: string; titulo: string; href: string } | null
 }
 
-const VAZIO: PainelDados = { v: VERSAO, temCronograma: false, feitasHoje: 0, totalHoje: 0, pctHoje: 0, pendencias: 0, pctSemana: 0, horasLabel: '0min', streak: 0, metas: [], continue: null }
+const VAZIO: PainelDados = { v: VERSAO, temCronograma: false, feitasHoje: 0, totalHoje: 0, pctHoje: 0, pendencias: 0, pctSemana: 0, horasLabel: '0min', streak: 0, metas: [], continue: null, foco: null }
 
 /** Minutos → rótulo "1h20" / "45min". */
 function fmtDur(min: number): string {
@@ -49,36 +57,96 @@ function selKindDe(tipo: string): 'brand' | 'gold' | 'green' {
   return tipoBase(tipo) === 'qu' ? 'green' : 'brand'
 }
 
+/** Cor do selo da meta do Cronograma Revisão (slug livre do tenant): questões → verde; lei seca/jurisprudência → dourado. */
+function selKindRevisao(slug: string): 'brand' | 'gold' | 'green' {
+  if (/quest/i.test(slug)) return 'green'
+  if (/^lp$|lei|juris/i.test(slug)) return 'gold'
+  return 'brand'
+}
+
+/** Metas de hoje / atrasadas / semana da EMISSÃO Revisão fixada (grade remontada + meta_checks). Chave estável = id da meta do catálogo. */
+async function dadosEmissao(tenantId: string, emissaoId: string): Promise<{ metas: PainelMeta[]; pendencias: number; pctSemana: number; horasLabel: string } | null> {
+  try {
+    const [r, checks] = await Promise.all([abrirEmissaoParaRender(emissaoId, tenantId), checksParaRender(emissaoId, tenantId)])
+    if (!r.ok || !r.dados || r.dados.indisponivel) return { metas: [], pendencias: 0, pctSemana: 0, horasLabel: '0min' }
+    const hoje = hojeISO()
+    const feita = (id: string) => id in checks
+    let pendencias = 0, pctSemana = 0
+    const doDia: PainelMeta[] = []
+    const duracoes: (string | null)[] = []
+    for (const sem of r.dados.grade.semanas) {
+      if (sem.kind !== 'conteudo') continue
+      if (sem.inicio <= hoje && hoje <= sem.fim) {
+        const tot = sem.metas.length
+        pctSemana = tot ? Math.round((sem.metas.filter((m) => feita(m.id)).length / tot) * 100) : 0
+      }
+      for (const m of sem.metas) {
+        if (m.data < hoje && !feita(m.id)) pendencias++
+        if (m.data !== hoje) continue
+        duracoes.push(m.duracao)
+        const f = duracaoEmMinutos(m.duracao)
+        doDia.push({
+          id: m.id, sel: m.tipoDef.nome, selKind: selKindRevisao(m.tipoDef.slug),
+          dur: f ? fmtFaixa(f) : '', titulo: m.titulo,
+          sub: [m.disciplina, m.aula ? `Aula ${m.aula}` : ''].filter(Boolean).join(' · '),
+          concluida: feita(m.id), data: m.data, fonte: 'revisao', emissaoId,
+        })
+      }
+    }
+    const soma = somarDuracoes(duracoes)
+    return { metas: doDia, pendencias, pctSemana, horasLabel: soma ? fmtFaixa(soma) : '' }
+  } catch { return null }
+}
+
 /** COMPUTA o painel (pesado). Session-independent — nunca chamado no render do caminho rápido. */
 export async function computarPainel(svc: SupabaseClient, tenantId: string, estId: string): Promise<PainelDados> {
   // Fonte das metas = Cronograma Adaptativo 2.0 FIXADO (plano em foco). carregarAdaptativo já
   // devolve o snapshot pronto (metas do dia/semana + atrasadas) — nenhuma computação aqui.
-  let snap: AdaptativoSnapshot | null = null
-  try {
-    const carga = await carregarAdaptativo(svc, tenantId, estId)
-    if (carga.temPlano) snap = carga.snapshot
-  } catch { /* sem plano / tabela ausente */ }
+  // O plano FIXADO pode ser de qualquer tipo. Sem nenhum fixado (aluno antigo / migração pendente) →
+  // comportamento anterior: Adaptativo (fixado ou mais recente).
+  let fixado: Awaited<ReturnType<typeof planoFixado>> = null
+  try { fixado = await planoFixado(svc, tenantId, estId) } catch { /* colunas ausentes */ }
 
-  const metasHoje = snap?.hoje.metas ?? []
-  const feitasHoje = metasHoje.filter((m) => m.estado === 'done').length
-  const totalHoje = metasHoje.length
+  let snap: AdaptativoSnapshot | null = null
+  let rev: Awaited<ReturnType<typeof dadosEmissao>> = null
+  if (fixado?.tipo === 'revisao') rev = await dadosEmissao(tenantId, fixado.id)
+  else {
+    try {
+      const carga = await carregarAdaptativo(svc, tenantId, estId)
+      if (carga.temPlano) snap = carga.snapshot
+    } catch { /* sem plano / tabela ausente */ }
+  }
+
+  let metas: PainelMeta[]
+  let pendencias: number, pctSemana: number, horasLabel: string
+  if (rev) {
+    ;({ metas, pendencias, pctSemana, horasLabel } = rev)
+  } else {
+    const metasHoje = snap?.hoje.metas ?? []
+    pendencias = snap?.hoje.atrasadas ?? 0
+    const hojeData = snap?.hoje.data ?? null
+    const semana = hojeData ? (snap?.semanas.find((s) => s.ini <= hojeData && hojeData <= s.fim) ?? null) : null
+    pctSemana = semana && semana.tot ? Math.round((semana.ok / semana.tot) * 100) : 0
+    horasLabel = fmtDur(snap?.hoje.cargaMin ?? 0)
+    metas = metasHoje.map((m) => ({
+      id: m.id,
+      sel: m.tipoNome,
+      selKind: selKindDe(m.tipo),
+      dur: m.durMin ? fmtDur(m.durMin) : '',
+      titulo: m.titulo,
+      sub: [m.disc, m.aula ? `Aula ${m.aula}` : ''].filter(Boolean).join(' · '),
+      concluida: m.estado === 'done',
+      data: m.data,
+      fonte: 'adaptativo' as const,
+    }))
+  }
+  const feitasHoje = metas.filter((m) => m.concluida).length
+  const totalHoje = metas.length
   const pctHoje = totalHoje ? Math.round((feitasHoje / totalHoje) * 100) : 0
-  const pendencias = snap?.hoje.atrasadas ?? 0
-  const hojeData = snap?.hoje.data ?? null
-  const semana = hojeData ? (snap?.semanas.find((s) => s.ini <= hojeData && hojeData <= s.fim) ?? null) : null
-  const pctSemana = semana && semana.tot ? Math.round((semana.ok / semana.tot) * 100) : 0
-  const minTotal = snap?.hoje.cargaMin ?? 0
-  const horasLabel = fmtDur(minTotal)
-  const metas: PainelMeta[] = metasHoje.map((m) => ({
-    id: m.id,
-    sel: m.tipoNome,
-    selKind: selKindDe(m.tipo),
-    dur: m.durMin ? fmtDur(m.durMin) : '',
-    titulo: m.titulo,
-    sub: [m.disc, m.aula ? `Aula ${m.aula}` : ''].filter(Boolean).join(' · '),
-    concluida: m.estado === 'done',
-    data: m.data,
-  }))
+  const temCron = !!snap || !!rev
+  const foco: PainelDados['foco'] = rev && fixado
+    ? { tipo: 'revisao', id: fixado.id, titulo: (fixado.titulo || 'Meu cronograma').trim(), href: `/aluno/cronograma/${fixado.id}` }
+    : snap ? { tipo: 'adaptativo', id: fixado?.id ?? '', titulo: (fixado?.titulo || 'Meu cronograma').trim(), href: '/aluno/cronograma?ver=adaptativo' } : null
 
   // Sequência (gamificação).
   let streak = 0
@@ -113,7 +181,7 @@ export async function computarPainel(svc: SupabaseClient, tenantId: string, estI
     }
   } catch { /* best-effort */ }
 
-  return { v: VERSAO, temCronograma: !!snap, feitasHoje, totalHoje, pctHoje, pendencias, pctSemana, horasLabel, streak, metas, continue: cont }
+  return { v: VERSAO, temCronograma: temCron, feitasHoje, totalHoje, pctHoje, pendencias, pctSemana, horasLabel, streak, metas, continue: cont, foco }
 }
 
 /** LÊ o painel (caminho rápido): 1 linha pronta. Só computa se não houver snapshot ou se o dia virou. */

@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { lerSessaoImpersonation } from '@/lib/impersonation/session'
+import { alunoBloqueado } from '@/lib/aluno-bloqueio'
 
 const COOKIE = 'aluno_session'
 const MAX_AGE = 60 * 60 * 24 * 7 // 7 dias
@@ -76,6 +77,8 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
     if (token) {
       const { payload } = await jwtVerify(token, secret())
       if (payload.estudanteId && payload.tenantId) {
+        // CS › Membros: aluno bloqueado perde a sessão já aberta (o cookie dura 7 dias).
+        if (await alunoBloqueado(String(payload.estudanteId))) return null
         return {
           estudanteId: String(payload.estudanteId),
           tenantId: String(payload.tenantId),

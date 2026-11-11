@@ -47,7 +47,6 @@ import { CardConteudo } from '@/components/biblioteca/card-conteudo'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
 import { BuscaDrive, type OpcaoChip } from '@/components/biblioteca/busca-drive'
 import { DriveUploadPanel, DriveNovoStyles, type DriveUploadItem } from '@/components/admin/drive-novo'
-import { cardGrid, FOLDER_MIN, POSTER_MIN } from '@/components/aluno/card-grid'
 import { TIPOS_CONTEUDO, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 import { detectarVideo, PLATAFORMA_LABEL, referenciaVideoProprio, type VideoPlataforma } from '@/lib/biblioteca/video-provedor'
 import { formatTime } from '@/lib/video/player-protocolo'
@@ -137,8 +136,8 @@ export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'bibliote
         showCloseButton
         className={cn(
           'flex flex-col gap-0 overflow-hidden p-0',
-          'w-[min(1120px,calc(100vw-2rem))] max-w-[min(1120px,calc(100vw-2rem))] sm:max-w-[min(1120px,calc(100vw-2rem))]',
-          'h-[min(86vh,780px)]',
+          'w-[min(1440px,calc(100vw-2rem))] max-w-[min(1440px,calc(100vw-2rem))] sm:max-w-[min(1440px,calc(100vw-2rem))]',
+          'h-[min(92vh,900px)]',
         )}
       >
         {/* Cabeçalho + abas (sublinhado) */}
@@ -305,7 +304,7 @@ function AbaBiblioteca({ tenantId, filtros, categoria: CATEGORIA, onReportar }: 
                 <div className="space-y-4">
                   {/* Subpastas (só quando não há busca por texto) */}
                   {buscaAtiva === null && subpastas.length > 0 && (
-                    <div style={cardGrid(FOLDER_MIN, 10)}>
+                    <div className="grid grid-cols-3 gap-2.5">
                       {subpastas.map((p) => (
                         <CardPasta key={p.id} nome={p.nome} cor={p.cor} onClick={() => { setSel(null); carregar(p.id) }} />
                       ))}
@@ -317,7 +316,7 @@ function AbaBiblioteca({ tenantId, filtros, categoria: CATEGORIA, onReportar }: 
                       Nenhum documento {tiposPermitidos?.length ? 'do tipo pedido ' : ''}aqui.
                     </div>
                   ) : (
-                    <div style={cardGrid(POSTER_MIN, 10)}>
+                    <div className="grid grid-cols-3 gap-2.5">
                       {docsFiltrados.map((d) => {
                         const kind = tipoOrigemToKind(d.tipo_origem)
                         const escolhido = sel?.id === d.id
@@ -489,19 +488,19 @@ function AbaUpload({ categoria: CATEGORIA, onReportar }: { categoria: Categoria;
       const it = itens[i]
       try {
         const prep = await prepararUploadConteudo(f.name)
-        if (!prep.ok || !prep.path || !prep.uploadUrl) { patch(it.id, { status: 'erro', pct: 100 }); continue }
+        if (!prep.ok || !prep.path || !prep.uploadUrl) { patch(it.id, { status: 'erro', pct: 100 }); toast.error(`${f.name}: ${prep.error || 'não foi possível preparar o envio.'}`); continue }
         let subiu = await subirComProgresso(prep.uploadUrl, f, (frac) => patch(it.id, { pct: Math.min(99, Math.round(frac * 100)) }))
         if (!subiu && prep.kind === 'supabase' && prep.token && prep.bucket) {
           const up = await createClient().storage.from(prep.bucket).uploadToSignedUrl(prep.path, prep.token, f, { contentType: f.type || undefined })
           subiu = !up.error
         }
-        if (!subiu) { patch(it.id, { status: 'erro', pct: 100 }); continue }
+        if (!subiu) { patch(it.id, { status: 'erro', pct: 100 }); toast.error(`${f.name}: falha ao enviar o arquivo ao armazenamento.`); continue }
         patch(it.id, { status: 'processando', pct: 100 })
         const titulo = f.name.replace(/\.[^.]+$/, '')
         const r = await importarDeStorage({ path: prep.path, titulo, nomeArquivo: f.name, mime: f.type, pastaId: destino, categoria: CATEGORIA })
         if (r.ok && r.documentoId) { patch(it.id, { status: 'ok' }); setEnviados((prev) => [...prev, { documentoId: r.documentoId!, titulo }]) }
-        else patch(it.id, { status: 'erro' })
-      } catch { patch(it.id, { status: 'erro', pct: 100 }) }
+        else { patch(it.id, { status: 'erro' }); toast.error(`${f.name}: ${r.error || 'não foi possível importar o documento.'}`) }
+      } catch (e) { patch(it.id, { status: 'erro', pct: 100 }); toast.error(`${f.name}: ${e instanceof Error ? e.message : 'falha na importação.'}`) }
     }
   }
 

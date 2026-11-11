@@ -47,18 +47,27 @@ export async function fetchAll<T = any>(
 export async function fetchAllByIn<T = any>(
   ids: string[],
   build: (idsChunk: string[]) => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }> },
-  { chunk = 80, pageSize = 1000, rotulo }: { chunk?: number; pageSize?: number; rotulo?: string } = {},
+  { chunk = 80, pageSize = 1000, rotulo, concorrencia = 1 }: { chunk?: number; pageSize?: number; rotulo?: string; concorrencia?: number } = {},
 ): Promise<T[]> {
-  const all: T[] = []
-  for (let i = 0; i < ids.length; i += chunk) {
-    const idsChunk = ids.slice(i, i + chunk)
+  const lerLote = async (idsChunk: string[]): Promise<T[]> => {
+    const out: T[] = []
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await build(idsChunk).range(from, from + pageSize - 1)
       if (error) throw error
       if (!data || data.length === 0) break
-      all.push(...data)
+      out.push(...data)
       if (data.length < pageSize) break
     }
+    return out
+  }
+  const lotes: string[][] = []
+  for (let i = 0; i < ids.length; i += chunk) lotes.push(ids.slice(i, i + chunk))
+  const all: T[] = []
+  // `concorrencia` > 1: lotes em ondas paralelas (ordem de saída preservada). Padrão 1 = comportamento antigo (sequencial).
+  const onda = Math.max(1, Math.floor(concorrencia))
+  for (let i = 0; i < lotes.length; i += onda) {
+    const partes = await Promise.all(lotes.slice(i, i + onda).map(lerLote))
+    for (const p of partes) all.push(...p)
   }
   avisarSeGrande(all.length, rotulo)
   return all

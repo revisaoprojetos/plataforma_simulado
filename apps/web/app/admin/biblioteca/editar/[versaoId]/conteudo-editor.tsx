@@ -15,8 +15,8 @@ const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
 const PLUGIN_AREAS_GUID = 'asc.{8B2D5E71-4F3A-4C19-9A60-D1E7A2B3C4F5}'
 const PLUGIN_EXPANSOR_GUID = 'asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}'
 
-export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca' }: {
-  versaoId: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string
+export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca' }: {
+  versaoId: string; documentoId?: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string
 }) {
   const montado = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -31,6 +31,8 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
     const pluginExpansorConfig = `${origin}/oo-plugin-expansor/config.json`
     const pluginSelosConfig = `${origin}/oo-plugin-selos/config.json`
     try { localStorage.setItem('teste_oo_docid', versaoId) } catch { /* sem storage, prévia do plugin degrada */ }
+    // id do DOCUMENTO (não da versão): o plugin Expansor usa p/ abrir o leitor do aluno ("Abrir no leitor do aluno").
+    try { if (documentoId) localStorage.setItem('oo_documento_id', documentoId) } catch { /* botão do plugin avisa */ }
     // Paleta dos blocos derivada da MARCA do tenant → o plugin usa estas cores (fallback = navy+dourado).
     try { if (palette) localStorage.setItem('oo_blocos_palette', JSON.stringify(palette)) } catch { /* mantém defaults */ }
     const criar = () => {
@@ -63,7 +65,7 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
     s.src = scriptSrc; s.async = true; s.onload = criar
     s.onerror = () => setErro(`Não carregou ${scriptSrc}. Suba o OnlyOffice e confira NEXT_PUBLIC_ONLYOFFICE_URL.`)
     document.body.appendChild(s)
-  }, [versaoId, onlyofficeUrl, documentUrl, wopiHost, chave, titulo, preview])
+  }, [versaoId, documentoId, onlyofficeUrl, documentUrl, wopiHost, chave, titulo, preview])
 
   // Ponte do plugin "Selos": o iframe do plugin não leva cookies, então pede à PÁGINA (sessão do admin) que
   // crie/edite/exclua a etiqueta; só aceita mensagens da própria origem do app.

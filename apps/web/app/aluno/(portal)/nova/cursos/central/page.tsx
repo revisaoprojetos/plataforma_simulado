@@ -86,6 +86,8 @@ export default async function CentralEstudosPage() {
           : <Seg items={['Meus cursos', 'Central de Estudos']} active={1} links={[R.cursos, R.central]} />}
       />
 
+      {/* Cronograma: gerar (sem plano) ou resumo + abrir (com plano). */}
+
       {/* Ferramentas da Central */}
       <Grid cols={3} gap={20}>
         {FERRAMENTAS.map((f) => (

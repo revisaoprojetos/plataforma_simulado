@@ -72,8 +72,10 @@ export async function salvarEstiloExpPadraoDoTenant(svc: any, tenantId: string, 
 }
 
 // ───────────────────────── marcadores ─────────────────────────
-const RE_MARC_TXT = /^\s*\[\[(\/?)(AREA|EXP):([a-z0-9]{4,16})(?:\|([^\]]*))?\]\]\s*$/i
-const RE_MARC_HTML = /<p\b[^>]*>(?:\s*<[^/!][^>]*>)*\s*\[\[(\/?)(AREA|EXP):([a-z0-9]{4,16})(?:\|([^\]]*))?\]\]\s*(?:<\/[^>]+>\s*)*<\/p>/gi
+// O parágrafo do marcador de INÍCIO do Expansor pode trazer, depois do código, um CABEÇALHO visível só no editor ("▸ Título"):
+// `[[EXP:id|Título|preset]]▸ Título`. O parágrafo inteiro é tratado como marcador (some para o aluno, no texto e no PDF).
+const RE_MARC_TXT = /^\s*\[\[(\/?)(AREA|EXP):([a-z0-9]{4,16})(?:\|([^\]]*))?\]\](?:\s*▸[^\r\n]*)?\s*$/i
+const RE_MARC_HTML = /<p\b[^>]*>(?:\s*<[^/!][^>]*>)*\s*\[\[(\/?)(AREA|EXP):([a-z0-9]{4,16})(?:\|([^\]]*))?\]\]\s*(?:(?:<[^>]+>\s*)*▸[^<]*)?(?:<\/[^>]+>\s*)*<\/p>/gi
 const RE_PARA = /<w:p[ >][\s\S]*?<\/w:p>/g
 
 function decodificar(s: string): string {

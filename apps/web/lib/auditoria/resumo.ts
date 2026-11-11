@@ -90,6 +90,7 @@ const SUBSTANTIVO: Record<string, string> = {
   simulado_cronogramas: 'cronograma', simulado_cronograma_pacotes: 'pacote de cronogramas',
   simulado_cronograma_meta_checks: 'meta de cronograma', simulado_cronograma_tipos_meta: 'tipo de meta',
   simulado_cronograma_downloads: 'exportação de cronograma',
+  simulado_roles: 'papel', simulado_role_permissions: 'permissões do papel', simulado_tenant_acessos: 'acesso à equipe',
   auth: 'painel',
 }
 
@@ -108,6 +109,17 @@ export function resumoRegistro(log: any, nomes: Map<string, string>): string {
   const comAlvo = alvo ? `${noun} "${alvo}"` : `um ${noun}`
 
   if (ent === 'auth') return op === 'LOGIN' ? 'Entrou no painel' : op === 'LOGOUT' ? 'Saiu do painel' : op
+
+  // Equipe / RBAC (Permissões da equipe): frases próprias.
+  if (ent === 'simulado_role_permissions' && d.papel && d.area) return `${d.papel} em ${d.area}: ${d.nivel ?? 'alterado'}`
+  if (ent === 'simulado_tenant_acessos') {
+    const quem = d.email ?? d.nome ?? ''
+    if (op === 'INSERT') return `Convidou ${quem || 'uma pessoa'} como ${d.cargo ?? 'membro da equipe'}`
+    if (op === 'DELETE') return 'Tirou o acesso de uma pessoa da equipe'
+    if (op === 'UPDATE' && d.role) return `Trocou o papel de uma pessoa para ${d.role}`
+    if (op === 'LIBERAR' || op === 'BLOQUEAR') return `${op === 'LIBERAR' ? 'Reativou' : 'Desativou'} o acesso de uma pessoa da equipe`
+  }
+  if (ent === 'simulado_tenants' && d.aparencia) return 'Alterou a aparência da plataforma'
 
   if (ent === 'simulado_cronograma_downloads') {
     const fmt = String(d.botao ?? '').toUpperCase() || 'arquivo'

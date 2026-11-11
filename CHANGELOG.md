@@ -12,6 +12,24 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.14.0 — 2026-11-11
+
+### Conteúdos — visibilidade por segmento em lote
+- **Painel lateral de Visibilidade** na aba Conteúdos do produto: vale para 1 aula, várias aulas marcadas ou módulos (diálogo). Mostra o estado atual, aplica "Mostrar somente para" / "Ocultar para" um segmento (não aparece ou com cadeado), substitui ou mantém regras e limpa regras.
+- **Segmentos completos dentro de Conteúdos**: criar, editar, duplicar e excluir segmentos (mesmo construtor da aba Visibilidade, com teste por aluno). Chip de regra nas linhas e "Visibilidade" no detalhe da aula; o dropdown antigo passou a se chamar "Acesso".
+- Novas ações de servidor: `aplicarVisibilidadeEmLoteAction` (valida alvos do produto/tenant, chunks de 80, audita) e `carregarVisibilidadeConteudoAction`.
+- Seletor de grupo/produto/simulado dos segmentos mais largo, com rolagem lateral.
+- Verificada a avaliação das condições (33 checagens com dados reais: E/OU, mostrar/ocultar/cadeado, grupo, datas, texto, números).
+
+### Seletor de arquivos
+- Pop-up maior (até 1440×900) com pastas e documentos em 3 colunas.
+- Upload: PDF sem camada de texto (digitalizado/protegido) agora é aceito (antes falhava a importação e deixava documento órfão); erros de envio passam a mostrar o motivo real.
+
+### Meta
+- Membros, CPF cifrado (etapa 1), Biblioteca/Questões do Pedagógico e demais ajustes pendentes da branch seguem no mesmo commit.
+
+---
+
 ## 4.13.0 — 2026-11-11
 
 ### Gerenciador de Vídeo — o serviço manda, a plataforma se adapta (stack única)

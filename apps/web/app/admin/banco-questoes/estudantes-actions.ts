@@ -12,6 +12,7 @@ import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { pdfStoragePath } from '@/lib/caderno-designer/material'
 import { getStorage } from '@/lib/storage'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) return { ok: false as const, error: 'Sem permissão.' }
@@ -272,7 +273,7 @@ export async function importarEstudante(
   } else {
     const { data: novo, error: pErr } = await svc
       .from('simulado_estudantes')
-      .insert({ tenant_id: g.tenantId, user_id: userId, nome, email, cpf: dados.cpf?.trim() || null, telefone: dados.telefone?.trim() || null })
+      .insert({ tenant_id: g.tenantId, user_id: userId, nome, email, cpf: dados.cpf?.trim() || null, ...colunasCpfCripto(dados.cpf?.trim() || null), telefone: dados.telefone?.trim() || null })
       .select('id')
       .single()
     if (pErr) return { ok: false, error: pErr.message }
@@ -327,7 +328,7 @@ export async function importarEstudantesLote(
       .insert(novos.map((r) => ({
         tenant_id: g.tenantId, user_id: null, email: r.email,
         nome: r.nome?.trim() || r.email, telefone: r.telefone?.trim() || null,
-        cpf: r.cpf?.trim() || null, classificacao: r.classificacao?.trim() || null,
+        cpf: r.cpf?.trim() || null, ...colunasCpfCripto(r.cpf?.trim() || null), classificacao: r.classificacao?.trim() || null,
       })))
       .select('id, email')
     if (error) return { ok: false, error: error.message }

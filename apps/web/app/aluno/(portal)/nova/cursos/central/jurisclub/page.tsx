@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Crumbs, Card, Muted, SecHead, Row, Col, Tag } from '@/components/nova/ui'
 import { materiaisJurisclubDoAluno, type MaterialJurisclub } from '@/lib/produtos/jurisclub-aluno'
+import { edicoesJurisclubDoAluno, type EdicaoAluno } from '@/lib/revisao/jurisclub-aluno-edicoes'
 import { R } from '@/lib/nova/rotas'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -61,6 +62,33 @@ function MateriaisProduto({ itens }: { itens: MaterialJurisclub[] }) {
   )
 }
 
+/** Edições do JurisClub montadas no admin (Pedagógico › JurisClub) e liberadas ao aluno. */
+function EdicoesAdmin({ itens }: { itens: EdicaoAluno[] }) {
+  return (
+    <div style={{ marginTop: 24 }}>
+      <SecHead title="Edições do JurisClub" sub="Publicadas para você" />
+      <Col gap={10}>
+        {itens.map((e) => {
+          const titulo = (
+            <Col gap={2}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{e.titulo}</span>
+              <Muted size={12}>{e.julgados} {e.pasta === '1a7d' ? 'temas' : 'julgados'}{e.questoes ? ` · ${e.questoes} questões V/F` : ''}</Muted>
+            </Col>
+          )
+          return (
+            <Card key={e.id} pad={14}>
+              <Row gap={12} style={{ justifyContent: 'space-between' }}>
+                {e.href ? <Link href={e.href} style={{ textDecoration: 'none', color: 'inherit', flex: 1 }}>{titulo}</Link> : titulo}
+                {e.href ? <Tag>Ler agora</Tag> : <Tag kind="gray">Leitura bloqueada</Tag>}
+              </Row>
+            </Card>
+          )
+        })}
+      </Col>
+    </div>
+  )
+}
+
 const primeiroNome =(nome: string) => (nome || '').trim().split(/\s+/)[0] || 'Aluno'
 
 export default async function JurisClubPage() {
@@ -71,21 +99,24 @@ export default async function JurisClubPage() {
 
   // Edições (desafios) a que o aluno tem acesso — REAL. desafiosDoAluno já ordena por id asc.
   // Materiais do JurisClub (Biblioteca › JurisClub) entregues pelos PRODUTOS do aluno, em paralelo.
-  const [desafios, materiais] = await Promise.all([
+  const [desafios, materiais, edicoesAdmin] = await Promise.all([
     desafiosDoAluno(estudanteId, tenantId, AREAS_JURISCLUB).catch(() => []),
     materiaisJurisclubDoAluno(tenantId, estudanteId, R.jurisclub).catch(() => []),
+    edicoesJurisclubDoAluno(tenantId, estudanteId, R.jurisclub).catch(() => []),
   ])
+  const secaoEdicoes = edicoesAdmin.length ? <EdicoesAdmin itens={edicoesAdmin} /> : null
   const secaoMateriais = materiais.length ? <MateriaisProduto itens={materiais} /> : null
 
   if (!desafios.length) {
     return (
       <>
         <Crumbs items={[['Cursos', R.cursos], ['JurisClub', '#']]} />
-        {secaoMateriais ?? (
+        {secaoEdicoes}
+        {secaoMateriais ?? (secaoEdicoes ? null : (
           <Card style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
             <Muted size={13}>Nenhuma edição do JurisClub disponível para você no momento.</Muted>
           </Card>
-        )}
+        ))}
       </>
     )
   }
@@ -189,6 +220,7 @@ export default async function JurisClubPage() {
         disciplinas={disciplinas}
         edicoes={edicoes}
       />
+      {secaoEdicoes}
       {secaoMateriais}
     </>
   )

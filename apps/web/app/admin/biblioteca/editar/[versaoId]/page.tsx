@@ -46,6 +46,7 @@ export default async function EditarConteudoPage({ params, searchParams }: { par
   return (
     <ConteudoEditor
       versaoId={versaoId}
+      documentoId={v.documento_id}
       titulo={doc?.titulo || 'Documento'}
       documentUrl={documentUrl}
       onlyofficeUrl={onlyofficeUrl}

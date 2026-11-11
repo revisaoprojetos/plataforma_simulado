@@ -21,11 +21,14 @@ export type TipoOrigem = 'docx' | 'pdf' | 'html' | KindMidia
 // Bucket do storage p/ os originais. CONFIGURÁVEL por env (STORAGE_CONTENT_BUCKET) e com AUTO-RESOLUÇÃO:
 // usa o preferido se existir, senão cai no 1º bucket existente da lista (ex.: 'pdfs') — assim o teste
 // não trava se o bucket dedicado ainda não foi criado. Resolvido 1x por processo (cache).
-export const BUCKET_CONTEUDO = process.env.STORAGE_CONTENT_BUCKET || 'conteudos'
+// ⚠️ O conteúdo SEMPRE morou DENTRO do bucket `pdfs` (conteudo/, conteudo-pdfs/, conteudo-thumbs/, materiais/);
+// NÃO existe bucket `conteudos` no Supabase e o `revisaopge-conteudos` do Hetzner é VAZIO. Por isso o padrão é
+// `pdfs`: com a env ausente (ex.: perdida num "Update the stack") o S3 não aponta mais p/ o bucket vazio.
+export const BUCKET_CONTEUDO = process.env.STORAGE_CONTENT_BUCKET || 'pdfs'
 let _bucketCache: string | null = null
 export async function resolverBucketConteudo(): Promise<string> {
   if (_bucketCache) return _bucketCache
-  const preferidos = [process.env.STORAGE_CONTENT_BUCKET, 'conteudos', 'pdfs', 'discursivas'].filter(Boolean) as string[]
+  const preferidos = [process.env.STORAGE_CONTENT_BUCKET || 'pdfs', 'conteudos', 'pdfs', 'discursivas']
   // Só o provider Supabase expõe listBuckets (auto-resolução p/ não travar se o bucket dedicado ainda
   // não existe). Nos demais (S3/Hetzner/GCS) os buckets são pré-criados → usa o preferido/ env direto.
   if ((process.env.STORAGE_PROVIDER ?? 'supabase') !== 'supabase') {
@@ -115,8 +118,12 @@ export async function converterParaHtml(data: Buffer, tipo: TipoOrigem): Promise
       return { html: removerImagensGrandes(html) }
     }
     if (tipo === 'pdf') {
-      const texto = await extrairTextoPdf(data, 60)
-      if (!texto.trim()) return { html: '', erro: 'PDF sem camada de texto (provável digitalização). Converta para docx ou use OCR.' }
+      // A extração de texto é só índice de busca/trechos: PDF digitalizado (sem camada de texto), protegido ou que o pdfjs
+      // não consegue ler NÃO pode barrar o import — o original é guardado e o aluno abre o PDF em si. Entra com marcador (0 trechos).
+      const marcadorPdf = '<!-- conteudo:pdf — sem camada de texto (digitalizado/protegido); original guardado, sem trechos -->'
+      let texto = ''
+      try { texto = await extrairTextoPdf(data, 60) } catch { texto = '' }
+      if (!texto.trim()) return { html: marcadorPdf }
       const html = texto.split(/\n{2,}|\n──────────\n/).map((p) => p.trim()).filter(Boolean)
         .map((p) => `<p>${escaparHtml(p).replace(/\n/g, ' ')}</p>`).join('\n')
       return { html }

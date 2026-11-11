@@ -17,6 +17,8 @@ export interface Metadados {
   selos?: string
   /** Vídeo mostrado na área de leitura (não é coluna da lista/planilha). */
   video?: VideoDoc
+  /** Duração do vídeo em minutos (Videoteca): no doc-vídeo ou no PDFull com vídeo por link. */
+  duracao_min?: number
 }
 
 /** Campos que guardam VÁRIOS valores separados por vírgula (chips na lista, filtro por item). */
@@ -74,6 +76,8 @@ export function normalizarMetadados(v: unknown): Metadados {
     if (v.tipo === 'link' && typeof v.url === 'string' && /^https:\/\/\S{4,}$/i.test(v.url.trim())) out.video = { tipo: 'link', url: v.url.trim().slice(0, 500), ...(titulo ? { titulo } : {}) }
     else if (v.tipo === 'plataforma' && typeof v.doc_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.doc_id)) out.video = { tipo: 'plataforma', doc_id: v.doc_id, ...(titulo ? { titulo } : {}) }
   }
+  const dm = typeof o.duracao_min === 'number' ? o.duracao_min : parseInt(String(o.duracao_min ?? ''), 10)
+  if (Number.isFinite(dm) && dm >= 1 && dm <= 1440) out.duracao_min = Math.round(dm)
   const a = typeof o.ano === 'number' ? o.ano : parseInt(String(o.ano ?? ''), 10)
   if (Number.isFinite(a) && a >= 1900 && a <= 2100) out.ano = a
   return out

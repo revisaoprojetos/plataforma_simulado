@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { salvarPreferencias } from '@/app/aluno/(portal)/cronograma/preferencias-actions'
 import { PREFERENCIAS_PADRAO, type PreferenciasEmissao } from '@/lib/cronograma/preferencias'
 
 /**
@@ -28,7 +27,7 @@ export function usarPreferencias(emissaoId: string | null, iniciais?: Preferenci
     }
     if (!emissaoId) return
     if (gravacao.current) clearTimeout(gravacao.current)
-    gravacao.current = setTimeout(() => void salvarPreferencias(emissaoId, prefs), 600)
+    gravacao.current = setTimeout(() => void fetch('/api/aluno/cronograma/preferencias', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emissaoId, prefs }) }).catch(() => {}), 600)
     return () => {
       if (gravacao.current) clearTimeout(gravacao.current)
     }

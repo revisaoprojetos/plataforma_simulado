@@ -189,6 +189,9 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // ── Nav canônico de 8 itens (spec 03 §2.1), p/ os shells VND/MEQ consumirem via contrato. ──
   // O shell da Revisão continua usando AlunoSidebar/AlunoMobileNav (nav próprio) — este objeto é
   // inofensivo p/ ela. Mesmos gates de visibilidade da sidebar (flags/gamAtivo/cronograma/manutenção).
+  // Itens que o admin escondeu do menu de TODOS os alunos (Admin › Aparência da plataforma › Menu do aluno).
+  // Guardado em tema.menu_aluno.ocultos (hrefs). Só esconde o item do menu; a rota segue existindo.
+  const menuOcultoTenant: string[] = Array.isArray(t.menu_aluno?.ocultos) ? (t.menu_aluno.ocultos as unknown[]).filter((h): h is string => typeof h === 'string') : []
   const navCanonico: AlunoNavItem[] = (
     [
       // Revisão: a Início PRINCIPAL é a nova (/aluno/nova/inicio). A original foi desativada (redireciona).
@@ -234,7 +237,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     // As áreas "/nova" (redesign recente da Revisão) ficam fora do menu de VND/MEQ/MAC — só a
     // Revisão as usa como experiência principal. Para as demais marcas, mostramos apenas as áreas
     // já consolidadas (Início, Simulados, Desafios, Recomendado, Banco, etc.).
-    .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href) && !(brand !== 'revisao' && n.href.startsWith('/aluno/nova')))
+    .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href) && !menuOcultoTenant.includes(n.href) && !(brand !== 'revisao' && n.href.startsWith('/aluno/nova')))
     .map(({ exact, gate, ...n }) => {
       const c = counts[n.href]
       let ativo = exact ? pathAtual === n.href : pathAtual.startsWith(n.href)

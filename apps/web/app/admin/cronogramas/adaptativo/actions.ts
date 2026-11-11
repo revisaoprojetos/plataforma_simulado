@@ -185,7 +185,7 @@ export async function salvarPainelMetas(params: Partial<ParamsAdaptativo>): Prom
   const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const svc = createAdminClient()
   const antes = await lerCfgMetas(svc, g.tenantId)
-  const depois = normalizarParams(params)
+  const depois = normalizarParams({ tiposBloqueados: antes.tiposBloqueados, ...params }) // bloqueios de tipo são geridos em Revisão › Cronograma › Regras: não zera aqui
   const r = await salvarCfgMetas(svc, g.tenantId, depois, g.userId)
   if (!r.ok) return r
   await registrarAudit({

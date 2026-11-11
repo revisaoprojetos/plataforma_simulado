@@ -60,9 +60,11 @@ const statusCfg: Record<string, { label: string; variant: 'default' | 'secondary
   aguardando: { label: 'Aguardando', variant: 'outline' },
 }
 
-export default async function EstudantePerfilPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function EstudantePerfilPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; voltar?: string }> }) {
   const { id } = await params
-  const { tab } = await searchParams
+  const { tab, voltar } = await searchParams
+  // volta para onde o admin veio (só rotas internas de Membros; qualquer outra coisa cai na lista de estudantes)
+  const voltarHref = voltar && voltar.startsWith('/admin/revisao/membros') && !voltar.startsWith('//') ? voltar : '/admin/estudantes'
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
@@ -85,6 +87,26 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
   const est = estRes.data ? { ...estRes.data, cpf: exibCpf.cpf((estRes.data as any).cpf) } : estRes.data
   if (!est) notFound()
   const sessoes = sessoesRes.data
+
+  // ── OTIMIZAÇÃO: o que só depende de id/tenant/e-mail/CPF dispara AGORA, em paralelo com a cadeia de sessões/respostas/bancos
+  // abaixo (antes rodava depois, em série: ~6 idas ao banco a mais antes de a página responder). ──
+  const pGam = (async () => {
+    const cfg = await getGamConfig(svc, TID)
+    const r = cfg?.ativo
+      ? await Promise.all([resumoGamificacao(svc, TID, id, cfg), conquistasDoAluno(svc, TID, id, cfg), carimbosGanhosDoAluno(svc, TID, id)])
+      : [null, [] as any[], [] as any[]]
+    return { cfg, r }
+  })().catch(() => ({ cfg: null as any, r: [null, [] as any[], [] as any[]] as any }))
+  const pSql = Promise.all([
+    desafiosAlunoSql(TID, id).catch(() => null),
+    assinaturasAlunoSql(TID, id).catch(() => null),
+    desafiosPendentesAlunoSql(TID, id).catch(() => null),
+    simuladosVinculadosAlunoSql(TID, id).catch(() => null),
+    gruposVinculadosAlunoSql(TID, id).catch(() => null),
+    pagamentosAlunoSql(TID, est.email, est.cpf).catch(() => null),
+  ])
+  const pAcesso = acessoEfetivoDoEstudante(TID, id).catch(() => [])
+  const pTenant = getCurrentTenant().catch(() => null)
 
   // ── Respostas do aluno (fetchAllByIn: histórico grande passa de 1000 → `.in()` cortaria os KPIs). ──
   const sessIds = (sessoes ?? []).map((s: any) => s.id)
@@ -245,30 +267,20 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
   })
 
   // Gamificação do aluno (o admin confere sem entrar na conta) — só quando ativa no tenant.
-  const gamConfig = await getGamConfig(svc, TID)
-  const [gamResumo, gamConquistas, carimbosGanhos] = gamConfig?.ativo
-    ? await Promise.all([resumoGamificacao(svc, TID, id, gamConfig), conquistasDoAluno(svc, TID, id, gamConfig), carimbosGanhosDoAluno(svc, TID, id)])
-    : [null, [] as any[], [] as any[]]
+  const { cfg: gamConfig, r: [gamResumo, gamConquistas, carimbosGanhos] } = await pGam
   // Adesivos (carimbos) conquistados → coleção no card de gamificação.
   const adesivos = (carimbosGanhos as { def: { id: string; url?: string | null; titulo: string; texto?: string | null }; modulo: string; ganhoEm: string | null }[])
     .map((c, i) => ({ id: `${c.modulo}:${c.def.id}:${i}`, url: c.def.url ?? null, titulo: c.def.titulo, texto: c.def.texto ?? null, modulo: c.modulo, ganhoEm: c.ganhoEm }))
 
   // Histórico de desafios (Lei Seca/Jurisprudência) + assinaturas recorrentes — SQL agregado
   // (nasce otimizado). `null` = SQL indisponível → a aba degrada com aviso; tolerante a erro.
-  const [desafiosAluno, assinaturasAluno, desafiosPendRaw, simVincRaw, grpVincRaw, pagamentosRaw] = await Promise.all([
-    desafiosAlunoSql(TID, id).catch(() => null),
-    assinaturasAlunoSql(TID, id).catch(() => null),
-    desafiosPendentesAlunoSql(TID, id).catch(() => null),
-    simuladosVinculadosAlunoSql(TID, id).catch(() => null),
-    gruposVinculadosAlunoSql(TID, id).catch(() => null),
-    pagamentosAlunoSql(TID, est.email, est.cpf).catch(() => null),
-  ])
+  const [desafiosAluno, assinaturasAluno, desafiosPendRaw, simVincRaw, grpVincRaw, pagamentosRaw] = await pSql
   const desafios = desafiosAluno ?? []
   const assinaturas = assinaturasAluno ?? []
   const assAtivas = assinaturas.filter((a) => a.status === 'ativo').length
 
   // Acesso efetivo (une regras de venda + catálogo/manual → produtos). Tolerante; degrada vazio.
-  const acessoItens = await acessoEfetivoDoEstudante(TID, id).catch(() => [])
+  const acessoItens = await pAcesso
   const acessoAtivos = acessoItens.filter((i) => i.temAcesso).length
 
   // Vínculos (aba): simulados que o aluno acessa + grupos (com nº de alunos).
@@ -306,7 +318,7 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
   }))
 
   // Estilo dos cards (pôster × ticket) definido pelo tenant (tema.card_view) — mesmo do resto do sistema.
-  const cardView = resolverCardView((((await getCurrentTenant())?.tema as any) ?? {}).card_view)
+  const cardView = resolverCardView((((await pTenant)?.tema as any) ?? {}).card_view)
 
   // Visual (capa/cor/ícone) dos módulos de desafio — para os cards da aba Histórico. Tolerante às colunas.
   const desafioVisual: Record<string, DesafioVisual> = {}
@@ -348,7 +360,7 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
         <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/4 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/admin/estudantes" className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0')}>
+            <Link href={voltarHref} aria-label={voltarHref === '/admin/estudantes' ? 'Voltar para estudantes' : 'Voltar para Membros'} className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0')}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="relative shrink-0">

@@ -193,6 +193,19 @@ async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any)
   })
 }
 
+/**
+ * O aluno pode ABRIR este documento no leitor? Mesma decisão do leitor (doc publicado/visível + gate de pasta e documento
+ * com herança pai_id, cache 60s) — usada para avisar ANTES de navegar (ex.: "Abrir material" do cronograma Revisão).
+ * Não verifica a liberação por data do Adaptativo (isso o leitor faz ao abrir).
+ */
+export async function alunoPodeAbrirDocumento(tenantId: string, alunoId: string, documentoId: string): Promise<boolean> {
+  if (!tenantId || !documentoId) return false
+  const svc = createAdminClient()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return false
+  return podeLerDoc(svc, tenantId, alunoId, doc)
+}
+
 export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number; capaUrl?: string | null }
 export interface DocAluno { id: string; titulo: string; tipo_origem: string; versaoAtualId: string }
 export interface ArvoreAluno {
@@ -700,6 +713,133 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
   return urlAssinadaOriginal((ver as any).arquivo_key, 600)
 }
 
+export type PreparoDownload =
+  | { ok: true; titulo: string; tipoOrigem: 'pdf' | 'docx'; urlOriginal: string; urlPdf: () => Promise<string | null> }
+  | { ok: false; erro: 'negado' | 'tipo' | 'indisponivel' | 'inexistente' }
+
+/**
+ * Fonte do download do aluno (rota /api/aluno/biblioteca/baixar). MESMO gate de `urlDownloadAluno` (publicado + pasta/doc com
+ * herança + permissão BAIXAR + liberação do cronograma; testador global fura) e MESMAS áreas de visibilidade (docx filtrado).
+ * Só PDF/DOCX; demais tipos → 'tipo'. `urlPdf()` converte o DOCX (variante por áreas) em PDF só quando a rota precisa (capa).
+ */
+export async function prepararDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<PreparoDownload> {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId || !documentoId) return { ok: false, erro: 'negado' }
+  const svc = createAdminClient()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria, tipo_origem')
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return { ok: false, erro: 'inexistente' }
+  if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
+    if (doc.status !== 'publicado') return { ok: false, erro: 'negado' }
+    const res = await avaliarDocAluno(svc, tenantId, alunoId, doc)
+    if (!res.permitido || !res.permissoes.baixar) return { ok: false, erro: 'negado' }
+    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return { ok: false, erro: 'negado' }
+  }
+  const tipo = String((doc as any).tipo_origem ?? '')
+  if (tipo !== 'pdf' && tipo !== 'docx') return { ok: false, erro: 'tipo' }
+  const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key, hash_arquivo').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+  const arquivoKey = (ver as any)?.arquivo_key as string | undefined
+  if (!arquivoKey) return { ok: false, erro: 'indisponivel' }
+  const { urlAssinadaOriginal } = await import('./ingestao')
+  const areas = tipo === 'docx' ? await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId) : null
+  let chaveFonte = arquivoKey
+  if (areas?.temAreas) {
+    const { chaveDocxVariante } = await import('./thumb')
+    const kv = await chaveDocxVariante(tenantId, doc.versao_atual_id, arquivoKey, (ver as any)?.hash_arquivo ?? '', areas)
+    if (!kv) return { ok: false, erro: 'indisponivel' } // sem variante pronta NÃO entrega o original (vazaria área oculta)
+    chaveFonte = kv
+  }
+  const urlOriginal = await urlAssinadaOriginal(chaveFonte, 600)
+  if (!urlOriginal) return { ok: false, erro: 'indisponivel' }
+  return {
+    ok: true, titulo: String((doc as any).titulo ?? ''), tipoOrigem: tipo, urlOriginal,
+    urlPdf: async () => {
+      if (tipo === 'pdf') return urlOriginal
+      const { gerarPdfDocumento } = await import('./thumb')
+      return gerarPdfDocumento(tenantId, documentoId, areas ?? undefined).catch(() => null)
+    },
+  }
+}
+
+export interface ProgressoLeituraEntrada {
+  versaoId?: string | null; pagina?: number | null; totalPaginas?: number | null
+  pct?: number | null; tempoIncSeg?: number; concluir?: boolean
+}
+export interface ProgressoLeituraSaida {
+  ok: true; pct: number | null; pagina: number | null; concluidoEm: string | null
+  degradado?: true; negado?: true; ignorado?: true
+}
+
+/**
+ * Grava o progresso detalhado da leitura (folha/%/conclusão/tempo) de UMA aula da Biblioteca.
+ * Gate: mesmo `podeLerDoc` (cache 60s) do leitor. pct = MÁXIMO alcançado; conclusão (pct>=90 OU última
+ * folha OU concluir) só seta uma vez. Rate-limit: ignora (sem erro) se < 5s da última gravação do doc.
+ * Coluna ausente (migração pendente) → degrada p/ só atualizar ultima_leitura_em.
+ */
+export async function registrarProgressoLeituraAluno(
+  tenantId: string, alunoId: string, documentoId: string, e: ProgressoLeituraEntrada,
+): Promise<ProgressoLeituraSaida | null> {
+  const svc = createAdminClient()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
+  if (!doc || doc.deletado) return null
+  if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+  const agora = Date.now()
+  const versaoId = e.versaoId || doc.versao_atual_id || null
+
+  const sel = await svc.from(T_LP)
+    .select('pct, pagina, total_paginas, concluido_em, tempo_seg, ultima_leitura_em, versao_id')
+    .eq('tenant_id', tenantId).eq('aluno_id', alunoId).eq('documento_id', documentoId).maybeSingle()
+
+  if (sel.error) { // migração não aplicada: só marca o acesso
+    await svc.from(T_LP).upsert({
+      tenant_id: tenantId, aluno_id: alunoId, documento_id: documentoId, versao_id: versaoId, origem: 'biblioteca',
+      ultima_leitura_em: new Date(agora).toISOString(),
+    }, { onConflict: 'tenant_id,aluno_id,documento_id' })
+    return { ok: true, degradado: true, pct: null, pagina: null, concluidoEm: null }
+  }
+  const at: any = sel.data
+  const concluidoAnt: string | null = at?.concluido_em ?? null
+  // Rate-limit leve (não vale p/ pedido explícito de concluir).
+  if (at?.ultima_leitura_em && !e.concluir && agora - new Date(at.ultima_leitura_em).getTime() < 5000) {
+    return { ok: true, ignorado: true, pct: at.pct ?? null, pagina: at.pagina ?? null, concluidoEm: concluidoAnt }
+  }
+
+  const clamp = (n: unknown, lo: number, hi: number) => (n == null || !Number.isFinite(Number(n)) ? null : Math.min(hi, Math.max(lo, Math.round(Number(n)))))
+  const total = clamp(e.totalPaginas, 1, 100000) ?? at?.total_paginas ?? null
+  let pagina = clamp(e.pagina, 1, 100000)
+  if (pagina != null && total != null && pagina > total) pagina = total
+  let pctNovo = clamp(e.pct, 0, 100)
+  if (pctNovo == null && pagina != null && total) pctNovo = Math.round((pagina / total) * 100)
+  const pctAnt: number | null = at?.pct ?? null
+  const paginaAnt: number | null = at?.pagina ?? null
+
+  // Maior pct vence; a página acompanha a maior pct (empate/sem pct: a maior página).
+  const pctFinal = pctNovo == null ? pctAnt : Math.max(pctAnt ?? 0, pctNovo)
+  let paginaFinal = paginaAnt
+  if (pagina != null) {
+    const avancou = pctNovo != null && pctNovo > (pctAnt ?? -1)
+    paginaFinal = avancou || paginaAnt == null ? pagina : Math.max(paginaAnt, pagina)
+  }
+
+  const ultimaFolha = paginaFinal != null && total != null && paginaFinal >= total
+  const concluirAgora = !concluidoAnt && (e.concluir === true || (pctFinal ?? 0) >= 90 || ultimaFolha)
+  const concluidoEm = concluidoAnt ?? (concluirAgora ? new Date(agora).toISOString() : null)
+  const inc = Math.min(600, Math.max(0, Math.round(Number(e.tempoIncSeg ?? 0)) || 0))
+  const tempoSeg = Math.min(100_000_000, Number(at?.tempo_seg ?? 0) + inc)
+
+  const { error } = await svc.from(T_LP).upsert({
+    tenant_id: tenantId, aluno_id: alunoId, documento_id: documentoId, versao_id: versaoId, origem: 'biblioteca',
+    ultima_leitura_em: new Date(agora).toISOString(),
+    pagina: paginaFinal, total_paginas: total, pct: pctFinal, concluido_em: concluidoEm, tempo_seg: tempoSeg,
+    posicao: paginaFinal != null ? { pagina: paginaFinal } : undefined,
+  }, { onConflict: 'tenant_id,aluno_id,documento_id' })
+  if (error) throw new Error(error.message)
+
+  if (concluirAgora) { // concluir muda "continuar de onde parou"/progresso dos cursos
+    void import('@/lib/nova/cursos-snapshot').then((m) => m.atualizarCatalogoSnapshot(svc, tenantId, alunoId)).catch(() => {})
+  }
+  return { ok: true, pct: pctFinal, pagina: paginaFinal, concluidoEm }
+}
+
 /** Registra/atualiza o progresso de leitura (histórico N15). */
 export async function registrarLeituraAluno(documentoId: string, alunoId: string, versaoId: string, origem: 'biblioteca' | 'desafio' = 'biblioteca'): Promise<void> {
   const tenantId = await getCurrentTenantId()
@@ -715,4 +855,16 @@ export async function registrarLeituraAluno(documentoId: string, alunoId: string
   void import('@/lib/nova/cursos-snapshot')
     .then((m) => m.atualizarCatalogoSnapshot(svc, tenantId, alunoId))
     .catch(() => {})
+}
+
+/** Progresso salvo do aluno num documento (para RETOMAR de onde parou). Tolerante à migração ausente → null. */
+export async function lerProgressoLeituraAluno(
+  tenantId: string, alunoId: string, documentoId: string,
+): Promise<{ pagina: number | null; pct: number | null; concluidoEm: string | null } | null> {
+  const { data, error } = await createAdminClient().from(T_LP)
+    .select('pagina, pct, concluido_em')
+    .eq('tenant_id', tenantId).eq('aluno_id', alunoId).eq('documento_id', documentoId).maybeSingle()
+  if (error || !data) return null
+  const d: any = data
+  return { pagina: d.pagina ?? null, pct: d.pct ?? null, concluidoEm: d.concluido_em ?? null }
 }

@@ -23,6 +23,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
+import { conflitoRevisaoComMetas, metasForaDoLimite } from '@/lib/cronograma/integridade'
 import type { CronogramaImportado, LinkImportado, MetaImportada } from '@/lib/cronograma/importar'
 
 async function guard(perm: string) {
@@ -92,6 +93,10 @@ export async function importarCronograma(
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
 
+  // Arquivo incoerente: metas em semana de revisão sumiriam da grade do aluno (gerador as descarta).
+  const erroGrade = conflitoRevisaoComMetas(metas, cron.semanas_revisao ?? []) ?? metasForaDoLimite(metas, { total_semanas: cron.total_semanas, nDias: (cron.dias_curso ?? []).length })
+  if (erroGrade) return { ok: false, error: `${cron.nome}: ${erroGrade}` }
+
   const { data: existente } = await svc
     .from('simulado_cronogramas')
     .select('id, status')
@@ -159,11 +164,13 @@ export async function importarCronograma(
 
   const antes = (resultado as any)?.antes ?? 0
   const depois = (resultado as any)?.depois ?? 0
+  const r = resultado as { preservadas?: number; inseridas?: number; removidas?: number } | null
   await registrarAudit({
     operacao: criado ? 'INSERT' : 'UPDATE',
     entidade: 'simulado_cronograma_metas',
     entidadeId: id,
-    depois: { cronograma_nome: cron.nome, importadas: depois, removidas: antes },
+    // Com a migration 20261114020000 a RPC faz diff por chave: ids preservados; antes/depois = totais.
+    depois: { cronograma_nome: cron.nome, importadas: depois, removidas: r?.removidas ?? antes, ...(r?.preservadas != null ? { preservadas: r.preservadas, inseridas: r.inseridas } : {}) },
     atorId: g.atorId,
     tenantId: g.tenantId,
   })

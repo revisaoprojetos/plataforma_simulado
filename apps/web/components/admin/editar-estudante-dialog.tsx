@@ -8,6 +8,7 @@ import { editarEstudanteAction } from '@/app/admin/estudantes/actions'
 import { Loader2, X, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ehCpfMascarado } from '@/lib/privacidade/cpf'
+import { CampoCpfOculto } from './campo-cpf-oculto'
 
 type Estudante = {
   id: string
@@ -95,9 +96,7 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
           <Campo label="E-mail"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Telefone"><input value={telefone} onChange={(e) => setTelefone(e.target.value)} className={inputCls} /></Campo>
           <Campo label="CPF">
-            <input value={cpf} onChange={(e) => setCpf(e.target.value)} className={inputCls}
-              // Mascarado: ao focar, seleciona tudo — digitar substitui pelo CPF novo.
-              onFocus={(e) => { if (cpfMascarado) e.currentTarget.select() }} />
+            <CampoCpfOculto value={cpf} onChange={setCpf} className={inputCls} />
             {cpfMascarado && <p className="text-[11px] text-muted-foreground">CPF oculto (visível só ao super admin). Digite para substituir.</p>}
           </Campo>
           <Campo label="Nascimento"><input type="date" value={nascimento} onChange={(e) => setNascimento(e.target.value)} className={inputCls} /></Campo>

@@ -1,4 +1,5 @@
 'use server'
+import { contarEmissoesDoCronograma, mensagemImpacto } from '@/lib/cronograma/impacto-emissoes'
 import type { CronogramaDetalhe, Diagnostico, EntradaMeta, OpcoesRepetir, ComposicaoBanco, PacotesDoCronograma } from './metas-actions-tipos'
 
 /**
@@ -16,6 +17,8 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { garantirPlataformaVideo } from '@/lib/cronograma/plataforma-video'
+import { validarPosicaoMeta } from '@/lib/cronograma/integridade'
+import { funcaoAusente, recalcularChaves } from '@/lib/cronograma/compat-legado'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 
 
@@ -187,13 +190,14 @@ function diagnosticar(c: CronogramaDetalhe, metas: MetaFonte[], comLink: Set<str
 
 
 /** Valida uma meta contra a grade do cronograma (as mesmas regras do banco, antes de ir). */
-function validarMeta(e: EntradaMeta, c: { total_semanas: number; dias_curso: number[] }): string | null {
-  if (!Number.isInteger(e.semana) || e.semana < 1 || e.semana > c.total_semanas) {
-    return `Semana precisa estar entre 1 e ${c.total_semanas}.`
-  }
-  if (!Number.isInteger(e.dia) || e.dia < 0 || e.dia >= c.dias_curso.length) {
-    return `Dia precisa ser um índice entre 0 e ${c.dias_curso.length - 1} (é a posição dentro dos dias de curso, não o dia da semana).`
-  }
+function validarMeta(
+  e: EntradaMeta,
+  c: { total_semanas: number; dias_curso: number[]; semanas_revisao?: number[] },
+  /** Edição que NÃO muda a semana de uma meta legada em semana de revisão não é bloqueada (só mover/criar). */
+  ignorarRevisao = false,
+): string | null {
+  const erroPos = validarPosicaoMeta(e, { total_semanas: c.total_semanas, dias_curso: c.dias_curso, semanas_revisao: ignorarRevisao ? [] : (c.semanas_revisao ?? []) })
+  if (erroPos) return erroPos
   if (!e.disciplina.trim()) return 'Informe a disciplina.'
   return null
 }
@@ -228,12 +232,12 @@ async function validarTipo(svc: any, tenantId: string, slug: string): Promise<st
 async function cronogramaDoTenant(svc: any, tenantId: string, cronogramaId: string) {
   const { data } = await svc
     .from('simulado_cronogramas')
-    .select('id, nome, total_semanas, dias_curso')
+    .select('id, nome, total_semanas, dias_curso, semanas_revisao')
     .eq('id', cronogramaId)
     .eq('tenant_id', tenantId)
     .eq('deletado', false)
     .maybeSingle()
-  return data as { id: string; nome: string; total_semanas: number; dias_curso: number[] } | null
+  return data as { id: string; nome: string; total_semanas: number; dias_curso: number[]; semanas_revisao: number[] } | null
 }
 
 export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -255,6 +259,7 @@ export async function criarMeta(cronogramaId: string, e: EntradaMeta): Promise<{
     .select('id')
     .single()
   if (error) return { ok: false, error: error.message }
+  await recalcularChaves(svc, g.tenantId, cronogramaId)
 
   await registrarAudit({
     operacao: 'INSERT',
@@ -303,6 +308,7 @@ export async function criarMetasEmLote(
   const linhas = metas.map((m) => ({ tenant_id: g.tenantId, cronograma_id: cronogramaId, ...normalizar(m) }))
   const { error } = await svc.from('simulado_cronograma_metas').insert(linhas)
   if (error) return { ok: false, error: error.message }
+  await recalcularChaves(svc, g.tenantId, cronogramaId)
 
   await registrarAudit({
     operacao: 'INSERT',
@@ -397,19 +403,6 @@ export async function repetirSemana(
     return { ok: false, error: 'Todas as semanas do intervalo já têm metas. Marque "substituir" para sobrescrever.' }
   }
 
-  if (opcoes.substituir) {
-    const cheias = paraGravar.filter((s) => comMetas.has(s))
-    if (cheias.length) {
-      const { error } = await svc
-        .from('simulado_cronograma_metas')
-        .delete()
-        .eq('tenant_id', g.tenantId)
-        .eq('cronograma_id', cronogramaId)
-        .in('semana', cheias)
-      if (error) return { ok: false, error: error.message }
-    }
-  }
-
   const linhas = paraGravar.flatMap((s) => {
     // O incremento acompanha a DISTÂNCIA até a origem, não a posição no intervalo: repetir a
     // semana 3 para 4..10 dá +1 na 4, +2 na 5, e assim por diante.
@@ -421,8 +414,34 @@ export async function repetirSemana(
     }))
   })
 
-  const { error } = await svc.from('simulado_cronograma_metas').insert(linhas)
-  if (error) return { ok: false, error: error.message }
+  // Caminho preferido: UMA transação que faz DIFF por chave nas semanas-alvo (quem continua igual
+  // mantém o id — e o progresso do aluno —; só sai o que mudou). Antes: DELETE e INSERT soltos,
+  // sem transação (falha no meio deixava as semanas vazias) e com ids novos.
+  const rpc = await svc.rpc('simulado_cronograma_aplicar_metas', {
+    p_tenant: g.tenantId,
+    p_cronograma: cronogramaId,
+    p_metas: linhas.map(({ tenant_id: _t, cronograma_id: _c, ...m }) => m),
+    p_semanas: paraGravar,
+    p_remover: !!opcoes.substituir,
+  })
+  if (rpc.error && !funcaoAusente(rpc.error)) return { ok: false, error: rpc.error.message }
+  if (rpc.error) {
+    // Migration 20261114020000 ainda não aplicada: comportamento antigo.
+    if (opcoes.substituir) {
+      const cheias = paraGravar.filter((s) => comMetas.has(s))
+      if (cheias.length) {
+        const { error } = await svc
+          .from('simulado_cronograma_metas')
+          .delete()
+          .eq('tenant_id', g.tenantId)
+          .eq('cronograma_id', cronogramaId)
+          .in('semana', cheias)
+        if (error) return { ok: false, error: error.message }
+      }
+    }
+    const { error } = await svc.from('simulado_cronograma_metas').insert(linhas)
+    if (error) return { ok: false, error: error.message }
+  }
 
   await registrarAudit({
     operacao: 'INSERT',
@@ -443,19 +462,17 @@ export async function repetirSemana(
   return { ok: true, criadas: linhas.length, semanas: paraGravar.length, puladas }
 }
 
-export async function atualizarMeta(cronogramaId: string, metaId: string, e: EntradaMeta): Promise<{ ok: boolean; error?: string }> {
+export async function atualizarMeta(
+  cronogramaId: string,
+  metaId: string,
+  e: EntradaMeta,
+  opcoes: { confirmarEmissoes?: boolean } = {},
+): Promise<{ ok: boolean; error?: string; requerConfirmacao?: boolean; emissoesAfetadas?: number }> {
   const g = await guard('cronogramas:update')
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const c = await cronogramaDoTenant(svc, g.tenantId, cronogramaId)
   if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
-  const erro = validarMeta(e, c)
-  if (erro) return { ok: false, error: erro }
-  const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
-  if (erroTipo) return { ok: false, error: erroTipo }
-  const erroDestino = validarDestinoSimulado(e, e.tipo === 'simulado')
-  if (erroDestino) return { ok: false, error: erroDestino }
-
   const { data: antes } = await svc
     .from('simulado_cronograma_metas')
     .select('semana, dia, tipo, disciplina, aula, conteudo, duracao')
@@ -464,6 +481,19 @@ export async function atualizarMeta(cronogramaId: string, metaId: string, e: Ent
     .eq('cronograma_id', cronogramaId)
     .maybeSingle()
   if (!antes) return { ok: false, error: 'Meta não encontrada.' }
+  const erro = validarMeta(e, c, (antes as { semana: number }).semana === e.semana)
+  if (erro) return { ok: false, error: erro }
+  const erroTipo = await validarTipo(svc, g.tenantId, e.tipo)
+  if (erroTipo) return { ok: false, error: erroTipo }
+  const erroDestino = validarDestinoSimulado(e, e.tipo === 'simulado')
+  if (erroDestino) return { ok: false, error: erroDestino }
+
+  // Mover a meta de semana/dia (renumeração) com emissões de alunos exige confirmação explícita.
+  const a0 = antes as { semana: number; dia: number }
+  if (!opcoes.confirmarEmissoes && (a0.semana !== e.semana || a0.dia !== e.dia)) {
+    const n = await contarEmissoesDoCronograma(svc, g.tenantId, cronogramaId)
+    if (n > 0) return { ok: false, requerConfirmacao: true, emissoesAfetadas: n, error: mensagemImpacto(n, `Você está movendo uma meta da semana ${a0.semana} para a semana ${e.semana}.`) }
+  }
 
   const { error } = await svc
     .from('simulado_cronograma_metas')
@@ -472,6 +502,7 @@ export async function atualizarMeta(cronogramaId: string, metaId: string, e: Ent
     .eq('tenant_id', g.tenantId)
     .eq('cronograma_id', cronogramaId)
   if (error) return { ok: false, error: error.message }
+  await recalcularChaves(svc, g.tenantId, cronogramaId) // a meta mudou de lugar/rótulo: chave estável acompanha
 
   await registrarAudit({
     operacao: 'UPDATE',
@@ -496,6 +527,7 @@ export async function excluirMeta(cronogramaId: string, metaId: string): Promise
     .eq('tenant_id', g.tenantId)
     .eq('cronograma_id', cronogramaId)
   if (error) return { ok: false, error: error.message }
+  await recalcularChaves(svc, g.tenantId, cronogramaId)
   await registrarAudit({
     operacao: 'DELETE',
     entidade: 'simulado_cronograma_metas',
@@ -560,6 +592,9 @@ export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco)
   const semIni = Math.min(Math.max(1, opts.semanaInicial || 1), totalSemanas)
   const diaIni = Math.min(Math.max(0, opts.diaInicial || 0), totalDias - 1)
   const alvos: { semana: number; dia: number }[] = []
+  if (opts.estrategia === 'mesmo_dia' && revisao.has(semIni)) {
+    return { ok: false, error: `A semana ${semIni} está marcada como semana de revisão e não pode receber aulas (elas sumiriam da grade do aluno). Escolha outra semana inicial.` }
+  }
   if (opts.estrategia === 'mesmo_dia') {
     for (let i = 0; i < aulas.length; i++) alvos.push({ semana: semIni, dia: diaIni })
   } else {
@@ -598,43 +633,66 @@ export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco)
     urlsPorAula.set(u.aula_id, l)
   }
 
-  // Insere meta a meta (para mapear meta_id ↔ questões com segurança) + conta ordem por (semana,dia).
+  // Linhas a gravar (+ ordem por (semana,dia)).
   const ordemBucket = new Map<string, number>()
-  let criadas = 0
-  for (let i = 0; i < usados.length; i++) {
-    const a = usados[i]
+  const linhasMeta = usados.map((a, i) => {
     const { semana, dia } = alvos[i]
     const k = `${semana}|${dia}`
     const ordem = ordemBucket.get(k) ?? 0
     ordemBucket.set(k, ordem + 1)
     const disc = conjMap.get(a.conjunto_id)
-    const { data: metaRow, error: eMeta } = await svc
-      .from('simulado_cronograma_metas')
-      .insert({
-        tenant_id: g.tenantId,
-        cronograma_id: cronogramaId,
-        semana,
-        dia,
-        tipo: a.tipo,
-        disciplina: (disc?.disciplina ?? '').trim(),
-        disciplina_id: disc?.disciplina_id ?? null,
-        aula: a.aula?.trim() || null,
-        conteudo: a.conteudo?.trim() || null,
-        duracao: a.duracao?.trim() || null,
-        ordem,
-      })
-      .select('id')
-      .single()
-    if (eMeta || !metaRow) {
-      avisos.push(`Falha ao inserir uma aula: ${eMeta?.message ?? '—'}`)
-      continue
+    return {
+      semana,
+      dia,
+      tipo: a.tipo as string,
+      disciplina: (disc?.disciplina ?? '').trim() as string,
+      disciplina_id: (disc?.disciplina_id ?? null) as string | null,
+      aula: (a.aula?.trim() || null) as string | null,
+      conteudo: (a.conteudo?.trim() || null) as string | null,
+      duracao: (a.duracao?.trim() || null) as string | null,
+      ordem,
     }
-    criadas++
-    const qs = qsPorAula.get(a.id) ?? []
+  })
+  const upsertQuestoes = async (i: number, metaId: string) => {
+    const qs = qsPorAula.get(usados[i].id) ?? []
     if (qs.length) {
       await svc
         .from('simulado_cronograma_meta_questoes')
-        .upsert(qs.map((q) => ({ tenant_id: g.tenantId, meta_id: (metaRow as any).id, questao_id: q.questao_id, ordem: q.ordem })), { onConflict: 'meta_id,questao_id', ignoreDuplicates: true })
+        .upsert(qs.map((q) => ({ tenant_id: g.tenantId, meta_id: metaId, questao_id: q.questao_id, ordem: q.ordem })), { onConflict: 'meta_id,questao_id', ignoreDuplicates: true })
+    }
+  }
+
+  let criadas = 0
+  // Caminho preferido: UMA transação, em modo "acrescentar" com diff por chave — recompor o mesmo
+  // conjunto REAPROVEITA as metas existentes (mesmo id, mesmo progresso) em vez de duplicá-las, e uma
+  // falha no meio não deixa metade das aulas gravada. A RPC devolve o id final de cada linha.
+  const rpc = await svc.rpc('simulado_cronograma_aplicar_metas', {
+    p_tenant: g.tenantId,
+    p_cronograma: cronogramaId,
+    p_metas: linhasMeta,
+    p_semanas: null,
+    p_remover: false,
+  })
+  if (rpc.error && !funcaoAusente(rpc.error)) return { ok: false, error: rpc.error.message }
+  if (!rpc.error) {
+    const r = rpc.data as { inseridas?: number; preservadas?: number; mapa?: { i: number; id: string }[] } | null
+    criadas = r?.inseridas ?? 0
+    for (const m of r?.mapa ?? []) await upsertQuestoes(m.i, m.id)
+    if ((r?.preservadas ?? 0) > 0) avisos.push(`${r?.preservadas} aula(s) já existiam na grade e foram reaproveitadas (sem duplicar).`)
+  } else {
+    // Migration 20261114020000 ainda não aplicada: insere meta a meta (comportamento antigo — recompor duplica).
+    for (let i = 0; i < usados.length; i++) {
+      const { data: metaRow, error: eMeta } = await svc
+        .from('simulado_cronograma_metas')
+        .insert({ tenant_id: g.tenantId, cronograma_id: cronogramaId, ...linhasMeta[i] })
+        .select('id')
+        .single()
+      if (eMeta || !metaRow) {
+        avisos.push(`Falha ao inserir uma aula: ${eMeta?.message ?? '—'}`)
+        continue
+      }
+      criadas++
+      await upsertQuestoes(i, (metaRow as any).id)
     }
   }
 

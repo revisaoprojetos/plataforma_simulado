@@ -13,6 +13,7 @@
  * usada em `dias_curso` no banco.
  */
 
+import { hojeBrtISO } from '@/lib/brt'
 export type DataISO = string // 'YYYY-MM-DD'
 
 const DIA_MS = 86_400_000
@@ -77,7 +78,7 @@ export function fmtIntervalo(inicio: DataISO, fim: DataISO): string {
   return `${fmtBr(inicio)} a ${fmtBr(fim)}`
 }
 
-/** Hoje em data civil UTC — usado como piso do seletor de data no formulário. */
+/** Hoje em data civil de BRASÍLIA (não UTC: das 21h às 24h UTC já seria "amanhã"). Piso do seletor de data e dia dos snapshots. */
 export function hojeISO(): DataISO {
-  return new Date().toISOString().slice(0, 10)
+  return hojeBrtISO()
 }

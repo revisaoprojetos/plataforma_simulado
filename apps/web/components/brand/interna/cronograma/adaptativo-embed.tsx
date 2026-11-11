@@ -23,8 +23,26 @@ function resolverCor(varName: string): string {
   } catch { return '' }
 }
 
-export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme; novo?: boolean }) {
+// modo 'ver' (default): plano FIXADO do aluno. modo 'criar': novo cronograma — o iframe abre direto em
+// "configurar" com estado limpo e só grava no clique de Gerar/Salvar (ver public/cronograma/adaptativo/index.html).
+// `novo` (legado) equivale a modo 'criar'.
+// modo 'revisao-fixo': plano do cronograma REVISÃO (emissão, grade congelada) nas MESMAS telas Hoje/Semana, somente leitura do plano
+// (dados de /api/aluno/cronograma/revisao-iframe; ver lib/cronograma/revisao-iframe.ts). Exige `emissaoId`. `iframeRef` expõe o
+// <iframe> ao portal (ele responde ao iframe: título novo / PDF em andamento).
+export function CronogramaAdaptativoEmbed({ theme, modo = 'ver', novo, emissaoId, abaInicial, iframeRef }: {
+  theme: InternaTheme
+  modo?: 'ver' | 'criar' | 'revisao-fixo'
+  novo?: boolean
+  emissaoId?: string
+  abaInicial?: 'hoje' | 'semana' | 'configurar'
+  iframeRef?: { current: HTMLIFrameElement | null }
+}) {
+  const revisaoFixo = modo === 'revisao-fixo' && !!emissaoId
+  const criar = !revisaoFixo && (modo === 'criar' || !!novo)
   const router = useRouter()
+  // Erro de carga visível + "Tentar de novo": se o iframe não sinalizar "pronto" a tempo, mostra aviso e permite remontar.
+  const [tentativa, setTentativa] = useState(0)
+  const [semSinal, setSemSinal] = useState(false)
   const ref = useRef<HTMLIFrameElement | null>(null)
   const [altura, setAltura] = useState<number>(720)
   // Cache-bust em DEV: o navegador cacheia o index.html do iframe por URL (o `v` só muda a cada deploy),
@@ -34,15 +52,9 @@ export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme
   // Animação de entrada: enquanto o iframe não terminou de carregar, mostramos um loader; ao ficar
   // pronto, o cronograma entra com fade + leve subida. (O iframe já se auto-oculta até estar estilizado.)
   const [pronto, setPronto] = useState(false)
-  // "+ Novo cronograma" (vindo do HUB do painel via /aluno/cronograma?novo=1): abre o embed direto na
-  // tela CONFIGURAR/MONTAR. Usa o hash `#configurar` (tela válida que o boot do iframe respeita e NÃO
-  // sobrescreve para "hoje" — ver public/cronograma/adaptativo/index.html). Definido só após montar,
-  // para não quebrar a hidratação (SSR renderiza sem hash; o cliente ajusta e recarrega uma vez).
-  const [hash, setHash] = useState('')
-  useEffect(() => {
-    const querNovo = novo || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('novo') === '1')
-    if (querNovo) setHash('#configurar')
-  }, [novo])
+  // Modo criar já na 1ª montagem do src (query `modo=criar` + hash `#configurar`): o iframe carrega UMA vez.
+  const query = criar ? '&modo=criar' : revisaoFixo ? `&modo=revisao-fixo&emissao=${encodeURIComponent(emissaoId!)}` : ''
+  const hash = criar ? '#configurar' : revisaoFixo && abaInicial ? `#${abaInicial}` : ''
 
   const enviarTema = useCallback(() => {
     const win = ref.current?.contentWindow
@@ -111,27 +123,31 @@ export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = (e?.data || {}) as { type?: string }
-      // O iframe avisando "pronto" também libera o loader (não depende só do onLoad do React).
-      if (d.type === 'rej-crono-ready') { enviarTema(); setPronto(true) }
+      // O iframe avisando "pronto" libera o loader (não depende só do onLoad do React).
+      if (d.type === 'rej-crono-ready') { recebeuReady.current = true; setSemSinal(false); enviarTema(); setPronto(true) }
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
   }, [enviarTema])
 
   // O loader NUNCA pode ficar preso: o <iframe> é renderizado no SSR e pode terminar de carregar ANTES da
-  // hidratação → o `onLoad` do React não dispara e o "Carregando seu cronograma…" ficava para sempre
-  // mesmo com o cronograma já usável. Então: (1) se o iframe já está completo ao montar, libera;
-  // (2) teto de segurança de 4s.
+  // hidratação → o `onLoad` do React não dispara. O sinal certo é o postMessage 'rej-crono-ready' do iframe;
+  // fallbacks: (1) iframe já completo ao montar; (2) teto de 4s só para o loader (o iframe fica visível);
+  // (3) sem sinal em 20s → aviso visível com "Tentar de novo" (remonta o iframe).
+  const recebeuReady = useRef(false)
   useEffect(() => {
+    recebeuReady.current = false
+    setSemSinal(false)
     try {
       const doc = ref.current?.contentDocument
       if (doc && doc.readyState === 'complete' && doc.location.href !== 'about:blank') { enviarTema(); setPronto(true) }
     } catch { /* ignore */ }
     const t = setTimeout(() => setPronto(true), 4000)
-    return () => clearTimeout(t)
-  }, [enviarTema])
+    const t2 = setTimeout(() => { if (!recebeuReady.current) setSemSinal(true) }, 20000) // 20s (era 10s): o HTML do iframe tem ~2MB e o servidor pode estar ocupado
+    return () => { clearTimeout(t); clearTimeout(t2) }
+  }, [enviarTema, tentativa])
 
-  const modo = theme === 'escuro' ? 'dark' : 'light'
+  const tema = theme === 'escuro' ? 'dark' : 'light'
   return (
     <div style={{ position: 'relative', width: '100%', margin: 0, minHeight: altura }}>
       <style>{`@keyframes cr-spin{to{transform:rotate(360deg)}}@keyframes cr-pulse{0%,100%{opacity:.55}50%{opacity:1}}`}</style>
@@ -141,11 +157,19 @@ export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--muted-foreground, #6b7280)', animation: 'cr-pulse 1.4s ease-in-out infinite' }}>Carregando seu cronograma…</div>
         </div>
       )}
+      {semSinal && (
+        <div role="alert" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, zIndex: 3, padding: 16, textAlign: 'center', background: 'color-mix(in srgb, var(--background, transparent) 90%, transparent)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground, inherit)' }}>O cronograma está demorando mais que o normal para abrir.</div>
+          <div style={{ fontSize: 13, color: 'var(--muted-foreground, #6b7280)' }}>Pode ser a conexão ou o servidor ocupado. Aguarde um instante ou tente de novo.</div>
+          <button type="button" onClick={() => { setPronto(false); setTentativa((n) => n + 1) }} style={{ padding: '9px 18px', borderRadius: 10, border: 0, fontWeight: 700, cursor: 'pointer', background: 'var(--primary, #6d28d9)', color: 'var(--primary-foreground, #fff)' }}>Tentar de novo</button>
+        </div>
+      )}
       <iframe
-        ref={ref}
-        src={`/cronograma/adaptativo/index.html?theme=${modo}&v=${APP_VERSION}${bust}${hash}`}
-        title="Cronograma Adaptativo"
-        onLoad={() => { enviarTema(); setTimeout(enviarTema, 120); setTimeout(enviarTema, 400); setTimeout(enviarTema, 1000); setPronto(true) }}
+        key={tentativa}
+        ref={(el) => { ref.current = el; if (iframeRef) iframeRef.current = el }}
+        src={`/cronograma/adaptativo/index.html?theme=${tema}&v=${APP_VERSION}${bust}${query}${hash}`}
+        title={revisaoFixo ? 'Cronograma Revisão' : 'Cronograma Adaptativo'}
+        onLoad={() => { recebeuReady.current = true; setSemSinal(false); enviarTema(); setTimeout(enviarTema, 120); setTimeout(enviarTema, 400); setTimeout(enviarTema, 1000); setPronto(true) }}
         style={{ width: '100%', height: altura, border: 0, display: 'block', background: 'transparent', opacity: pronto ? 1 : 0, transform: pronto ? 'none' : 'translateY(10px)', transition: 'opacity .45s ease, transform .45s ease' }}
         allow="clipboard-write"
         suppressHydrationWarning /* o `cb=Date.now()` do dev difere entre SSR e cliente (só atributo `src`) */

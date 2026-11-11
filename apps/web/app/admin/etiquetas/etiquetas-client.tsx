@@ -10,11 +10,11 @@ import { cn } from '@/lib/utils'
 import type { Etiqueta, FuncaoEtiqueta, QuestaoDaEtiqueta } from './actions-tipos'
 import {criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, questoesDaEtiqueta} from './actions'
 
-const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
+export const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 const ordenar = (a: Etiqueta, b: Etiqueta) => a.nome.localeCompare(b.nome, 'pt-BR')
 
 // Funções (comportamento da etiqueta no simulado).
-const FUNCOES: { id: FuncaoEtiqueta; nome: string; desc: string; badge: string }[] = [
+export const FUNCOES: { id: FuncaoEtiqueta; nome: string; desc: string; badge: string }[] = [
   { id: 'anular', nome: 'Anular questão', desc: 'No simulado: bloqueia a questão, mostra o aviso no topo e dá o ponto a todos (acerte, erre ou nem responda).', badge: 'Anula + ponto' },
   { id: 'avisar', nome: 'Só avisar', desc: 'Mostra um alerta no topo da questão; ela continua respondível e pontua normalmente.', badge: 'Aviso' },
   { id: 'desconsiderar', nome: 'Desconsiderar', desc: 'Tira a questão do total da prova (não pontua ninguém) e bloqueia a resposta.', badge: 'Fora do total' },
@@ -306,7 +306,7 @@ function QuestoesModal({ etiqueta, itens, carregando, onClose }: {
   )
 }
 
-function FuncaoSelect({ value, onChange }: { value: FuncaoEtiqueta | ''; onChange: (v: FuncaoEtiqueta | '') => void }) {
+export function FuncaoSelect({ value, onChange }: { value: FuncaoEtiqueta | ''; onChange: (v: FuncaoEtiqueta | '') => void }) {
   const info = funcInfo(value || null)
   return (
     <div className="min-w-[11rem]">
@@ -320,7 +320,7 @@ function FuncaoSelect({ value, onChange }: { value: FuncaoEtiqueta | ''; onChang
   )
 }
 
-function PaletaCor({ value, onChange, compact }: { value: string; onChange: (c: string) => void; compact?: boolean }) {
+export function PaletaCor({ value, onChange, compact }: { value: string; onChange: (c: string) => void; compact?: boolean }) {
   return (
     <div className={cn('flex flex-wrap gap-1.5', compact && 'gap-1')}>
       {CORES.map((c) => (

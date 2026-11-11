@@ -6,7 +6,7 @@
 // Este módulo é client-safe (só tipos/const) — pode ser importado no front.
 
 // ── Referência do item (o que a aula aponta) ──
-export type TipoRef = 'documento_biblioteca' | 'video_url' | 'simulado' | 'quiz' | 'link'
+export type TipoRef = 'documento_biblioteca' | 'video_url' | 'simulado' | 'quiz' | 'link' | 'cronograma'
 
 export const TIPO_REF_LABEL: Record<TipoRef, string> = {
   documento_biblioteca: 'Documento da Biblioteca',
@@ -14,6 +14,7 @@ export const TIPO_REF_LABEL: Record<TipoRef, string> = {
   simulado: 'Simulado',
   quiz: 'Quiz',
   link: 'Link externo',
+  cronograma: 'Cronograma',
 }
 
 // ── Disponibilidade (nomes do designer, decisão 31/10) ──
@@ -55,7 +56,7 @@ export const DISPONIBILIDADE_PADRAO: Disponibilidade = { tipo: 'na_matricula', a
 /** Resumo curto de uma disponibilidade (para a lista de aulas: "disponível sempre"). */
 export function resumoDisponibilidade(d: Disponibilidade | null | undefined): string {
   if (!d || d.tipo === 'na_matricula') return 'disponível sempre'
-  if (d.tipo === 'data') return d.data ? `a partir de ${new Date(d.data).toLocaleDateString('pt-BR')}` : 'em uma data'
+  if (d.tipo === 'data') return d.data ? `a partir de ${new Date(d.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` : 'em uma data'
   if (d.tipo === 'intervalo') return `${d.dias ?? 0} dia(s) após a matrícula`
   if (d.tipo === 'data_e_intervalo') return 'data + intervalo'
   if (d.tipo === 'dia_semana_e_intervalo') return `${DIAS_SEMANA[d.diaSemana ?? 1]} + intervalo`
@@ -66,7 +67,7 @@ export function resumoDisponibilidade(d: Disponibilidade | null | undefined): st
 export type SubtipoConteudo =
   | 'pdfull' | 'pdflash' | 'videoaula' | 'slide' | 'legproc' | 'jurisclub'
   | 'video' | 'documento' | 'quiz' | 'incorporacao' | 'audio' | 'texto'
-  | 'simulado' | 'webinar' | 'entrega' | 'galeria' | 'flashcards' | 'scorm' | 'formulario'
+  | 'simulado' | 'webinar' | 'entrega' | 'galeria' | 'flashcards' | 'scorm' | 'formulario' | 'cronograma'
 
 /** Catálogo de subtipos do "Novo conteúdo" → o tipo_ref base de cada um. */
 export interface SubtipoDef {
@@ -91,6 +92,7 @@ export const SUBTIPOS: SubtipoDef[] = [
   { v: 'documento', nome: 'Documento', descricao: 'PDF ou arquivo para leitura', grupo: 'plataforma', tipoRef: 'documento_biblioteca' },
   { v: 'quiz', nome: 'Quiz', descricao: 'Perguntas de um banco de questões', grupo: 'plataforma', tipoRef: 'quiz' },
   { v: 'simulado', nome: 'Simulado', descricao: 'Um simulado da plataforma', grupo: 'plataforma', tipoRef: 'simulado' },
+  { v: 'cronograma', nome: 'Cronograma', descricao: 'Plano de estudo do aluno (resumo + atalho)', grupo: 'plataforma', tipoRef: 'cronograma' },
   { v: 'incorporacao', nome: 'Incorporação', descricao: 'Código ou link de outro site', grupo: 'plataforma', tipoRef: 'link' },
   { v: 'audio', nome: 'Áudio', descricao: 'Arquivo de áudio', grupo: 'plataforma', tipoRef: 'documento_biblioteca' },
   { v: 'texto', nome: 'Texto', descricao: 'Texto com editor', grupo: 'plataforma', tipoRef: 'link' },
@@ -137,3 +139,63 @@ export interface ItemRow {
   meta: Record<string, unknown>
   disponibilidade: Disponibilidade
 }
+
+// ── Tipo de MATERIAL (agrupamento da página do módulo do aluno) ──
+// Derivado de `subtipo` (quando conhecido), senão de `tipo_ref` e, para documentos sem subtipo, do prefixo do título.
+export type MaterialChave = 'pdfull' | 'pdflash' | 'pdfight' | 'legproc' | 'juris' | 'questoes' | 'video' | 'outros'
+export const MATERIAIS: { v: MaterialChave; label: string; curto: string }[] = [
+  { v: 'pdfull', label: 'PDFull', curto: 'Material completo' },
+  { v: 'pdflash', label: 'PDFlash', curto: 'Revisão rápida' },
+  { v: 'pdfight', label: 'PDFight', curto: 'Fixação e prática' },
+  { v: 'legproc', label: 'LegProc', curto: 'Lei seca por assunto' },
+  { v: 'juris', label: 'Juris', curto: 'Jurisprudência' },
+  { v: 'questoes', label: 'Questões', curto: 'Simulados e quizzes' },
+  { v: 'video', label: 'Vídeos', curto: 'Videoaulas e slides' },
+  { v: 'outros', label: 'Outros', curto: 'Demais materiais' },
+]
+
+export function materialDoItem(subtipo: string | null | undefined, tipoRef: TipoRef, titulo: string): MaterialChave {
+  switch ((subtipo ?? '').toLowerCase()) {
+    case 'pdfull': return 'pdfull'
+    case 'pdflash': return 'pdflash'
+    case 'pdfight': return 'pdfight'
+    case 'legproc': return 'legproc'
+    case 'jurisclub': case 'juris': return 'juris'
+    case 'quiz': case 'simulado': case 'questoes': return 'questoes'
+    case 'videoaula': case 'video': case 'slide': case 'webinar': return 'video'
+  }
+  if (tipoRef === 'simulado' || tipoRef === 'quiz') return 'questoes'
+  if (tipoRef === 'video_url') return 'video'
+  if (tipoRef === 'documento_biblioteca') {
+    const t = titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    const m = /^\s*(pdfull|pdflash|pdfight|legproc)\b/.exec(t)
+    if (m) return m[1] as MaterialChave
+    if (/^\s*(juris|stf|stj)\b/.test(t)) return 'juris'
+  }
+  return 'outros'
+}
+
+// ── Visão em CARDS do módulo (agregados calculados NO SERVIDOR; o cliente nunca recebe as aulas para montar os cards) ──
+export interface ModuloCard {
+  id: string
+  pai_id: string | null
+  titulo: string
+  imagem_url: string | null
+  ocultar_titulo: boolean
+  descricao: string | null
+  ordem: number
+  /** aulas diretas + as dos submódulos (rollup) */
+  aulas: number
+  /** aulas só deste módulo */
+  aulasDiretas: number
+  submodulos: number
+  materiais: Partial<Record<MaterialChave, number>>
+  /** aulas com liberação programada (não "sempre disponível") */
+  programadas: number
+  /** menor data futura entre as aulas com liberação por data (ISO) */
+  proxData: string | null
+  rascunhos: number
+}
+
+export type OrdemModulos = 'ordem' | 'nome' | 'nome_desc' | 'aulas' | 'aulas_asc' | 'sub' | 'sub_asc' | 'rascunhos' | 'rascunhos_asc'
+export type FiltroModulos = 'todos' | 'com_sub' | 'programadas' | 'rascunho'

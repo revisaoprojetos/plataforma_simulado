@@ -36,10 +36,25 @@ export async function lerCfgMetas(svc: SupabaseClient, tenantId: string): Promis
   })
 }
 
-/** Só os parâmetros do motor (sem metadados), prontos p/ `ctx.params`. */
+/** Disciplinas com PDFull/LegProc desligados (tabela do admin Revisão › Cronograma › Disciplinas). Sem migração/tabela → {}. */
+export async function lerDiscSemTipo(svc: SupabaseClient, tenantId: string): Promise<Record<string, string[]>> {
+  try {
+    const { data, error } = await svc.from('simulado_revisao_cron_disciplinas').select('nome, pdfull, legproc, juris').eq('tenant_id', tenantId).or('pdfull.eq.false,legproc.eq.false,juris.eq.false').limit(1000)
+    if (error) return {}
+    const out: Record<string, string[]> = { pf: [], lp: [], jp: [] }
+    for (const r of (data ?? []) as Array<{ nome: string; pdfull: boolean | null; legproc: boolean | null; juris: boolean | null }>) {
+      if (r.pdfull === false) out.pf.push(r.nome)
+      if (r.legproc === false) out.lp.push(r.nome)
+      if (r.juris === false) out.jp.push(r.nome)
+    }
+    return out
+  } catch { return {} }
+}
+
+/** Só os parâmetros do motor (sem metadados), prontos p/ `ctx.params` (+ bloqueios por disciplina vindos do admin). */
 export async function lerParamsMotor(svc: SupabaseClient, tenantId: string): Promise<ParamsAdaptativo> {
-  const { atualizadoEm: _e, atualizadoPor: _p, ...params } = await lerCfgMetas(svc, tenantId)
-  return params
+  const [{ atualizadoEm: _e, atualizadoPor: _p, ...params }, discSem] = await Promise.all([lerCfgMetas(svc, tenantId), remember(`crono-metas:discsem:${tenantId}`, 30, () => lerDiscSemTipo(svc, tenantId))])
+  return { ...params, discSemTipo: discSem }
 }
 
 /** Grava a config (merge no `tema`, sem apagar outras chaves) e invalida o cache. */
@@ -47,9 +62,11 @@ export async function salvarCfgMetas(svc: SupabaseClient, tenantId: string, cfg:
   const { data, error: e1 } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   if (e1) return { ok: false, error: e1.message }
   const tema = { ...(((data as { tema?: Record<string, unknown> } | null)?.tema) ?? {}) }
-  tema[CHAVE_TEMA] = { ...normalizarParams(cfg), atualizadoEm: new Date().toISOString(), atualizadoPor: atorId }
+  const { discSemTipo: _d, ...paraSalvar } = normalizarParams(cfg)
+  tema[CHAVE_TEMA] = { ...paraSalvar, atualizadoEm: new Date().toISOString(), atualizadoPor: atorId }
   const { error } = await svc.from('simulado_tenants').update({ tema }).eq('id', tenantId)
   if (error) return { ok: false, error: error.message }
   await esquecer(kCfg(tenantId)).catch(() => {})
+  await esquecer(`crono-metas:discsem:${tenantId}`).catch(() => {})
   return { ok: true }
 }

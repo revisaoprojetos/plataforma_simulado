@@ -5,15 +5,22 @@
  * grupos de acesso. Nada é gravado antes daqui — o assistente monta tudo em memória e este é
  * o único ponto de escrita.
  *
- * O cronograma nasce reusando `criarCronograma` (slug + validação já provados). Se as metas
- * falharem, o cronograma recém-criado é desfeito para não deixar casca órfã. Links e vínculos
- * são complementares: uma falha ali vira aviso, não derruba a criação.
+ * O cronograma nasce reusando `criarCronograma` (slug + validação já provados). TUDO que é validável
+ * é validado ANTES de criar (posição das metas contra a grade e as semanas de revisão, tipos ativos,
+ * categoria/pacotes/questões do tenant). Metas e questões anexadas são parte do núcleo: qualquer falha
+ * ali DESFAZ o cronograma (o delete cascateia para metas/questões) e, se o próprio desfazer falhar,
+ * o erro diz qual cronograma ficou incompleto. Links e vínculos a pacotes são complementares: falha
+ * vira aviso.
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { SLUG_PDF, SLUG_VIDEO } from '@/lib/cronograma/tipos'
 import { garantirPlataformaVideo, garantirPlataformaPdf } from '@/lib/cronograma/plataforma-video'
+import { registrarAudit } from '@/lib/audit'
+import { validarPosicoesEmLote } from '@/lib/cronograma/integridade'
+import { recalcularChaves } from '@/lib/cronograma/compat-legado'
+import { idsForaDoTenant, tiposInvalidos } from '@/lib/cronograma/validar-lote'
 import { criarCronograma, alternarLiberacao } from '../actions'
 import type { CronogramaDraft } from './criar-context'
 
@@ -26,6 +33,38 @@ export async function criarCronogramaCompletoAction(
   const tenantId = access.tenantId
   const svc = createAdminClient()
   const avisos: string[] = []
+
+  // 0. Validação prévia (nada é criado se algo estiver inválido).
+  const erroPos = validarPosicoesEmLote(draft.metas, {
+    total_semanas: draft.totalSemanas,
+    dias_curso: draft.diasCurso,
+    semanas_revisao: draft.semanasRevisao,
+  })
+  if (erroPos) return { error: erroPos }
+  const semDisc = draft.metas.findIndex((m) => !m.disciplina?.trim())
+  if (semDisc >= 0) return { error: `Meta ${semDisc + 1}: informe a disciplina.` }
+  if (draft.metas.some((m) => m.tipo === 'simulado')) {
+    return { error: 'Metas do tipo simulado precisam de destino (simulado da plataforma ou externo): crie o cronograma e adicione-as pela tela de metas.' }
+  }
+  const tiposRuins = await tiposInvalidos(svc, tenantId, draft.metas.map((m) => m.tipo))
+  if (tiposRuins.length) return { error: `Tipo(s) de meta inexistente(s) ou inativo(s): ${tiposRuins.join(', ')}.` }
+  const pacotesRuins = await idsForaDoTenant(svc, 'simulado_cronograma_pacotes', tenantId, draft.pacoteIds)
+  if (pacotesRuins.length) return { error: 'Algum grupo de acesso selecionado não existe nesta plataforma.' }
+  const questoesRuins = await idsForaDoTenant(svc, 'simulado_questoes', tenantId, draft.metas.flatMap((m) => m.questaoIds ?? []))
+  if (questoesRuins.length) return { error: `${questoesRuins.length} questão(ões) anexada(s) não pertencem a esta plataforma.` }
+  if (draft.categoriaId && (await idsForaDoTenant(svc, 'simulado_cronograma_categorias', tenantId, [draft.categoriaId])).length) {
+    return { error: 'Categoria inválida.' }
+  }
+
+  // Desfaz o cronograma recém-criado e REPORTA se o próprio desfazer falhar (nunca engole).
+  const desfazer = async (id: string, motivo: string) => {
+    const { error } = await svc.from('simulado_cronogramas').delete().eq('id', id).eq('tenant_id', tenantId)
+    if (error) {
+      console.error('[cronograma] rollback da criação FALHOU:', id, error.message)
+      return `${motivo} Além disso, não foi possível desfazer a criação: o cronograma ${id} ficou incompleto — exclua-o manualmente (${error.message}).`
+    }
+    return motivo
+  }
 
   // 1. Cronograma (rascunho) — reusa a action provada (slug + validação + auditoria).
   const r = await criarCronograma({
@@ -58,24 +97,31 @@ export async function criarCronogramaCompletoAction(
       ordem: m.ordem ?? 0,
     }))
     const { data: metasRows, error: eMetas } = await svc.from('simulado_cronograma_metas').insert(linhas).select('id')
-    if (eMetas) {
-      await svc.from('simulado_cronogramas').delete().eq('id', id).eq('tenant_id', tenantId)
-      return { error: `Não foi possível gravar as metas: ${eMetas.message}` }
+    if (eMetas) return { error: await desfazer(id, `Não foi possível gravar as metas: ${eMetas.message}.`) }
+    if ((metasRows ?? []).length !== linhas.length) {
+      return { error: await desfazer(id, 'As metas não foram gravadas por inteiro (contagem divergente).') }
     }
+    await recalcularChaves(svc, tenantId, id)
+    await registrarAudit({
+      operacao: 'INSERT',
+      entidade: 'simulado_cronograma_metas',
+      entidadeId: id,
+      depois: { cronograma_nome: draft.nome, via: 'criar_completo', em_lote: linhas.length, semanas: [...new Set(draft.metas.map((m) => m.semana))].length },
+      atorId: access.userId ?? null,
+      tenantId,
+    })
 
     // 2b. Questões anexadas (via Montagem) → meta_questoes. O INSERT devolve os ids na ORDEM de
     // entrada, então metasRows[i] casa com draft.metas[i]. Só vincula se a contagem bater (defensivo).
     const ids = (metasRows ?? []) as { id: string }[]
     const temQuestoes = draft.metas.some((m) => (m.questaoIds?.length ?? 0) > 0)
-    if (temQuestoes && ids.length === draft.metas.length) {
+    if (temQuestoes) {
       const mq: { tenant_id: string; meta_id: string; questao_id: string; ordem: number }[] = []
       draft.metas.forEach((m, i) => (m.questaoIds ?? []).forEach((qid, k) => mq.push({ tenant_id: tenantId, meta_id: ids[i].id, questao_id: qid, ordem: k })))
       if (mq.length) {
         const { error: eMq } = await svc.from('simulado_cronograma_meta_questoes').upsert(mq, { onConflict: 'meta_id,questao_id', ignoreDuplicates: true })
-        if (eMq) avisos.push(`Questões das metas: ${eMq.message}`)
+        if (eMq) return { error: await desfazer(id, `Não foi possível vincular as questões às metas: ${eMq.message}.`) }
       }
-    } else if (temQuestoes) {
-      avisos.push('As questões anexadas não puderam ser vinculadas às metas (contagem divergente).')
     }
   }
 

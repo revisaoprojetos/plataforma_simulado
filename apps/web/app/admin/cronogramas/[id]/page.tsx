@@ -4,12 +4,13 @@ import { buttonVariants } from '@/components/ui/button'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { carregarDetalhe, pacotesDoCronograma } from './metas-actions'
 import { MetasClient } from './metas-client'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CronogramaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [r, p] = await Promise.all([carregarDetalhe(id), pacotesDoCronograma(id)])
+  const [r, p, tenantId] = await Promise.all([carregarDetalhe(id), pacotesDoCronograma(id), getCurrentTenantId()])
 
   if (!r.ok || !r.cronograma) {
     return (
@@ -31,7 +32,7 @@ export default async function CronogramaDetalhePage({ params }: { params: Promis
           Voltar ao catálogo
         </Link>
       </div>
-      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} simulados={r.simulados ?? []} pacotes={p.dados ?? { dentro: [], fora: [] }} diagnostico={r.diagnostico!} />
+      <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} simulados={r.simulados ?? []} pacotes={p.dados ?? { dentro: [], fora: [] }} diagnostico={r.diagnostico!} tenantId={tenantId ?? undefined} />
     </div>
   )
 }

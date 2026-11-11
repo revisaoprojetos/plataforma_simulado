@@ -304,7 +304,12 @@ export function CronogramasClient({
 
   function salvar() {
     iniciar(async () => {
-      const r = editando ? await atualizarCronograma(editando, form) : await criarCronograma(form)
+      let r: { ok: boolean; error?: string; requerConfirmacao?: boolean; id?: string } = editando ? await atualizarCronograma(editando, form) : await criarCronograma(form)
+      if (!r.ok && r.requerConfirmacao && editando) {
+        const sim = await confirmar({ titulo: 'Alterar semanas com emissões de alunos', mensagem: r.error ?? 'Há emissões de alunos neste cronograma. Continuar?', destrutivo: true })
+        if (!sim) return
+        r = await atualizarCronograma(editando, form, { confirmarEmissoes: true })
+      }
       if (!r.ok) {
         toast.error(r.error ?? 'Não foi possível salvar.')
         return

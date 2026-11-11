@@ -1,166 +1,85 @@
-import Link from 'next/link'
-import { CalendarDays, CalendarRange, ChevronRight, ArrowLeft } from 'lucide-react'
 import { redirect } from 'next/navigation'
+import { CalendarDays } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { getTenantTheme } from '@/lib/tenant-theme'
-import { createAdminClient } from '@/lib/supabase/server'
-import { cronogramasDoAluno } from '@/lib/cronograma/acesso'
-import { Card } from '@/components/ui/card'
-import { CronogramaClient } from './cronograma-client'
-import { HistoricoTabela, LiberadosTabela } from './cronograma-paineis'
-import { listarMinhasEmissoes } from './emissoes-actions'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { InternaPageShell } from '@/components/brand/interna/page-shell'
 import { CronogramaAdaptativoEmbed } from '@/components/brand/interna/cronograma/adaptativo-embed'
+import { carregarMeusCronogramas, type OrdemMeus } from '@/lib/cronograma/meus'
+import { CronogramaHome } from './_hub/home'
+import { EscolherTipo } from './_hub/escolher-tipo'
+import { CriarRevisao } from './_hub/criar-revisao'
 export const dynamic = 'force-dynamic'
 
-export default async function CronogramaAlunoPage() {
-  // O layout do portal já barra quem não tem sessão; repetimos porque a página lê
-  // estudanteId e tenantId dela — e o tenant vem da SESSÃO, não do host (que falha
-  // dentro de iframe).
+// PÁGINA ÚNICA do Cronograma (fonte única: Meus cronogramas + Modelos + Criar novo).
+//   /aluno/cronograma                          → HOME
+//   ?criar                                     → etapa 1 (tipo) — pula se só há um tipo
+//   ?criar=adaptativo                          → embed (modo criar)
+//   ?criar=revisao[&modelo=<id>]               → CronogramaClient (padrão/catálogo)
+//   ?ver=adaptativo                            → embed (modo ver, plano fixado)
+//   ?novo=1 (legado)                           → redireciona p/ ?criar
+// Nada é gravado ao navegar entre as etapas; só em "Gerar/Salvar". Emissões: /cronograma/[emissaoId] e /meus.
+type SP = Record<string, string | string[] | undefined>
+const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+
+export default async function CronogramaAlunoPage({ searchParams }: { searchParams: Promise<SP> }) {
+  // O tenant vem da SESSÃO (não do host, que falha dentro de iframe).
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
+  const sp = await searchParams
 
-  // ── Revisão: o Cronograma é o ADAPTATIVO 2.0 (iframe). Saiu da SIDEBAR (gate no layout) e é
-  // acessado pelo "Meu painel de estudos" (os botões do hub apontam para cá). Renderiza AQUI, no
-  // shell interno — mesmo título/padding/marca das demais páginas (ex.: Simulados). O embed opera
-  // sobre o plano FIXADO; "+ Novo" chega com ?novo=1 e abre direto em Configurar. ──
-  const _it = await resolverInterno()
-  if (_it.ativo && _it.brand === 'revisao') {
-    // Render no shell interno (mesmo gutter/marca das demais páginas). Breadcrumb acima volta ao
-    // "Meu painel de estudos" (hub). O iframe já traz seu próprio título, então não duplicamos header.
-    // O breadcrumb ("← Painel de estudos / Cronograma") agora vive DENTRO do iframe (topo do conteúdo):
-    // rola junto com o conteúdo (não fica fixo por cima) e o card "Resumo" volta a grudar (o iframe rola
-    // internamente). A página só renderiza o embed, que preenche a área (ehAreaNova, sem padding do shell).
-    return <CronogramaAdaptativoEmbed theme={_it.theme} />
+  if (um(sp.novo) === '1') redirect('/aluno/cronograma?criar')
+
+  const it = await resolverInterno()
+  const ord: OrdemMeus = ['recentes', 'antigos', 'nome'].includes(um(sp.ord) ?? '') ? (um(sp.ord) as OrdemMeus) : 'recentes'
+  const q = (um(sp.q) ?? '').trim().slice(0, 80)
+  const pagina = Math.max(0, parseInt(um(sp.pg) ?? '0', 10) || 0)
+  const dados = await carregarMeusCronogramas(sessao.tenantId, sessao.estudanteId, { q, ord, pagina })
+
+  const criar = sp.criar !== undefined ? (um(sp.criar) ?? '') : null
+  const ver = um(sp.ver)
+
+  // ── Adaptativo: visualizar o plano fixado ──
+  if (ver === 'adaptativo' && dados.tipos.adaptativo) {
+    return <CronogramaAdaptativoEmbed modo="ver" theme={it.theme} />
   }
 
-  const svc = createAdminClient()
+  // ── Criar ──
+  if (criar !== null) {
+    const { revisao, adaptativo } = dados.tipos
+    if (!revisao && !adaptativo) redirect('/aluno/cronograma')
+    const alvo = criar === 'adaptativo' && adaptativo ? 'adaptativo' : criar === 'revisao' && revisao ? 'revisao' : null
 
-  // O módulo é ligado por tenant; enquanto estiver desligado, nem a tela aparece.
-  const { data: cfg } = await svc
-    .from('simulado_cronograma_config')
-    .select('ativo')
-    .eq('tenant_id', sessao.tenantId)
-    .maybeSingle()
+    if (alvo === 'adaptativo') return <CronogramaAdaptativoEmbed modo="criar" theme={it.theme} />
 
-  const ativo = !!(cfg as { ativo?: boolean } | null)?.ativo
-  const catalogo = ativo ? await cronogramasDoAluno(svc, sessao.tenantId, sessao.estudanteId) : []
-  // Histórico: carrega um lote (paginação/busca/filtro acontecem no cliente, na tabela).
-  const emissoes = await listarMinhasEmissoes({ porPagina: 100 })
-  const historico = emissoes.dados?.itens ?? []
-  const salvos = emissoes.dados?.ativas ?? 0
-  const { tenantNome } = await getTenantTheme()
-  // "Revisão / Ensino Jurídico" no meio da frase fica arrastado — a manchete usa só a primeira
-  // parte do nome do tenant, que é como a marca é dita ("do Revisão").
-  const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()
+    if (alvo === 'revisao') {
+      const modeloId = um(sp.modelo)
+      const inicial = modeloId && dados.modelos.some((m) => m.id === modeloId) ? modeloId : undefined
+      // A escolha do tipo é feita no modal "Novo cronograma" do Painel de estudos → "Voltar" retorna ao Painel
+      // (não à home do cronograma, que reabre o plano em foco).
+      const voltarPara = '/aluno/nova/painel'
+      return (
+        <InternaPageShell brand={it.brand} theme={it.theme} titulo="Novo cronograma" subtitulo="Escolha o modelo, defina sua rotina e gere o plano." icone={<CalendarDays className="h-6 w-6" />}>
+          <CriarRevisao modelos={dados.modelosBrutos} modeloInicialId={inicial} voltarPara={voltarPara} />
+        </InternaPageShell>
+      )
+    }
 
-  // Mesma linguagem dos heróis do portal (Ligas, Perfil): marca do tenant no gradiente e
-  // `--brand-accent` no destaque.
-  const HERO_BG =
-    'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 62%, var(--pn-17122e,#17122e)) 0%, color-mix(in oklab, var(--brand-primary, var(--primary)) 26%, var(--pn-14102a,#14102a)) 100%)'
-  const ACENTO = 'var(--brand-accent, var(--pn-f6c343,#f6c343))'
-
-  // ── NOVO VISUAL INTERNO: Cronograma no header/fundo novos, reusando o construtor/tabelas funcionais. ──
-  // (A Revisão com visual interno já foi redirecionada no topo para /aluno/nova/painel.)
-  if (_it.ativo) {
+    // Só um tipo disponível → pula a etapa 1.
+    if (revisao !== adaptativo) {
+      const modeloId = um(sp.modelo)
+      redirect(revisao ? `/aluno/cronograma?criar=revisao${modeloId ? `&modelo=${encodeURIComponent(modeloId)}` : ''}` : '/aluno/cronograma?criar=adaptativo')
+    }
     return (
-      <InternaPageShell brand={_it.brand} theme={_it.theme} titulo="Cronograma de estudos" subtitulo="Monte, salve e acompanhe seus planos de estudo." icone={<CalendarDays className="h-6 w-6" />}>
-        {!catalogo.length ? (
-          <Card className="px-4 py-12 text-center">
-            <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">Nenhum cronograma liberado para você ainda.</p>
-          </Card>
-        ) : (
-          <CronogramaClient catalogo={catalogo} />
-        )}
-        <div className="grid items-start gap-4 lg:grid-cols-2">
-          <HistoricoTabela itens={historico} salvos={salvos} />
-          <LiberadosTabela itens={catalogo} />
-        </div>
+      <InternaPageShell brand={it.brand} theme={it.theme} titulo="Novo cronograma" subtitulo="Monte seu plano de estudo." icone={<CalendarDays className="h-6 w-6" />}>
+        <EscolherTipo tipos={dados.tipos} modeloId={um(sp.modelo)} />
       </InternaPageShell>
     )
   }
 
+  // ── HOME ──
   return (
-    <div className="animate-page space-y-6">
-      {/* Bloco roxo: manchete + o card de montar cronograma vivem DENTRO do mesmo fundo,
-          então o roxo vai até a base do card. */}
-      <section
-        className="relative overflow-hidden rounded-2xl px-4 pb-6 pt-10 sm:px-8 sm:pt-14"
-        style={{ background: HERO_BG }}
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full"
-          style={{ background: `color-mix(in oklab, ${ACENTO} 20%, transparent)`, filter: 'blur(70px)' }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 right-1/4 h-64 w-64 rounded-full"
-          style={{ background: 'color-mix(in oklab, #ffffff 12%, transparent)', filter: 'blur(60px)' }}
-        />
-        {/* Ícone-referência de cronograma, à direita da manchete (decorativo). */}
-        <CalendarRange
-          aria-hidden
-          strokeWidth={1.25}
-          className="pointer-events-none absolute right-4 top-8 hidden h-44 w-44 text-white/10 lg:block xl:right-10 xl:h-56 xl:w-56"
-        />
-
-        <div className="relative max-w-2xl px-2">
-          <div className="mb-3 flex items-center gap-2">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: ACENTO, boxShadow: `0 0 10px 1px color-mix(in oklab, ${ACENTO} 60%, transparent)` }}
-            />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: ACENTO }}>
-              Cronograma de estudos
-            </span>
-          </div>
-          {/* `main h1` recebe --content-title do tema; aqui o fundo é escuro, então a cor é explícita. */}
-          <h1 className="text-3xl font-bold leading-[1.1] tracking-tight sm:text-[2.5rem]" style={{ color: '#fff' }}>
-            Gere seu cronograma de estudo{' '}
-            <span style={{ color: ACENTO }}>{marca ? `do ${marca}.` : 'do seu jeito.'}</span>
-          </h1>
-          <p className="mt-3 max-w-xl text-sm text-white/70 sm:text-base">
-            Escolha sua rotina, defina quando começar e receba um plano completo — organizado semana a semana
-            {salvos > 0 ? ' e guardado na sua conta.' : ' e guardado na sua conta, para você voltar quando quiser.'}
-          </p>
-          {salvos > 0 && (
-            <Link
-              href="/aluno/cronograma/meus"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-inset ring-white/25 transition hover:bg-white/10"
-            >
-              <CalendarDays className="h-3.5 w-3.5" />
-              {salvos === 1 ? 'Ver meu cronograma salvo' : `Ver meus ${salvos} cronogramas salvos`}
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
-        </div>
-
-        {/* Card de montar — dentro do roxo, com respiro embaixo (pb do section) */}
-        <div className="relative z-10 mt-8">
-          {!catalogo.length ? (
-            <Card className="px-4 py-12 text-center">
-              <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-              <p className="font-medium">Nenhum cronograma disponível para você</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                {ativo
-                  ? 'Os cronogramas são liberados pela equipe. Fale com o suporte para saber como ter acesso.'
-                  : 'Esta área ainda está sendo preparada. Volte em breve.'}
-              </p>
-            </Card>
-          ) : (
-            <CronogramaClient catalogo={catalogo} />
-          )}
-        </div>
-      </section>
-
-      {/* Painéis (tabelas com busca/filtro/paginação): histórico (esq.) + liberados (dir.) */}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <HistoricoTabela itens={historico} salvos={salvos} />
-        <LiberadosTabela itens={catalogo} />
-      </div>
-    </div>
+    <InternaPageShell brand={it.brand} theme={it.theme} titulo="Cronograma de estudos" subtitulo="Monte, salve e acompanhe seus planos de estudo." icone={<CalendarDays className="h-6 w-6" />}>
+      <CronogramaHome dados={dados} q={q} ord={ord} />
+    </InternaPageShell>
   )
 }

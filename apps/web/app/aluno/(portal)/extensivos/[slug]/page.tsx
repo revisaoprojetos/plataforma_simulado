@@ -1,36 +1,29 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { RevisaoParticulas } from '@/components/brand/loadings/revisao-particulas'
-import { REVISAO_R_PATH, REVISAO_R_OUTLINE } from '@/components/brand/brand-marks'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, curriculoDoExtensivo, type VitrineSecao, type VitrineItem } from '@/lib/produtos/aluno'
-import { ModulosVitrine } from './curriculo'
+import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, curriculoDoExtensivo } from '@/lib/produtos/aluno'
+import { carregarPaginaProduto, carregarDadosPagina, montarItensPagina } from '@/lib/produtos/pagina/loader'
 import { voltarDoExtensivo } from '@/lib/nova/extensivos-aluno'
-import { PRODUTO_TIPOS } from '@/lib/produtos/tipos'
-import { ArrowLeft, ClipboardList, BookOpen, CalendarDays, CalendarClock, ChevronRight, Megaphone, Pin, Layers, Wrench } from 'lucide-react'
+import { PaginaAluno } from './render-blocos' // → <PaginaRender modo="aluno"/> (components/produtos/pagina/blocos)
+import { accessCan, getCurrentAccess } from '@/lib/auth/permissions'
+import { FaixaPrevia } from '@/components/produtos/pagina/editor/versoes/faixa-previa'
+import { ArrowLeft, ChevronRight, Layers, Wrench } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-const labelTipo = (t: string) => PRODUTO_TIPOS.find((x) => x.v === t)?.label ?? t
-
-// Dimensões do card por tamanho da seção (espelha os layouts da Curseduca).
-const CARD: Record<string, string> = {
-  vertical_small: 'w-36 aspect-[3/4]',
-  vertical_large: 'w-44 aspect-[3/4]',
-  horizontal_small: 'w-56 aspect-video',
-  horizontal_large: 'w-72 aspect-video',
-  destaque: 'w-[22rem] aspect-[21/9]',
-}
-function iconeItem(tipo: string) {
-  if (tipo === 'simulado') return ClipboardList
-  if (tipo === 'cronograma') return CalendarDays
-  return BookOpen
+// Prévia do rascunho (?preview=rascunho): nunca indexar.
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
+  const sp = await searchParams
+  return sp?.preview ? { robots: { index: false, follow: false } } : {}
 }
 
-export default async function ExtensivoPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ExtensivoPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ preview?: string }> }) {
   const { slug } = await params
+  const sp = await searchParams
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
+  // Prévia do rascunho: SÓ com produtos:manage (checagem no servidor); sem a permissão o parâmetro é ignorado.
+  const previa = sp?.preview === 'rascunho' && accessCan(await getCurrentAccess(), 'produtos:manage')
   const [ext, voltar] = await Promise.all([getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug), voltarDoExtensivo()])
   if (!ext) notFound()
   // Modo "em edição/manutenção": bloqueio TOTAL — todos os alunos (até matriculados) veem a mensagem de
@@ -54,16 +47,23 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
       </div>
     )
   }
-  const [vit, prog, avisos, curriculo] = await Promise.all([
+  // Leituras pesadas em PARALELO (como antes) + a página (blocos V1: versão publicada ou derivação legada).
+  const [vit, progressoSimulados, avisos, curriculo, carregada] = await Promise.all([
     vitrineDoAluno(sessao.tenantId, sessao.estudanteId, slug),
     progressoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id),
     avisosDoProduto(sessao.tenantId, ext.id),
     curriculoDoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id, slug),
+    carregarPaginaProduto(ext.id, { estado: previa ? 'rascunho' : 'publicado', tenantId: sessao.tenantId }),
   ])
   if (!vit) notFound()
-  const pct = prog.total > 0 ? Math.round((prog.feitos / prog.total) * 100) : 0
-  const cor = vit.cor || 'var(--brand-primary, var(--primary))'
-  const cor2 = vit.cor_secundaria || cor
+  const dados = await carregarDadosPagina(ext.id, carregada.pagina, {
+    tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, vit, slug, voltar,
+    pre: { avisos, progressoSimulados, curriculo },
+  })
+  if (!dados) notFound()
+  // Itens da página (hero, avisos, continuar, progresso, cronograma, módulos, vitrine…) montados NO SERVIDOR.
+  const itens = await montarItensPagina(carregada.pagina, dados, sessao.tenantId, sessao.estudanteId)
+  const cor = dados.cor
   // Fallback: produto sem vitrine montada → lista simples do que foi liberado.
   // "Acessos incluídos" etc. só quando NÃO há vitrine NEM currículo (era o único conteúdo antes do currículo).
   const semVitrine = vit.secoes.length === 0 && curriculo.length === 0
@@ -71,79 +71,8 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
 
   return (
     <div className="w-full space-y-6">
-      {/* Banner branded (cor/logo do produto) — ocupa o topo inteiro da área (sangra sobre o padding do shell) e leva o "Voltar" dentro */}
-      <div className="relative -mx-[14px] -mt-[14px] min-h-[260px] overflow-hidden p-6 text-white shadow-sm min-[900px]:-mx-7 min-[900px]:-mt-6 min-[900px]:min-h-[320px] sm:p-8 sm:pb-12"
-        style={vit.banner_url
-          ? { backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cor} 82%, transparent), color-mix(in srgb, ${cor2} 60%, #000)), url(${vit.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-          : { background: `linear-gradient(135deg, ${cor}, color-mix(in srgb, ${cor2} 60%, #000))` }}>
-        {/* Grade fixa + quadradinhos que acendem (mesmo efeito do loading/login) + linha percorrendo o contorno do "R" */}
-        <style>{'@keyframes extDraw{to{stroke-dashoffset:0}}@keyframes extRun{to{stroke-dashoffset:-422}}@keyframes extFade{from{opacity:0}to{opacity:1}}.ext-trace-base{stroke-dasharray:420;stroke-dashoffset:420;animation:extDraw 2.6s cubic-bezier(.6,.1,.2,1) .4s forwards}.ext-trace-run{stroke-dasharray:22 400;opacity:0;animation:extFade .6s ease-out 3s forwards,extRun 7s linear 3s infinite}@media (prefers-reduced-motion:reduce){.ext-trace-base{stroke-dashoffset:0;animation:none}.ext-trace-run{display:none}}'}</style>
-        <span aria-hidden className="pointer-events-none absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '64px 64px' }} />
-        <RevisaoParticulas quadrados />
-        <svg aria-hidden viewBox="0 0 68 66" className="pointer-events-none absolute -bottom-4 right-6 h-[210px] w-[216px] sm:right-12">
-          <path fillRule="evenodd" fill="rgba(255,255,255,.06)" d={REVISAO_R_PATH} />
-          <path className="ext-trace-base" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} />
-          <path className="ext-trace-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" strokeWidth="0.55" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
-        </svg>
-        <div className="relative flex h-full min-h-[212px] flex-col justify-between gap-6 min-[900px]:min-h-[264px]">
-          <Link href={voltar.href} className="self-start mb-0 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/25">
-            <ArrowLeft className="h-4 w-4" />Voltar
-          </Link>
-          <div>
-          {vit.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={vit.logo_url} alt="" className="mb-3 h-9 w-auto" />
-          )}
-          <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">{vit.nome}</h1>
-          {vit.descricao && <p className="mt-1 max-w-2xl text-sm text-white/85">{vit.descricao}</p>}
-          {vit.expira_em && (
-            <div className="mt-3 inline-flex items-center gap-1 text-xs text-white/85"><CalendarClock className="h-3.5 w-3.5" />Acesso até {new Date(vit.expira_em).toLocaleDateString('pt-BR')}</div>
-          )}
-          </div>
-        </div>
-      </div>
-
-      {/* Avisos */}
-      {avisos.length > 0 && (
-        <div className="space-y-2">
-          {avisos.map((a) => (
-            <div key={a.id} className="flex items-start gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl" style={{ background: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}>
-                {a.fixado ? <Pin className="h-4 w-4" /> : <Megaphone className="h-4 w-4" />}
-              </span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">{a.titulo}</div>
-                {a.corpo && <p className="mt-0.5 whitespace-pre-line text-sm text-muted-foreground">{a.corpo}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Progresso */}
-      {prog && prog.total > 0 && (
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-semibold">Seu progresso nos simulados</span>
-            <span className="tabular-nums text-muted-foreground">{prog.feitos}/{prog.total} · {pct}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: cor }} />
-          </div>
-          {prog.proximo && (
-            <Link href="/aluno/simulados" className="mt-3 flex items-center justify-between gap-2 rounded-xl border p-2.5 transition-colors hover:bg-muted/50">
-              <span className="min-w-0"><span className="text-xs text-muted-foreground">Continuar de onde parou</span><span className="block truncate text-sm font-medium">{prog.proximo.titulo}</span></span>
-              <ChevronRight className="h-4 w-4 shrink-0" style={{ color: cor }} />
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* CONTEÚDO DO CURSO — módulos e aulas montados no configurador do produto */}
-      {curriculo.length > 0 && <ModulosVitrine modulos={curriculo} slug={slug} cor={cor} layout={vit.vitrine_layout} />}
-
-      {/* VITRINE (seções) */}
-      {vit.secoes.map((s) => <Secao key={s.id} s={s} cor={cor} />)}
+      {previa && <FaixaPrevia sairHref={`/aluno/extensivos/${slug}`} />}
+      <PaginaAluno itens={itens} dados={dados} />
 
       {/* Fallback quando a vitrine ainda não foi montada */}
       {semVitrine && fallback && (
@@ -165,37 +94,3 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
     </div>
   )
 }
-
-function Secao({ s, cor }: { s: VitrineSecao; cor: string }) {
-  if (s.tipo === 'banner') {
-    if (!s.imagem) return null
-    const img = (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={s.imagem} alt={s.nome ?? ''} className="w-full rounded-2xl border object-cover shadow-sm" />
-    )
-    return s.link ? <a href={s.link} target="_blank" rel="noreferrer" className="block">{img}</a> : img
-  }
-  if (!s.itens.length) return null
-  const size = CARD[s.tamanho] ?? CARD.vertical_small
-  return (
-    <section className="space-y-2">
-      {s.nome && <h2 className="text-sm font-semibold">{s.nome}</h2>}
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
-        {s.itens.map((it) => <CardItem key={`${it.tipo}:${it.id}`} it={it} size={size} cor={cor} />)}
-      </div>
-    </section>
-  )
-}
-
-function CardItem({ it, size, cor }: { it: VitrineItem; size: string; cor: string }) {
-  const Icon = iconeItem(it.tipo)
-  return (
-    <Link href={it.href} className={`group relative flex shrink-0 flex-col justify-end overflow-hidden rounded-2xl border p-3 text-white shadow-sm transition-transform hover:-translate-y-0.5 ${size}`}
-      style={{ background: `linear-gradient(160deg, color-mix(in srgb, ${cor} 70%, #000), color-mix(in srgb, ${cor} 30%, #000))` }}>
-      <Icon className="absolute right-2 top-2 h-4 w-4 text-white/70" />
-      <span className="line-clamp-3 text-sm font-semibold leading-tight">{it.nome}</span>
-      {it.area && <span className="mt-1 text-[10px] uppercase tracking-wide text-white/70">{it.area}</span>}
-    </Link>
-  )
-}
-

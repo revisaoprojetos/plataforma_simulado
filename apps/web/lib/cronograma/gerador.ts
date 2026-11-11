@@ -24,6 +24,7 @@ import {
   type MetaFonte,
   type OpcoesGeracao,
   type MapaTipos,
+  type ResumoGrade,
   type SemanaGrade,
   type TipoMetaDef,
 } from './tipos'
@@ -36,7 +37,7 @@ import {
 export const MAX_SEMANAS_CALENDARIO = 520
 
 /** Texto fixo das semanas de revisão (spec §3). */
-const BLOCOS_REVISAO: BlocoRevisao[] = [
+export const BLOCOS_REVISAO: BlocoRevisao[] = [
   { titulo: 'Segunda e terça', texto: 'Revise as disciplinas de Direito Constitucional, Administrativo e Tributário.' },
   { titulo: 'Quarta e quinta', texto: 'Revise as disciplinas de Direito Civil, Processo Civil e Empresarial.' },
   { titulo: 'Sexta e sábado', texto: 'Revise as disciplinas de Direito Penal, Processo Penal e as demais matérias do seu edital.' },
@@ -119,7 +120,7 @@ export function ordenarMetas(metas: MetaFonte[], tipos: MapaTipos): MetaFonte[] 
  * e avança-se a partir da segunda até encontrá-lo. Por isso um cronograma
  * `[1,2,3,4,5,6,0]` tem o domingo como ÚLTIMO dia da semana, não como primeiro.
  */
-function datarMetas(
+export function datarMetas(
   metas: MetaFonte[],
   inicioSemana: DataISO,
   cron: CronogramaFonte,
@@ -237,6 +238,15 @@ export function gerarGrade(
   if (!alocado.ok) return alocado
 
   const { semanas } = alocado
+  return { ok: true, grade: { semanas, resumo: montarResumoGrade(semanas, cron), avisos: [...new Set(avisos)] } }
+}
+
+/**
+ * Resumo (R4, R9, R16, R17) de uma lista de semanas já datadas. Compartilhado entre o
+ * gerador "ao vivo" e o gerador de calendário CONGELADO (emissão): os números do topo
+ * saem da mesma regra nos dois caminhos.
+ */
+export function montarResumoGrade(semanas: SemanaGrade[], cron: Pick<CronogramaFonte, 'dias_curso' | 'dias_nome'>): ResumoGrade {
   const semanasConteudo = semanas.filter((s) => s.kind === 'conteudo').length
   const semanasRevisao = semanas.filter((s) => s.kind === 'revisao').length
   const semanasRecesso = semanas.filter((s) => s.kind === 'recesso').length
@@ -252,23 +262,16 @@ export function gerarGrade(
   // R4 — a conclusão é o último DIA DE CURSO da última semana (não o domingo dela).
   const ultima = semanas[semanas.length - 1]
   const ultimoDia = cron.dias_curso[cron.dias_curso.length - 1]
-  const conclusao = addDias(ultima.inicio, offsetDesdeSegunda(ultimoDia))
+  const conclusao = ultima ? addDias(ultima.inicio, offsetDesdeSegunda(ultimoDia)) : ''
 
   return {
-    ok: true,
-    grade: {
-      semanas,
-      resumo: {
-        totalSemanas: semanas.length, // R17 — já com revisões e recessos
-        semanasConteudo,
-        semanasRevisao,
-        semanasRecesso,
-        diasPorSemana: cron.dias_nome.length, // R17
-        atividades,
-        conclusao,
-        subtitulo: subtituloGrade({ semanasConteudo, semanasRevisao, semanasRecesso }), // R9
-      },
-      avisos: [...new Set(avisos)],
-    },
+    totalSemanas: semanas.length, // R17 — já com revisões e recessos
+    semanasConteudo,
+    semanasRevisao,
+    semanasRecesso,
+    diasPorSemana: cron.dias_nome.length, // R17
+    atividades,
+    conclusao,
+    subtitulo: subtituloGrade({ semanasConteudo, semanasRevisao, semanasRecesso }), // R9
   }
 }

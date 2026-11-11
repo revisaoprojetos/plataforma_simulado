@@ -73,6 +73,12 @@ export interface ParamsAdaptativo {
   jurisTitulosExpansivos: boolean
   /** Histórico ("Já estuda pelo Revisão?" = Sim): diagnóstico dos temas anteriores (2–3 metas/semana) e reforço pelo resultado. */
   historicoDiagnostico219: boolean
+
+  // ── Bloqueio de tipos de material (admin › Cronograma › Regras do cronograma / Disciplinas) ──
+  /** Tipos que o gerador NÃO cria para ninguém do tenant (chaves do motor: pf=PDFull, fl=PDFlash/revisão, qu=Questões, lp=LegProc, jp=Jurisprudência). */
+  tiposBloqueados?: string[]
+  /** Só em tempo de execução (vem da tabela de disciplinas; NÃO é salvo na config): disciplinas com PDFull (pf) / LegProc (lp) desligados. */
+  discSemTipo?: Record<string, string[]>
 }
 
 /** Valores 2.8 (defaults). Mexer aqui muda o comportamento base de TODOS os tenants — prefira a config por tenant. */
@@ -121,9 +127,12 @@ export const PARAMS_SEM_EFEITO: ReadonlyArray<{ k: ReadonlyArray<keyof ParamsAda
   { k: ['pdfInteiro218'], rotulo: 'Segundo PDFull só se couber inteiro', motivo: 'Regra incorporada ao gerador.' },
   { k: ['revisaoPorResultado218'], rotulo: 'Revisão pelo resultado recente do tema', motivo: 'Sempre ativa.' },
   { k: ['historicoDiagnostico219'], rotulo: 'Diagnóstico e reforço dos temas anteriores', motivo: 'Sempre ativo para quem já estuda pelo Revisão.' },
-  { k: ['jurisprudencia219'], rotulo: 'Ligar a meta semanal de Jurisprudência', motivo: 'Sempre ativa; só a duração é configurável.' },
+  { k: ['jurisprudencia219'], rotulo: 'Ligar a meta semanal de Jurisprudência', motivo: 'Opcional do aluno: ele marca Jurisprudência em Metas no cronograma (padrão desmarcado); só a duração é configurável.' },
   { k: ['paralelo'], rotulo: 'Disciplinas em paralelo', motivo: 'Substituído pelo rodízio por vagas.' },
 ]
+
+/** Tipos bloqueáveis pelo admin (chave do motor → rótulo). */
+export const TIPOS_BLOQUEAVEIS: string[] = ['pf', 'fl', 'qu', 'lp', 'jp']
 
 const inteiro = (v: unknown, def: number, min: number, max: number): number => {
   const n = Math.trunc(Number(v))
@@ -171,6 +180,7 @@ export function normalizarParams(raw: unknown): ParamsAdaptativo {
     jurisTagsImagem: r.jurisTagsImagem !== false,
     jurisTitulosExpansivos: r.jurisTitulosExpansivos !== false,
     historicoDiagnostico219: r.historicoDiagnostico219 === true,
+    tiposBloqueados: [...new Set((Array.isArray(r.tiposBloqueados) ? r.tiposBloqueados : []).filter((t): t is string => typeof t === 'string' && TIPOS_BLOQUEAVEIS.includes(t)))],
   }
 }
 

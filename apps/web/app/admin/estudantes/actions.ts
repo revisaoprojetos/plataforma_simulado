@@ -15,6 +15,7 @@ import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { ehCpfMascarado } from '@/lib/privacidade/cpf'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
@@ -208,6 +209,7 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
     nome: data.nome,
     email,
     cpf: data.cpf || null,
+    ...colunasCpfCripto(data.cpf || null),
     telefone: data.telefone || null,
     classificacao: data.classificacao ?? 'normal',
   })
@@ -280,7 +282,7 @@ export async function editarEstudanteAction(id: string, data: EditarEstudanteDat
   // um CPF novo continua permitido (corrige/preenche sem precisar ver o anterior).
   if (data.cpf === undefined || ehCpfMascarado(data.cpf)) delete update.cpf
 
-  const { error } = await svc.from('simulado_estudantes').update(update).eq('id', id).eq('tenant_id', tenantId)
+  const { error } = await svc.from('simulado_estudantes').update({ ...update, ...('cpf' in update ? colunasCpfCripto(update.cpf as string | null) : {}) }).eq('id', id).eq('tenant_id', tenantId)
   if (error) return { error: error.message }
 
   // Reconhecimento de mudança de categoria: passaporte/vitalício entram no grupo "Passaporte";

@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 const nowIso = () => new Date().toISOString()
@@ -105,6 +106,7 @@ export async function anonimizarEstudante(svc: SupabaseClient, estudanteId: stri
     nome: 'Titular anonimizado',
     email: `${marca}@anonimizado.local`,
     cpf: null,
+    ...colunasCpfCripto(null),
     telefone: null,
     data_nascimento: null,
     updated_at: nowIso(),
@@ -112,7 +114,7 @@ export async function anonimizarEstudante(svc: SupabaseClient, estudanteId: stri
   const { error } = await svc.from('simulado_estudantes').update(patch).eq('id', estudanteId).eq('tenant_id', tid)
   if (error) {
     // Campos tolerantes: se alguma coluna não existir na migração do destino, tenta o núcleo.
-    const { error: e2 } = await svc.from('simulado_estudantes').update({ nome: 'Titular anonimizado', email: `${marca}@anonimizado.local`, cpf: null, telefone: null }).eq('id', estudanteId).eq('tenant_id', tid)
+    const { error: e2 } = await svc.from('simulado_estudantes').update({ nome: 'Titular anonimizado', email: `${marca}@anonimizado.local`, cpf: null, ...colunasCpfCripto(null), telefone: null }).eq('id', estudanteId).eq('tenant_id', tid)
     if (e2) return false
   }
   return true

@@ -71,6 +71,8 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Leitura: publica as aulas AGENDADAS cuja data (publicarEm) já chegou → publicado=true. Idempotente.
   // 300s: 5 min de atraso máx. p/ publicar uma aula agendada é aceitável.
   setInterval(() => { void chamarCron('/api/cron/leitura-publicar', 'cron leitura-publicar', (j) => !!j.publicadas) }, 300_000)
+  // JurisClub: publica as edições AGENDADAS cuja data já chegou (status agendado→publicado + aviso). Idempotente.
+  setInterval(() => { void chamarCron('/api/cron/jurisclub-publicar', 'cron jurisclub-publicar', (j) => !!j.publicadas) }, 300_000)
   // Self-healing do elo grupo→banco (lê vínculos+membros+matrículas inteiros). Não precisa ser rápido →
   // 30 min (o webhook de entrada no grupo já matricula na hora; isto é só a rede de segurança).
   setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas)) }, 1_800_000)

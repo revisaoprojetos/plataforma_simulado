@@ -104,6 +104,15 @@
 <div id="msg"></div>
 
 <script>
+/* carrega o plugins.js do MESMO servidor do editor (origem do referrer), síncrono via document.write.
+   Sem isto `window.Asc` não existe, o init nunca dispara e o plugin fica em "Editor não conectado". */
+(function(){
+  var o='http://localhost:8082';
+  try{ if(document.referrer) o=new URL(document.referrer).origin; }catch(e){}
+  document.write('<scr'+'ipt src="'+o+'/sdkjs-plugins/v1/plugins.js"></scr'+'ipt>');
+})();
+</script>
+<script>
 /* ============================================================================================
    Plugin "Visibilidade" (áreas de visibilidade) (OnlyOffice, Word, painel).
    CONTRATO (o servidor depende — NÃO MUDAR): área = DOIS parágrafos de nível de corpo:

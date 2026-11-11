@@ -28,7 +28,7 @@ import { alternarAtivoTipo, atualizarTipo, criarTipo, excluirTipo, reordenarTipo
  * Cada flag é uma regra da especificação. O texto abaixo é o que a equipe lê ao decidir —
  * sem ele, "prefixo_aula" não significa nada para quem não conhece o gerador.
  */
-const COMPORTAMENTOS: { chave: keyof EntradaTipo; titulo: string; ajuda: string }[] = [
+export const COMPORTAMENTOS: { chave: keyof EntradaTipo; titulo: string; ajuda: string }[] = [
   {
     chave: 'mostra_links',
     titulo: 'Mostra os links de questões',
@@ -66,7 +66,7 @@ const COMPORTAMENTOS: { chave: keyof EntradaTipo; titulo: string; ajuda: string 
   },
 ]
 
-const vazio = (): EntradaTipo => ({
+export const vazio = (): EntradaTipo => ({
   nome: '',
   rotulo_docx: '',
   cor: null,

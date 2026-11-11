@@ -8,6 +8,7 @@ import { registrarAudit } from '@/lib/audit'
 import { getProdutoDetalhe, listarProdutos, listarMembrosProduto } from '@/lib/produtos/produtos'
 import { concederProduto, revogarProduto } from '@/lib/produtos/conceder'
 import type { Produto, ProdutoItem } from '@/lib/produtos/tipos'
+import { ehModuloLayout } from '@/lib/produtos/tipos'
 
 async function guard(manage = false) {
   const access = await getCurrentAccess()
@@ -55,7 +56,10 @@ export async function salvarProdutoAction(input: Partial<Produto> & { id?: strin
     const { error } = await svc.from('simulado_produtos').update(campos).eq('id', input.id).eq('tenant_id', g.tenantId)
     if (error) return { error: error.message }
     if (layout) await svc.from('simulado_produtos').update({ vitrine_layout: layout }).eq('id', input.id).eq('tenant_id', g.tenantId)
-    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produtos', entidadeId: input.id, depois: { ...campos, vitrine_layout: layout }, tenantId: g.tenantId })
+    // Formato da página do módulo (migr 20261113070000): também à parte e tolerante (coluna ausente → ignora).
+    const moduloLayout = ehModuloLayout(input.modulo_layout) ? input.modulo_layout : null
+    if (moduloLayout) await svc.from('simulado_produtos').update({ modulo_layout: moduloLayout }).eq('id', input.id).eq('tenant_id', g.tenantId)
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produtos', entidadeId: input.id, depois: { ...campos, vitrine_layout: layout, modulo_layout: moduloLayout }, tenantId: g.tenantId })
     revalidatePath('/admin/produtos'); revalidatePath('/admin/conteudos/produtos'); return { ok: true as const, id: input.id }
   }
   // slug é NOT NULL no schema (tabela compartilhada com o módulo de regras). Gera a partir do nome
@@ -109,7 +113,7 @@ export async function salvarVitrineAction(produtoId: string, secoes: SecaoIn[]) 
   // 1) Substitui as seções (ordem = índice).
   await svc.from('simulado_produto_secoes').delete().eq('produto_id', produtoId).eq('tenant_id', g.tenantId)
   const rows = secoes.map((s, i) => ({
-    tenant_id: g.tenantId, produto_id: produtoId, ordem: i, tipo: s.tipo === 'banner' ? 'banner' : 'carrossel',
+    tenant_id: g.tenantId, produto_id: produtoId, ordem: i, tipo: ['banner', 'progresso', 'cronograma', 'modulos'].includes(s.tipo) ? s.tipo : 'carrossel', // blocos da página do extensivo preservados
     nome: s.nome?.trim() || null, tamanho: s.tamanho || 'vertical_small', ordenacao: s.ordenacao || 'manual',
     config: s.config ?? {}, ativo: true,
   }))

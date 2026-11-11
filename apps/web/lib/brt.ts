@@ -43,3 +43,8 @@ export function formatBrt(iso?: string | null): string | null {
 
 /** Rótulo padrão exibido ao lado dos campos de data/hora. */
 export const BRT_LABEL = 'Horário de Brasília (UTC−3)'
+
+/** Data civil de HOJE em Brasília (YYYY-MM-DD). `toISOString()` é UTC e vira "amanhã" das 21h às 24h. */
+export function hojeBrtISO(agora: Date = new Date()): string {
+  return new Date(agora.getTime() - 3 * 3600_000).toISOString().slice(0, 10)
+}
