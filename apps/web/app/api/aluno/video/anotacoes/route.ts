@@ -1,42 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/server'
 import { anotacaoCriarSchema, anotacaoEditarSchema, anotacaoListarSchema } from '@/lib/video/tipos'
-import { carregarAula } from '@/lib/video/dados'
 import { criarNota, editarNota, listarNotas, removerNota, tokenDoAluno } from '@/lib/video/client'
-import { contextoAluno, podeAssistir, respostaDeErro } from '@/lib/video/aluno'
+import { contextoAluno, garantirMatricula, podeAssistir, respostaDeErro } from '@/lib/video/aluno'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
  * Anotações com tempo do aluno (guardadas na video-api, escopo do próprio aluno).
- *   GET    ?aulaId=<uuid>                   -> { notas: [{id, atS, text}] }
- *   POST   { aulaId, atS, text }            -> { nota }
+ *   GET    ?courseId=<uuid>&lessonId=<uuid>                   -> { notas: [{id, atS, text}] }
+ *   POST   { courseId, lessonId, atS, text }            -> { nota }
  *   PATCH  { id, atS?, text? }              -> { nota }
  *   DELETE ?id=<uuid>                       -> { ok: true }
- * Nosso gate (aula pronta + acesso) vale em GET/POST; PATCH/DELETE dependem do dono da nota (o serviço valida).
+ * Nosso gate (acesso na plataforma + matrícula sob demanda) vale em GET/POST; PATCH/DELETE dependem do dono da nota (o serviço valida).
  */
 const NO_STORE = { 'Cache-Control': 'no-store' }
 const uuid = z.string().uuid()
 
-async function aulaAutorizada(ctx: { sessao: any }, aulaId: string) {
-  const aula = await carregarAula(ctx.sessao.tenantId, aulaId, createAdminClient())
-  if (!aula) return { erro: NextResponse.json({ code: 'nao_encontrado', message: 'Aula não encontrada.' }, { status: 404 }) }
-  if (!(await podeAssistir(ctx.sessao, aula))) return { erro: NextResponse.json({ code: 'sem_acesso', message: 'Sem acesso a esta aula.' }, { status: 403 }) }
-  return { aula }
+async function aulaAutorizada(ctx: { sessao: any; slug: string }, courseId: string, lessonId: string) {
+  if (!(await podeAssistir(ctx.sessao, courseId, lessonId))) return { erro: NextResponse.json({ code: 'sem_acesso', message: 'Sem acesso a esta aula.' }, { status: 403 }) }
+  return {}
 }
 
 export async function GET(req: NextRequest) {
   const ctx = await contextoAluno()
   if (!ctx.ok) return ctx.res
-  const q = anotacaoListarSchema.safeParse({ aulaId: req.nextUrl.searchParams.get('aulaId') })
-  if (!q.success) return NextResponse.json({ code: 'requisicao_invalida', message: 'aulaId inválido.' }, { status: 400 })
-  const a = await aulaAutorizada(ctx, q.data.aulaId)
+  const q = anotacaoListarSchema.safeParse({ courseId: req.nextUrl.searchParams.get('courseId'), lessonId: req.nextUrl.searchParams.get('lessonId') })
+  if (!q.success) return NextResponse.json({ code: 'requisicao_invalida', message: 'courseId/lessonId inválidos.' }, { status: 400 })
+  const a = await aulaAutorizada(ctx, q.data.courseId, q.data.lessonId)
   if (a.erro) return a.erro
   try {
+    await garantirMatricula(ctx.slug, ctx.sessao, q.data.courseId)
     const token = await tokenDoAluno(ctx.slug, ctx.sessao.estudanteId)
-    const notas = await listarNotas(token, a.aula!.lesson_id)
+    const notas = await listarNotas(token, q.data.lessonId)
     return NextResponse.json({ notas: (notas ?? []).map((n) => ({ id: n.id, atS: n.atS, text: n.text })) }, { headers: NO_STORE })
   } catch (e) { return respostaDeErro(e) }
 }
@@ -49,11 +46,12 @@ export async function POST(req: NextRequest) {
   }
   const b = anotacaoCriarSchema.safeParse(await req.json().catch(() => null))
   if (!b.success) return NextResponse.json({ code: 'requisicao_invalida', message: 'Dados inválidos.' }, { status: 400 })
-  const a = await aulaAutorizada(ctx, b.data.aulaId)
+  const a = await aulaAutorizada(ctx, b.data.courseId, b.data.lessonId)
   if (a.erro) return a.erro
   try {
+    await garantirMatricula(ctx.slug, ctx.sessao, b.data.courseId)
     const token = await tokenDoAluno(ctx.slug, ctx.sessao.estudanteId)
-    const n = await criarNota(token, a.aula!.lesson_id, { atS: b.data.atS, text: b.data.text })
+    const n = await criarNota(token, b.data.lessonId, { atS: b.data.atS, text: b.data.text })
     return NextResponse.json({ nota: { id: n.id, atS: n.atS, text: n.text } }, { status: 201, headers: NO_STORE })
   } catch (e) { return respostaDeErro(e) }
 }

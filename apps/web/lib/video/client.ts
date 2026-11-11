@@ -1,16 +1,12 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { normalizarBase, type PlaybackServico } from './puro'
+import { carregarConfigVideo, segredosVideo } from './config'
 
 /**
- * Cliente HTTP SERVER-ONLY da video-api. Segredos só por env:
- *   VIDEO_API_URL          origem INTERNA da API (ex.: http://video-api:3000 ou https://video-api.revisaopge.com.br)
- *   VIDEO_PUBLIC_API_URL   origem PÚBLICA que o navegador usa (default = VIDEO_API_URL)
- *   VIDEO_INTEGRATION_KEY  chave de integração (token `access:manage`) — rotas /access/*; por empresa:
- *                          VIDEO_INTEGRATION_KEY__<SLUG> (slug em MAIÚSCULAS, '-' => '_') sobrepõe a global.
- *   VIDEO_ADMIN_EMAIL / VIDEO_ADMIN_PASSWORD   conta admin da empresa no serviço (login p/ upload/aulas/analytics,
- *                          rotas que não aceitam a chave de integração). Também com sufixo __<SLUG>.
- * A chave/credenciais NUNCA vão ao browser; o browser só recebe o token de playback (5 min).
+ * Cliente HTTP SERVER-ONLY da video-api. Config em lib/video/config.ts (tabela global video_config,
+ * com fallback às env VIDEO_*). Chave/credenciais NUNCA vão ao browser; o browser só recebe o token de
+ * playback (5 min) e fala com a video-api pelo prefixo do próprio domínio da plataforma.
  */
 
 export class VideoApiError extends Error {
@@ -27,24 +23,27 @@ export class VideoApiError extends Error {
 
 const TIMEOUT_MS = 15_000
 
-function envSlug(base: string, slug: string): string | undefined {
-  const suf = slug.toUpperCase().replace(/[^A-Z0-9]/g, '_')
-  return process.env[`${base}__${suf}`] || process.env[base] || undefined
+export async function videoConfigurado(): Promise<boolean> {
+  return !!(await carregarConfigVideo())
 }
 
-export function videoConfigurado(): boolean {
-  return !!process.env.VIDEO_API_URL
+export async function baseInterna() {
+  const c = await carregarConfigVideo()
+  if (!c) throw new VideoApiError('Serviço de vídeo não configurado', null, 'local')
+  return normalizarBase(c.urlInterna)
 }
 
-export function baseInterna() {
-  const u = process.env.VIDEO_API_URL
-  if (!u) throw new VideoApiError('VIDEO_API_URL não configurada', null, 'local')
-  return normalizarBase(u)
-}
-
-/** Origem pública (a que o player usa p/ manifest/chave/heartbeat). */
-export function basePublica() {
-  return normalizarBase(process.env.VIDEO_PUBLIC_API_URL || process.env.VIDEO_API_URL || '')
+/**
+ * Origem pública (a que o player usa p/ manifest/chave/heartbeat): pelo MESMO domínio do request
+ * (`<origin do request><prefixo>`, ex.: https://plataforma/video-api), roteado pelo proxy ao serviço.
+ * No fallback de env com VIDEO_PUBLIC_API_URL definida, mantém o comportamento antigo (origem fixa).
+ */
+export async function basePublica(origemRequest: string | undefined) {
+  const c = await carregarConfigVideo()
+  if (c?.publicaFixa) return normalizarBase(c.publicaFixa)
+  const origem = (origemRequest ?? '').replace(/\/+$/, '')
+  if (!origem && c?.fonte === 'env') return normalizarBase(c.urlInterna)
+  return normalizarBase(origem + (c?.prefixoPublico ?? '/video-api'))
 }
 
 type Auth = { tipo: 'integracao'; slug: string } | { tipo: 'bearer'; token: string } | { tipo: 'admin'; slug: string }
@@ -72,8 +71,7 @@ async function tokenAdmin(slug: string): Promise<string> {
   const voo = jwtAdminVoo.get(slug)
   if (voo) return voo
   const p = (async () => {
-    const email = envSlug('VIDEO_ADMIN_EMAIL', slug)
-    const password = envSlug('VIDEO_ADMIN_PASSWORD', slug)
+    const { adminEmail: email, adminSenha: password } = await segredosVideo(slug)
     if (!email || !password) throw new VideoApiError('Credenciais admin do serviço de vídeo não configuradas', null, 'local')
     const r = await req<{ accessToken: string; expiresIn: number }>('/auth/login', {
       metodo: 'POST', corpo: { tenant: slug, email, password }, auth: { tipo: 'bearer', token: '' }, retries: 1,
@@ -86,7 +84,7 @@ async function tokenAdmin(slug: string): Promise<string> {
 }
 
 async function req<T>(caminho: string, o: Opcoes): Promise<T> {
-  const { v1 } = baseInterna()
+  const { v1 } = await baseInterna()
   const correlationId = `web-${randomUUID()}`
   const qs = o.query
     ? '?' + new URLSearchParams(Object.entries(o.query).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
@@ -97,8 +95,8 @@ async function req<T>(caminho: string, o: Opcoes): Promise<T> {
   let bearer = ''
   if (o.auth.tipo === 'bearer') bearer = o.auth.token
   else if (o.auth.tipo === 'integracao') {
-    const k = envSlug('VIDEO_INTEGRATION_KEY', o.auth.slug)
-    if (!k) throw new VideoApiError('VIDEO_INTEGRATION_KEY não configurada', null, correlationId)
+    const k = (await segredosVideo(o.auth.slug)).chave
+    if (!k) throw new VideoApiError('Chave de integração do vídeo não configurada', null, correlationId)
     bearer = k
   } else bearer = await tokenAdmin(o.auth.slug)
 
@@ -226,3 +224,33 @@ export async function tokenDoAluno(slug: string, estudanteId: string): Promise<s
   return r.accessToken
 }
 export function esquecerTokenDoAluno(slug: string, estudanteId: string) { sessaoCache.delete(`${slug}:${estudanteId}`) }
+
+// ── Catálogo admin (listagens/edição direta no serviço — sem espelho) ───────
+
+export interface CursoServico { id: string; title: string; description?: string | null; status: string; createdAt?: string }
+export interface AulaServico { id: string; moduleId: string; title: string; position: number; status: string; videoId: string | null }
+export interface ModuloServico { id: string; courseId: string; title: string; position: number; lessons: AulaServico[] }
+export interface PaginaServico<T> { data: T[]; page: number; limit: number; total: number }
+export interface VideoServico { id: string; status: string; lessonId: string | null; originalName?: string; sizeBytes?: number; durationS: number | null; error: string | null; createdAt?: string }
+
+export const listarCursos = (slug: string, page = 1, limit = 50) =>
+  req<PaginaServico<CursoServico>>('/courses', { query: { page, limit }, auth: { tipo: 'admin', slug } })
+export const obterCurso = (slug: string, courseId: string) =>
+  req<CursoServico>(`/courses/${courseId}`, { auth: { tipo: 'admin', slug } })
+/** Módulos do curso já com as aulas (ordenados por posição). */
+export const listarModulos = (slug: string, courseId: string) =>
+  req<ModuloServico[]>(`/courses/${courseId}/modules`, { auth: { tipo: 'admin', slug } })
+export const listarAulasModulo = (slug: string, moduleId: string) =>
+  req<AulaServico[]>(`/modules/${moduleId}/lessons`, { auth: { tipo: 'admin', slug } })
+export const obterAula = (slug: string, lessonId: string) =>
+  req<AulaServico>(`/lessons/${lessonId}`, { auth: { tipo: 'admin', slug } })
+export const obterVideo = (slug: string, videoId: string) =>
+  req<VideoServico>(`/videos/${videoId}`, { auth: { tipo: 'admin', slug } })
+export const renomearCurso = (slug: string, courseId: string, title: string) =>
+  req<unknown>(`/courses/${courseId}`, { metodo: 'PATCH', corpo: { title }, auth: { tipo: 'admin', slug } })
+export const removerCurso = (slug: string, courseId: string) =>
+  req<void>(`/courses/${courseId}`, { metodo: 'DELETE', auth: { tipo: 'admin', slug } })
+export const renomearModulo = (slug: string, moduleId: string, title: string) =>
+  req<unknown>(`/modules/${moduleId}`, { metodo: 'PATCH', corpo: { title }, auth: { tipo: 'admin', slug } })
+export const removerModulo = (slug: string, moduleId: string) =>
+  req<void>(`/modules/${moduleId}`, { metodo: 'DELETE', auth: { tipo: 'admin', slug } })

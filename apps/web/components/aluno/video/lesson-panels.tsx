@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils'
 import { chapterIndexAt, formatTime, type Chapter } from '@/lib/video/player-protocolo'
 
 type PanelCtx = {
+  courseId: string
+  /** id da aula (o mesmo no serviço de vídeo). */
   aulaId: string
   apiBase: string
   lessonId?: string
@@ -155,7 +157,7 @@ function normalizeNotes(j: unknown): Note[] {
 }
 
 export function NotesPanel({ ctx }: { ctx: PanelCtx }) {
-  const { aulaId, seek, getTime, time } = ctx
+  const { courseId, aulaId, seek, getTime, time } = ctx
   const [notes, setNotes] = React.useState<Note[] | null>(null)
   const [err, setErr] = React.useState<string | null>(null)
   const [text, setText] = React.useState('')
@@ -163,12 +165,12 @@ export function NotesPanel({ ctx }: { ctx: PanelCtx }) {
 
   const load = React.useCallback(async () => {
     try {
-      const r = await fetch(`/api/aluno/video/anotacoes?aulaId=${encodeURIComponent(aulaId)}`)
+      const r = await fetch(`/api/aluno/video/anotacoes?courseId=${encodeURIComponent(courseId)}&lessonId=${encodeURIComponent(aulaId)}`)
       if (!r.ok) throw new Error(String(r.status))
       setNotes(normalizeNotes(await r.json()))
       setErr(null)
     } catch { setErr('Não foi possível carregar as anotações.') }
-  }, [aulaId])
+  }, [courseId, aulaId])
   React.useEffect(() => { void load() }, [load])
 
   async function add() {
@@ -179,7 +181,7 @@ export function NotesPanel({ ctx }: { ctx: PanelCtx }) {
       const r = await fetch('/api/aluno/video/anotacoes', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ aulaId, atS: Math.floor(getTime()), text: body }),
+        body: JSON.stringify({ courseId, lessonId: aulaId, atS: Math.floor(getTime()), text: body }),
       })
       if (!r.ok) throw new Error(String(r.status))
       setText('')

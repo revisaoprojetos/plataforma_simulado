@@ -64,6 +64,16 @@ export const envSchema = z.object({
   /** Quantos proxies confiáveis existem à frente da API (para o IP real em `req.ip`). 0 = nenhum. */
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
   /**
+   * Prefixo de caminho em que a API é exposta ao navegador quando o proxy a publica sob o domínio de outra
+   * aplicação (ex.: `/video-api`, com stripprefix no Traefik). Só afeta a URL da chave AES gravada DENTRO do
+   * manifesto (caminho absoluto, que o navegador resolve contra a origem). Vazio = API na raiz do host.
+   */
+  PUBLIC_PATH_PREFIX: z
+    .string()
+    .trim()
+    .regex(/^(\/[a-z0-9._-]+)*$/i, 'use caminho como /video-api (sem barra final)')
+    .default(''),
+  /**
    * Em produção a API precisa estar atrás de proxy (Traefik/nginx): sem TRUST_PROXY>=1 todo cliente
    * parece ter o IP do proxy e o limite por IP/lockout vira um limite global. Valor recomendado: 1.
    * Com true (padrão), TRUST_PROXY=0 derruba o boot em produção; false só para ambientes sem proxy.

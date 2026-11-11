@@ -69,7 +69,7 @@ escritos e o relatório diz que não rodaram).
 
 | Id | Tarefa |
 |---|---|
-| 2.1 | `docker-compose.video.portainer.yml` (raiz): serviços api, consolidator, worker, postgres, redis, migrate (job `replicas:0`/`restart_policy none` + instrução), sem `build`, sem `depends_on condition`, `deploy.resources`, healthchecks, labels Traefik (`Host(video-api...)`, entrypoint websecure, certresolver), rede externa `network_swarm_public` + rede interna, placement do worker em nó rotulado `video-worker=true`, `stop_grace_period` 10 min |
+| 2.1 | `docker-compose.portainer.yml` (raiz): serviços api, consolidator, worker, postgres, redis, migrate (job `replicas:0`/`restart_policy none` + instrução), sem `build`, sem `depends_on condition`, `deploy.resources`, healthchecks, labels Traefik (`Host(video-api...)`, entrypoint websecure, certresolver), rede externa `network_swarm_public` + rede interna, placement do worker em nó rotulado `video-worker=true`, `stop_grace_period` 10 min |
 | 2.2 | Workflow `.github/workflows/docker-publish-video.yml`: build/push `ghcr.io/<repo>/video-api`, `video-worker` por SHA (gatilho por mudanças em `services/video/**`); NÃO altera `docker-publish.yml` existente |
 | 2.3 | Dockerfiles: alvo `runtime` único para migrate (sem devDeps no deploy; `prisma migrate deploy` via `npx prisma` incluído), usuário não-root, healthcheck |
 | 2.4 | Worker: SIGTERM gracioso (devolver job à fila sem perder), `lockDuration`/`stalledInterval` revisados, checagem de espaço em `/tmp`, timeout por job (não por rendition), `ffmpeg -threads` configurável |

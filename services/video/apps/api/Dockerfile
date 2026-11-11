@@ -13,7 +13,7 @@ RUN npm run build -w apps/api && mkdir -p apps/api/node_modules
 
 # O estágio build (dev) serve ao docker-compose.prod.yml. Em produção Swarm o MESMO estágio final (run) roda as migrations:
 # node_modules inteiro vai junto (inclui a CLI do Prisma), então não há imagem separada de migrate
-# (docker-compose.video.portainer.yml: serviço migrate = mesma imagem, command prisma migrate deploy).
+# (docker-compose.portainer.yml: serviço video-migrate = mesma imagem, command prisma migrate deploy).
 
 FROM node:22-bookworm-slim AS run
 ARG GIT_SHA=dev

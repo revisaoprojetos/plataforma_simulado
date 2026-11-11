@@ -45,7 +45,7 @@ export function watermarkText(w: PlaybackData['watermark']): string {
   return !w ? '' : typeof w === 'string' ? w : w.text
 }
 
-export function usePlaybackSession(aulaId: string, snapshot: VideoSnapshot) {
+export function usePlaybackSession(courseId: string, lessonId: string, snapshot: VideoSnapshot) {
   const [status, setStatus] = React.useState<SessionStatus>('loading')
   const [error, setError] = React.useState<string | null>(null)
   const [data, setData] = React.useState<PlaybackData | null>(null)
@@ -147,7 +147,7 @@ export function usePlaybackSession(aulaId: string, snapshot: VideoSnapshot) {
         const res = await fetch('/api/aluno/video/playback', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ aulaId }),
+          body: JSON.stringify({ courseId, lessonId }),
         })
         const j = (await res.json().catch(() => ({}))) as Partial<PlaybackData> & { error?: string; message?: string }
         if (!res.ok) throw new Error(j.error ?? j.message ?? 'Não foi possível iniciar o vídeo.')
@@ -179,7 +179,7 @@ export function usePlaybackSession(aulaId: string, snapshot: VideoSnapshot) {
       beat(true)
       endSession()
     }
-  }, [aulaId, reloadKey, beat, endSession, fail])
+  }, [courseId, lessonId, reloadKey, beat, endSession, fail])
 
   return {
     status, error, data, beat, tokenRef,

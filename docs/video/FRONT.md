@@ -29,13 +29,13 @@ Sem isso, o `next build` falha ao resolver `hls.js` assim que `lesson-player.tsx
 ## PENDÊNCIA 2 — patches propostos (arquivos já modificados: NÃO editados)
 
 **`apps/web/proxy.ts` / CSP.** A rota do aluno que renderiza o player dentro do iframe Curseduca já precisa de `frame-ancestors` do domínio da Curseduca (comportamento atual). Acrescentar para as rotas com player:
-- `connect-src`: origem `video-api` (`https://video-api.revisaopge.com.br`) — heartbeat/renew/transcript/manifest/chaves.
+- `connect-src`: `'self'` (o serviço é publicado em `<domínio da plataforma>/video-api`) — heartbeat/renew/transcript/manifest/chaves.
 - `media-src` e `img-src`: `blob:` e a origem do S3 Hetzner (segmentos por URL assinada, sprite, poster).
 - `worker-src blob:` (hls.js pode usar worker).
 ```
-connect-src 'self' https://video-api.revisaopge.com.br;
+connect-src 'self';
 media-src 'self' blob: https://<bucket-host>;
-img-src 'self' data: https://<bucket-host> https://video-api.revisaopge.com.br;
+img-src 'self' data: https://<bucket-host>;
 ```
 **Iframe Curseduca:** o `<iframe>` hospedeiro precisa de `allow="fullscreen; picture-in-picture; autoplay"` (tela cheia/PiP não funcionam sem). No pai, escutar:
 ```js

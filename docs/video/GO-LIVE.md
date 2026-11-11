@@ -43,8 +43,8 @@ Executar a partir de `services/video/` (exceto onde indicado). "Aceite" = result
 
 | Verificação | Comando | Aceite |
 |---|---|---|
-| Arquivos entregues | `test -f ../../docker-compose.video.portainer.yml && test -f ../../.github/workflows/docker-publish-video.yml && test -f .env.video.example && test -f ../../docs/video/RUNBOOK.md && echo ok` (ajustar caminhos do `.env.video.example` ao local real) | `ok` |
-| Compose válido e sem `build`/`depends_on` condicional | `docker compose -f ../../docker-compose.video.portainer.yml config -q` ; `grep -nE "build:|condition:" ../../docker-compose.video.portainer.yml` | config válida; grep vazio |
+| Arquivos entregues | `test -f ../../docker-compose.portainer.yml && test -f ../../.github/workflows/docker-publish-video.yml && test -f .env.video.example && test -f ../../docs/video/RUNBOOK.md && echo ok` (ajustar caminhos do `.env.video.example` ao local real) | `ok` |
+| Compose válido e sem `build`/`depends_on` condicional | `docker compose -f ../../docker-compose.portainer.yml config -q` ; `grep -nE "build:|condition:" ../../docker-compose.portainer.yml` | config válida; grep vazio |
 | Imagens por SHA publicadas | `gh run list --workflow docker-publish-video.yml -L 3` (após push do operador) | último run `success`; imagem `:<sha>` existe no GHCR |
 | Serviços de pé no Swarm (staging) | `docker service ls \| grep video` | `video-api N/N`, `video-consolidator 1/1`, `video-worker 1/1`, `video-postgres 1/1`, `video-redis 1/1` |
 | Saúde | `curl -fsS https://<staging>/health` | `{"status":"ok"...}` |
@@ -61,11 +61,11 @@ Executar na raiz do monorepo (`apps/web`), pnpm.
 | Verificação | Comando | Aceite |
 |---|---|---|
 | Cliente server-only existe e não vaza chave | `test -f apps/web/lib/video/client.ts && git grep -n "VIDEO_INTEGRATION_KEY" -- apps/web` | só aparece em módulos server-side (`import "server-only"`), nunca em `"use client"` ou `NEXT_PUBLIC_*` |
-| Migration nova aditiva e com RLS | `ls supabase/migrations \| grep -i video` e revisão do SQL | cria `video_empresas`, `video_aulas`, `video_matriculas_sync` com RLS por tenant; sem `DROP` |
+| Migrations de vídeo | `ls supabase/migrations \| grep -i video` | `video_config` criada; `20261110040000_video_remove_espelho.sql` remove o espelho (tabelas vazias) |
 | Typecheck e lint do web | `pnpm --filter web exec tsc --noEmit` (ou `pnpm typecheck`) e `pnpm lint` | verdes |
 | Rotas protegidas | `grep -rn "checkPermission" apps/web/app/api/admin/video apps/web/app/api/aluno/video` (ajustar caminhos) | toda rota admin com `checkPermission`; rotas do aluno exigem sessão |
 | Playback fim a fim (staging) | login de aluno de teste -> `POST /api/aluno/video/playback` | devolve `manifestUrl` + token; sem a chave de integração no payload |
-| Sync de acesso | conceder/revogar via regra de liberação de teste | `video_matriculas_sync` passa a `ok`; revogado perde acesso em <= 30 s; reconciliação corrige divergência |
+| Acesso sob demanda | aluno com produto ativo contendo a aula abre o player; aluno sem acesso | 200 com `manifestUrl` / 403 `sem_acesso`; remover o acesso na plataforma bloqueia a próxima abertura |
 | Permissões e auditoria | `video:view/manage` no RBAC; ação de admin gera linha em `content_audit` | presentes |
 
 ### Fase 4 — Front (player e Estúdio)
@@ -86,7 +86,7 @@ Executar na raiz do monorepo (`apps/web`), pnpm.
 | Verificação | Comando | Aceite |
 |---|---|---|
 | Scripts de carga válidos | `for f in load/staging/*.js; do node --check $f; done; sh -n load/staging/run.sh` | sem erro |
-| Travas de staging | `sh load/staging/run.sh playback` ; `I_KNOW_THIS_IS_STAGING=1 API_URL=https://video-api.revisaopge.com.br sh load/staging/run.sh playback` | ambos **recusados** (exit 2) |
+| Travas de staging | `sh load/staging/run.sh playback` ; `I_KNOW_THIS_IS_STAGING=1 API_URL=https://<domínio da plataforma>/video-api sh load/staging/run.sh playback` | ambos **recusados** (exit 2) |
 | Carga | `CARGA-E-EGRESS.md` §2–§4 | heartbeat p95 < 100 ms a 1.000 hb/s/réplica; live-peak sem `live_refused` |
 | Egress | `npx tsx apps/api/scripts/egress-estimate.ts --days 7` | gera GB por aluno-hora; preços `PRECO_*` preenchidos pelo operador |
 | Segurança | `SEGURANCA-CHECKLIST.md` | 100% marcado |

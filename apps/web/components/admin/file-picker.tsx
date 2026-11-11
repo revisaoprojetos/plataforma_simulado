@@ -555,12 +555,12 @@ function AbaUpload({ categoria: CATEGORIA, onReportar }: { categoria: Categoria;
 function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null, texto?: string | null) => void }) {
   const [url, setUrl] = useState('')
   const [titulo, setTitulo] = useState('')
-  const [proprio, setProprio] = useState<{ id: string; titulo: string } | null>(null)
+  const [proprio, setProprio] = useState<{ courseId: string; lessonId: string; titulo: string } | null>(null)
   const info = useMemo(() => (url.trim() ? detectarVideo(url) : null), [url])
   const valido = !!info && info.plataforma !== 'desconhecido'
 
   useEffect(() => {
-    if (proprio) onReportar([{ tipo: 'video', url: referenciaVideoProprio(proprio.id), plataforma: 'proprio', titulo: titulo.trim() || proprio.titulo, embedUrl: null }], `${PLATAFORMA_LABEL.proprio} · ${titulo.trim() || proprio.titulo}`)
+    if (proprio) onReportar([{ tipo: 'video', url: referenciaVideoProprio(proprio.courseId, proprio.lessonId), plataforma: 'proprio', titulo: titulo.trim() || proprio.titulo, embedUrl: null }], `${PLATAFORMA_LABEL.proprio} · ${titulo.trim() || proprio.titulo}`)
     else if (valido && info) onReportar([{ tipo: 'video', url: url.trim(), plataforma: info.plataforma, titulo: titulo.trim() || undefined, embedUrl: info.embedUrl }], `${PLATAFORMA_LABEL[info.plataforma]}${titulo.trim() ? ` · ${titulo.trim()}` : ''}`)
     else onReportar(null)
   }, [proprio, valido, info, url, titulo, onReportar])
@@ -595,7 +595,7 @@ function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null
           )}
 
           {/* Vídeo próprio (hospedado): lista os vídeos prontos do Estúdio (/admin/conteudos/videos). */}
-          <SeletorVideoProprio selecionadoId={proprio?.id ?? null} onEscolher={(v) => { setProprio(v); if (v) setUrl('') }} />
+          <SeletorVideoProprio selecionadoId={proprio?.lessonId ?? null} onEscolher={(v) => { setProprio(v); if (v) setUrl('') }} />
         </div>
 
         {/* Prévia do embed */}
@@ -617,71 +617,110 @@ function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null
   )
 }
 
-// Vídeos hospedados prontos (GET /api/admin/video?status=ready — busca/paginação no servidor). Sem permissão (403)
-// ou falha → estado vazio discreto; os provedores por link seguem funcionando.
-type LinhaVideoProprio = { id: string; titulo: string; duracaoS?: number | null }
-function SeletorVideoProprio({ selecionadoId, onEscolher }: { selecionadoId: string | null; onEscolher: (v: { id: string; titulo: string } | null) => void }) {
+// Vídeos hospedados: escolhe Curso > Aula (só aulas com vídeo pronto), lidos direto do serviço de vídeo via
+// GET /api/admin/video (cursos paginados; ?cursoId&prontas=1). Sem permissão (403) ou falha → estado vazio
+// discreto; os provedores por link seguem funcionando.
+type CursoSel = { id: string; titulo: string }
+type AulaProntaSel = { id: string; titulo: string; moduloTitulo: string; duracaoS?: number | null }
+function SeletorVideoProprio({ selecionadoId, onEscolher }: { selecionadoId: string | null; onEscolher: (v: { courseId: string; lessonId: string; titulo: string } | null) => void }) {
   const [busca, setBusca] = useState('')
-  const [rows, setRows] = useState<LinhaVideoProprio[]>([])
+  const [cursos, setCursos] = useState<CursoSel[]>([])
+  const [cursoId, setCursoId] = useState('')
+  const [aulas, setAulas] = useState<AulaProntaSel[]>([])
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'indisponivel'>('carregando')
+  const [carregandoAulas, setCarregandoAulas] = useState(false)
 
   useEffect(() => {
     const ctrl = new AbortController()
-    const t = setTimeout(async () => {
-      setEstado('carregando')
+    ;(async () => {
       try {
-        const qs = new URLSearchParams({ status: 'ready', pageSize: '50', page: '1' })
-        if (busca.trim()) qs.set('search', busca.trim())
-        const res = await fetch(`/api/admin/video?${qs}`, { signal: ctrl.signal, cache: 'no-store' })
-        if (!res.ok) { setRows([]); setEstado('indisponivel'); return }
-        const j = (await res.json()) as { rows?: LinhaVideoProprio[] }
-        setRows(Array.isArray(j.rows) ? j.rows : [])
+        const res = await fetch('/api/admin/video?page=1&pageSize=100', { signal: ctrl.signal, cache: 'no-store' })
+        if (!res.ok) { setEstado('indisponivel'); return }
+        const j = (await res.json()) as { rows?: CursoSel[] }
+        setCursos(Array.isArray(j.rows) ? j.rows : [])
         setEstado('ok')
       } catch (e) {
         if ((e as { name?: string })?.name === 'AbortError') return
-        setRows([]); setEstado('indisponivel')
+        setEstado('indisponivel')
       }
-    }, busca ? 300 : 0)
-    return () => { clearTimeout(t); ctrl.abort() }
-  }, [busca])
+    })()
+    return () => ctrl.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!cursoId) { setAulas([]); return }
+    const ctrl = new AbortController()
+    setCarregandoAulas(true)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/video?cursoId=${cursoId}&prontas=1`, { signal: ctrl.signal, cache: 'no-store' })
+        const j = res.ok ? ((await res.json()) as { aulas?: AulaProntaSel[] }) : {}
+        setAulas(Array.isArray(j.aulas) ? j.aulas : [])
+      } catch (e) {
+        if ((e as { name?: string })?.name === 'AbortError') return
+        setAulas([])
+      } finally {
+        if (!ctrl.signal.aborted) setCarregandoAulas(false)
+      }
+    })()
+    return () => ctrl.abort()
+  }, [cursoId])
+
+  const q = busca.trim().toLowerCase()
+  const visiveis = q ? aulas.filter((a) => a.titulo.toLowerCase().includes(q) || a.moduloTitulo.toLowerCase().includes(q)) : aulas
 
   return (
     <div className="rounded-xl border bg-card p-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><VideoIcon className="h-3.5 w-3.5" />{PLATAFORMA_LABEL.proprio}</div>
       {estado === 'indisponivel' ? (
         <p className="text-xs text-muted-foreground">Nenhum vídeo hospedado disponível para seu acesso. Use um dos provedores acima por link.</p>
+      ) : estado === 'carregando' ? (
+        <div className="flex items-center gap-1.5 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Carregando cursos…</div>
       ) : (
         <>
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar vídeo hospedado pelo título"
-            aria-label="Buscar vídeo hospedado"
+          <select
+            value={cursoId}
+            onChange={(e) => { setCursoId(e.target.value); setBusca(''); onEscolher(null) }}
+            aria-label="Curso do vídeo hospedado"
             className="mb-2 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          />
-          <div className="max-h-48 overflow-y-auto rounded-lg border">
-            {estado === 'carregando' ? (
-              <div className="flex items-center gap-1.5 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Carregando vídeos…</div>
-            ) : rows.length === 0 ? (
-              <div className="p-3 text-xs text-muted-foreground">{busca.trim() ? 'Nenhum vídeo pronto encontrado.' : 'Nenhum vídeo pronto ainda.'}</div>
-            ) : (
-              <ul>
-                {rows.map((v) => {
-                  const on = v.id === selecionadoId
-                  return (
-                    <li key={v.id}>
-                      <button type="button" aria-pressed={on} onClick={() => onEscolher(on ? null : { id: v.id, titulo: v.titulo })}
-                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60', on && 'bg-primary/10 text-primary')}>
-                        {on ? <Check className="h-4 w-4 shrink-0" /> : <VideoIcon className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                        <span className="min-w-0 flex-1 truncate">{v.titulo}</span>
-                        {typeof v.duracaoS === 'number' && v.duracaoS > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTime(v.duracaoS)}</span>}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
+          >
+            <option value="">{cursos.length ? 'Escolha o curso…' : 'Nenhum curso de vídeo ainda'}</option>
+            {cursos.map((c) => <option key={c.id} value={c.id}>{c.titulo}</option>)}
+          </select>
+          {cursoId && (
+            <>
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar aula pelo título"
+                aria-label="Buscar aula hospedada"
+                className="mb-2 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
+              <div className="max-h-48 overflow-y-auto rounded-lg border">
+                {carregandoAulas ? (
+                  <div className="flex items-center gap-1.5 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Carregando aulas…</div>
+                ) : visiveis.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground">{q ? 'Nenhuma aula pronta encontrada.' : 'Este curso ainda não tem aula com vídeo pronto.'}</div>
+                ) : (
+                  <ul>
+                    {visiveis.map((v) => {
+                      const on = v.id === selecionadoId
+                      return (
+                        <li key={v.id}>
+                          <button type="button" aria-pressed={on} onClick={() => onEscolher(on ? null : { courseId: cursoId, lessonId: v.id, titulo: v.titulo })}
+                            className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60', on && 'bg-primary/10 text-primary')}>
+                            {on ? <Check className="h-4 w-4 shrink-0" /> : <VideoIcon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                            <span className="min-w-0 flex-1 truncate">{v.titulo}<span className="ml-1.5 text-xs text-muted-foreground">{v.moduloTitulo}</span></span>
+                            {typeof v.duracaoS === 'number' && v.duracaoS > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTime(v.duracaoS)}</span>}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

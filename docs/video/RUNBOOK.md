@@ -1,21 +1,29 @@
 # Runbook — Gerenciador de Vídeo (Swarm / Portainer / Traefik / GHCR)
 
 Complementa `docs/runbook-deploy-e-incidentes.md` (mesmas regras: SHA completo, nunca `:latest` em branch).
-Stack: `docker-compose.video.portainer.yml` (raiz). Variáveis: `services/video/.env.video.example`.
+Stack: **a mesma da plataforma** — `docker-compose.portainer.yml` (raiz), serviços `video-*`. Variáveis: `services/video/.env.video.example`
+(todas com prefixo `VIDEO_`, porque a stack já usa `S3_*` etc.).
 Plano e fases: `docs/video/PLANO-GERENCIADOR-VIDEO.md`. Métricas e alertas: `docs/video/OBSERVABILIDADE.md`.
+
+> **Nomes nesta stack única.** O Swarm nomeia os serviços `<stack>_<serviço>`. Onde este documento (e os scripts em
+> `services/video/apps/api/scripts/`) citar `video_api`, `video_worker`, `video_migrate`, `video_postgres`, `video_redis`
+> ou `video_consolidator`, leia `<stack>_video-api`, `<stack>_video-worker`, `<stack>_video-migrate`,
+> `<stack>_video-postgres`, `<stack>_video-redis` e `<stack>_video-consolidator` (`docker stack ls` mostra o nome da stack).
+> A rede interna continua `video_internal` (nome fixo) e os hosts internos `video-postgres` / `video-redis`.
+> **O vídeo nasce desligado (0 réplicas) e não bloqueia o deploy do web**: liga-se definindo `VIDEO_*_REPLICAS`.
 
 > Estado: nada foi deployado nem criado em produção. Tudo abaixo é passo manual do operador.
 
 ## 1. Mapa
 
-| Serviço Swarm (stack `video`) | Papel | Onde roda | Estado |
+| Serviço Swarm (na stack da plataforma) | Papel | Onde roda | Estado |
 |---|---|---|---|
-| `video_api` (2 réplicas) | API NestJS, HLS/chave/heartbeat | `node.role == worker` | stateless; Traefik `VIDEO_API_HOST` |
-| `video_consolidator` | grava heartbeats do Redis no Postgres | `node.role == worker` | stateless |
-| `video_worker` | transcode ffmpeg | nó `video-worker=true` | volume `worker_tmp` (/tmp, originais) |
-| `video_migrate` | `prisma migrate deploy` (execução única) | `node.role == worker` | termina e fica "Complete" |
-| `video_postgres` | banco dedicado (alias `video-postgres`) | nó `video-data=true` | volume `video_pgdata` |
-| `video_redis` | fila + heartbeats (alias `video-redis`) | nó `video-data=true` | volume `video_redisdata` (AOF) |
+| `video-api` (`VIDEO_API_REPLICAS`, 2 ao ligar) | API NestJS, HLS/chave/heartbeat | `node.role == worker` | stateless; Traefik em `<domínio da plataforma>/video-api`; web a alcança em `http://video-api:3000` |
+| `video-consolidator` | grava heartbeats do Redis no Postgres | `node.role == worker` | stateless |
+| `video-worker` | transcode ffmpeg | nó `video-worker=true` | volume `video_worker_tmp` (/tmp, originais) |
+| `video-migrate` | `prisma migrate deploy` (execução única) | `node.role == worker` | termina e fica "Complete" |
+| `video-postgres` | banco dedicado | nó `video-data=true` | volume `video_pgdata` |
+| `video-redis` | fila + heartbeats | nó `video-data=true` | volume `video_redisdata` (AOF) |
 
 Imagens: `ghcr.io/revisaoprojetos/plataforma_simulado-video-api:<SHA>` (api, consolidator e migrate usam a mesma) e
 `...-video-worker:<SHA>`. Workflow: `.github/workflows/docker-publish-video.yml` (só dispara com mudança em `services/video/**`).
@@ -24,15 +32,17 @@ Imagens: `ghcr.io/revisaoprojetos/plataforma_simulado-video-api:<SHA>` (api, con
 
 1. **GHCR:** rodar o workflow (Actions > "Build e Push Video para GHCR") e deixar os 2 pacotes **públicos**.
 2. **S3:** chave dedicada ao bucket `revisaopge-videos` (D1); aplicar CORS (`npm run s3:cors -w apps/api` com as credenciais) e a política de multipart abandonado (§6).
-3. **DNS:** A `video-api.revisaopge.com.br` -> IP da VPS.
+3. **DNS/roteamento:** o serviço é publicado em `<domínio da plataforma>/video-api` (`PUBLIC_PATH_PREFIX=/video-api`; o Traefik/proxy da plataforma roteia o prefixo para `video_api`). Domínio `video-api.revisaopge.com.br` dedicado não é mais necessário. A configuração (URL interna, prefixo, chave, admin) fica em `video_config` (tela `/super/video`).
 4. **Rótulos de nó** (no manager):
    ```bash
    docker node update --label-add video-worker=true <no-com-cpu>
    docker node update --label-add video-data=true   <no-dos-volumes>   # Postgres e Redis ficam fixos aqui
    ```
-5. **Portainer > Stacks > Add stack** (nome `video`), colar `docker-compose.video.portainer.yml`, preencher as variáveis do `.env.video.example` (`VIDEO_TAG` = SHA completo).
-   Sem `VIDEO_TAG`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `S3_*`, `JWT_*`, `CORS_ORIGINS` ou `METRICS_TOKEN` a stack **recusa subir** (mensagem aponta a variável).
-6. Aguardar `video_postgres`/`video_redis` ficarem `healthy` e `video_migrate` concluir (`docker service logs video_migrate`). Se a API subiu antes da migration, ela se recupera sozinha no próximo healthcheck/reinício (`docker service update --force video_api`).
+5. **Portainer > Stacks > (a stack da plataforma) > Editor:** colar o `docker-compose.portainer.yml` atualizado e, em **Environment variables**, preencher as do `.env.video.example`:
+   `VIDEO_TAG` (SHA completo), `VIDEO_POSTGRES_PASSWORD`, `VIDEO_REDIS_PASSWORD`, `VIDEO_S3_ACCESS_KEY`, `VIDEO_S3_SECRET_KEY`, `VIDEO_JWT_ACCESS_SECRET`, `VIDEO_JWT_REFRESH_SECRET`, `VIDEO_CORS_ORIGINS` e `VIDEO_METRICS_TOKEN`.
+   **Ligar em duas etapas** (Update the stack em cada uma): (a) `VIDEO_INFRA_REPLICAS=1` (Postgres, Redis e migrate); depois (b) `VIDEO_API_REPLICAS=2`, `VIDEO_CONSOLIDATOR_REPLICAS=1`, `VIDEO_WORKER_REPLICAS=1`.
+   Sem os segredos o próprio serviço do vídeo recusa subir (Postgres recusa senha vazia; a API recusa segredo fraco) — o web e o resto da stack não são afetados.
+6. Aguardar `video-postgres`/`video-redis` ficarem `healthy` e `video-migrate` concluir (`docker service logs <stack>_video-migrate`). Se a API subiu antes da migration, ela se recupera sozinha no próximo healthcheck/reinício (`docker service update --force <stack>_video-api`).
 7. Criar o primeiro operador da plataforma (o seed não roda em produção):
    ```bash
    docker run --rm --network video_internal \
@@ -42,7 +52,7 @@ Imagens: `ghcr.io/revisaoprojetos/plataforma_simulado-video-api:<SHA>` (api, con
      node_modules/.bin/tsx prisma/create-platform-admin.ts
    ```
    Depois: criar as empresas (`POST /v1/platform/tenants`), habilitar `accessEndpointEnabled` por empresa e emitir a chave de integração (passos 5 e 6 do plano).
-8. **Validar:** `curl -fsS https://video-api.revisaopge.com.br/health` (`db`, `redis`, `s3` = `up`); `curl -i https://video-api.revisaopge.com.br/metrics` deve dar **403** (bloqueado na borda); idem `/mcp`.
+8. **Validar:** `curl -fsS https://<domínio da plataforma>/video-api/health` (`db`, `redis`, `s3` = `up`); `curl -i https://<domínio da plataforma>/video-api/metrics` deve dar **403** (bloqueado na borda); idem `/mcp`.
    `docker service ls | grep video_` com tudo `n/n`; `docker service logs video_worker` com "worker pronto".
 
 ## 3. Deploy de nova versão (por SHA)

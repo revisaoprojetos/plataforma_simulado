@@ -115,7 +115,7 @@ export class PlaybackService {
         );
       }),
     );
-    const keyUrl = `/v1/hls/key/${claims.vid}?t=${encodeURIComponent(token)}`;
+    const keyUrl = `${this.env.PUBLIC_PATH_PREFIX}/v1/hls/key/${claims.vid}?t=${encodeURIComponent(token)}`;
     try {
       return rewriteVariant(text, keyUrl, signed);
     } catch {

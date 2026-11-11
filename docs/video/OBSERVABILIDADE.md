@@ -9,7 +9,7 @@ Todos exigem `Authorization: Bearer <METRICS_TOKEN>` (sem token configurado resp
 
 | Alvo | Endereço (dentro da rede `video_internal`) |
 |---|---|
-| API | `tasks.video_api:3000/metrics` (uma série por réplica) |
+| API | `tasks.<stack>_video-api:3000/metrics` (uma série por réplica) |
 | Consolidador | `tasks.video_consolidator:9102/metrics` |
 | Worker | `tasks.video_worker:9100/metrics` |
 

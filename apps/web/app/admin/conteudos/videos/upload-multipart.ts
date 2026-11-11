@@ -1,10 +1,11 @@
 /**
  * Upload multipart direto ao S3 (URLs pré-assinadas pelo servidor), com progresso, retomada e cancelamento.
- *  1. POST /api/admin/video {titulo,pastaId?}            -> {id, uploadId, partSize}
- *  2. POST /api/admin/video/:id/parts {partNumbers[]}    -> {urls}   (array alinhado a partNumbers OU mapa nº->url)
+ * `id` = id da AULA no serviço de vídeo (a aula já existe; o upload cria o vídeo dela).
+ *  1. POST /api/admin/video/:id/upload {filename,size,contentType} -> {id, uploadId, partSize}
+ *  2. POST /api/admin/video/:id/parts {partNumbers[]}    -> {urls}   (array alinhado a partNumbers)
  *  3. PUT <url> (XHR, progresso por parte)                -> header ETag (o CORS do bucket precisa expor ETag)
  *  4. POST /api/admin/video/:id/complete {parts:[{partNumber,etag}]}
- * O estado das partes concluídas fica em localStorage (chave por vídeo) para retomar após queda/recarga.
+ * O estado das partes concluídas fica em localStorage (chave por aula) para retomar após queda/recarga.
  */
 
 import { retryDelayMs } from '@/lib/video/player-protocolo'
@@ -62,29 +63,28 @@ export type UploadHandle = { cancelar: () => void; promessa: Promise<void> }
  */
 export function iniciarUpload(opts: {
   file: File
-  titulo: string
-  pastaId?: string
-  retomarId?: string
-  onChange: (p: UploadProgresso, videoId: string | null) => void
+  /** id da aula de destino (também usado como chave de retomada). */
+  aulaId: string
+  retomar?: boolean
+  onChange: (p: UploadProgresso, aulaId: string) => void
 }): UploadHandle {
   const ac = new AbortController()
   const { file, onChange } = opts
-  let videoId: string | null = opts.retomarId ?? null
+  const videoId: string = opts.aulaId
 
   const promessa = (async () => {
     const total = file.size
     const emit = (estado: UploadEstado, enviado: number, erro?: string) => onChange({ estado, enviado, total, erro }, videoId)
     try {
-      let salvo = opts.retomarId ? ler(opts.retomarId) : null
+      let salvo = opts.retomar ? ler(opts.aulaId) : null
       if (salvo && (salvo.tamanho !== file.size || salvo.nome !== file.name || salvo.modificado !== file.lastModified)) {
         throw new Error('Este não é o mesmo arquivo do envio interrompido.')
       }
       if (!salvo) {
-        const c = await json<{ id: string; uploadId: string; partSize: number }>(await fetch('/api/admin/video', {
+        const c = await json<{ id: string; uploadId: string; partSize: number }>(await fetch(`/api/admin/video/${opts.aulaId}/upload`, {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ titulo: opts.titulo, pastaId: opts.pastaId }), signal: ac.signal,
+          body: JSON.stringify({ filename: file.name, size: file.size, contentType: file.type || 'video/mp4' }), signal: ac.signal,
         }))
-        videoId = c.id
         salvo = { id: c.id, uploadId: c.uploadId, partSize: c.partSize, nome: file.name, tamanho: file.size, modificado: file.lastModified, parts: [] }
         gravar(salvo)
       }
@@ -103,11 +103,11 @@ export function iniciarUpload(opts: {
 
       const fila = Array.from({ length: nParts }, (_, i) => i + 1).filter((n) => !feitas.has(n))
       const urlsDe = async (nums: number[]): Promise<Record<number, string>> => {
-        const r = await json<{ urls: string[] | Record<string, string> }>(await fetch(`/api/admin/video/${id}/parts`, {
+        const r = await json<{ urls: string[] }>(await fetch(`/api/admin/video/${id}/parts`, {
           method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ partNumbers: nums }), signal: ac.signal,
         }))
         const out: Record<number, string> = {}
-        nums.forEach((n, i) => { out[n] = Array.isArray(r.urls) ? r.urls[i] : r.urls[String(n)] })
+        nums.forEach((n, i) => { out[n] = r.urls[i] })
         return out
       }
 

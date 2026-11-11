@@ -1,32 +1,28 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/server'
 import { VideoApiError, videoConfigurado } from './client'
-import { carregarAula, carregarEmpresa, type AulaRow } from './dados'
+import { slugDoTenant } from './catalogo'
 import { guardAdminVideo } from './permissoes'
 
 export const NO_STORE = { 'Cache-Control': 'no-store' }
-const uuid = z.string().uuid()
+export const uuid = z.string().uuid()
 
 export type CtxAdmin = { tenantId: string; userId: string; slug: string }
 
-/** Gate + empresa de vídeo ativa. `nivel`: view (leitura) | manage (escrita). */
+/** Gate (checkPermission video:view/manage) + slug do tenant (= empresa no serviço). `nivel`: view | manage. */
 export async function contextoAdmin(nivel: 'view' | 'manage'): Promise<{ ok: true; ctx: CtxAdmin } | { ok: false; res: NextResponse }> {
   const g = await guardAdminVideo(nivel)
   if (!g.ok) return g
-  if (!videoConfigurado()) return { ok: false, res: NextResponse.json({ code: 'video_indisponivel', message: 'VIDEO_API_URL não configurada.' }, { status: 503 }) }
-  const empresa = await carregarEmpresa(g.tenantId, createAdminClient())
-  if (!empresa?.ativo) return { ok: false, res: NextResponse.json({ code: 'video_nao_habilitado', message: 'Vídeo próprio não está habilitado para esta plataforma.' }, { status: 409 }) }
-  return { ok: true, ctx: { tenantId: g.tenantId, userId: g.userId, slug: empresa.slug } }
+  if (!(await videoConfigurado())) return { ok: false, res: NextResponse.json({ code: 'video_indisponivel', message: 'Serviço de vídeo não configurado.' }, { status: 503 }) }
+  const slug = await slugDoTenant(g.tenantId)
+  if (!slug) return { ok: false, res: NextResponse.json({ code: 'video_nao_habilitado', message: 'Plataforma sem identificador de vídeo.' }, { status: 409 }) }
+  return { ok: true, ctx: { tenantId: g.tenantId, userId: g.userId, slug } }
 }
 
-/** Valida o `[id]` da URL e confirma que a aula é DESTE tenant (id vem do cliente). */
-export async function aulaDoTenant(tenantId: string, id: string): Promise<{ aula: AulaRow } | { res: NextResponse }> {
-  if (!uuid.safeParse(id).success) return { res: NextResponse.json({ message: 'id inválido.' }, { status: 400 }) }
-  const aula = await carregarAula(tenantId, id)
-  if (!aula) return { res: NextResponse.json({ message: 'Vídeo não encontrado.' }, { status: 404 }) }
-  return { aula }
+/** Valida um id vindo da URL. */
+export function idValido(id: string): NextResponse | null {
+  return uuid.safeParse(id).success ? null : NextResponse.json({ message: 'id inválido.' }, { status: 400 })
 }
 
 export function respostaErroAdmin(e: unknown): NextResponse {

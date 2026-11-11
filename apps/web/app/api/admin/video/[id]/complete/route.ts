@@ -1,33 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
-import { concluirSchema } from '@/lib/video/tipos'
+import { concluirSchema } from '@/lib/video/catalogo-tipos'
 import * as vc from '@/lib/video/client'
-import { statusAulaDoServico } from '@/lib/video/puro'
-import { NO_STORE, aulaDoTenant, contextoAdmin, lerJson, respostaErroAdmin } from '@/lib/video/admin'
+import { NO_STORE, contextoAdmin, idValido, lerJson, respostaErroAdmin } from '@/lib/video/admin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-/** POST /api/admin/video/[id]/complete { parts:[{partNumber, etag}] } -> { status } (idempotente) */
+/** POST /api/admin/video/[lessonId]/complete { parts:[{partNumber, etag}] } -> { status } (idempotente) (video:manage). */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const g = await contextoAdmin('manage')
   if (!g.ok) return g.res
-  const r = await aulaDoTenant(g.ctx.tenantId, (await params).id)
-  if ('res' in r) return r.res
-  if (!r.aula.video_id) return NextResponse.json({ message: 'Upload não iniciado para este vídeo.' }, { status: 409 })
+  const id = (await params).id
+  const bad = idValido(id); if (bad) return bad
   const b = await lerJson(req, concluirSchema)
   if (!b.ok) return b.res
   try {
-    const out = await vc.concluirUpload(g.ctx.slug, r.aula.video_id, b.data.parts)
-    const status = statusAulaDoServico(out?.status ?? 'queued')
-    await createAdminClient().from('video_aulas').update({ status, erro: null, atualizado_em: new Date().toISOString() }).eq('id', r.aula.id).eq('tenant_id', g.ctx.tenantId)
-    await registrarAudit({ operacao: 'UPDATE', entidade: 'video_aulas', entidadeId: r.aula.id, tenantId: g.ctx.tenantId, atorId: g.ctx.userId, antes: { status: r.aula.status }, depois: { status, upload: 'concluido' } })
-    return NextResponse.json({ status }, { status: 202, headers: NO_STORE })
-  } catch (e) {
-    if (e instanceof vc.VideoApiError && e.status === 422) {
-      await createAdminClient().from('video_aulas').update({ status: 'erro', erro: e.message.slice(0, 400), atualizado_em: new Date().toISOString() }).eq('id', r.aula.id).eq('tenant_id', g.ctx.tenantId)
-    }
-    return respostaErroAdmin(e)
-  }
+    const aula = await vc.obterAula(g.ctx.slug, id)
+    if (!aula.videoId) return NextResponse.json({ message: 'Upload não iniciado para esta aula.' }, { status: 409 })
+    const out = await vc.concluirUpload(g.ctx.slug, aula.videoId, b.data.parts)
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'video_aula', entidadeId: id, tenantId: g.ctx.tenantId, atorId: g.ctx.userId, depois: { upload: 'concluido' } })
+    return NextResponse.json({ status: out?.status ?? 'queued' }, { status: 202, headers: NO_STORE })
+  } catch (e) { return respostaErroAdmin(e) }
 }

@@ -1,6 +1,6 @@
 // Detecção de provedor de vídeo por URL + construção da URL de embed. PURO (sem server-only) → usável
 // no client e no server. Provedores REAIS do projeto: YouTube, Vimeo, Panda Video, Google Drive.
-// "Vídeo próprio" (hospedado): referência `video-proprio:<aulaId>` (video_aulas.id), tocada pelo <LessonPlayer>.
+// "Vídeo próprio" (hospedado): referência `video-proprio:<courseId>:<lessonId>` (ids do serviço de vídeo), tocada pelo <LessonPlayer>.
 
 export type VideoPlataforma = 'youtube' | 'vimeo' | 'panda' | 'google_drive' | 'proprio' | 'desconhecido'
 
@@ -23,15 +23,20 @@ export const PLATAFORMA_LABEL: Record<VideoPlataforma, string> = {
 const PREFIXO_PROPRIO = 'video-proprio:'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** Referência persistida de um vídeo hospedado: `video-proprio:<aulaId>`. */
-export function referenciaVideoProprio(aulaId: string): string { return `${PREFIXO_PROPRIO}${aulaId.trim()}` }
+/** Referência persistida de uma aula de vídeo hospedada: `video-proprio:<courseId>:<lessonId>` (ids do serviço de vídeo). */
+export function referenciaVideoProprio(courseId: string, lessonId: string): string {
+  return `${PREFIXO_PROPRIO}${courseId.trim().toLowerCase()}:${lessonId.trim().toLowerCase()}`
+}
 
-/** Extrai o aulaId (uuid) de `video-proprio:<id>`; null se não for uma referência válida. */
-export function aulaIdDeReferencia(url: string | null | undefined): string | null {
-  const s = (url || '').trim()
+/** Extrai { courseId, lessonId } de `video-proprio:<courseId>:<lessonId>`; null se não for referência válida (só UUIDs). */
+export function parseReferenciaVideoProprio(ref: string | null | undefined): { courseId: string; lessonId: string } | null {
+  const s = (ref || '').trim()
   if (!s.toLowerCase().startsWith(PREFIXO_PROPRIO)) return null
-  const id = s.slice(PREFIXO_PROPRIO.length).trim()
-  return UUID_RE.test(id) ? id.toLowerCase() : null
+  const partes = s.slice(PREFIXO_PROPRIO.length).split(':')
+  if (partes.length !== 2) return null
+  const [courseId, lessonId] = partes.map((x) => x.trim())
+  if (!UUID_RE.test(courseId) || !UUID_RE.test(lessonId)) return null
+  return { courseId: courseId.toLowerCase(), lessonId: lessonId.toLowerCase() }
 }
 
 /** Normaliza: adiciona https:// quando o usuário cola "youtu.be/..." sem protocolo. */
@@ -47,8 +52,8 @@ function normalizar(raw: string): string {
  * se aceita mesmo assim (ex.: tratar como link externo).
  */
 export function detectarVideo(urlRaw: string): VideoInfo {
-  const propriaId = aulaIdDeReferencia(urlRaw)
-  if (propriaId) return { plataforma: 'proprio', id: propriaId, embedUrl: null, rotulo: PLATAFORMA_LABEL.proprio }
+  const propria = parseReferenciaVideoProprio(urlRaw)
+  if (propria) return { plataforma: 'proprio', id: propria.lessonId, embedUrl: null, rotulo: PLATAFORMA_LABEL.proprio }
   const url = normalizar(urlRaw)
   let host = ''
   try { host = new URL(url).hostname.toLowerCase() } catch { return { plataforma: 'desconhecido', id: null, embedUrl: null, rotulo: PLATAFORMA_LABEL.desconhecido } }

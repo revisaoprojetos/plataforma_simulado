@@ -52,10 +52,11 @@ function safeSet(k: string, v: string) { try { localStorage.setItem(k, v) } catc
 type Aba = 'capitulos' | 'transcricao' | 'anotacoes'
 
 export type LessonPlayerProps = {
-  aulaId: string
+  courseId: string
+  lessonId: string
   titulo?: string
   /** Clique em "Próxima aula" (ou fim do vídeo com próxima disponível). */
-  onNext?: (nextAulaId: string) => void
+  onNext?: (nextLessonId: string) => void
   onCompleted?: () => void
   className?: string
 }
@@ -63,7 +64,7 @@ export type LessonPlayerProps = {
 const ctlBtn =
   'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white outline-none transition-colors hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:w-9'
 
-export function LessonPlayer({ aulaId, titulo, onNext, onCompleted, className }: LessonPlayerProps) {
+export function LessonPlayer({ courseId, lessonId, titulo, onNext, onCompleted, className }: LessonPlayerProps) {
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const boxRef = React.useRef<HTMLDivElement>(null)
   const hlsRef = React.useRef<HlsInstance | null>(null)
@@ -102,7 +103,7 @@ export function LessonPlayer({ aulaId, titulo, onNext, onCompleted, className }:
     }
   }, [])
 
-  const { status, error, data, beat, tokenRef, reload, finish } = usePlaybackSession(aulaId, snapshot)
+  const { status, error, data, beat, tokenRef, reload, finish } = usePlaybackSession(courseId, lessonId, snapshot)
   useEmbedResize()
 
   const getToken = React.useCallback(() => tokenRef.current, [tokenRef])
@@ -308,7 +309,7 @@ export function LessonPlayer({ aulaId, titulo, onNext, onCompleted, className }:
     setTime(v.currentTime)
     if (!completedRef.current && isCompleted(v.currentTime, v.duration, false)) {
       completedRef.current = true
-      postToParent({ type: 'video:completed', aulaId })
+      postToParent({ type: 'video:completed', aulaId: lessonId })
       onCompleted?.()
     }
   }
@@ -332,7 +333,7 @@ export function LessonPlayer({ aulaId, titulo, onNext, onCompleted, className }:
   const hoverChapter = hover ? chapters[chapterIndexAt(chapters, hover.t)]?.title : undefined
 
   const panelCtx: PanelCtx | null = data ? {
-    aulaId, apiBase: data.apiBase, lessonId: data.lessonId, getToken, time, seek, getTime,
+    courseId, aulaId: lessonId, apiBase: data.apiBase, lessonId: data.lessonId, getToken, time, seek, getTime,
   } : null
   const wm = watermarkText(data?.watermark ?? null)
   const wmClass = ['left-3 top-3', 'right-3 top-3', 'bottom-16 right-3', 'bottom-16 left-3'][wmPos]
@@ -363,12 +364,12 @@ export function LessonPlayer({ aulaId, titulo, onNext, onCompleted, className }:
           onClick={togglePlay}
           onPlay={() => {
             setPlaying(true); setEnded(false)
-            if (!startedRef.current) { startedRef.current = true; postToParent({ type: 'video:started', aulaId }) }
+            if (!startedRef.current) { startedRef.current = true; postToParent({ type: 'video:started', aulaId: lessonId }) }
             beat(false)
           }}
           onPause={() => { setPlaying(false); beat(true) }}
           onSeeked={() => beat(true)}
-          onEnded={() => { setEnded(true); setPlaying(false); finish(); postToParent({ type: 'video:completed', aulaId }); if (!completedRef.current) { completedRef.current = true; onCompleted?.() } }}
+          onEnded={() => { setEnded(true); setPlaying(false); finish(); postToParent({ type: 'video:completed', aulaId: lessonId }); if (!completedRef.current) { completedRef.current = true; onCompleted?.() } }}
           onTimeUpdate={onTimeUpdate}
           onProgress={onProgress}
           onDurationChange={() => setDuration(videoRef.current?.duration || 0)}

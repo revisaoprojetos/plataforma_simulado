@@ -86,7 +86,7 @@ export function VideoAnalytics({ id }: { id: string }) {
     setD(null); setErr(null)
     fetch(`/api/admin/video/${id}/analytics`, { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(setD)
+      .then((j: { analytics?: Analytics } & Analytics) => setD(j.analytics ?? j))
       .catch((e) => { if (!ac.signal.aborted) setErr(e instanceof Error ? 'Não foi possível carregar as métricas.' : 'Erro.') })
     return () => ac.abort()
   }, [id])

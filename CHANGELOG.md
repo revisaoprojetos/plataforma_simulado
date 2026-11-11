@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.13.0 — 2026-11-11
+
+### Gerenciador de Vídeo — o serviço manda, a plataforma se adapta (stack única)
+- **Catálogo direto no serviço**: cursos > módulos > aulas, upload e status lidos/escritos no gerenciador (sem espelho no Supabase). Referência da aula: `video-proprio:<courseId>:<lessonId>`; página do aluno em `/aluno/video/<courseId>/<lessonId>`.
+- **Configuração global em `/super/video`** (tabela `video_config`, segredos cifrados): URL interna, prefixo público, chave de integração, admin da empresa e interruptor Ativo; teste de conexão.
+- **Mesmo domínio, sem DNS novo**: o navegador acessa `<domínio da plataforma>/video-api` (Traefik com stripprefix); o web fala com `http://video-api:3000` na rede da stack. `PUBLIC_PATH_PREFIX` faz a URL da chave AES do manifesto levar o prefixo.
+- **Acesso do aluno**: gate da plataforma (produto liberado cujo currículo contém a aula, ou testador global) e matrícula just-in-time no serviço.
+- **Stack única no Portainer**: serviços `video-*` (api, consolidator, worker, migrate, postgres, redis) no `docker-compose.portainer.yml`, variáveis `VIDEO_*`, nascem com 0 réplicas (não afetam o deploy do web).
+- Removidos: espelho do vídeo no Supabase, sync e cron `video-sync`.
+
+### API (NestJS)
+- **Corrigido**: a API caía em loop no boot (`TypeError` do Swagger ao ler parâmetros dos controllers, pois o bundle do tsup não emite `design:paramtypes`). Agora o Swagger é opcional: se falhar, a API sobe sem `/api/docs`; `API_SWAGGER=false` desliga.
+
 ## 4.12.0 — 2026-11-10
 
 ### Cronograma Adaptativo — novo gerador de cronogramas (substitui o motor anterior)

@@ -9,7 +9,6 @@ on:
     branches: ['**']
     paths:
       - 'services/video/**'
-      - 'docker-compose.video.portainer.yml'
       - '.github/workflows/docker-publish-video.yml'
   workflow_dispatch:
 
@@ -127,5 +126,5 @@ jobs:
             echo "- \`ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}-video-api:${GITHUB_SHA}\`"
             echo "- \`ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}-video-worker:${GITHUB_SHA}\`"
             echo ""
-            echo "Deploy manual: defina \`VIDEO_TAG=${GITHUB_SHA}\` na stack \`video\` (docker-compose.video.portainer.yml)."
+            echo "Deploy manual: defina \`VIDEO_TAG=${GITHUB_SHA}\` na stack da plataforma (docker-compose.portainer.yml, serviços video-*)."
           } >> "$GITHUB_STEP_SUMMARY"

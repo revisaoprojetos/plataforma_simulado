@@ -1,7 +1,7 @@
 import 'server-only'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import type { Disponibilidade, TipoRef } from './curriculo'
-import { aulaIdDeReferencia } from '@/lib/biblioteca/video-provedor'
+import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 
 /**
@@ -84,9 +84,9 @@ export function momentoLiberacao(d: Disponibilidade, matricula: Date | null): Da
 function hrefDaAula(tipo: TipoRef, refId: string | null, refUrl: string | null, meta: any, voltar: string, produtoId?: string): { href: string | null; externo: boolean } {
   if (tipo === 'documento_biblioteca') return refId ? { href: `/aluno/biblioteca/${refId}?voltar=${encodeURIComponent(voltar)}${produtoId ? `&produto=${produtoId}` : ''}`, externo: false } : { href: null, externo: false }
   if (tipo === 'simulado' || tipo === 'quiz') return { href: '/aluno/simulados', externo: false }
-  // Vídeo próprio (hospedado): `video-proprio:<aulaId>` abre o player interno, na mesma aba.
-  const propria = aulaIdDeReferencia(refUrl)
-  if (propria) return { href: `/aluno/video/${propria}`, externo: false }
+  // Vídeo próprio (hospedado): `video-proprio:<courseId>:<lessonId>` abre o player interno, na mesma aba.
+  const propria = parseReferenciaVideoProprio(refUrl ?? '')
+  if (propria) return { href: `/aluno/video/${propria.courseId}/${propria.lessonId}`, externo: false }
   const url = String(refUrl || meta?.embedUrl || '').trim()
   return /^https?:\/\//i.test(url) ? { href: url, externo: true } : { href: null, externo: false }
 }
@@ -192,7 +192,31 @@ export async function docLiberadoPorProduto(
     .select('id, produto_id, modulo_id, disponibilidade')
     .eq('tenant_id', tenantId).eq('ref_id', documentoId).eq('tipo_ref', 'documento_biblioteca')
     .eq('deletado', false).eq('situacao', 'ativo').limit(50)
-  const lista = (itens ?? []) as any[]
+  return itensLiberadosPorProduto(svc, tenantId, estudanteId, (itens ?? []) as any[], temAcesso)
+}
+
+/**
+ * A aula de vídeo próprio `video-proprio:<courseId>:<lessonId>` está num item ATIVO e já liberado do currículo
+ * de algum produto a que o aluno tem acesso? Mesma regra de `docLiberadoPorProduto` (reuso exato do núcleo).
+ * Uma consulta indexada por (tenant, ref_url) + checagens por produto. Limite: só cobre aulas colocadas no
+ * currículo de produtos (não cobre vídeos dentro de documentos da Biblioteca).
+ */
+export async function videoLiberadoPorProduto(
+  svc: any, tenantId: string, estudanteId: string, courseId: string, lessonId: string,
+  temAcesso: (produtoId: string) => Promise<boolean>,
+): Promise<boolean> {
+  const { data: itens } = await svc.from('simulado_produto_modulo_itens')
+    .select('id, produto_id, modulo_id, disponibilidade')
+    .eq('tenant_id', tenantId).eq('ref_url', referenciaVideoProprio(courseId, lessonId))
+    .eq('deletado', false).eq('situacao', 'ativo').limit(50)
+  return itensLiberadosPorProduto(svc, tenantId, estudanteId, (itens ?? []) as any[], temAcesso)
+}
+
+/** Núcleo compartilhado: algum dos itens (aulas) está liberado ao aluno via produto (acesso + segmentos + disponibilidade)? */
+async function itensLiberadosPorProduto(
+  svc: any, tenantId: string, estudanteId: string, lista: any[],
+  temAcesso: (produtoId: string) => Promise<boolean>,
+): Promise<boolean> {
   if (!lista.length) return false
   for (const produtoId of [...new Set(lista.map((i) => i.produto_id as string))]) {
     const { data: prod } = await svc.from('simulado_produtos').select('id').eq('tenant_id', tenantId).eq('id', produtoId).eq('ativo', true).maybeSingle()

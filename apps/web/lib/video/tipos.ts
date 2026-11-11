@@ -11,15 +11,11 @@ export const PERM_VIDEO_MANAGE = 'video:manage'
 export const STATUS_AULA = ['rascunho', 'enviando', 'processando', 'pronta', 'erro', 'excluida'] as const
 export type StatusAulaVideo = (typeof STATUS_AULA)[number]
 
-export const ESTADOS_SYNC = ['pendente', 'processando', 'sincronizado', 'falhou'] as const
-export type EstadoSync = (typeof ESTADOS_SYNC)[number]
-export type AcaoSync = 'enroll' | 'revoke'
-
 const uuid = z.string().uuid()
 
 // ── Aluno ───────────────────────────────────────────────────────────────────
 
-export const playbackReqSchema = z.object({ aulaId: uuid }).strict()
+export const playbackReqSchema = z.object({ courseId: uuid, lessonId: uuid }).strict()
 export type PlaybackReq = z.infer<typeof playbackReqSchema>
 
 export const playbackResSchema = z.object({
@@ -42,12 +38,12 @@ export const playbackResSchema = z.object({
 export type PlaybackRes = z.infer<typeof playbackResSchema>
 
 export const anotacaoCriarSchema = z
-  .object({ aulaId: uuid, atS: z.number().finite().min(0).max(86_400), text: z.string().trim().min(1).max(2000) })
+  .object({ courseId: uuid, lessonId: uuid, atS: z.number().finite().min(0).max(86_400), text: z.string().trim().min(1).max(2000) })
   .strict()
 export const anotacaoEditarSchema = z
   .object({ id: uuid, atS: z.number().finite().min(0).max(86_400).optional(), text: z.string().trim().min(1).max(2000).optional() })
   .strict()
-export const anotacaoListarSchema = z.object({ aulaId: uuid })
+export const anotacaoListarSchema = z.object({ courseId: uuid, lessonId: uuid })
 
 // ── Admin ───────────────────────────────────────────────────────────────────
 
