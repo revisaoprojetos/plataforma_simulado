@@ -127,7 +127,7 @@ export const PARAMS_SEM_EFEITO: ReadonlyArray<{ k: ReadonlyArray<keyof ParamsAda
   { k: ['pdfInteiro218'], rotulo: 'Segundo PDFull só se couber inteiro', motivo: 'Regra incorporada ao gerador.' },
   { k: ['revisaoPorResultado218'], rotulo: 'Revisão pelo resultado recente do tema', motivo: 'Sempre ativa.' },
   { k: ['historicoDiagnostico219'], rotulo: 'Diagnóstico e reforço dos temas anteriores', motivo: 'Sempre ativo para quem já estuda pelo Revisão.' },
-  { k: ['jurisprudencia219'], rotulo: 'Ligar a meta semanal de Jurisprudência', motivo: 'Opcional do aluno: ele marca Jurisprudência em Metas no cronograma (padrão desmarcado); só a duração é configurável.' },
+  { k: ['jurisprudencia219'], rotulo: 'Ligar a meta semanal de Jurisprudência', motivo: 'Opt-in do aluno: vem desmarcada; só é reservada se o aluno marcar Jurisprudência em Metas no cronograma e a semana tiver ≥14h30. O admin controla a duração da meta e pode BLOQUEAR o tipo em Tipos de meta.' },
   { k: ['paralelo'], rotulo: 'Disciplinas em paralelo', motivo: 'Substituído pelo rodízio por vagas.' },
 ]
 

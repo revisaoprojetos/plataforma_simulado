@@ -32,7 +32,9 @@ import {
 } from '../actions'
 import { carregarModulosAction, carregarModuloInternoAction, buscarAulasProdutoAction } from './lazy-actions'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { PainelVisibilidade, resumoRegrasAlvo } from './painel-visibilidade'
+import { SegmentosDialog, SinaisSegmento, resumoRegrasAlvo, type AbaSegmentos, type SinaisSeg } from './segmentos-dialog'
+import { carregarRegrasSegmentoAction } from './segmento-regras-actions'
+import type { RegrasSegmentoAdmin } from './segmento-regras-tipos'
 import { carregarVisibilidadeConteudoAction } from './visibilidade-actions'
 import type { VisibilidadeConteudo } from './visibilidade-actions-tipos'
 import type { RegraVisibilidade } from '@/lib/segmentos/tipos'
@@ -92,13 +94,14 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   // Sem ?vista=, lembra a última escolha (localStorage com try/catch).
   useEffect(() => {
     if (searchParams.get('vista')) return
-    try { if (localStorage.getItem(VISTA_LS) === 'tabela') { setVistaState('tabela'); setPpMod(14) } } catch { /* storage indisponível */ }
+    try { if (localStorage.getItem(VISTA_LS) === 'tabela') { setVistaState('tabela'); setPpMod(14); setPpSub(14) } } catch { /* storage indisponível */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   function setVista(v: Vista) {
     if (v === vista) return
-    setVistaState(v); setPageMod(1); setPpMod(v === 'tabela' ? 14 : 24)
+    setVistaState(v); setPageMod(1); setPpMod(v === 'tabela' ? 14 : 24); setPageSub(1); setPpSub(v === 'tabela' ? 14 : 24)
     if (v === 'cards' && !['ordem', 'nome', 'aulas'].includes(ordemMod)) setOrdemMod('ordem')
+    if (v === 'cards' && !['ordem', 'nome', 'aulas'].includes(ordemSub)) setOrdemSub('ordem')
     try { localStorage.setItem(VISTA_LS, v) } catch { /* ignore */ }
     const u = new URL(window.location.href); u.searchParams.set('vista', v); window.history.replaceState(null, '', u)
   }
@@ -106,6 +109,14 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   const [totalMod, setTotalMod] = useState(0)
   const [totais, setTotais] = useState({ aulas: 0, modulos: 0 })
   const [marcadosMod, setMarcadosMod] = useState<Set<string>>(new Set())
+  // Submódulos do módulo aberto: MESMAS ferramentas da visão de módulos (busca, ordem, página, seleção, lote, reordenar)
+  const [qSub, setQSub] = useState('')
+  const [ordemSub, setOrdemSub] = useState<OrdemMod>('ordem')
+  const [pageSub, setPageSub] = useState(1)
+  const [ppSub, setPpSub] = useState(() => (searchParams.get('vista') === 'tabela' ? 14 : 24))
+  const [totalSub, setTotalSub] = useState(0)
+  const [marcadosSub, setMarcadosSub] = useState<Set<string>>(new Set())
+  const [reordenarSub, setReordenarSub] = useState(false)
 
   // Visão interna
   const [qAula, setQAula] = useState('')
@@ -119,26 +130,54 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   const [marcados, setMarcados] = useState<Set<string>>(new Set())
 
   // Visibilidade por segmentos (regras de módulo/aula): carga leve, só quando o painel abre ou há módulo aberto (chips das linhas).
-  type PainelVis = { alvos: { tipo: 'modulo' | 'aula'; id: string }[]; titulo?: string; seguirSelecao: boolean }
+  type PainelVis = { alvos: { tipo: 'modulo' | 'aula'; id: string }[]; titulo?: string; aba?: AbaSegmentos }
   const [painelVis, setPainelVis] = useState<PainelVis | null>(null)
   const [visDados, setVisDados] = useState<(VisibilidadeConteudo & { disponivel: boolean }) | null>(null)
+  const [segRegras, setSegRegras] = useState<RegrasSegmentoAdmin | null>(null)
   const visCarregando = useRef(false)
   const recarregarVis = async () => {
     if (visCarregando.current) return
     visCarregando.current = true
     try {
-      const r = await carregarVisibilidadeConteudoAction(produtoId)
+      const [r, g] = await Promise.all([carregarVisibilidadeConteudoAction(produtoId), carregarRegrasSegmentoAction(produtoId).catch(() => null)])
       if ('error' in r) toast.error(r.error); else setVisDados({ ...r.dados, disponivel: r.disponivel })
+      if (g && 'ok' in g) setSegRegras(g.dados)
     } catch { /* mantém o que já havia */ } finally { visCarregando.current = false }
   }
-  useEffect(() => { if ((moduloId || painelVis) && !visDados) void recarregarVis() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [moduloId, painelVis])
+  // Sinais (Visibilidade/Liberação/Capa) nos cards e linhas: carga leve (2 consultas) ao abrir a aba.
+  useEffect(() => { if (!visDados) void recarregarVis() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [moduloId, painelVis])
   const regrasPorAlvo = useMemo(() => {
     const m = new Map<string, RegraVisibilidade[]>()
     for (const r of visDados?.regras ?? []) if (r.alvo_id) m.set(r.alvo_id, [...(m.get(r.alvo_id) ?? []), r])
     return m
   }, [visDados])
+  /** id → título de módulos (cards/lista) e aulas da página: o modal de Segmentos lista QUEM tem cada regra. */
+  const titulosAlvos = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const x of modulos) m[x.id] = x.titulo
+    for (const x of cards) m[x.id] = x.titulo
+    for (const x of subs) m[x.id] = x.titulo
+    for (const x of aulas.itens) m[x.id] = x.titulo
+    return m
+  }, [modulos, cards, subs, aulas.itens])
+  const imagensAlvos = useMemo(() => {
+    const m: Record<string, string | null> = {}
+    for (const x of modulos) m[x.id] = x.imagem_url ?? null
+    for (const x of cards) m[x.id] = x.imagem_url ?? m[x.id] ?? null
+    for (const x of subs) m[x.id] = x.imagem_url ?? m[x.id] ?? null
+    return m
+  }, [modulos, cards, subs])
+  /** id (módulo/aula) → o que tem de regra por segmento (texto p/ tooltip). */
+  const sinais = useMemo(() => {
+    const m = new Map<string, SinaisSeg>()
+    const seg = (id: string) => visDados?.segmentos.find((x) => x.id === id)?.nome ?? 'segmento'
+    const poe = (id: string | null, campo: keyof SinaisSeg, txt: string) => { if (!id) return; const c = m.get(id) ?? { vis: null, lib: null, capa: null }; c[campo] = c[campo] ? `${c[campo]} · ${txt}` : txt; m.set(id, c) }
+    for (const r of visDados?.regras ?? []) if (r.ativo && r.alvo_tipo !== 'produto') poe(r.alvo_id, 'vis', `${r.efeito === 'mostrar' ? 'só' : 'oculto p/'} ${seg(r.segmento_id)}`)
+    for (const r of segRegras?.disp ?? []) if (r.ativo) poe(r.alvo_id, 'lib', `${seg(r.segmento_id)}: ${resumoDisponibilidade(r.disponibilidade)}`)
+    for (const r of segRegras?.capas ?? []) if (r.ativo && r.alvo_tipo === 'modulo') poe(r.alvo_id, 'capa', seg(r.segmento_id))
+    return m
+  }, [visDados, segRegras])
   const nomeSegVis = (id: string) => visDados?.segmentos.find((s) => s.id === id)?.nome ?? 'segmento'
-  const alvosAulaMarcadas = useMemo(() => [...marcados].map((id) => ({ tipo: 'aula' as const, id })), [marcados])
 
   const [carregando, setCarregando] = useState(true)
   const seq = useRef(0)
@@ -146,6 +185,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
 
   function irModulo(id: string | null, item: ItemRow | null = null) {
     setModuloId(id); setSel(item); setMarcados(new Set()); setQAula(''); setMatAula('todos'); setPageAula(1); setBusca('')
+    setMarcadosSub(new Set()); setQSub(''); setOrdemSub('ordem'); setPageSub(1)
     const u = new URL(window.location.href)
     u.searchParams.set('aba', 'conteudos')
     if (id) u.searchParams.set('modulo', id); else u.searchParams.delete('modulo')
@@ -178,20 +218,20 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
     const mine = ++seq.current
     setCarregando(true)
     const t = setTimeout(() => {
-      carregarModuloInternoAction(produtoId, moduloId, { q: qAula, material: matAula, page: pageAula, pp: ppAula })
+      carregarModuloInternoAction(produtoId, moduloId, { q: qAula, material: matAula, page: pageAula, pp: ppAula, subQ: qSub, subOrdem: ordemSub, subPage: pageSub, subPp: ppSub })
         .then((r) => {
           if (mine !== seq.current) return
           if ('error' in r) { toast.error(r.error); return }
           if (!r.atual) { toast.message('Módulo não encontrado — voltando à lista.'); irModulo(null); return }
-          setAulas(r.aulas); setSubs(r.subs); setModulos(r.modulos); setAtual(r.atual); setIrmaos(r.irmaos)
+          setAulas(r.aulas); setSubs(r.subs); setTotalSub(r.subsTotal); if (r.subsPage !== pageSub) setPageSub(r.subsPage); setModulos(r.modulos); setAtual(r.atual); setIrmaos(r.irmaos)
           if (r.aulas.page !== pageAula) setPageAula(r.aulas.page)
         })
         .catch(() => { if (mine === seq.current) toast.error('Falha ao carregar o módulo.') })
         .finally(() => { if (mine === seq.current) setCarregando(false) })
-    }, qAula ? 250 : 0)
+    }, qAula || qSub ? 250 : 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduloId, produtoId, qAula, matAula, pageAula, ppAula, reloadKey])
+  }, [moduloId, produtoId, qAula, matAula, pageAula, ppAula, qSub, ordemSub, pageSub, ppSub, reloadKey])
 
   // ── Busca global (agrupada por módulo de origem) ──
   const [achados, setAchados] = useState<{ itens: ItemRow[]; total: number } | null>(null)
@@ -218,7 +258,6 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   const [moverItem, setMoverItem] = useState<ItemRow | null>(null)
   const [duplicarItem, setDuplicarItem] = useState<ItemRow | null>(null)
   const [alterarTipo, setAlterarTipo] = useState<ItemRow | null>(null)
-  const [dispItem, setDispItem] = useState<ItemRow | null>(null)
   const [reordenar, setReordenar] = useState(false)
 
   // Reordenação das aulas por arrasto (HTML5 nativo). `ovr` = ordem otimista local (id -> posição); limpa quando o servidor devolve dados.
@@ -287,7 +326,6 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
 
   // ── Ações em lote NO NÍVEL DE AULA: UMA ida ao servidor por ação (valida permissão, atualiza em chunks de 80, audita a lista de ids) ──
   const [emLote, setEmLote] = useState(false)
-  const [dispLote, setDispLote] = useState(false)
   const [moverLote, setMoverLote] = useState(false)
   const idsMarcados = () => [...marcados]
   async function aplicarLote(patch: Parameters<typeof atualizarItensEmLoteAction>[2], titulo: string, mensagem: string, ok: string) {
@@ -312,29 +350,42 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   }
 
   // ── Ações em lote NO NÍVEL DE MÓDULO (valem p/ as aulas do módulo e dos submódulos) ──
-  const [dispLoteMod, setDispLoteMod] = useState(false)
-  async function aplicarLoteMod(patch: Parameters<typeof atualizarModulosEmLoteAction>[2], titulo: string, mensagem: string, ok: string) {
-    const ids = [...marcadosMod]; if (!ids.length) return
+  async function aplicarLoteMod(patch: Parameters<typeof atualizarModulosEmLoteAction>[2], titulo: string, mensagem: string, ok: string, marcX: Set<string> = marcadosMod, limpar: () => void = () => setMarcadosMod(new Set())) {
+    const ids = [...marcX]; if (!ids.length) return
     if (!(await confirmar({ titulo, mensagem: `${mensagem} em todas as aulas de ${ids.length} módulo${ids.length === 1 ? '' : 's'} (inclui submódulos).`, confirmar: 'Aplicar' }))) return
     setEmLote(true)
     const r = await atualizarModulosEmLoteAction(produtoId, ids, patch)
     setEmLote(false)
     if ('error' in r && r.error) { toast.error(r.error); return }
     toast.success(`${(r as { aulas: number }).aulas} aula(s) em ${(r as { modulos: number }).modulos} módulo(s) — ${ok}.`)
-    setMarcadosMod(new Set()); refresh()
+    limpar(); refresh()
   }
-  async function excluirModulosMarcados() {
-    const ids = [...marcadosMod]; if (!ids.length) return
+  async function excluirModulosMarcados(marcX: Set<string> = marcadosMod, limpar: () => void = () => setMarcadosMod(new Set())) {
+    const ids = [...marcX]; if (!ids.length) return
     if (!(await confirmar({ titulo: 'Excluir módulos', mensagem: `Excluir ${ids.length} módulo(s)? Os submódulos e as aulas dentro deles vão para a Lixeira.`, confirmar: 'Excluir', destrutivo: true }))) return
     setEmLote(true)
     const r = await excluirModulosEmLoteAction(produtoId, ids)
     setEmLote(false)
     if ('error' in r && r.error) { toast.error(r.error); return }
-    toast.success(`${(r as { modulos: number }).modulos} módulo(s) excluído(s).`); setMarcadosMod(new Set()); refresh()
+    toast.success(`${(r as { modulos: number }).modulos} módulo(s) excluído(s).`); limpar(); refresh()
   }
 
+  /** Liberação BASE (todos os alunos) feita pelo painel de Segmento > Liberação: aulas = a(s) aula(s); módulos = as aulas dentro. */
+  async function aplicarBase(alvos: { tipo: 'modulo' | 'aula'; id: string }[], d: Disponibilidade) {
+    const ids = alvos.map((a) => a.id); if (!ids.length) return
+    const mod = alvos.every((a) => a.tipo === 'modulo')
+    if (!(await confirmar({ titulo: 'Definir liberação', mensagem: `Aplicar “${resumoDisponibilidade(d)}” a todos os alunos em ${ids.length} ${mod ? `módulo${ids.length === 1 ? '' : 's'} (todas as aulas dentro, inclui submódulos)` : `aula${ids.length === 1 ? '' : 's'}`}.`, confirmar: 'Aplicar' }))) return
+    setEmLote(true)
+    const r = mod ? await atualizarModulosEmLoteAction(produtoId, ids, { disponibilidade: d }) : await atualizarItensEmLoteAction(produtoId, ids, { disponibilidade: d })
+    setEmLote(false)
+    if ('error' in r && r.error) { toast.error(r.error); return }
+    toast.success(`Liberação aplicada: ${resumoDisponibilidade(d)}.`); refresh()
+  }
+  const baseResumoPainel = painelVis && painelVis.alvos.length === 1 && painelVis.alvos[0].tipo === 'aula'
+    ? (() => { const it = aulas.itens.find((x) => x.id === painelVis.alvos[0].id); return it ? resumoDisponibilidade(it.disponibilidade) : null })() : null
+
   /** Abre o painel lateral de visibilidade para UMA aula (se havia seleção, o painel fica só nela). */
-  function abrirVisAula(it: ItemRow) { setPainelVis({ alvos: [{ tipo: 'aula', id: it.id }], titulo: it.titulo, seguirSelecao: false }) }
+  function abrirVisAula(it: ItemRow) { setPainelVis({ alvos: [{ tipo: 'aula', id: it.id }], titulo: it.titulo }) }
 
   function menuAula(it: ItemRow) {
     return (
@@ -345,8 +396,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
           <DropdownMenuItem onClick={() => setAlterarTipo(it)}><Shuffle className="h-4 w-4" />Alterar tipo da aula</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setMoverItem(it)}><FolderInput className="h-4 w-4" />Mover aula</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setDuplicarItem(it)}><Copy className="h-4 w-4" />Duplicar aula</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDispItem(it)}><CalendarClock className="h-4 w-4" />Configurar disponibilidade</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => abrirVisAula(it)}><Users className="h-4 w-4" />Visibilidade por segmento</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => abrirVisAula(it)}><Users className="h-4 w-4" />Segmento e liberação</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => excluirAula(it)}><Trash2 className="h-4 w-4" />Excluir</DropdownMenuItem>
         </DropdownMenuContent>
@@ -364,7 +414,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
           <CaixaSelecao checked={marcada} onChange={() => toggleMarcado(it.id)} label="Selecionar aula" />
         )}
         <GripVertical className={cn('h-4 w-4 shrink-0 text-muted-foreground/60', podeArrastar && 'cursor-grab active:cursor-grabbing')} aria-hidden />
-        <button type="button" onClick={() => { setSel(it); setPainelVis((p) => (p?.seguirSelecao ? p : null)) }} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+        <button type="button" onClick={() => { setSel(it); setPainelVis(null) }} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">{iconeTipoRef(it.tipo_ref)}</span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{it.titulo}</span>
@@ -374,6 +424,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
             </span>
           </span>
         </button>
+        <SinaisSegmento sinais={sinais.get(it.id) ? { ...sinais.get(it.id)!, vis: null, capa: null } : null} compacto className="hidden sm:inline-flex" />
         {(() => {
           const rs = resumoRegrasAlvo(regrasPorAlvo.get(it.id), nomeSegVis)
           if (!rs) return null
@@ -392,15 +443,23 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   }
 
   const editarCard = (c: ModuloCard) => setModuloDlg({ modulo: nomeModulo.get(c.id) ?? null, paiId: c.pai_id, card: c })
-  function cardDe(c: ModuloCard, comSelecao: boolean) {
+  function cardDe(c: ModuloCard, comSelecao: boolean, marcX: Set<string> = marcadosMod, toggleX: (id: string) => void = toggleMarcadoMod) {
     return (
-      <CardModulo key={c.id} m={c} podeEditar={podeEditar}
-        marcado={comSelecao ? marcadosMod.has(c.id) : undefined} onMarcar={comSelecao ? () => toggleMarcadoMod(c.id) : undefined}
+      <CardModulo key={c.id} m={c} podeEditar={podeEditar} sinais={sinais.get(c.id)}
+        marcado={comSelecao ? marcX.has(c.id) : undefined} onMarcar={comSelecao ? () => toggleX(c.id) : undefined}
         onAbrir={() => irModulo(c.id)} onEditar={() => editarCard(c)}
         onSub={() => setModuloDlg({ modulo: null, paiId: c.id })} onConteudo={() => setNovoConteudo({ moduloPadrao: c.id })} />
     )
   }
 
+  const seletorVista = (
+    <div className="flex items-center rounded-lg border p-0.5" role="group" aria-label="Visualização">
+      <button type="button" onClick={() => setVista('cards')} aria-pressed={vista === 'cards'} className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm', vista === 'cards' ? 'bg-muted text-foreground' : 'text-muted-foreground')}><LayoutGrid className="h-4 w-4" />Cards</button>
+      <button type="button" onClick={() => setVista('tabela')} aria-pressed={vista === 'tabela'} className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm', vista === 'tabela' ? 'bg-muted text-foreground' : 'text-muted-foreground')}><ListIcon className="h-4 w-4" />Tabela</button>
+    </div>
+  )
+  const irmaosSub = useMemo(() => modulos.filter((m) => (m.pai_id ?? null) === moduloId).sort((a, b) => a.ordem - b.ordem).map((m) => m.id), [modulos, moduloId])
+  const cardDeSub = (c: ModuloCard) => cardDe(c, true, marcadosSub, (id) => setMarcadosSub((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }))
   const topoIds = useMemo(() => modulos.filter((m) => !m.pai_id).map((m) => m.id), [modulos])
   const filtrosMod = !!qMod.trim() || filtroMod !== 'todos' || matMod !== 'todos'
   const buscando_ = !!busca.trim()
@@ -448,19 +507,21 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   })()
 
   // ── Tabela de módulos: mesmo casco/densidade da TabelaCron (Biblioteca/Cronograma); seleção e ações em massa = as dos cards ──
-  const ordenarPor = (asc: OrdemMod, desc: OrdemMod) => { setOrdemMod(ordemMod === desc ? asc : desc); setPageMod(1) }
-  function ThOrd({ rotulo, asc, desc, className }: { rotulo: string; asc: OrdemMod; desc: OrdemMod; className?: string }) {
-    const ativo = ordemMod === asc || ordemMod === desc
+  /** Tabela de módulos (topo OU submódulos): mesma para os dois níveis; só muda a lista/ordem/seleção. */
+  function tabelaDeModulos(lista: ModuloCard[], ordemAtual: OrdemMod, setOrdem: (o: OrdemMod) => void, marcadosX: Set<string>, setMarcadosX: React.Dispatch<React.SetStateAction<Set<string>>>, rotuloPrimeira: string) {
+  const toggleX = (id: string) => setMarcadosX((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const ThOrd = ({ rotulo, asc, desc, className }: { rotulo: string; asc: OrdemMod; desc: OrdemMod; className?: string }) => {
+    const ativo = ordemAtual === asc || ordemAtual === desc
     return (
-      <th className={cn('px-3 py-2.5 font-medium', className)} aria-sort={ordemMod === asc ? 'ascending' : ordemMod === desc ? 'descending' : 'none'}>
-        <button type="button" onClick={() => ordenarPor(asc, desc)} className={cn('inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground', ativo && 'text-foreground')}>
-          {rotulo}{ativo ? (ordemMod === asc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-50" />}
+      <th className={cn('px-3 py-2.5 font-medium', className)} aria-sort={ordemAtual === asc ? 'ascending' : ordemAtual === desc ? 'descending' : 'none'}>
+        <button type="button" onClick={() => setOrdem(ordemAtual === desc ? asc : desc)} className={cn('inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground', ativo && 'text-foreground')}>
+          {rotulo}{ativo ? (ordemAtual === asc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-50" />}
         </button>
       </th>
     )
   }
-  const todosPagMarcados = cards.length > 0 && cards.every((c) => marcadosMod.has(c.id))
-  const tabelaModulos = (
+  const todosPagMarcados = lista.length > 0 && lista.every((c) => marcadosX.has(c.id))
+  return (
     <section className={cn('rounded-2xl border bg-card p-2 shadow-sm transition-opacity', carregando && 'opacity-70')} aria-busy={carregando}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -469,11 +530,11 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
               {podeEditar && (
                 <th className="w-9 px-3 py-2.5">
                   <input type="checkbox" aria-label="Selecionar todos desta página" checked={todosPagMarcados}
-                    onChange={(e) => setMarcadosMod((p) => { const n = new Set(p); for (const c of cards) { if (e.target.checked) n.add(c.id); else n.delete(c.id) } return n })}
+                    onChange={(e) => setMarcadosX((p) => { const n = new Set(p); for (const c of lista) { if (e.target.checked) n.add(c.id); else n.delete(c.id) } return n })}
                     className="h-4 w-4 cursor-pointer accent-[var(--primary)]" />
                 </th>
               )}
-              <ThOrd rotulo="Módulo" asc="nome" desc="nome_desc" />
+              <ThOrd rotulo={rotuloPrimeira} asc="nome" desc="nome_desc" />
               <ThOrd rotulo="Aulas" asc="aulas_asc" desc="aulas" className="w-20" />
               <ThOrd rotulo="Submódulos" asc="sub_asc" desc="sub" className="w-28" />
               <th className="px-3 py-2.5 font-medium">Tipos de material</th>
@@ -483,12 +544,12 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
             </tr>
           </thead>
           <tbody>
-            {cards.map((c) => {
+            {lista.map((c) => {
               const chips = MATERIAIS.filter((x) => (c.materiais[x.v] ?? 0) > 0)
               const sit = situacaoModulo(c)
               return (
-                <tr key={c.id} className={cn('border-b last:border-0 hover:bg-muted/40', marcadosMod.has(c.id) && 'bg-primary/5')}>
-                  {podeEditar && <td className="px-3 py-1.5"><CaixaSelecao checked={marcadosMod.has(c.id)} onChange={() => toggleMarcadoMod(c.id)} label={`Selecionar ${c.titulo}`} /></td>}
+                <tr key={c.id} className={cn('border-b last:border-0 hover:bg-muted/40', marcadosX.has(c.id) && 'bg-primary/5')}>
+                  {podeEditar && <td className="px-3 py-1.5"><CaixaSelecao checked={marcadosX.has(c.id)} onChange={() => toggleX(c.id)} label={`Selecionar ${c.titulo}`} /></td>}
                   <td className="px-3 py-1.5 align-middle">
                     <button type="button" onClick={() => irModulo(c.id)} className="flex min-w-0 items-center gap-2.5 text-left">
                       <span className="relative h-10 w-[27px] shrink-0 overflow-hidden rounded-md" style={{ background: 'linear-gradient(170deg, var(--primary), color-mix(in srgb, var(--primary) 40%, black))' }}>
@@ -496,6 +557,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
                       </span>
                       <span className="min-w-0 max-w-[32ch] truncate font-medium hover:underline">{c.titulo}</span>
                     </button>
+                    <SinaisSegmento sinais={sinais.get(c.id)} compacto className="mt-1 pl-[37px]" />
                   </td>
                   <td className="px-3 py-1.5 tabular-nums">{c.aulas}</td>
                   <td className="px-3 py-1.5 tabular-nums">{c.submodulos}</td>
@@ -532,6 +594,38 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
       </div>
     </section>
   )
+  }
+  const tabelaModulos = tabelaDeModulos(cards, ordemMod, (o) => { setOrdemMod(o); setPageMod(1) }, marcadosMod, setMarcadosMod, 'Módulo')
+
+  /** Barra de lote dos módulos (topo OU submódulos): Segmento, Ativar, Rascunho, Excluir sobre os cards/linhas marcados. */
+  function barraLoteModulos(o: { total: number; lista: ModuloCard[]; marcados: Set<string>; setMarcados: React.Dispatch<React.SetStateAction<Set<string>>>; todosIds: string[]; filtrado: boolean; extra?: string }) {
+    if (!(o.total > 0 && podeEditar)) return null
+    const { marcados: mk, setMarcados: setMk } = o
+    const limpar = () => setMk(new Set())
+    return (
+      <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border bg-card px-3 py-2 text-sm">
+        {mk.size === 0 ? (
+          <>
+            <span className="text-muted-foreground"><span className="font-medium text-foreground">{o.total}</span> módulo{o.total === 1 ? '' : 's'}{!o.filtrado && o.extra} · marque cards para agir em massa nas aulas deles</span>
+            <button type="button" onClick={() => setMk(new Set(o.lista.map((c) => c.id)))} className="ml-auto whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline">Selecionar esta página ({o.lista.length})</button>
+          </>
+        ) : (
+          <>
+            <span className="font-medium text-foreground">{mk.size} módulo{mk.size === 1 ? '' : 's'} selecionado{mk.size === 1 ? '' : 's'}</span>
+            {!o.filtrado && mk.size < o.todosIds.length && <button type="button" onClick={() => setMk(new Set(o.todosIds))} className="whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline">Selecionar todos ({o.todosIds.length})</button>}
+            <button type="button" onClick={limpar} className="whitespace-nowrap text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Limpar</button>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {emLote && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              <Button size="sm" variant="outline" disabled={emLote} onClick={() => setPainelVis({ alvos: [...mk].map((id) => ({ tipo: 'modulo' as const, id })) })}><Users className="h-4 w-4" />Segmento</Button>
+              <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'ativo' }, 'Ativar aulas', 'Tornar ativas', 'ativas', mk, limpar)}><Eye className="h-4 w-4" />Ativar</Button>
+              <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'rascunho' }, 'Passar para rascunho', 'Passar para rascunho', 'em rascunho', mk, limpar)}><EyeOff className="h-4 w-4" />Rascunho</Button>
+              <Button size="sm" variant="destructive" disabled={emLote} onClick={() => excluirModulosMarcados(mk, limpar)}><Trash2 className="h-4 w-4" />Excluir</Button>
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
 
   // ═════════ VISÃO 1: módulos como cards ═════════
   const visaoModulos = (
@@ -558,37 +652,10 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
                 </select></label>
             )}
             {podeEditar && <Button variant="outline" onClick={() => setReordenar(true)} disabled={topoIds.length < 2}><ArrowUpDown className="h-4 w-4" />Reordenar</Button>}
-            <div className="flex items-center rounded-lg border p-0.5" role="group" aria-label="Visualização">
-              <button type="button" onClick={() => setVista('cards')} aria-pressed={vista === 'cards'} className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm', vista === 'cards' ? 'bg-muted text-foreground' : 'text-muted-foreground')}><LayoutGrid className="h-4 w-4" />Cards</button>
-              <button type="button" onClick={() => setVista('tabela')} aria-pressed={vista === 'tabela'} className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm', vista === 'tabela' ? 'bg-muted text-foreground' : 'text-muted-foreground')}><ListIcon className="h-4 w-4" />Tabela</button>
-            </div>
+            {seletorVista}
           </div>
 
-          {/* Barra de lote — MÓDULOS */}
-          {totalMod > 0 && podeEditar && (
-            <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border bg-card px-3 py-2 text-sm">
-              {marcadosMod.size === 0 ? (
-                <>
-                  <span className="text-muted-foreground"><span className="font-medium text-foreground">{totalMod}</span> módulo{totalMod === 1 ? '' : 's'}{!filtrosMod && ` · ${totais.aulas} aulas`} · marque cards para agir em massa nas aulas deles</span>
-                  <button type="button" onClick={() => setMarcadosMod(new Set(cards.map((c) => c.id)))} className="ml-auto whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline">Selecionar esta página ({cards.length})</button>
-                </>
-              ) : (
-                <>
-                  <span className="font-medium text-foreground">{marcadosMod.size} módulo{marcadosMod.size === 1 ? '' : 's'} selecionado{marcadosMod.size === 1 ? '' : 's'}</span>
-                  {!filtrosMod && marcadosMod.size < topoIds.length && <button type="button" onClick={() => setMarcadosMod(new Set(topoIds))} className="whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline">Selecionar todos ({topoIds.length})</button>}
-                  <button type="button" onClick={() => setMarcadosMod(new Set())} className="whitespace-nowrap text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Limpar</button>
-                  <div className="ml-auto flex flex-wrap items-center gap-2">
-                    {emLote && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                    <Button size="sm" variant="outline" disabled={emLote} onClick={() => setDispLoteMod(true)}><CalendarClock className="h-4 w-4" />Disponibilidade das aulas</Button>
-                    <Button size="sm" variant="outline" disabled={emLote} onClick={() => setPainelVis({ alvos: [...marcadosMod].map((id) => ({ tipo: 'modulo' as const, id })), seguirSelecao: false })}><Users className="h-4 w-4" />Visibilidade</Button>
-                    <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'ativo' }, 'Ativar aulas', 'Tornar ativas', 'ativas')}><Eye className="h-4 w-4" />Ativar</Button>
-                    <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'rascunho' }, 'Passar para rascunho', 'Passar para rascunho', 'em rascunho')}><EyeOff className="h-4 w-4" />Rascunho</Button>
-                    <Button size="sm" variant="destructive" disabled={emLote} onClick={excluirModulosMarcados}><Trash2 className="h-4 w-4" />Excluir</Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          {barraLoteModulos({ total: totalMod, lista: cards, marcados: marcadosMod, setMarcados: setMarcadosMod, todosIds: topoIds, filtrado: filtrosMod, extra: ` · ${totais.aulas} aulas` })}
 
           {carregando && cards.length === 0 ? <Carga texto="Carregando módulos…" /> : cards.length === 0 ? (
             <div className="rounded-2xl border border-dashed bg-muted/30 p-10 text-center text-sm text-muted-foreground">
@@ -648,6 +715,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
                 <Button variant="outline" size="sm" disabled={!proximo} onClick={() => proximo && irModulo(proximo.id)} title={proximo?.titulo}>Próximo<ChevronRight className="h-4 w-4" /></Button>
                 {podeEditar && atual && <>
                   <Button variant="outline" size="sm" onClick={() => editarCard(atual)}><Pencil className="h-4 w-4" />Editar módulo</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setSel(null); setPainelVis({ alvos: [{ tipo: 'modulo', id: atual.id }], titulo: atual.titulo, aba: 'capa' }) }}><Users className="h-4 w-4" />Segmentos</Button>
                   <Button variant="outline" size="sm" onClick={() => setModuloDlg({ modulo: null, paiId: atual.id })}><FolderPlus className="h-4 w-4" />Submódulo</Button>
                   <Button size="sm" onClick={() => setNovoConteudo({ moduloPadrao: atual.id })}><Plus className="h-4 w-4" />Conteúdo</Button>
                 </>}
@@ -655,11 +723,32 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
             </div>
           </div>
 
-          {/* Submódulos (mesma lógica, recursiva: abrir um submódulo mostra as aulas dele) */}
-          {subs.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Submódulos <span className="font-normal normal-case">({subs.length})</span></div>
-              <div className={GRID_CARDS}>{subs.map((c) => cardDe(c, false))}</div>
+          {/* Submódulos: as MESMAS ferramentas da visão de módulos (busca, ordem, reordenar, vista, seleção/lote, paginação) */}
+          {(subs.length > 0 || totalSub > 0 || !!qSub.trim()) && (
+            <div className="space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Submódulos <span className="font-normal normal-case">({totalSub}{qSub.trim() ? ' no filtro' : ''})</span></div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-48 flex-1">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={qSub} onChange={(e) => { setQSub(e.target.value); setPageSub(1) }} placeholder="Filtrar submódulos por nome" className="pl-8" />
+                </div>
+                {vista === 'cards' && (
+                  <label className="flex items-center gap-1.5 text-sm text-muted-foreground"><ArrowUpDown className="h-4 w-4" />
+                    <select aria-label="Ordenar submódulos" className={SELECT_CLS} value={ordemSub} onChange={(e) => { setOrdemSub(e.target.value as OrdemMod); setPageSub(1) }}>
+                      <option value="ordem">Ordem do produto</option><option value="nome">Nome (A–Z)</option><option value="aulas">Mais aulas</option>
+                    </select></label>
+                )}
+                {podeEditar && <Button variant="outline" onClick={() => setReordenarSub(true)} disabled={irmaosSub.length < 2}><ArrowUpDown className="h-4 w-4" />Reordenar</Button>}
+                {seletorVista}
+              </div>
+              {barraLoteModulos({ total: totalSub, lista: subs, marcados: marcadosSub, setMarcados: setMarcadosSub, todosIds: irmaosSub, filtrado: !!qSub.trim(), extra: '' })}
+              {subs.length === 0 ? (
+                <div className="rounded-2xl border border-dashed bg-muted/30 p-8 text-center text-sm text-muted-foreground">{carregando ? 'Carregando…' : 'Nenhum submódulo com esse filtro.'}</div>
+              ) : vista === 'cards' ? (
+                <div className={cn(GRID_CARDS, carregando && 'opacity-60 transition-opacity')}>{subs.map((c) => cardDeSub(c))}</div>
+              ) : tabelaDeModulos(subs, ordemSub, (o) => { setOrdemSub(o); setPageSub(1) }, marcadosSub, setMarcadosSub, 'Submódulo')}
+              <PaginacaoBib total={totalSub} page={pageSub} pp={ppSub} opcoesPP={vista === 'cards' ? PP_CARDS : PP_TABELA.filter((n) => n <= 60)} selecionados={marcadosSub.size} carregando={carregando}
+                onPage={setPageSub} onPP={(n) => { setPpSub(n); setPageSub(1) }} rotuloVazio="Nenhum submódulo" />
             </div>
           )}
 
@@ -696,8 +785,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
                     {podeEditar && (
                       <div className="ml-auto flex flex-wrap items-center gap-2">
                         {emLote && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                        <Button size="sm" variant="outline" disabled={emLote} onClick={() => setDispLote(true)}><CalendarClock className="h-4 w-4" />Disponibilidade</Button>
-                        <Button size="sm" variant={painelVis?.seguirSelecao ? 'default' : 'outline'} disabled={emLote} onClick={() => { setSel(null); setPainelVis({ alvos: [], seguirSelecao: true }) }}><Users className="h-4 w-4" />Visibilidade</Button>
+                        <Button size="sm" variant="outline" disabled={emLote} onClick={() => { setSel(null); setPainelVis({ alvos: [...marcados].map((id) => ({ tipo: 'aula' as const, id })), titulo: marcados.size === 1 ? aulas.itens.find((x) => marcados.has(x.id))?.titulo : undefined }) }}><Users className="h-4 w-4" />Segmento</Button>
                         <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLote({ situacao: 'ativo' }, 'Ativar aulas', 'Tornar ativas', 'ativas')}><Eye className="h-4 w-4" />Ativar</Button>
                         <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLote({ situacao: 'rascunho' }, 'Desativar aulas', 'Passar para rascunho', 'em rascunho')}><EyeOff className="h-4 w-4" />Rascunho</Button>
                         <DropdownMenu>
@@ -738,10 +826,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
       {/* Detalhe da aula (só dentro do módulo) */}
       {moduloId && (
         <aside className="rounded-2xl border bg-card p-4 shadow-sm xl:sticky xl:top-4 xl:self-start">
-          {painelVis ? (
-            <PainelVisibilidade produtoId={produtoId} podeEditar={podeEditar} dados={visDados} titulo={painelVis.titulo}
-              alvos={painelVis.seguirSelecao ? alvosAulaMarcadas : painelVis.alvos} onFechar={() => setPainelVis(null)} onMudou={recarregarVis} />
-          ) : sel ? <DetalheAula it={sel} podeEditar={podeEditar} visResumo={resumoRegrasAlvo(regrasPorAlvo.get(sel.id), nomeSegVis)} onVis={() => abrirVisAula(sel)} onEditar={() => setEditarItem({ item: sel, criar: false })} onAlterarTipo={() => setAlterarTipo(sel)} onMover={() => setMoverItem(sel)} onDuplicar={() => setDuplicarItem(sel)} onDisp={() => setDispItem(sel)} onExcluir={() => excluirAula(sel)} /> : (
+          {sel ? <DetalheAula it={sel} podeEditar={podeEditar} visResumo={resumoRegrasAlvo(regrasPorAlvo.get(sel.id), nomeSegVis)} onVis={() => abrirVisAula(sel)} onEditar={() => setEditarItem({ item: sel, criar: false })} onAlterarTipo={() => setAlterarTipo(sel)} onMover={() => setMoverItem(sel)} onDuplicar={() => setDuplicarItem(sel)} onExcluir={() => excluirAula(sel)} /> : (
             <div className="space-y-3 text-sm">
               <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground"><FileStack className="h-7 w-7 opacity-40" />Clique numa aula para ver os detalhes.</div>
               <div className="border-t pt-3">
@@ -757,7 +842,8 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
       {moduloDlg && (
         <ModuloDialog produtoId={produtoId} modulo={moduloDlg.modulo} paiId={moduloDlg.paiId}
           modulosCount={moduloDlg.card?.submodulos} aulasCount={moduloDlg.card?.aulasDiretas}
-          onClose={() => setModuloDlg(null)} onPronto={refresh} />
+          onClose={() => setModuloDlg(null)} onPronto={refresh}
+          onSegmentos={moduloDlg.modulo ? (aba) => { const m = moduloDlg.modulo!; setModuloDlg(null); setSel(null); setPainelVis({ alvos: [{ tipo: 'modulo', id: m.id }], titulo: m.titulo, aba }) } : undefined} />
       )}
       {novoConteudo && (
         <NovoConteudoDialog tipoProduto={tipoProduto} modulos={modulos} moduloPadrao={novoConteudo.moduloPadrao} onClose={() => setNovoConteudo(null)}
@@ -772,30 +858,16 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
       {duplicarItem && <DuplicarAulaDialog produtoId={produtoId} item={duplicarItem} modulos={modulos} onClose={() => setDuplicarItem(null)} onPronto={refresh} />}
       {alterarTipo && <AlterarTipoDialog produtoId={produtoId} item={alterarTipo} onClose={() => setAlterarTipo(null)} onPronto={() => { const it = alterarTipo; setAlterarTipo(null); if (it) setEditarItem({ item: it, criar: false }); refresh() }} />}
       {reordenar && <ReordenarModulosDialog produtoId={produtoId} modulos={modulos} onClose={() => setReordenar(false)} onPronto={refresh} />}
-      {dispLote && (
-        <DisponibilidadeDialog valor={{ tipo: 'na_matricula', antes: 'bloqueado_cadeado' }} escopo="aula" onClose={() => setDispLote(false)}
-          onAplicar={(d: Disponibilidade) => { setDispLote(false); aplicarLote({ disponibilidade: d }, 'Definir disponibilidade', `Aplicar “${resumoDisponibilidade(d)}”`, resumoDisponibilidade(d)) }} />
-      )}
-      {dispLoteMod && (
-        <DisponibilidadeDialog valor={{ tipo: 'na_matricula', antes: 'bloqueado_cadeado' }} escopo="aula" onClose={() => setDispLoteMod(false)}
-          onAplicar={(d: Disponibilidade) => { setDispLoteMod(false); aplicarLoteMod({ disponibilidade: d }, 'Definir disponibilidade', `Aplicar “${resumoDisponibilidade(d)}”`, resumoDisponibilidade(d)) }} />
-      )}
+      {reordenarSub && moduloId && <ReordenarModulosDialog produtoId={produtoId} modulos={modulos} paiId={moduloId} onClose={() => setReordenarSub(false)} onPronto={refresh} />}
       {/* Visibilidade dos MÓDULOS marcados (a visão de módulos não tem painel lateral → diálogo) */}
-      {painelVis && !moduloId && (
-        <Dialog open onOpenChange={(o) => { if (!o) setPainelVis(null) }}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
-            <DialogTitle className="sr-only">Visibilidade dos módulos</DialogTitle>
-            <PainelVisibilidade produtoId={produtoId} podeEditar={podeEditar} dados={visDados} alvos={painelVis.alvos} onFechar={() => setPainelVis(null)} onMudou={recarregarVis} />
-          </DialogContent>
-        </Dialog>
+      {painelVis && (
+        <SegmentosDialog key={`${painelVis.aba ?? 'v'}:${painelVis.alvos.map((a) => a.id).join(',')}`} produtoId={produtoId} podeEditar={podeEditar} dados={visDados}
+          alvos={painelVis.alvos} titulo={painelVis.titulo} titulos={titulosAlvos} imagens={imagensAlvos} abaInicial={painelVis.aba} onClose={() => setPainelVis(null)} onMudou={recarregarVis}
+          onAplicarBase={aplicarBase} baseResumo={baseResumoPainel} />
       )}
       {moverLote && (
         <MoverAulasLoteDialog quantidade={marcados.size} modulos={modulos} onClose={() => setMoverLote(false)}
           onConfirmar={(destino) => { setMoverLote(false); aplicarLote({ modulo_id: destino }, 'Mover aulas', `Mover para “${modulos.find((m) => m.id === destino)?.titulo ?? ''}”`, 'movidas') }} />
-      )}
-      {dispItem && (
-        <DisponibilidadeDialog valor={dispItem.disponibilidade} escopo="aula" onClose={() => setDispItem(null)}
-          onAplicar={async (d: Disponibilidade) => { const r = await salvarItemAction(dispItem.id, produtoId, { disponibilidade: d }); if ('error' in r && r.error) toast.error(r.error); else { toast.success('Disponibilidade salva.'); refresh() } setDispItem(null) }} />
       )}
     </div>
   )
@@ -805,9 +877,9 @@ function Carga({ texto }: { texto: string }) {
   return <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed bg-muted/30 p-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{texto}</div>
 }
 
-function DetalheAula({ it, podeEditar, visResumo, onVis, onEditar, onAlterarTipo, onMover, onDuplicar, onDisp, onExcluir }: {
+function DetalheAula({ it, podeEditar, visResumo, onVis, onEditar, onAlterarTipo, onMover, onDuplicar, onExcluir }: {
   it: ItemRow; podeEditar: boolean; visResumo: string | null; onVis: () => void
-  onEditar: () => void; onAlterarTipo: () => void; onMover: () => void; onDuplicar: () => void; onDisp: () => void; onExcluir: () => void
+  onEditar: () => void; onAlterarTipo: () => void; onMover: () => void; onDuplicar: () => void; onExcluir: () => void
 }) {
   const subLabel = SUBTIPO_LABEL[it.subtipo ?? ''] ?? TIPO_REF_LABEL[it.tipo_ref]
   const arquivoTxt = it.tipo_ref === 'documento_biblioteca' ? (it.ref_id ? 'Documento da Biblioteca' : '—') : (it.ref_url || '—')
@@ -846,7 +918,7 @@ function DetalheAula({ it, podeEditar, visResumo, onVis, onEditar, onAlterarTipo
           <L k="Situação" v={it.situacao === 'ativo' ? 'Ativo' : 'Rascunho'} />
           <L k="Acesso" v={it.visibilidade === 'publico' ? 'Público' : 'Privado'} />
           <L k="Disponibilidade" v={resumoDisponibilidade(it.disponibilidade)} />
-          <L k="Visibilidade" v={visResumo ?? 'Todos com acesso'} />
+          <L k="Segmento" v={visResumo ?? 'Todos com acesso'} />
         </dl>
       </div>
 
@@ -867,8 +939,7 @@ function DetalheAula({ it, podeEditar, visResumo, onVis, onEditar, onAlterarTipo
             <Button variant="outline" onClick={onAlterarTipo}><Shuffle className="h-4 w-4" />Alterar tipo</Button>
             <Button variant="outline" onClick={onMover}><FolderInput className="h-4 w-4" />Mover aula</Button>
             <Button variant="outline" onClick={onDuplicar}><Copy className="h-4 w-4" />Duplicar aula</Button>
-            <Button variant="outline" onClick={onDisp}><CalendarClock className="h-4 w-4" />Disponibilidade</Button>
-            <Button variant="outline" className="col-span-2" onClick={onVis}><Users className="h-4 w-4" />Visibilidade por segmento</Button>
+            <Button variant="outline" className="col-span-2" onClick={onVis}><Users className="h-4 w-4" />Segmento e liberação</Button>
             <Button variant="destructive" className="col-span-2" onClick={onExcluir}><Trash2 className="h-4 w-4" />Excluir</Button>
           </div>
         </div>

@@ -14,7 +14,19 @@ import * as L from './motor28'
 import type { AulaAS, Cfg28, Contexto, Detalhe, ItemLP, NotaTema, ParamsResolvido, Plano, Remanejada, DataISO } from './motor28'
 
 export * from './motor28'
-export const VERSAO_MOTOR = '3.1.0' // 3.1 = regraRotina300 15 (revisão obrigatória, teto de PDFulls, faixas 24h30)
+export const VERSAO_MOTOR = '3.2.0' // 3.1 = regraRotina300 15 (revisão obrigatória, teto de PDFulls, faixas 24h30) · 3.2 = regraRotina300 23 (ref. rev. 23)
+/** Primeira versão do motor com a regra da referência rev. 23 (teto 3 até 14h30, reta final, conclusão na mesma semana em ≤3 datas, 2 PDFulls distintos/dia…). */
+export const VERSAO_REGRA23 = '3.2.0'
+const partesVersao = (m: unknown): number[] | null => typeof m === 'string' && /^\d+(\.\d+)*$/.test(m) ? m.split('.').map(Number) : null
+/** cfg.motor >= min (comparação numérica por partes). Sem carimbo válido → false (plano legado mantém a regra vigente dele). */
+export function motorAtingiu(motor: unknown, min: string): boolean {
+  const a = partesVersao(motor), b = partesVersao(min)
+  if (!a || !b) return false
+  for (let k = 0; k < Math.max(a.length, b.length); k++) { const x = a[k] || 0, y = b[k] || 0; if (x !== y) return x > y }
+  return true
+}
+/** A regra da ref. rev. 23 só vale para planos carimbados com cfg.motor >= 3.2.0. */
+export const regra23 = (cfg: object | null | undefined): boolean => motorAtingiu((cfg as { motor?: unknown } | null | undefined)?.motor, VERSAO_REGRA23)
 export const MAX_SEM = 600
 /** semanas especiais aceitas em planos NOVOS; 10/12 só são preservadas quando já existiam (legado). */
 export const REV_OPCOES_NOVAS = [4, 6, 8]
@@ -41,6 +53,8 @@ export interface Contexto30 extends Contexto {
   complementarLegproc?: boolean
   /** plano gravado (S.plano): usado só como data de fallback de resultados de questões. */
   planoAtual?: Plano
+  /** migração automática: mantém cfg.motor (3.x) do plano gravado em vez de promover à versão atual. */
+  manterMotor?: boolean
 }
 
 // ── tipos/ids ───────────────────────────────────────────────────────────────────────────────────────
@@ -120,6 +134,7 @@ export function tetoPDF300(cfg: Cfg28, sem: number): number {
   const inicio = semInicio(cfg.start, sem)
   let horas = 0
   for (let k = 0; k < 7; k++) horas += +(horasEm(cfg, dAdd(inicio, k))[k] || 0)
+  if (regra23(cfg) && horas <= 14.5) return 3 // rev. 23: 10h–14h30 → 3 PDFulls novos por semana
   return horas <= 24.5 ? 4 : horas <= 35 ? 5 : 6
 }
 /** PDFulls que COMEÇAM na semana (1ª parte de cada aula; continuação e reforço/revisão adaptativa não contam). */
@@ -136,27 +151,49 @@ function iniciosPDF300(cfg: Cfg28, plano: Plano, detalhes: Record<string, Detalh
 }
 /** Existe, nesta ou nas 3 semanas seguintes, um dia de leitura com capacidade para a aula inteira? (cache por função de capacidade) */
 const cacheDiaInteiro300 = new WeakMap<object, Map<DataISO, number>>()
-function temDiaInteiro300(cfg: Cfg28, desde: DataISO, minutos: number, capacidade: (d: DataISO) => number): boolean {
+function temDiaInteiro300(cfg: Cfg28, desde: DataISO, minutos: number, capacidade: (d: DataISO) => number, retaFinal = false): boolean {
   let cache = cacheDiaInteiro300.get(capacidade)
   if (!cache) { cache = new Map(); cacheDiaInteiro300.set(capacidade, cache) }
-  const c = cache.get(desde)
+  const nova = regra23(cfg), chave = desde + (retaFinal ? ':final' : '')
+  const c = cache.get(chave)
   if (c !== undefined) return c >= minutos
   const atual = semDe(cfg.start, desde)
   let maior = 0
-  for (let sem = atual; sem <= atual + 3; sem++) {
-    if (L.ehRev(cfg, sem)) continue
+  // rev. 23: qualquer dia de estudo; na reta final só a própria semana (dias depois de `desde`); fora dela, sem pular semana de revisão.
+  for (let sem = atual; sem <= atual + (retaFinal ? 0 : 3); sem++) {
+    if (!retaFinal && L.ehRev(cfg, sem)) continue
     const rotina = rotina300(cfg, sem, desde)
-    const dias = rotina.faixa === 3 ? rotina.ativos : [...rotina.pdf]
-    for (const d of dias) maior = Math.max(maior, capacidade(d))
+    const dias = nova || rotina.faixa === 3 ? rotina.ativos : [...rotina.pdf]
+    for (const d of dias) if (!retaFinal || d > desde) maior = Math.max(maior, capacidade(d))
   }
-  cache.set(desde, maior)
+  cache.set(chave, maior)
   return maior >= minutos
+}
+/** rev. 23: até 2 metas distintas por dia de PDFull/Revisão/Questões (parcelas da mesma leitura contam como uma). `idsDia` = ids já no dia. */
+function cabeTipoNoDia300(idsDia: string[], detalhes: Record<string, Detalhe>, id: string, pai?: string): boolean {
+  const tipo = familiaMeta(id)
+  if (tipo !== 'pf' && tipo !== 'fl' && tipo !== 'qu') return true
+  const chave = (k: string) => tipo === 'pf' ? (detalhes[k]?.pai || (k.startsWith('pp:') ? 'pf:' + indiceAula(k) : k)) : k
+  const metas = new Set<string>()
+  for (const k of idsDia) if (familiaMeta(k) === tipo) metas.add(chave(k))
+  return metas.size < 2 || (tipo === 'pf' && metas.has(pai || chave(id)))
+}
+/** rev. 23: o saldo da leitura cabe hoje + nos melhores dias seguintes da MESMA semana (≤3 datas no total)? */
+function cabeSaldoNaSemana300(total: number, hoje: number, partes: number, dias: DataISO[], livre: (d: DataISO) => number): boolean {
+  if (partes >= 3) return false
+  const minutos = (v: number) => Math.max(0, Math.floor(v / 30) * 30)
+  const seguintes = dias.map((d) => minutos(livre(d))).sort((a, b) => b - a).slice(0, 2 - partes)
+  return minutos(hoje) >= 30 && minutos(hoje) + seguintes.reduce((a, b) => a + b, 0) >= total
+}
+/** rev. 23: reta final — fila de leituras vazia, ou (a partir da semana 2) restam ≤2 tetos (≤4 após a semana 4). */
+function faseFinal300(cfg: Cfg28, sem: number, leiturasRestantes: number): boolean {
+  return leiturasRestantes === 0 || (sem > 1 && leiturasRestantes <= (sem > 4 ? 4 : 2) * tetoPDF300(cfg, sem))
 }
 /** Retorno (fl/qu) pode ser ANTECIPADO na revisão obrigatória: ≥1 semana (fl) / ≥2 semanas (qu) após a leitura. */
 const podeAnteciparRetorno300 = (cfg: Cfg28, leitura: DataISO, data: DataISO, tipo: string): boolean => semDe(cfg.start, data) - semDe(cfg.start, leitura) >= (tipo === 'fl' ? 1 : 2)
 /** Cota de PDFlash do dia na semana de revisão obrigatória (distribui as pendências pelos dias com capacidade). */
-export function cotaPDFlash300(dias: DataISO[], livre: (d: DataISO) => number, pendentes: number): number {
-  const capacidades = dias.map((d) => Math.max(0, Math.floor(livre(d) / 60)))
+export function cotaPDFlash300(dias: DataISO[], livre: (d: DataISO) => number, pendentes: number, duracao = 60): number {
+  const capacidades = dias.map((d) => Math.max(0, Math.floor(livre(d) / duracao)))
   const ativos = capacidades.filter((n) => n > 0).length
   const depois = capacidades.slice(1).reduce((a, b) => a + b, 0)
   return Math.min(capacidades[0] || 0, Math.max(Math.ceil(pendentes / Math.max(1, ativos)), pendentes - depois))
@@ -429,6 +466,10 @@ function semanaRevisao216Base(E: Env, cfg: Cfg28, plano: Plano, sem: number, pro
   const contadores: Record<number, number> = {}
   for (const id of [...Object.keys(plano), ...Object.keys(E.prog)]) if (id.startsWith('pp:')) contadores[indiceAula(id)] = Math.max(contadores[indiceAula(id)] || 0, +id.split(':')[2])
   const colocar = (id: string, d: DataISO, m: number, md: Detalhe) => { out[id] = [d, m / 60]; detalhes[id] = { ...md, semanaRevisao: true, semanaOrigemRevisao: sem, ordemAlternancia: ordem++ }; cursor = d; livre[d] -= m; if (familiaMeta(id) === 'qu') qs[d]++ }
+  // rev. 23: no máx. 2 PDFlashes (e 2 PDFulls / 2 questões) por data na semana especial
+  const R23 = regra23(cfg)
+  const metasNoDia = (d: DataISO) => [...Object.entries(plano), ...Object.entries(out)].filter(([, [data]]) => data === d)
+  const cabeFlash = (d: DataISO) => !R23 || metasNoDia(d).filter(([id]) => familiaMeta(id) === 'fl').length < 2
   type Item = { i: number; resultado: NonNullable<ReturnType<typeof resultadoTema217>>; tipo: string; id: string; min: number }
   const definir = (x: { i: number; resultado: NonNullable<ReturnType<typeof resultadoTema217>> }): Item => {
     const tipo: string = x.resultado?.tipo || 'rq', id = tipo === 'rq' ? 'rq:' + sem + ':' + x.i : tipo + ':' + x.i + ':revisao:' + sem
@@ -437,12 +478,12 @@ function semanaRevisao216Base(E: Env, cfg: Cfg28, plano: Plano, sem: number, pro
   }
   const colocarEstudada = (x: Item): boolean => {
     if (x.tipo !== 'pf') {
-      const d = dias.find((d) => d >= cursor && livre[d] >= x.min && (x.tipo !== 'rq' || !qs[d]))
+      const d = dias.find((d) => d >= cursor && livre[d] >= x.min && (x.tipo !== 'rq' || (R23 ? qs[d] < 2 : !qs[d])) && (x.tipo !== 'fl' || cabeFlash(d)))
       if (!d) return false
       colocar(x.id, d, x.min, { essencialNaoSelecionada: false, material: x.tipo === 'rq' ? 'Questões' : 'PDFlash', reforco: x.tipo !== 'rq', pai: x.id, origem: x.resultado?.origem, percentualOrigem: x.resultado?.pct })
       return true
     }
-    const melhores = dias.filter((d) => d >= cursor && livre[d] >= 30).sort((a, b) => livre[b] - livre[a] || a.localeCompare(b))
+    const melhores = dias.filter((d) => d >= cursor && livre[d] >= 30 && (!R23 || metasNoDia(d).filter(([id]) => ehPdf(tipoEstudo(id))).length < 2)).sort((a, b) => livre[b] - livre[a] || a.localeCompare(b))
     const blocos: DataISO[] = []
     let soma = 0
     for (const d of melhores.slice(0, 3)) { blocos.push(d); soma += Math.floor(livre[d] / 30) * 30; if (soma >= x.min) break }
@@ -465,7 +506,7 @@ function semanaRevisao216Base(E: Env, cfg: Cfg28, plano: Plano, sem: number, pro
     let saldo = [...objetivosAnteriores.values()].reduce((n, externa) => n + (externa ? 1 : -1), 0)
     while (saldo > 0 && fila.length) { if (!colocarEstudada(fila[0])) return { plano: out, detalhes }; fila.shift(); saldo-- }
     while (saldo < 0 && extras.length) {
-      const d = dias.find((d) => d >= cursor && livre[d] >= P.durRevisao.rf)
+      const d = dias.find((d) => d >= cursor && livre[d] >= P.durRevisao.rf && cabeFlash(d))
       if (!d) return { plano: out, detalhes }
       colocar('rf:' + sem + ':' + extras.shift(), d, P.durRevisao.rf, { essencialNaoSelecionada: true, material: 'PDFlash' })
       saldo++
@@ -474,7 +515,7 @@ function semanaRevisao216Base(E: Env, cfg: Cfg28, plano: Plano, sem: number, pro
   if (estudadas.length && externas.length && (!fila.length || !extras.length)) return { plano: out, detalhes }
   if (fila.length && extras.length) {
     while (fila.length && extras.length) {
-      const foto = { ...livre }, qfoto = { ...qs }, oAntes = { ...out }, mdAntes = { ...detalhes }, nAntes = ordem, cAntes = { ...contadores }, cursorAntes = cursor, i = extras[0], d = dias.find((d) => d >= cursor && livre[d] >= P.durRevisao.rf)
+      const foto = { ...livre }, qfoto = { ...qs }, oAntes = { ...out }, mdAntes = { ...detalhes }, nAntes = ordem, cAntes = { ...contadores }, cursorAntes = cursor, i = extras[0], d = dias.find((d) => d >= cursor && livre[d] >= P.durRevisao.rf && cabeFlash(d))
       if (!d) break
       colocar('rf:' + sem + ':' + i, d, P.durRevisao.rf, { essencialNaoSelecionada: true, material: 'PDFlash' })
       if (!colocarEstudada(fila[0])) {
@@ -487,7 +528,7 @@ function semanaRevisao216Base(E: Env, cfg: Cfg28, plano: Plano, sem: number, pro
       extras.shift(); fila.shift()
     }
   } else if (fila.length) { for (const x of fila) if (!colocarEstudada(x)) break }
-  else for (const i of extras) { const d = dias.find((d) => livre[d] >= P.durRevisao.rf); if (!d) break; colocar('rf:' + sem + ':' + i, d, P.durRevisao.rf, { essencialNaoSelecionada: true, material: 'PDFlash' }) }
+  else for (const i of extras) { const d = dias.find((d) => livre[d] >= P.durRevisao.rf && cabeFlash(d)); if (!d) break; colocar('rf:' + sem + ':' + i, d, P.durRevisao.rf, { essencialNaoSelecionada: true, material: 'PDFlash' }) }
   return { plano: out, detalhes }
 }
 
@@ -533,9 +574,17 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
   const A = ancora && ancora > cfg.start ? ancora : cfg.start
   const plano: Plano = {}, detalhes: Record<string, Detalhe> = {}, carga: Record<string, number> = {}, ativas = new Set(cfg.discs)
   const metas = (cfg.metas || {}) as Record<string, boolean | undefined>
-  let rotina!: Rotina300, ultimoTipoRevisao: string | null = null
+  let rotina!: Rotina300, ultimoTipoRevisao: string | null = null, retaFinal = false
+  const R23 = regra23(cfg) // regra da ref. rev. 23 só vale para planos com cfg.motor >= 3.2.0
   const livre = (d: DataISO) => Math.max(0, Math.round(horasDia(cfg, d) * 60) - (carga[d] || 0))
-  const por = (d: DataISO, id: string, m: number, md?: Detalhe | null) => { plano[id] = [d, m / 60]; carga[d] = (carga[d] || 0) + m; if (md) detalhes[id] = md }
+  const idsPorDia = new Map<DataISO, string[]>() // índice dia → ids (equivale a varrer Object.keys(plano))
+  const idsDoDia = (d: DataISO): string[] => idsPorDia.get(d) || []
+  const por = (d: DataISO, id: string, m: number, md?: Detalhe | null) => {
+    const ant = plano[id]
+    if (ant && ant[0] !== d) { const l = idsPorDia.get(ant[0]); if (l) l.splice(l.indexOf(id), 1) }
+    if (!ant || ant[0] !== d) { const l = idsPorDia.get(d); if (l) l.push(id); else idsPorDia.set(d, [id]) }
+    plano[id] = [d, m / 60]; carga[d] = (carga[d] || 0) + m; if (md) detalhes[id] = md
+  }
   const especial = (id: string) => /^r[fq]:/.test(id), feita = (id: string) => feito(E, id)
   for (const [id, v] of Object.entries(fixos)) {
     if (!feita(id) && especial(id)) continue
@@ -561,15 +610,20 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
   const rodizio = criarRodizioLP25(cfg.discs, null, P.lpJanelaRodizio)
   const iniciadas = new Set<string>(Object.keys(fixos).filter((id) => id.startsWith('lp:')).map((id) => chaveLei(metasLP.get(id))))
   let fechou = false, leisFinais: Set<string> = new Set(), qi = 0
-  type CursoT = { i: number; total: number; p: number; resta: number; k: number; ultima: DataISO | null; partes?: number }
+  type CursoT = { i: number; total: number; p: number; resta: number; k: number; ultima: DataISO | null; partes?: number; semana?: number }
   let curso = null as CursoT | null
   let fim = Math.max(1, semDe(cfg.start, A)), semRevPreparada = 0, herancas = 0, semAtual216 = 0
   const candidatos = (t: string) => devidos.filter((x) => x.t === t).sort((a, b) => a.due.localeCompare(b.due) || indiceAula(a.id) - indiceAula(b.id))
   const elegivel = (x: Devido, d: DataISO) => {
+    if (R23) {
+      if (!cabeTipoNoDia300(idsDoDia(d), detalhes, x.id)) return false
+      const semana = semDe(cfg.start, d)
+      if (x.t === 'qu' && !retaFinal && revisaoObrigatoria300(cfg, semana) && !L.ehRev(cfg, semana)) return false
+    }
     // Revisão obrigatória: o retorno pode ser ANTECIPADO (≥1 semana do PDFull p/ revisão, ≥2 p/ questões).
     const leitura = plano['pf:' + indiceAula(x.id)]?.[0]
     const adiantar = !questoesHistorico(x.id) && L.motorRevObrigatoria(cfg) && revisaoObrigatoria300(cfg, semDe(cfg.start, d)) && !!leitura && podeAnteciparRetorno300(cfg, leitura, d, x.t)
-    if (x.due > d && !adiantar) return false
+    if (x.due > d && !adiantar && !(R23 && retaFinal && leitura && leitura <= d && !questoesHistorico(x.id))) return false
     if (x.t === 'qu' && !questoesHistorico(x.id) && metas.fl && !SEM_FLASH.has(AS[indiceAula(x.id)][0])) {
       const fl = 'fl:' + indiceAula(x.id); if (!plano[fl] || plano[fl][0] > d) return false
     }
@@ -579,14 +633,15 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
   const minutosLeitura = (i: number) => minPdf(Math.max(1, (AS[i][3] || 60) - paginasFeitas216(E, i, cfg, fixos)), cfg.vel, P.velPadrao)
   const selecionarPDF = (d: DataISO) => {
     if (curso || qi >= fila.length) return
-    const rodada = rodizioPDF.indicesRodada[fila[qi]], disciplinas = new Set<string>(), cands: Array<{ k: number; minutos: number }> = []
-    for (let k = qi; k < fila.length && rodizioPDF.indicesRodada[fila[k]] === rodada; k++) {
+    const rodada = rodizioPDF.indicesRodada[fila[qi]], disciplinas = new Set<string>(), cands: Array<{ k: number; rodada: number; minutos: number }> = []
+    // rev. 23: testa a rodada atual E a seguinte; prefere a atual e, entre as que cabem inteiras, a maior duração.
+    for (let k = qi; k < fila.length && (R23 ? rodizioPDF.indicesRodada[fila[k]] <= rodada + 1 : rodizioPDF.indicesRodada[fila[k]] === rodada); k++) {
       const i = fila[k], disc = AS[i][0], pai = rodizioPDF.dependencias[i]
       if (disciplinas.has(disc)) continue
       disciplinas.add(disc)
-      if (pai == null || plano['pf:' + pai]?.[0] <= d) cands.push({ k, minutos: minutosLeitura(i) })
+      if (pai == null || plano['pf:' + pai]?.[0] <= d) cands.push({ k, rodada: rodizioPDF.indicesRodada[i], minutos: minutosLeitura(i) })
     }
-    const inteiro = cands.filter((x) => x.minutos <= livre(d)).sort((a, b) => b.minutos - a.minutos)[0]
+    const inteiro = cands.filter((x) => x.minutos <= livre(d)).sort((a, b) => (R23 ? a.rodada - b.rodada : 0) || b.minutos - a.minutos)[0]
     if (inteiro) { const [i] = fila.splice(inteiro.k, 1); fila.splice(qi, 0, i) }
   }
   // capacidade do dia descontada da reserva de Jurisprudência da semana (registrada ou projetada)
@@ -601,26 +656,52 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     const juris = reservasInteiro.get(semana)
     return Math.round(horasDia(cfg, d) * 60) - (juris?.[0] === d ? Math.round(juris[1] * 60) : 0)
   }
-  const ler = (d: DataISO, m: number): boolean => {
+  // rev. 23: sobra ≥60min na reta final / semana de revisão obrigatória pode iniciar um trecho em vez de esperar o dia inteiro
+  const repartirParaAvancar = (d: DataISO, m: number) => R23 && m >= 60 && (retaFinal || revisaoObrigatoria300(cfg, semDe(cfg.start, d)))
+  const ler = (d: DataISO, m: number, encaixeExtra = false): boolean => {
     if (!metas.pf) return false
     const i = curso?.i ?? fila[qi]; if (i == null || m < 30) return false
+    if (R23 && !cabeTipoNoDia300(idsDoDia(d), detalhes, 'pf:' + i)) return false
     const restantesNovos = novosPDFDia27(plano, cfg, d, detalhes)
     const continuacao = paginasFeitas216(E, i, cfg, fixos) > 0 || (!!curso?.ultima && curso.ultima < d)
-    if (!continuacao && !restantesNovos.has(i) && restantesNovos.size >= limitePDF27(E, cfg, d, plano)) return false
+    if (!(R23 && (encaixeExtra || retaFinal)) && !continuacao && !restantesNovos.has(i) && restantesNovos.size >= limitePDF27(E, cfg, d, plano)) return false
     const partes = curso?.partes ?? new Set(Object.keys(fixos).filter((id) => id.startsWith('pp:' + i + ':') && feita(id)).map((id) => fixos[id][0])).size
-    // Parcelamento: no máximo 3 datas — a partir da 3ª só entra o que fecha a leitura.
-    if (partes >= 2 && m < (curso?.resta ?? minutosLeitura(i))) return false
-    // Prefere a leitura inteira: se há dia (nesta ou nas 3 semanas seguintes) que comporta a aula toda, não divide.
-    if (!continuacao && !curso && m < minutosLeitura(i) && temDiaInteiro300(cfg, d, minutosLeitura(i), capacidadeInteiro)) return false
-    // Teto semanal de PDFulls novos (4/5/6 pela faixa de horas); continuações pertencem à aula já iniciada.
+    if (R23) {
+      // Conclusão na mesma semana, em até 3 datas: o saldo precisa caber hoje + nos melhores dias restantes da semana.
+      const restantePDF = curso?.resta ?? minutosLeitura(i)
+      if (m < restantePDF && !cabeSaldoNaSemana300(restantePDF, m, partes, rotina.ativos.filter((data) => data > d && cabeTipoNoDia300(idsDoDia(data), detalhes, 'pf:' + i)), livre)) return false
+      // Prefere a leitura inteira (salvo sobra ≥60min na reta final / revisão obrigatória).
+      if (!continuacao && !curso && m < minutosLeitura(i) && !repartirParaAvancar(d, m) && temDiaInteiro300(cfg, d, minutosLeitura(i), capacidadeInteiro, retaFinal)) return false
+    } else {
+      // Parcelamento: no máximo 3 datas — a partir da 3ª só entra o que fecha a leitura.
+      if (partes >= 2 && m < (curso?.resta ?? minutosLeitura(i))) return false
+      // Prefere a leitura inteira: se há dia (nesta ou nas 3 semanas seguintes) que comporta a aula toda, não divide.
+      if (!continuacao && !curso && m < minutosLeitura(i) && temDiaInteiro300(cfg, d, minutosLeitura(i), capacidadeInteiro)) return false
+    }
+    // Teto semanal de PDFulls novos (3/4/5/6 pela faixa de horas); continuações pertencem à aula já iniciada.
     const semanaLeitura = semDe(cfg.start, d)
-    if (!curso && !continuacao && iniciosPDF300(cfg, plano, detalhes, semanaLeitura) >= tetoPDF300(cfg, semanaLeitura)) return false
+    if (!retaFinal && !(R23 && encaixeExtra && semanaLeitura > 4) && !curso && !continuacao && iniciosPDF300(cfg, plano, detalhes, semanaLeitura) >= tetoPDF300(cfg, semanaLeitura)) return false
     // Antes do ciclo de revisão obrigatória: não abrir PDFull novo se o custo (PDFlash+questões) estoura a capacidade da semana de revisão.
     const ciclo = cicloRevisao300(cfg, d)
-    if (!curso && ciclo && L.motorRevObrigatoria(cfg)) {
+    if (!retaFinal && !curso && ciclo && L.motorRevObrigatoria(cfg)) {
       const custo = (metas.fl && !SEM_FLASH.has(AS[i][0]) ? DUR.fl : 0) + (metas.qu ? DUR.qu : 0)
-      const comprometidos = devidos.filter((x) => x.due <= semInicio(cfg.start, ciclo)).reduce((t, x) => t + x.minutos, 0)
+      const inicioCiclo = semInicio(cfg.start, ciclo)
+      const comprometidos = devidos.filter((x) => x.due <= inicioCiclo).reduce((t, x) => t + x.minutos, 0)
       const capacidade = capacidadeRevisao300(cfg, ciclo)
+      if (R23) {
+        // até 24h30 a capacidade de retornos também é medida em VAGAS DIÁRIAS de questões (2 por dia ativo da semana de revisão)
+        const vagasQuestoes = rotina300(cfg, ciclo).ativos.length * 2
+        const questoesPendentes = devidos.filter((x) => x.t === 'qu' && x.due <= inicioCiclo).length
+        if (metas.qu && vagasQuestoes > 0 && questoesPendentes >= vagasQuestoes) return false
+        if (encaixeExtra && iniciosPDF300(cfg, plano, detalhes, semanaLeitura) >= tetoPDF300(cfg, semanaLeitura)) {
+          // PDFull extra acima do teto: preserva parte da capacidade de retornos para as semanas comuns restantes do ciclo
+          const futuras = Math.max(0, ciclo - semanaLeitura - 1)
+          const margem = metas.qu ? Math.max(0, vagasQuestoes - questoesPendentes - 1) : Infinity
+          const reservaPorSemana = Math.min(tetoPDF300(cfg, semanaLeitura), metas.qu ? Math.floor(vagasQuestoes / 3) : tetoPDF300(cfg, semanaLeitura))
+          const reserva = futuras * reservaPorSemana
+          if (margem < reserva || comprometidos + custo + reserva * custo > capacidade) return false
+        }
+      }
       if (custo > 0 && capacidade >= custo && comprometidos + custo > capacidade) return false
     }
     if (!curso) {
@@ -633,7 +714,7 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     const final = m === cs.resta, id = final ? 'pf:' + i : 'pp:' + i + ':' + (++cs.k)
     const lidas = final ? cs.total - cs.p : Math.max(1, Math.min(cs.total - cs.p - 1, Math.floor((cs.total - cs.p) * m / cs.resta)))
     por(d, id, m, { paginaInicio: cs.p + 1, paginaFim: cs.p + lidas, totalPaginas: cs.total, continuacao: !!continuacao, pai: 'pf:' + i })
-    cs.p += lidas; cs.resta -= m; cs.ultima = d; cs.partes = partes + 1
+    cs.p += lidas; cs.resta -= m; cs.ultima = d; cs.partes = partes + 1; cs.semana = semDe(cfg.start, d)
     if (final) { registrar(i, d); curso = null }
     return true
   }
@@ -662,6 +743,11 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
   for (let k = 0, d = A; k < horizonte; k++, d = dAdd(d, 1)) {
     diaAtual = d
     const sem = semDe(cfg.start, d)
+    if (R23) {
+      // rev. 23: um PDFull só começa se couber na semana (≤3 datas); se ficou aberto ao virar a semana, a geração falha (nada é gravado).
+      if (curso?.semana != null && curso.semana !== sem) throw Error('Não foi possível concluir o PDFull na semana em que ele começou.')
+      retaFinal = retaFinal || faseFinal300(cfg, sem, fila.length - qi + (curso ? 1 : 0))
+    }
     if (sem !== semAtual216) { semAtual216 = sem; rotina = rotina300(cfg, sem, A); histPorSem[sem] = Object.keys(plano).filter((id) => questoesHistorico(id) && semDe(cfg.start, plano[id][0]) === sem).length }
     if (!temAcademico() && !fechou) fechar()
     if (fechou && !lp.some((x) => leisFinais.has(chaveLei(x)))) break
@@ -670,6 +756,7 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
       if (reservaJ) por(reservaJ.valor[0], reservaJ.id, Math.round(reservaJ.valor[1] * 60), { jurisprudencia: true })
     }
     if (!livre(d)) continue
+    if (R23 && curso) ler(d, livre(d)) // continuação da leitura aberta tem prioridade nos próximos dias disponíveis
     const rev = L.ehRev(cfg, sem)
     if (rev && !fechou) {
       if (semRevPreparada !== sem) {
@@ -681,7 +768,7 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     } else if (!fechou && hist.tem() && (histPorSem[sem] || 0) < metaSemanalHistorico(cfg, sem)) {
       const i = hist.proxima(); adicionar('qu:' + i + ':hist:' + sem, d, 'qu', DUR.qu); hist.avancar(); histPorSem[sem]++
     }
-    if (rotina.faixa < 3 && !rev) {
+    if (!retaFinal && rotina.faixa < 3 && !rev) {
       const eDiaPDF = rotina.pdf.has(d)
       const eDiaRevisao = rotina.revisao.has(d)
       const aquecimento = sem <= (metas.qu ? 2 : metas.fl ? 1 : 0)
@@ -700,12 +787,13 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
         }
       }
       const temLeitura = !fechou && metas.pf && (curso || qi < fila.length)
-      if (temLeitura && (eDiaPDF || (aquecimento && eDiaRevisao && !questoes().length && !revisoes().length))) {
+      if (temLeitura && (R23 || eDiaPDF || (aquecimento && eDiaRevisao && !questoes().length && !revisoes().length))) {
         selecionarPDF(d)
         const i = (curso as any)?.i ?? fila[qi]
         const restante = (curso as any)?.resta ?? minPdf(Math.max(1, (AS[i][3] || 60) - paginasFeitas216(E, i, cfg, fixos)), cfg.vel, P.velPadrao)
-        const outroDiaCompleto = !curso && [...rotina.pdf].some((data) => data > d && livre(data) >= restante)
-        if (!outroDiaCompleto || livre(d) >= restante) ler(d, livre(d))
+        // rev. 23: qualquer dia de estudo recebe PDFull; "outro dia completo" considera todos os dias ativos da semana
+        const outroDiaCompleto = !curso && (R23 ? rotina.ativos : [...rotina.pdf]).some((data) => data > d && livre(data) >= restante)
+        if (!outroDiaCompleto || livre(d) >= restante || repartirParaAvancar(d, livre(d))) ler(d, livre(d))
       }
       if (!temAcademico() && !fechou) fechar()
       distribuirRevisao()
@@ -713,24 +801,34 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
         const qu = questoes()[0]
         if (qu) { alocar(qu, d); ultimoTipoRevisao = 'qu' }
       }
+      if (R23 && !fechou && metas.pf && !curso && qi < fila.length && livre(d) >= 30) {
+        // PDFull adicional na sobra (antes do LegProc); após a semana 4 pode ultrapassar o teto semanal inicial
+        selecionarPDF(d)
+        if (minutosLeitura(fila[qi]) <= livre(d) || (sem > 4 && repartirParaAvancar(d, livre(d)))) ler(d, livre(d), true)
+      }
       blocoLP(d)
       blocoLP(d, true)
       if (carga[d]) fim = Math.max(fim, sem)
       continue
     }
     // Semana de revisão OBRIGATÓRIA (rotina ≤24h30): só PDFlashes (com cota diária) e questões pendentes; LegProc na sobra.
-    if (rev && revisaoObrigatoria300(cfg, sem)) {
+    if (!retaFinal && rev && revisaoObrigatoria300(cfg, sem)) {
       const diasRestantes = rotina.ativos.filter((data) => data >= d)
       const pendentes = candidatos('fl').filter((x) => elegivel(x, d)).length
       const cota = cotaPDFlash300(diasRestantes, livre, pendentes)
-      let revisoesHoje = 0
+      let revisoesHoje = 0, questoesHoje = 0
+      // rev. 23: cota diária também para questões (distribuídas pelos dias) e alternância PDFlash ↔ questões
+      const fimSemana = rotina.ativos[rotina.ativos.length - 1]
+      const cotaQuestoes = R23 ? cotaPDFlash300(diasRestantes, (data) => livre(data) - (data === d ? 60 * cota : 0), candidatos('qu').filter((x) => x.due <= fimSemana).length, 30) : Infinity
+      let anterior: string | null = ultimoTipoRevisao
       while (livre(d) >= 30) {
         const fl = revisoesHoje < cota && candidatos('fl').find((x) => elegivel(x, d) && x.minutos <= livre(d))
-        const qu = candidatos('qu').find((x) => elegivel(x, d) && x.minutos <= livre(d))
-        const proxima = fl || qu
+        const qu = (!R23 || questoesHoje < cotaQuestoes) && candidatos('qu').find((x) => elegivel(x, d) && x.minutos <= livre(d))
+        const proxima: Devido | false | undefined = R23 && anterior === 'fl' ? qu || fl : fl || qu
         if (!proxima) break
         alocar(proxima, d)
-        if (proxima.t === 'fl') revisoesHoje++
+        if (proxima.t === 'fl') revisoesHoje++; else questoesHoje++
+        if (R23) anterior = ultimoTipoRevisao = proxima.t
       }
       blocoLP(d)
       blocoLP(d, true)
@@ -747,15 +845,28 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
       const retornos = devidos.filter((x) => x.due <= fimSemana)
       const questoesRet = retornos.filter((x) => x.t === 'qu').length
       const sobraHoje = livre(d) - restante
+      const qpd = R23 && tetoPDF300(cfg, sem) === 5 ? 2 : 1 // rev. 23: faixa 25h–35h comporta 2 questões por dia
+      const vagasQuestoes = R23
+        ? depois.reduce((n, data) => n + Math.min(qpd, Math.floor(livre(data) / 30)), 0) + Math.min(qpd, Math.floor(sobraHoje / 30))
+        : depois.filter((data) => livre(data) >= 30).length + (sobraHoje >= 30 ? 1 : 0)
       if (sobraHoje >= 0 && retornos.reduce((t, x) => t + x.minutos, 0) <= sobraHoje + depois.reduce((t, data) => t + livre(data), 0) &&
-          questoesRet <= depois.filter((data) => livre(data) >= 30).length + (sobraHoje >= 30 ? 1 : 0)) ler(d, restante)
+          questoesRet <= vagasQuestoes) ler(d, restante)
     }
-    const idsQu = Object.keys(plano).filter((id) => familiaMeta(id) === 'qu' && plano[id][0] === d), limQu = 1 + herancas
+    const idsQu = Object.keys(plano).filter((id) => familiaMeta(id) === 'qu' && plano[id][0] === d)
+    // rev. 23: faixa 25h–35h equilibra retornos (≤2 revisões e ≤2 questões por dia, pela cota dos dias restantes); reta final libera questões
+    const equilibrar = R23 && tetoPDF300(cfg, sem) === 5
+    const diasParaRetorno = rotina.ativos.filter((data) => data >= d)
+    const ultData = diasParaRetorno[diasParaRetorno.length - 1]
+    const limiteRetorno = (tipo: string, duracao: number) => Math.min(2, Math.max(1, cotaPDFlash300(diasParaRetorno, livre, candidatos(tipo).filter((x) => x.due <= ultData).length, duracao)))
+    const limQu = equilibrar ? limiteRetorno('qu', 30) : retaFinal ? Infinity : 1 + herancas
+    const limFl = equilibrar ? limiteRetorno('fl', 60) : Infinity
+    let revisoesDia = idsDoDia(d).filter((id) => familiaMeta(id) === 'fl').length
     // O primeiro PDFull tem precedência; protege os compromissos vencidos quando há tempo para ambos.
-    for (const x of candidatos('fl')) if (elegivel(x, d) && livre(d) >= x.minutos) alocar(x, d)
+    for (const x of candidatos('fl')) if (revisoesDia < limFl && elegivel(x, d) && livre(d) >= x.minutos) { alocar(x, d); revisoesDia++ }
     let feitasQu = idsQu.length, usouHeranca = 0
     for (const x of candidatos('qu')) if (elegivel(x, d) && feitasQu < limQu && livre(d) >= x.minutos) { alocar(x, d); feitasQu++; if (feitasQu > 1) usouHeranca++ }
-    if (!fechou && !rev && metas.pf && (curso || qi < fila.length)) {
+    const temRetornoPendente = !retaFinal && equilibrar && devidos.some((x) => elegivel(x, d))
+    if (!fechou && !rev && metas.pf && (curso || (!temRetornoPendente && qi < fila.length))) {
       selecionarPDF(d)
       const restante = (curso as any)?.resta ?? minutosLeitura(fila[qi])
       const inteiroDepois = !curso && rotina.ativos.some((data) => data > d && livre(data) >= restante && (livre(d) < 60 || rotina.fimDeSemana.has(data)))
@@ -765,9 +876,26 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     // Só cria herança se havia uma meta elegível e a capacidade realmente impediu o encaixe diário.
     if (feitasQu === 0 && candidatos('qu').some((x) => elegivel(x, d)) && livre(d) < 30) herancas++
     if (!temAcademico() && !fechou) fechar()
-    if (!fechou && !rev && rotina.faixa === 3 && livre(d) >= 30) {
+    if (!fechou && !rev && (rotina.faixa === 3 || retaFinal) && !temRetornoPendente && livre(d) >= 30) {
       const i = (curso as any)?.i ?? fila[qi], restante = i == null ? Infinity : ((curso as any)?.resta ?? minutosLeitura(i))
       if (restante <= livre(d)) ler(d, livre(d))
+    }
+    if (retaFinal) {
+      // rev. 23 — reta final: usa todos os dias; PDFlash/questões entram no mesmo dia da leitura e PDFulls restantes ocupam a sobra
+      while (livre(d) >= 30) {
+        const fl = revisoesDia < limFl && candidatos('fl').find((x) => elegivel(x, d) && x.minutos <= livre(d))
+        const qu = feitasQu < limQu && candidatos('qu').find((x) => elegivel(x, d) && x.minutos <= livre(d))
+        if (fl) { alocar(fl, d); revisoesDia++; continue }
+        if (qu) { alocar(qu, d); feitasQu++; continue }
+        if (!metas.pf || (!curso && qi >= fila.length)) break
+        selecionarPDF(d)
+        if (!ler(d, livre(d))) break
+      }
+    }
+    if (R23 && !retaFinal && !rev && sem > 4 && metas.pf && !curso && qi < fila.length && livre(d) >= 30) {
+      // após a semana 4: PDFull inteiro na sobra pode ultrapassar o teto semanal inicial (se houver capacidade p/ os retornos do ciclo)
+      selecionarPDF(d)
+      if (minutosLeitura(fila[qi]) <= livre(d)) ler(d, livre(d), true)
     }
     blocoLP(d, false)
     blocoLP(d, true)
@@ -870,7 +998,9 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     if (ultima && disciplinaMeta(ultima) === disc && ids.filter((id) => disciplinaMeta(id) === disc).length === 1 && leiMeta(ultima) === leiMeta(x.id)) return -1
     return ordemRodizio25().indexOf(disc as string)
   }
-  let inicioMovida: DataISO | null = null, semanaRotina = 0, rotina!: Rotina300, ultimoTipoRevisao: string | null = null, cotaFlash = Infinity, flashHoje = 0
+  let inicioMovida: DataISO | null = null, semanaRotina = 0, rotina!: Rotina300, ultimoTipoRevisao: string | null = null, cotaFlash = Infinity, flashHoje = 0, retaFinal = false
+  const R23 = regra23(cfg) // regra da ref. rev. 23 só vale para planos com cfg.motor >= 3.2.0
+  const semanasIniciadas = new Map<string, number>() // pai da leitura → semana em que começou (rev. 23: não pode atravessar semanas)
   const temPDF = (d: DataISO) => fila.some((x) => ehPdf(x.t) && !metaRevisao217(x.id, detalhes) && x.data <= d)
   const novosDia = memoDia((d: DataISO) => novosPDFDia27(plano, cfg, d, detalhes).size)
   const limiteDia = memoDia((d: DataISO) => limitePDF27(E, cfg, d, plano))
@@ -881,6 +1011,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     if (ehPdf(x.t) && ((x.data > d) || (pdfsDia(d).size > 0 && !pdfsDia(d).has(indiceAula(x.id))))) return 4
     if (x.t === 'lp') return 6 // LegProc: ÚLTIMA prioridade em todas as faixas
     if (rotina.faixa < 3 && !L.ehRev(cfg, semanaRotina)) {
+      if (R23 && ehPdf(x.t) && !rotina.pdf.has(d)) return 4
       if (rotina.revisao.has(d) && ['fl', 'qu'].includes(x.t)) return x.t === ultimoTipoRevisao ? 2 : 1
       if (x.t === 'qu' && rotina.pdf.has(d)) return 4
     }
@@ -893,25 +1024,44 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
   }
   const liberar = (x: FilaD, d: DataISO): boolean => {
     const semana = semDe(cfg.start, d), esp = metaRevisao217(x.id, detalhes)
+    if (R23) {
+      // até 2 PDFulls distintos / 2 revisões / 2 questões por dia
+      if (!cabeTipoNoDia300(idsDoDia(d), detalhes, x.id, x.detalhe.pai)) return false
+      if (ehPdf(x.t)) {
+        const pai = x.detalhe.pai || x.id
+        // a leitura não atravessa semanas e só começa se o saldo couber (≤3 datas) hoje + nos melhores dias restantes da semana
+        if (semanasIniciadas.has(pai) && semanasIniciadas.get(pai) !== semana) return false
+        const partes = new Set((pdfPorAula.get(indiceAula(x.id)) || []).filter((id) => (detalhes[id]?.pai || id) === pai).map((id) => plano[id][0]))
+        partes.delete(d)
+        const saldo = capacidade(d) - ocupado(d)
+        const total = x.minutos + fila.filter((y) => y !== x && ehPdf(y.t) && (y.detalhe.pai || y.id) === pai).reduce((n, y) => n + y.minutos, 0)
+        if (!cabeSaldoNaSemana300(total, saldo, partes.size, rotina.ativos.filter((data) => data > d), (data) => capacidade(data) - ocupado(data))) return false
+      }
+    }
     if (esp && !L.ehRev(cfg, semana)) return false
+    if (R23) {
+      if (!retaFinal && (x.t === 'qu' || x.t === 'rq') && revisaoObrigatoria300(cfg, semana) && !L.ehRev(cfg, semana)) return false
+      if (tetoPDF300(cfg, semana) === 5 && (x.t === 'fl' || x.t === 'rf') && idsDoDia(d).filter((k) => familiaMeta(k) === 'fl').length >= 2) return false
+    }
     if (x.t === 'fl' && !esp && flashHoje >= cotaFlash && opcoes.movida?.id !== x.id) return false // cota diária de PDFlash (revisão obrigatória)
     if (x.t === 'rf' && !(disciplinaMeta(x.id) != null && cfg.discs.includes(disciplinaMeta(x.id) as string)) && revisaoObrigatoria300(cfg, semana)) return false
     if (esp && opcoes.movida?.id !== x.id && Number.isFinite(x.detalhe.ordemAlternancia)) {
       const origem = x.detalhe.semanaOrigemRevisao || semDe(cfg.start, x.data)
       if (fila.some((y) => y !== x && metaRevisao217(y.id, detalhes) && (y.detalhe.semanaOrigemRevisao || semDe(cfg.start, y.data)) === origem && (y.detalhe.ordemAlternancia as number) < (x.detalhe.ordemAlternancia as number))) return false
     }
-    if (rotina.faixa < 3 && !L.ehRev(cfg, semana) && !(opcoes.movida?.id === x.id && opcoes.movida.dia === d)) {
+    if (!retaFinal && rotina.faixa < 3 && !L.ehRev(cfg, semana) && !(opcoes.movida?.id === x.id && opcoes.movida.dia === d)) {
       const aquecimento = semana <= (cfg.metas.qu ? 2 : cfg.metas.fl ? 1 : 0)
       const diaPDF = rotina.pdf.has(d), diaRevisao = rotina.revisao.has(d)
-      if (ehPdf(x.t) && !diaPDF && !x.detalhe.continuacao && !(aquecimento && diaRevisao)) return false
+      if (!R23 && ehPdf(x.t) && !diaPDF && !x.detalhe.continuacao && !(aquecimento && diaRevisao)) return false // rev. 23: qualquer dia de estudo recebe PDFull
       if (x.t === 'fl' && !diaRevisao) return false
       if (x.t === 'qu' && !diaRevisao && !(rotina.faixa === 2 && diaPDF)) return false
       if (x.t === 'lp' && !diaPDF && !aquecimento && temPDF(d)) return false
     }
-    if (ehPdf(x.t) && L.ehRev(cfg, semana) && !esp && !x.detalhe.continuacao) return false
+    if (!retaFinal && ehPdf(x.t) && L.ehRev(cfg, semana) && !esp && !x.detalhe.continuacao) return false
     // Leitura inteira: não divide se (nesta ou nas 3 semanas seguintes) há dia de leitura com capacidade para a aula toda.
     if (ehPdf(x.t) && !esp && !L.ehRev(cfg, semana) && !x.detalhe.continuacao && !cont(x.id, d) && x.id !== opcoes.movida?.id &&
-        x.minutos > capacidade(d) - ocupado(d) && temDiaInteiro300(cfg, d, x.minutos, capacidade)) return false
+        x.minutos > capacidade(d) - ocupado(d) && !(R23 && (retaFinal || revisaoObrigatoria300(cfg, semana)) && capacidade(d) - ocupado(d) >= 60) &&
+        temDiaInteiro300(cfg, d, x.minutos, capacidade, retaFinal)) return false
     if (ehPdf(x.t) && !cont(x.id, d) && pdfsDia(d).size > 0 && !pdfsDia(d).has(indiceAula(x.id)) && opcoes.movida?.id !== x.id && x.minutos > capacidade(d) - ocupado(d)) return false
     if (x.t === 'qu' || x.t === 'rq') {
       const nQu = idsDoDia(d).filter((k) => familiaMeta(k) === 'qu').length
@@ -920,12 +1070,15 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     const adiantar = d === desde && ((opcoes.adiantarLP && x.t === 'lp') || (opcoes.adiantarPDF && ehPdf(x.t)))
     // LegProc regular (sem continuação/remanejo/movida) pode ser ANTECIPADO para a sobra de um dia anterior.
     const legprocDeSobra = x.t === 'lp' && !x.detalhe.continuacao && !cfg.remanejadas?.[x.id] && (!opcoes.movida || opcoes.movida.id !== x.id)
-    if (x.data > d && !adiantar && !legprocDeSobra) return false
+    // rev. 23 — reta final: PDFull/PDFlash/questões regulares podem ser ANTECIPADOS para a sobra (exceto remanejados e a meta movida)
+    const anteciparFinal = retaFinal && !cfg.remanejadas?.[x.id] && opcoes.movida?.id !== x.id && !esp &&
+      (ehPdf(x.t) || ((x.t === 'fl' || x.t === 'qu') && !questoesHistorico(x.id) && !reforcoHistorico(x.id)))
+    if (x.data > d && !adiantar && !legprocDeSobra && !anteciparFinal) return false
     const i = indiceAula(x.id)
     if (ehPdf(x.t)) {
       const resto = x.detalhe.continuacao || (cfg.paginasLidas?.[i] || 0) > 0 || (cfg.partesLidas?.[i] || 0) > 0 || (pdfPorAula.get(i) || []).some((id) => plano[id][0] < d)
-      if (!resto && !esp && !reforcoHistorico(x.id) && iniciosPDF300(cfg, plano, detalhes, semana) >= tetoPDF300(cfg, semana)) return false
-      if (!resto && !pdfsDia(d).has(i) && novosDia(d) >= limiteDia(d)) return false
+      if (!retaFinal && !resto && !esp && !reforcoHistorico(x.id) && iniciosPDF300(cfg, plano, detalhes, semana) >= tetoPDF300(cfg, semana)) return false
+      if (!retaFinal && !resto && !pdfsDia(d).has(i) && novosDia(d) >= limiteDia(d)) return false
       const antes = fila.some((y) => y !== x && ehPdf(y.t) && ((!x.detalhe.continuacao && !x.detalhe.reforco && disciplinaMeta(y.id) === disciplinaMeta(x.id) && (ordem.get(indiceAula(y.id)) ?? 1e9) < (ordem.get(i) ?? 1e9)) || (indiceAula(y.id) === i && (y.data < x.data || (y.data === x.data && y.seq < x.seq)))))
       if (antes) return false
       if (!x.detalhe.reforco) {
@@ -937,7 +1090,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     if (x.t === 'fl' || x.t === 'qu') {
       const pai = 'pf:' + i
       if (fila.some((y) => y.id === pai)) return false
-      if (plano[pai]) { const ideal = revisaoObrigatoria300(cfg, semana) && podeAnteciparRetorno300(cfg, plano[pai][0], d, x.t) ? d : L.proxSemConteudo(cfg, plano[pai][0], x.t === 'fl' ? P.offsetRevisao : P.offsetQuestoes); if (d < ideal) return false }
+      if (plano[pai]) { const ideal = retaFinal ? plano[pai][0] : revisaoObrigatoria300(cfg, semana) && podeAnteciparRetorno300(cfg, plano[pai][0], d, x.t) ? d : L.proxSemConteudo(cfg, plano[pai][0], x.t === 'fl' ? P.offsetRevisao : P.offsetQuestoes); if (d < ideal) return false }
       if (x.t === 'qu' && fila.some((y) => y.id === 'fl:' + i)) return false
       if (x.t === 'qu' && plano['fl:' + i] && d < plano['fl:' + i][0]) return false
     }
@@ -960,9 +1113,14 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     const sem = semDe(cfg.start, d)
     if (sem !== semanaRotina) { semanaRotina = sem; rotina = rotina300(opcoes.rotinaOriginal || cfg, sem, desde) }
     let livre = capacidade(d) - ocupado(d); const revObrig = L.ehRev(cfg, sem) && revisaoObrigatoria300(cfg, sem)
-    limiteQuestoes216 = revObrig ? Infinity : 1 + (rotina.faixa === 3 || L.ehRev(cfg, sem) ? quAdiados.size : 0); if (livre <= 0) continue
+    limiteQuestoes216 = revObrig ? Infinity : R23 && tetoPDF300(cfg, sem) === 5 ? 2 : 1 + (rotina.faixa === 3 || L.ehRev(cfg, sem) ? quAdiados.size : 0); if (livre <= 0) continue
+    if (R23) {
+      // reta final do reagendamento: restam ≤2 (≤4 após a semana 4) tetos de PDFull nas leituras pendentes
+      const restantes = new Set(fila.filter((x) => ehPdf(x.t) && !metaRevisao217(x.id, detalhes) && !reforcoHistorico(x.id)).map((x) => indiceAula(x.id)))
+      retaFinal = retaFinal || faseFinal300(cfg, sem, restantes.size)
+    }
     flashHoje = 0
-    cotaFlash = revObrig ? cotaPDFlash300(rotina.ativos.filter((data) => data >= d), (data) => capacidade(data) - ocupado(data), fila.filter((x) => x.t === 'fl' && !metaRevisao217(x.id, detalhes) && semDe(cfg.start, x.data) <= sem).length) : Infinity
+    cotaFlash = !retaFinal && revObrig ? cotaPDFlash300(rotina.ativos.filter((data) => data >= d), (data) => capacidade(data) - ocupado(data), fila.filter((x) => x.t === 'fl' && !metaRevisao217(x.id, detalhes) && semDe(cfg.start, x.data) <= sem).length) : Infinity
     while (livre > 0) {
       const disponiveis = fila.filter((x) => liberar(x, d) && (ehPdf(x.t) || x.minutos <= livre)).sort((a, b) => prioridade(a, d) - prioridade(b, d) || (ehPdf(a.t) && ehPdf(b.t) && !a.detalhe.continuacao && !b.detalhe.continuacao && !a.detalhe.reforco && !b.detalhe.reforco ? (ordem.get(indiceAula(a.id)) ?? 1e9) - (ordem.get(indiceAula(b.id)) ?? 1e9) : 0) || (a.t === 'lp' && b.t === 'lp' ? rankRodizio25(a, d) - rankRodizio25(b, d) : 0) || a.data.localeCompare(b.data) || a.seq - b.seq)
       const x = disponiveis[0]; if (!x) break
@@ -972,7 +1130,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
         const outros = fila.filter((y) => y !== x && liberar(y, d) && ['fl', 'rf', 'qu', 'rq'].includes(y.t))
         const rv = outros.find((y) => y.t === 'fl' || y.t === 'rf'), qu = outros.find((y) => y.t === 'qu' || y.t === 'rq')
         let reserva = (rv?.minutos || 0) + (qu?.minutos || 0)
-        if (!metaRevisao217(x.id, detalhes)) reserva = 0
+        if (R23 || !metaRevisao217(x.id, detalhes)) reserva = 0
         if (livre - reserva >= 30) m = Math.min(m, Math.floor((livre - reserva) / 30) * 30)
         else m = Math.min(m, Math.floor(livre / 30) * 30)
         const pai = x.detalhe.pai || x.id
@@ -990,11 +1148,12 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
         const pags = Math.max(0, (md.paginaFim || 0) - (md.paginaInicio || 1) + 1), lidas = Math.floor(pags * m / x.minutos)
         md.paginaFim = (md.paginaInicio || 1) + lidas - 1
         colocar(id, [d, m / 60]); detalhes[id] = md
-        x.detalhe = { ...x.detalhe, paginaInicio: md.paginaFim + 1 }
+        x.detalhe = { ...x.detalhe, paginaInicio: md.paginaFim + 1, ...(R23 ? { continuacao: true } : {}) }
         x.minutos -= m; x.data = dAdd(d, 1); x.detalhe.deslocada = true
       } else {
         colocar(x.id, [d, m / 60]); detalhes[x.id] = { ...x.detalhe, deslocada: d !== x.data || x.detalhe.deslocada }; fila.splice(fila.indexOf(x), 1)
       }
+      if (R23 && ehPdf(x.t)) semanasIniciadas.set(x.detalhe.pai || x.id, sem)
       livre -= m; fim = Math.max(fim, semDe(cfg.start, d))
     }
     if (capacidade(d) > 0 && !idsDoDia(d).some((id) => familiaMeta(id) === 'qu') && capacidade(d) - ocupado(d) < 30) { const q = fila.find((x) => (x.t === 'qu' || x.t === 'rq') && liberar(x, d)); if (q) quAdiados.add(q.id) }
@@ -1042,7 +1201,9 @@ export function gerarPlano(cfg0: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano
   const E = criarEnv(AS, LP, ctx, P)
   const baseData = ancora && ancora > cfg0.start ? ancora : cfg0.start
   const cfg: Cfg28 & Record<string, any> = copiar(cfg0)
-  cfg.motor = VERSAO_MOTOR // plano gerado agora segue a regra 3.x (revisão obrigatória, teto de PDFulls…) mesmo se o cfg veio sem carimbo
+  // Plano gerado/recalculado agora segue a regra vigente (VERSAO_MOTOR). Exceção: migração automática do servidor
+  // (ctx.manterMotor) preserva o carimbo 3.x do plano gravado — planos antigos mantêm a regra deles até o aluno recalcular.
+  cfg.motor = ctx.manterMotor && typeof cfg0.motor === 'string' && /^3\./.test(cfg0.motor) ? cfg0.motor : VERSAO_MOTOR
   aplicarBloqueioCfg(E, cfg); fixos = semBloqueadas(E, fixos)
   cfg.revisao ||= { ativa: true, cada: REV_PADRAO }
   cfg.revisao.ativa = true // semana de revisão é OBRIGATÓRIA em todas as faixas (o "Não" foi removido)
@@ -1077,7 +1238,9 @@ export function calcularDomino(fonte: Plano, cfg0: Cfg28, desde: DataISO, opcoes
   const P = L.resolverParams({ ...(ctx.params || {}), maxSemanas: MAX_SEM })
   const E = criarEnv(AS, LP, ctx, P)
   const cfg: Cfg28 & Record<string, any> = copiar(cfg0)
-  cfg.motor = VERSAO_MOTOR
+  // O reagendamento (dominó) segue a regra do CARIMBO do plano: plano 3.1.x mantém a regra 3.1; só 3.2+ usa a ref. rev. 23.
+  // Sem carimbo 3.x (cfg legado/sem motor) → regra 3.1 (comportamento anterior à rev. 23).
+  cfg.motor = typeof cfg0.motor === 'string' && /^3\./.test(cfg0.motor) ? cfg0.motor : '3.1.0'
   aplicarBloqueioCfg(E, cfg); fonte = semBloqueadas(E, fonte)
   cfg.revisao ||= { ativa: true, cada: REV_PADRAO }; cfg.revisao.ativa = true; cfg.revisao.cada = normalizarCada(cfg.revisao.cada, true)
   return calcularDominoE(E, fonte, cfg, desde, opcoes)

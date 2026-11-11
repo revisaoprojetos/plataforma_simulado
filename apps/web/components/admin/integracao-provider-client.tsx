@@ -508,14 +508,15 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Resultado</th>
               <th className="px-3 py-2 font-medium">Comprador</th>
+              <th className="px-3 py-2 font-medium">Cód. produto</th>
               <th className="px-3 py-2 text-right font-medium">Ação</th>
             </tr>
           </thead>
           <tbody>
             {itens === null ? (
-              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
             ) : itens.length === 0 ? (
-              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma requisição recebida ainda. Cadastre a URL na {PROVIDER_META[provider].nome} e faça uma compra de teste (ou abra a URL no navegador para um ping GET).</td></tr>
+              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">Nenhuma requisição recebida ainda. Cadastre a URL na {PROVIDER_META[provider].nome} e faça uma compra de teste (ou abra a URL no navegador para um ping GET).</td></tr>
             ) : itens.map((e) => (
               <tr key={e.id} className="border-b last:border-0 align-top hover:bg-muted/30">
                 <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{fmt(e.recebidoEm)}</td>
@@ -523,6 +524,7 @@ function Recebidos({ provider, appUrl, token }: { provider: Provider; appUrl: st
                 <td className="px-3 py-2"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', corStatus(e.statusResp))}>{e.statusResp ?? '—'}</span></td>
                 <td className="max-w-[240px] px-3 py-2 text-xs">{e.resultado ?? '—'}</td>
                 <td className="px-3 py-2 text-xs">{e.comprador ?? '—'}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{e.produtoCodigo ?? '—'}</td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button type="button" onClick={() => abrir(e.id)} disabled={abrindo === e.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60">
@@ -556,11 +558,32 @@ function Eventos({ provider }: { provider: Provider }) {
   const [reprocessando, setReprocessando] = useState<string | null>(null)
   const [detalhe, setDetalhe] = useState<EventoDetalhe | null>(null)
   const [abrindo, setAbrindo] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+  const [buscaAplicada, setBuscaAplicada] = useState('')
+  const [fStatus, setFStatus] = useState('todos')
+  const [fTipo, setFTipo] = useState('todos')
+  const [fPeriodo, setFPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('todos')
+  const [pag, setPag] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [tipos, setTipos] = useState<string[]>([])
+  const PPS = 20
+  const totalPag = Math.max(1, Math.ceil(total / PPS))
 
   function carregar() {
-    startCarregar(async () => { const r = await listarEventos(provider); if (r.ok) setEventos(r.eventos ?? []); else toast.error(r.error ?? 'Falha ao carregar') })
+    startCarregar(async () => {
+      const r = await listarEventos(provider, { busca: buscaAplicada, status: fStatus, tipo: fTipo, periodo: fPeriodo, pag, pps: PPS })
+      if (r.ok) { setEventos(r.eventos ?? []); setTotal(r.total ?? 0); if (r.tipos) setTipos(r.tipos) } else toast.error(r.error ?? 'Falha ao carregar')
+    })
   }
-  useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { carregar() }, [buscaAplicada, fStatus, fTipo, fPeriodo, pag]) // eslint-disable-line react-hooks/exhaustive-deps
+  // busca com debounce (volta p/ página 1)
+  useEffect(() => {
+    const t = setTimeout(() => { if (busca.trim() !== buscaAplicada) { setPag(1); setBuscaAplicada(busca.trim()) } }, 400)
+    return () => clearTimeout(t)
+  }, [busca]) // eslint-disable-line react-hooks/exhaustive-deps
+  const mudaFiltro = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPag(1) }
+  const temFiltro = !!buscaAplicada || fStatus !== 'todos' || fTipo !== 'todos' || fPeriodo !== 'todos'
+  const limpar = () => { setBusca(''); setBuscaAplicada(''); setFStatus('todos'); setFTipo('todos'); setFPeriodo('todos'); setPag(1) }
 
   function abrirDetalhe(id: string) {
     setAbrindo(id)
@@ -584,8 +607,43 @@ function Eventos({ provider }: { provider: Provider }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Webhooks recebidos da {PROVIDER_META[provider].nome} (últimos 50). Reprocesse os que deram erro.</p>
+        <p className="text-sm text-muted-foreground">Webhooks recebidos da {PROVIDER_META[provider].nome} ({total} {total === 1 ? 'evento' : 'eventos'}). Reprocesse os que deram erro.</p>
         <Button variant="outline" size="sm" onClick={carregar} disabled={carregando}>{carregando ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />} Atualizar</Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por e-mail, nome, produto, código do produto ou ID do evento…" className="h-8 pl-8 text-sm" />
+        </div>
+        <Select value={fStatus} onValueChange={(v) => mudaFiltro(setFStatus)(v ?? 'todos')}>
+          <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            <SelectItem value="processado">Processado</SelectItem>
+            <SelectItem value="erro">Erro</SelectItem>
+            <SelectItem value="recebido">Recebido</SelectItem>
+            <SelectItem value="processando">Processando</SelectItem>
+            <SelectItem value="ignorado">Ignorado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={fTipo} onValueChange={(v) => mudaFiltro(setFTipo)(v ?? 'todos')}>
+          <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os tipos</SelectItem>
+            {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={fPeriodo} onValueChange={(v) => mudaFiltro(setFPeriodo)((v ?? 'todos') as typeof fPeriodo)}>
+          <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue placeholder="Período" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todo o período</SelectItem>
+            <SelectItem value="hoje">Hoje</SelectItem>
+            <SelectItem value="7d">Últimos 7 dias</SelectItem>
+            <SelectItem value="30d">Últimos 30 dias</SelectItem>
+          </SelectContent>
+        </Select>
+        {temFiltro && <Button variant="ghost" size="sm" onClick={limpar}><X className="mr-1 h-3.5 w-3.5" />Limpar</Button>}
       </div>
 
       <div className="overflow-hidden rounded-lg border">
@@ -596,21 +654,23 @@ function Eventos({ provider }: { provider: Provider }) {
               <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Comprador</th>
               <th className="px-3 py-2 font-medium">Produto</th>
+              <th className="px-3 py-2 font-medium">Cód. produto</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 text-right font-medium">Ação</th>
             </tr>
           </thead>
           <tbody>
             {eventos === null ? (
-              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
             ) : eventos.length === 0 ? (
-              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum webhook recebido ainda.</td></tr>
+              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{temFiltro ? 'Nenhum evento encontrado com esses filtros.' : 'Nenhum webhook recebido ainda.'}</td></tr>
             ) : eventos.map((e) => (
               <tr key={e.id} className="border-b last:border-0 align-top hover:bg-muted/30">
                 <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{fmt(e.recebidoEm)}</td>
                 <td className="px-3 py-2 text-xs">{e.tipo ?? '—'}</td>
                 <td className="px-3 py-2 text-xs">{e.comprador ?? '—'}</td>
                 <td className="max-w-[220px] truncate px-3 py-2 text-xs">{e.produto ?? '—'}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{e.produtoCodigo ?? '—'}</td>
                 <td className="px-3 py-2"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cor[e.status] ?? 'bg-muted')}>{e.status}</span>{e.erro && <span className="mt-0.5 block max-w-[220px] truncate text-[10px] text-rose-600 dark:text-rose-400" title={e.erro}>{e.erro}</span>}</td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -628,6 +688,15 @@ function Eventos({ provider }: { provider: Provider }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{total === 0 ? '0 resultados' : `${(pag - 1) * PPS + 1}–${Math.min(pag * PPS, total)} de ${total}`}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={pag <= 1 || carregando} onClick={() => setPag((p) => p - 1)}>Anterior</Button>
+          <span>Página {pag} de {totalPag}</span>
+          <Button variant="outline" size="sm" disabled={pag >= totalPag || carregando} onClick={() => setPag((p) => p + 1)}>Próxima</Button>
+        </div>
       </div>
 
       {/* Pop-up de detalhe — payload completo (headers + query + body), estilo n8n */}

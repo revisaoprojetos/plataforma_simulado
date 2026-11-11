@@ -28,6 +28,7 @@ export interface EventoDTO {
   status: string
   comprador: string | null
   produto: string | null
+  produtoCodigo?: string | null
   recebidoEm: string
   processadoEm: string | null
   erro: string | null
@@ -91,6 +92,7 @@ export interface InboxDTO {
   resultado: string | null
   comprador: string | null
   produto: string | null
+  produtoCodigo?: string | null
   ip: string | null
   recebidoEm: string
 }
@@ -121,3 +123,5 @@ export interface InboxDetalhe {
   bodyRaw: string | null
   resumo?: string[]
 }
+
+export interface FiltroEventos { busca?: string; status?: string; tipo?: string; periodo?: 'hoje' | '7d' | '30d' | 'todos'; pag?: number; pps?: number }

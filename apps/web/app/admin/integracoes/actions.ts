@@ -1,5 +1,5 @@
 'use server'
-import type { ConfigDTO, MapeamentoDTO, EventoDTO, EventoDetalhe, ReconciliacaoDTO, MapaConfigDTO, AssinaturaGuruDTO, AssinaturasResult, InboxDTO, RecebidoDTO, InboxDetalhe } from './actions-tipos'
+import type { ConfigDTO, MapeamentoDTO, EventoDTO, EventoDetalhe, ReconciliacaoDTO, MapaConfigDTO, AssinaturaGuruDTO, AssinaturasResult, InboxDTO, RecebidoDTO, InboxDetalhe, FiltroEventos } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
@@ -192,29 +192,49 @@ export async function excluirMapeamento(provider: string, id: string): Promise<{
 
 // ── Eventos (monitor dos webhooks recebidos) ──────────────────────────────────
 /** Extrai comprador/produto do payload cru (best-effort, formato Guru). */
-function resumoEvento(payload: any): { comprador: string | null; produto: string | null } {
+function resumoEvento(payload: any): { comprador: string | null; produto: string | null; produtoCodigo: string | null } {
   const c = payload?.contact ?? payload?.buyer ?? {}
   const p = payload?.product ?? {}
   return {
     comprador: c.email ?? c.name ?? (c.doc ? mascararCpf(String(c.doc)) : null),
     produto: p.name ?? p.marketplace_id ?? payload?.checkout_url ?? null,
+    produtoCodigo: [p.marketplace_id, p.internal_id, p.id, payload?.product_id].map((v: any) => (v == null || v === '' ? null : String(v))).find(Boolean) ?? null,
   }
 }
 
-export async function listarEventos(provider: string, limite = 50): Promise<{ ok: boolean; error?: string; eventos?: EventoDTO[] }> {
+/** Lista paginada/filtrada NO SERVIDOR (busca em e-mail/nome/produto/event_id; status; tipo; período). */
+export async function listarEventos(provider: string, f: FiltroEventos = {}): Promise<{ ok: boolean; error?: string; eventos?: EventoDTO[]; total?: number; tipos?: string[] }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data } = await svc.from('simulado_integracao_eventos')
-    .select('id, event_id, tipo, status, payload, recebido_em, processado_em, erro')
+  const pps = Math.min(100, Math.max(5, f.pps ?? 20))
+  const pag = Math.max(1, f.pag ?? 1)
+  let q = svc.from('simulado_integracao_eventos')
+    .select('id, event_id, tipo, status, payload, recebido_em, processado_em, erro', { count: 'exact' })
     .eq('tenant_id', g.tenantId).eq('provider', provider)
-    .order('recebido_em', { ascending: false }).limit(limite)
+  if (f.status && f.status !== 'todos') q = q.eq('status', f.status)
+  if (f.tipo && f.tipo !== 'todos') q = q.eq('tipo', f.tipo)
+  if (f.periodo && f.periodo !== 'todos') {
+    const d = new Date()
+    if (f.periodo === 'hoje') d.setHours(0, 0, 0, 0); else d.setDate(d.getDate() - (f.periodo === '7d' ? 7 : 30))
+    q = q.gte('recebido_em', d.toISOString())
+  }
+  const termo = (f.busca ?? '').trim().replace(/[,()%*\\]/g, ' ').trim().slice(0, 80)
+  if (termo) {
+    const p = `%${termo}%`
+    q = q.or([`event_id.ilike.${p}`, `payload->contact->>email.ilike.${p}`, `payload->contact->>name.ilike.${p}`, `payload->product->>name.ilike.${p}`, `payload->product->>marketplace_id.ilike.${p}`, `payload->product->>internal_id.ilike.${p}`, `payload->buyer->>email.ilike.${p}`].join(','))
+  }
+  const { data, count, error } = await q.order('recebido_em', { ascending: false }).range((pag - 1) * pps, pag * pps - 1)
+  if (error) return { ok: false, error: error.message }
   const eventos: EventoDTO[] = (data ?? []).map((e: any) => {
     const r = resumoEvento(e.payload)
-    return { id: e.id, eventId: e.event_id, tipo: e.tipo, status: e.status, comprador: r.comprador, produto: r.produto, recebidoEm: e.recebido_em, processadoEm: e.processado_em, erro: e.erro }
+    return { id: e.id, eventId: e.event_id, tipo: e.tipo, status: e.status, comprador: r.comprador, produto: r.produto, produtoCodigo: r.produtoCodigo, recebidoEm: e.recebido_em, processadoEm: e.processado_em, erro: e.erro }
   })
-  return { ok: true, eventos }
+  // tipos distintos p/ o filtro (amostra das últimas 500 linhas)
+  const { data: tp } = await svc.from('simulado_integracao_eventos').select('tipo').eq('tenant_id', g.tenantId).eq('provider', provider).order('recebido_em', { ascending: false }).limit(500)
+  const tipos = [...new Set((tp ?? []).map((x: any) => x.tipo).filter(Boolean))] as string[]
+  return { ok: true, eventos, total: count ?? eventos.length, tipos }
 }
 
 /** Detalhe COMPLETO de um evento (headers + body cru) — para o pop-up de visualização. */
@@ -410,7 +430,7 @@ export async function listarWebhookInbox(provider: string, limite = 100): Promis
   }
   const itens: InboxDTO[] = (data ?? []).map((e: any) => {
     const r = resumoEvento(e.body_json)
-    return { id: e.id, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, ip: e.ip, recebidoEm: e.recebido_em }
+    return { id: e.id, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, produtoCodigo: r.produtoCodigo, ip: e.ip, recebidoEm: e.recebido_em }
   })
   return { ok: true, itens }
 }
@@ -435,7 +455,7 @@ export async function listarRecebidos(filtroFonte?: string, limite = 200): Promi
   const filtradas = filtroFonte ? linhas.filter((e) => (e.fonte ?? e.provider) === filtroFonte) : linhas
   const itens: RecebidoDTO[] = filtradas.map((e) => {
     const r = resumoEvento(e.body_json)
-    return { id: e.id, provider: e.provider, fonte: e.fonte ?? e.provider, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, ip: e.ip, recebidoEm: e.recebido_em }
+    return { id: e.id, provider: e.provider, fonte: e.fonte ?? e.provider, metodo: e.metodo, statusResp: e.status_resp, resultado: e.resultado, comprador: r.comprador, produto: r.produto, produtoCodigo: r.produtoCodigo, ip: e.ip, recebidoEm: e.recebido_em }
   })
   return { ok: true, itens, fontes }
 }

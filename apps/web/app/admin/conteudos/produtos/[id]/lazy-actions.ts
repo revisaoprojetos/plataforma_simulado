@@ -104,15 +104,18 @@ export async function carregarModulosAction(produtoId: string, o: { paiId?: stri
 }
 
 /** Aba CONTEÚDOS › visão interna: só as aulas DIRETAS do módulo aberto (paginadas) + cards dos submódulos. */
-export async function carregarModuloInternoAction(produtoId: string, moduloId: string, o: { q?: string; material?: string; page?: number; pp?: number } = {}) {
+export async function carregarModuloInternoAction(produtoId: string, moduloId: string, o: { q?: string; material?: string; page?: number; pp?: number; subQ?: string; subOrdem?: string; subPage?: number; subPp?: number } = {}) {
   const g = await guard(); if ('error' in g) return { error: g.error }
   const [aulas, subs] = await Promise.all([
     aulasDoModulo(g.tenantId, produtoId, moduloId, { q: (o.q ?? '').slice(0, 120), material: mat(o.material), page: pgn(o.page, 1), pp: pgn(o.pp, 25) }),
-    moduloCardsProduto(g.tenantId, produtoId, { paiId: moduloId, pp: 60 }),
+    moduloCardsProduto(g.tenantId, produtoId, {
+      paiId: moduloId, q: (o.subQ ?? '').slice(0, 120),
+      ordem: ORDENS_MOD.includes(o.subOrdem as OrdemModulos) ? (o.subOrdem as OrdemModulos) : 'ordem', page: pgn(o.subPage, 1), pp: pgn(o.subPp, 24),
+    }),
   ])
   const atual = subs.todos.find((m) => m.id === moduloId) ?? null
   const irmaos = atual ? subs.todos.filter((m) => (m.pai_id ?? null) === (atual.pai_id ?? null)).sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id)).map((m) => ({ id: m.id, titulo: m.titulo })) : []
-  return { ok: true as const, aulas, subs: subs.cards, modulos: subs.modulos, atual, irmaos }
+  return { ok: true as const, aulas, subs: subs.cards, subsTotal: subs.total, subsPage: subs.page, modulos: subs.modulos, atual, irmaos }
 }
 
 /** Busca global de aulas do produto (resultados limitados, com a lista de módulos p/ o agrupamento). */

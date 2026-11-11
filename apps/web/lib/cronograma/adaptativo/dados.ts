@@ -247,8 +247,9 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: Pl
 
     const detalhesAtuais = await lerDetalhesMetas(svc, row.id)
     const legado = !planoUsaMotorAtual(cfg.motor) // plano gravado com o motor 2.8.1: migra pelo MESMO motor (planos existentes não mudam de comportamento)
-    const cfg2 = carimbar({ ...cfg, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] }, undefined, catId, legado ? (cfg.motor || '2.8.1') : VERSAO_MOTOR)
-    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { legado, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas), prog: progDeMetas(metas), hoje, planoAtual: row.plano as Plano, detalhes: detalhesAtuais })
+    const cfg2 = carimbar({ ...cfg, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] }, undefined, catId, legado ? (cfg.motor || '2.8.1') : (cfg.motor || VERSAO_MOTOR))
+    // manterMotor: a correção automática do catálogo não promove o plano à regra nova (rev. 23 só vale ao recalcular/gerar de novo)
+    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { legado, manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas), prog: progDeMetas(metas), hoje, planoAtual: row.plano as Plano, detalhes: detalhesAtuais })
     const revs = Object.fromEntries(Object.entries(row.revs || {}).filter(([k]) => semInicio(cfg2.start, +k) <= hoje))
     try {
       const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs })], { type: 'application/json' })

@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, RotateCcw, Plus, X, Save } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { TiposMaterial } from '@/components/admin/cronograma/tipos-material'
 import { PARAMS_SEM_EFEITO, type ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
 import type { PainelMetas } from '../actions-tipos'
 import {salvarPainelMetas} from '../actions'
@@ -67,14 +69,16 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
   const [salvando, setSalvando] = useState(false)
   const padrao = inicial.padrao
 
-  const mudou = JSON.stringify(p) !== JSON.stringify(inicial.params)
-  const difPadrao = JSON.stringify(p) !== JSON.stringify(padrao)
+  // tiposBloqueados é gerido pelo card "Tipos de meta" (ação própria): fica fora da comparação/salvar deste formulário.
+  const semTipos = (x: ParamsAdaptativo) => ({ ...x, tiposBloqueados: undefined })
+  const mudou = JSON.stringify(semTipos(p)) !== JSON.stringify(semTipos(inicial.params))
+  const difPadrao = JSON.stringify(semTipos(p)) !== JSON.stringify(semTipos(padrao))
   const set: SetFn = (k, v) => setP((c) => ({ ...c, [k]: v }))
   const c = { p, padrao, set }
 
   async function salvar() {
     setSalvando(true)
-    const r = await salvarPainelMetas(p)
+    const r = await salvarPainelMetas(semTipos(p))
     setSalvando(false)
     if (!r.ok) { toast.error(r.error || 'Falha ao salvar.'); return }
     toast.success('Configuração das metas salva. Vale para os próximos cronogramas gerados e recalculados.')
@@ -97,6 +101,28 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
         <span className="text-xs text-muted-foreground">{inicial.alunosComPlano} alunos com cronograma — vale quando o plano for gerado ou recalculado.</span>
         {inicial.atualizadoEm && <span className="ml-auto text-xs text-muted-foreground">Salvo em {new Date(inicial.atualizadoEm).toLocaleString('pt-BR')}</span>}
       </div>
+
+      <TiposMaterial bloqueados={inicial.params.tiposBloqueados ?? []} podeEditar={inicial.podeEditar} alunosComPlano={inicial.alunosComPlano} />
+
+      <section className="rounded-2xl border bg-card p-4">
+        <h2 className="text-sm font-semibold">Bloqueio por disciplina</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Disciplinas com PDFull, LegProc ou Jurisprudência desligados individualmente. Edite na aba{' '}
+          <Link href="/admin/revisao/cronograma?aba=adaptativo&sub=disc" className="text-primary underline-offset-2 hover:underline">Disciplinas (Revisão › Cronograma)</Link>.
+          Um tipo bloqueado acima vale para todas as disciplinas.
+        </p>
+        <ul className="mt-3 grid gap-3 text-xs sm:grid-cols-3">
+          {([['pf', 'PDFull'], ['lp', 'LegProc'], ['jp', 'Jurisprudência']] as const).map(([k, rot]) => {
+            const lista = inicial.discSemTipo?.[k] ?? []
+            return (
+              <li key={k} className="rounded-xl border p-3">
+                <b className="block text-sm">{rot} <span className="font-normal text-muted-foreground">· {lista.length} disciplina{lista.length === 1 ? '' : 's'} bloqueada{lista.length === 1 ? '' : 's'}</span></b>
+                <span className="mt-1 block text-muted-foreground">{lista.length ? lista.slice(0, 8).join(', ') + (lista.length > 8 ? ` e mais ${lista.length - 8}` : '') : 'Nenhuma.'}</span>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Bloco titulo="Tempo e duração das metas" desc="PDFull = páginas ÷ ritmo × 2, em blocos de 30 min. Dia curto não começa PDFull.">
@@ -139,11 +165,11 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
         </Bloco>
 
 
-        <Bloco titulo="Jurisprudência semanal" desc="Uma meta geral de Jurisprudência por semana de atividade, preferindo sexta ou sábado. Sempre ativa nos cronogramas gerados ou recalculados; aqui se ajusta a duração e a leitura do aluno.">
+        <Bloco titulo="Jurisprudência semanal" desc="Opt-in do aluno: vem desmarcada e só é reservada (1 meta por semana, preferindo sexta ou sábado) quando o aluno marca Jurisprudência em Metas no cronograma e a semana tem ≥14h30. Aqui você ajusta a duração da meta; para impedir o tipo para todos, bloqueie Jurisprudência em Tipos de meta. As duas chaves abaixo são da LEITURA do aluno, não do cronograma.">
           <Chave ligado={p.jurisTagsImagem} onChange={(v) => set('jurisTagsImagem', v)}
-            titulo="Converter <tags> em imagens de selo na leitura" desc="Na leitura do aluno, troca marcadores como <repercussão geral> ou <entendimento consolidado> pela imagem do selo cadastrado na Biblioteca de tags. Útil para documentos que não foram montados com o plugin Selos no editor. Desligado = o texto aparece como está. Vale na hora, sem recalcular planos." />
+            titulo="Leitura: converter <tags> em imagens de selo" desc="Na leitura do aluno, troca marcadores como <repercussão geral> ou <entendimento consolidado> pela imagem do selo cadastrado na Biblioteca de tags. Útil para documentos que não foram montados com o plugin Selos no editor. Desligado = o texto aparece como está. Vale na hora, sem recalcular planos." />
           <Chave ligado={p.jurisTitulosExpansivos} onChange={(v) => set('jurisTitulosExpansivos', v)}
-            titulo="Seções dos títulos expansivas e recolhíveis" desc="Na leitura do aluno, cada título e tudo o que vem abaixo dele, até o próximo título, vira uma área expansiva e recolhível no estilo do JurisClub. O que fica antes do primeiro título (nome do julgado, tags e quadro do entendimento) não muda. Vale na hora, sem recalcular planos." />
+            titulo="Leitura: seções dos títulos expansivas e recolhíveis" desc="Na leitura do aluno, cada título e tudo o que vem abaixo dele, até o próximo título, vira uma área expansiva e recolhível no estilo do JurisClub. O que fica antes do primeiro título (nome do julgado, tags e quadro do entendimento) não muda. Vale na hora, sem recalcular planos." />
           <Num {...c} k="jurisprudenciaMin" label="Duração da meta" min={15} max={180} un="min" hint="Padrão 60 min." />
         </Bloco>
 

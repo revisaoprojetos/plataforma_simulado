@@ -12,10 +12,11 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { RevisaoCard } from '@/components/admin/revisao/ui'
 import { Nota, Pilula } from '../_comp/lista'
 import {
-  CR_ALLF, CR_ARR, CR_SCHEMA, CR_TIPOS_MATERIAL, crAlteradas, crDef, crFmt, crHm, crMin, crMudou,
+  CR_ALLF, CR_ARR, CR_SCHEMA, crAlteradas, crDef, crFmt, crHm, crMin, crMudou,
   type CampoRegra, type ValoresRegras,
 } from '@/lib/revisao/cronograma-schema'
-import { restaurarRegrasCronograma, salvarRegrasCronograma, salvarTiposBloqueadosCronograma } from './actions'
+import { TiposMaterial } from '@/components/admin/cronograma/tipos-material'
+import { restaurarRegrasCronograma, salvarRegrasCronograma } from './actions'
 
 // Aba "Regras do cronograma": formulário por seção (porte fiel do protótipo), simulador rápido e "O que muda em relação ao 2.0".
 // O estado é local até "Salvar regras" (grava de uma vez, com auditoria do que mudou).
@@ -55,54 +56,6 @@ function Campo({ f, v, onChange, motor }: { f: CampoRegra; v: number | boolean |
       </span>
       {doMotor && <span className="text-xs text-muted-foreground">Valor vigente no motor de hoje (somente leitura aqui). Para mudar: <Link href="/admin/cronogramas/adaptativo/metas" className="text-primary underline-offset-2 hover:underline">Metas &amp; inteligência</Link>.</span>}
     </div>
-  )
-}
-
-/** Controle global (por tenant) dos tipos de material que o gerador adaptativo pode entregar ao aluno. Grava na config do motor (não depende de migração). */
-function TiposMaterial({ bloqueados, podeEditar }: { bloqueados: string[]; podeEditar: boolean }) {
-  const router = useRouter()
-  const [pend, start] = useTransition()
-  const [bloq, setBloq] = useState<Set<string>>(new Set(bloqueados))
-  const sujo = bloq.size !== bloqueados.length || bloqueados.some((t) => !bloq.has(t))
-  const alternar = (chave: string, disponivel: boolean) => setBloq((p) => { const n = new Set(p); if (disponivel) n.delete(chave); else n.add(chave); return n })
-  function salvar() {
-    start(async () => {
-      const r = await salvarTiposBloqueadosCronograma([...bloq])
-      if (r.ok) { toast.success('Tipos de material salvos.'); router.refresh() } else toast.error(r.error ?? 'Falha ao salvar.')
-    })
-  }
-  return (
-    <RevisaoCard>
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Tipos de material no cronograma do aluno</h2>
-          <p className="text-sm text-muted-foreground">Desligue um tipo para que o gerador adaptativo deixe de entregá-lo a qualquer aluno da plataforma. Vale nas próximas gerações e nos recálculos; metas já concluídas continuam no histórico.</p>
-        </div>
-        {bloq.size > 0 && <Pilula tipo="warn">{bloq.size} bloqueado{bloq.size > 1 ? 's' : ''}</Pilula>}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {CR_TIPOS_MATERIAL.map((t) => {
-          const disponivel = !bloq.has(t.chave)
-          return (
-            <div key={t.chave} className={cn('flex flex-col gap-1.5 rounded-xl border p-3', !disponivel && 'border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/10')}>
-              <label htmlFor={`cr-tipo-${t.chave}`} className="text-sm font-medium leading-snug">{t.rotulo}</label>
-              <div className="flex items-center gap-2">
-                <Switch id={`cr-tipo-${t.chave}`} checked={disponivel} disabled={!podeEditar || pend} onCheckedChange={(c) => alternar(t.chave, !!c)} aria-label={`${t.rotulo} disponível ao aluno`} />
-                <span className="text-sm">{disponivel ? 'Disponível ao aluno' : 'Bloqueado'}</span>
-              </div>
-              <small className="text-xs text-muted-foreground">{t.descricao}</small>
-            </div>
-          )
-        })}
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">Ordem de prevalência: tipo bloqueado aqui &gt; disciplina desligada na aba Disciplinas &gt; ligado. PDFight não é uma meta do gerador (é material de apoio); ele continua sendo controlado por disciplina.</p>
-      {podeEditar && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button onClick={salvar} disabled={pend || !sujo}><Save className="h-4 w-4" />{pend ? 'Salvando…' : 'Salvar tipos de material'}</Button>
-          {sujo && <span className="text-xs text-amber-700 dark:text-amber-400">Há alterações não salvas.</span>}
-        </div>
-      )}
-    </RevisaoCard>
   )
 }
 

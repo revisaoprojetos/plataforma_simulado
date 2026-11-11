@@ -4,5 +4,5 @@
 export {
   fold, fmtData, hrefModulo, todasAulas, progresso,
   ProgressoGeral, ModulosVitrine, SecaoModulos, ChamadaCronograma,
-  ListaAulas, CardCronograma, CabecalhoAulas, AulaLinha,
+  ListaAulas, CardCronograma, Poster, CabecalhoAulas, AulaLinha,
 } from '@/components/produtos/pagina/blocos/curriculo-ui'

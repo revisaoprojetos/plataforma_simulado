@@ -3,6 +3,7 @@
 // Peças da visão em CARDS da aba Conteúdos: card de módulo (agregados vindos do servidor) e diálogo "Reordenar módulos".
 // Só apresentação — nenhum cálculo sobre as aulas acontece aqui.
 
+import { SinaisSegmento, type SinaisSeg } from './segmentos-dialog'
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, FolderPlus, GripVertical, Loader2, MoreVertical, Pencil, Plus, Save } from 'lucide-react'
 import { toast } from 'sonner'
@@ -26,7 +27,8 @@ export function resumoLiberacaoCard(c: ModuloCard): { texto: string; alerta: boo
   return out
 }
 
-export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar, onSub, onConteudo }: {
+export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar, onSub, onConteudo, sinais }: {
+  sinais?: SinaisSeg | null
   m: ModuloCard; podeEditar: boolean; marcado?: boolean; onMarcar?: () => void
   onAbrir: () => void; onEditar: () => void; onSub?: () => void; onConteudo: () => void
 }) {
@@ -50,6 +52,7 @@ export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar
           )}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
             {m.ocultar_titulo ? null : <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagem_url ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>}
+            <SinaisSegmento sinais={sinais} sobreImagem className="mt-1.5" />
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
               {m.aulas} {m.aulas === 1 ? 'aula' : 'aulas'} · {m.submodulos} {m.submodulos === 1 ? 'submódulo' : 'submódulos'}
             </div>
@@ -71,7 +74,7 @@ export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar
           </div>
         )}
       </div>
-      {/* Faixa de admin (compacta): tipos de material + resumo de liberação */}
+      {/* Faixa de admin (compacta): sinais de segmento + tipos de material + resumo de liberação */}
       <button type="button" onClick={onAbrir} className="flex w-full min-w-0 flex-col gap-1.5 p-2 text-left">
         {chips.length > 0 && (
           <span className="flex flex-wrap gap-1">
@@ -98,10 +101,10 @@ export function situacaoModulo(c: ModuloCard): { texto: string; ativo: boolean }
 }
 
 /** Reordenar módulos de topo: arrastar ou subir/descer; grava a ordem inteira numa só chamada. */
-export function ReordenarModulosDialog({ produtoId, modulos, onClose, onPronto }: {
-  produtoId: string; modulos: ModuloRow[]; onClose: () => void; onPronto: () => void
+export function ReordenarModulosDialog({ produtoId, modulos, paiId = null, onClose, onPronto }: {
+  produtoId: string; modulos: ModuloRow[]; /** irmãos de qual nível (null = topo) */ paiId?: string | null; onClose: () => void; onPronto: () => void
 }) {
-  const [ids, setIds] = useState(() => modulos.filter((m) => !m.pai_id).sort((a, b) => a.ordem - b.ordem).map((m) => m.id))
+  const [ids, setIds] = useState(() => modulos.filter((m) => (m.pai_id ?? null) === paiId).sort((a, b) => a.ordem - b.ordem).map((m) => m.id))
   const [drag, setDrag] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const nome = (id: string) => modulos.find((m) => m.id === id)?.titulo ?? ''
@@ -121,7 +124,7 @@ export function ReordenarModulosDialog({ produtoId, modulos, onClose, onPronto }
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent showCloseButton className="sm:max-w-lg">
-        <DialogTitle>Reordenar módulos</DialogTitle>
+        <DialogTitle>{paiId ? 'Reordenar submódulos' : 'Reordenar módulos'}</DialogTitle>
         <p className="text-sm text-muted-foreground">Arraste ou use as setas. A ordem vale para o aluno.</p>
         <ul className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
           {ids.map((id, i) => (

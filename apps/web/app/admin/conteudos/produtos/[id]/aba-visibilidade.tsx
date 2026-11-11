@@ -10,6 +10,7 @@
 // Avaliação no servidor por aluno: lib/segmentos/avaliar.ts + lib/segmentos/visibilidade.ts.
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Eye, EyeOff, Plus, Loader2, MoreVertical, Pencil, Copy, Trash2, AlertTriangle, Users, X, Search,
   KeyRound, Layers, Lock, Check, FlaskConical, CircleCheck, CircleX, Filter, ShieldCheck, ShieldOff, ChevronDown,
@@ -448,7 +449,7 @@ export function SegmentoDialog({ seg, produtoId, podeEditar, nomes, onNomes, onC
   )
 }
 
-function JuncaoToggle({ valor, onChange, disabled, grande, rotulos = ['E', 'OU'] }: { valor: Juncao; onChange: (v: Juncao) => void; disabled?: boolean; grande?: boolean; rotulos?: [string, string] }) {
+export function JuncaoToggle({ valor, onChange, disabled, grande, rotulos = ['E', 'OU'] }: { valor: Juncao; onChange: (v: Juncao) => void; disabled?: boolean; grande?: boolean; rotulos?: [string, string] }) {
   return (
     <span className={cn('inline-flex overflow-hidden rounded-full border bg-background', grande ? 'text-xs' : 'text-[11px]')}>
       {(['e', 'ou'] as Juncao[]).map((v, i) => (
@@ -459,7 +460,7 @@ function JuncaoToggle({ valor, onChange, disabled, grande, rotulos = ['E', 'OU']
   )
 }
 
-function LinhaCondicao({ c, nomes, disabled, resultado, onChange, onNome, onRemover }: {
+export function LinhaCondicao({ c, nomes, disabled, resultado, onChange, onNome, onRemover }: {
   c: Condicao; nomes: Record<string, string>; disabled: boolean; produtoId: string; resultado?: boolean
   onChange: (p: Partial<Condicao>) => void; onNome: (id: string, nome: string) => void; onRemover: () => void
 }) {
@@ -523,6 +524,23 @@ function RefPicker({ tipo, value, nome, obrigatoria, disabled, onChange }: {
   const [q, setQ] = useState('')
   const [rows, setRows] = useState<{ id: string; nome: string }[] | null>(null)
   const caixa = useRef<HTMLDivElement>(null)
+  const lista = useRef<HTMLDivElement>(null)
+  // A lista abre FORA da área rolável (em portal dentro do pop-up), posicionada pelo botão: antes ficava cortada/atrás da coluna lateral.
+  const [pos, setPos] = useState<null | { host: HTMLElement; left: number; top: number; width: number; maxH: number }>(null)
+  function abrir() {
+    const btn = caixa.current?.querySelector('button')
+    const host = btn?.closest('[role=dialog]') as HTMLElement | null
+    if (btn && host) {
+      const b = btn.getBoundingClientRect(), h = host.getBoundingClientRect()
+      const left = Math.max(8, b.left - h.left)
+      const abaixo = h.bottom - b.bottom - 16
+      const acima = b.top - h.top - 16
+      const emCima = abaixo < 260 && acima > abaixo
+      const maxH = Math.max(180, Math.min(420, emCima ? acima : abaixo))
+      setPos({ host, left, top: emCima ? Math.max(8, b.top - h.top - maxH - 6) : b.bottom - h.top + 6, width: Math.max(320, Math.min(560, h.width - left - 16)), maxH })
+    } else setPos(null)
+    setAberto((a) => !a); setRows(null)
+  }
 
   useEffect(() => {
     if (!aberto) return
@@ -533,7 +551,7 @@ function RefPicker({ tipo, value, nome, obrigatoria, disabled, onChange }: {
   }, [aberto, q, tipo])
   useEffect(() => {
     if (!aberto) return
-    const fora = (e: MouseEvent) => { if (caixa.current && !caixa.current.contains(e.target as Node)) setAberto(false) }
+    const fora = (e: MouseEvent) => { const t = e.target as Node; if (caixa.current?.contains(t) || lista.current?.contains(t)) return; setAberto(false) }
     document.addEventListener('mousedown', fora)
     return () => document.removeEventListener('mousedown', fora)
   }, [aberto])
@@ -541,12 +559,27 @@ function RefPicker({ tipo, value, nome, obrigatoria, disabled, onChange }: {
   const rotulo = value ? (nome ?? `(${REF_LABEL[tipo]})`) : obrigatoria ? `Escolher ${REF_LABEL[tipo]}…` : `Qualquer ${REF_LABEL[tipo]}`
   return (
     <div ref={caixa} className="relative">
-      <button type="button" disabled={disabled} onClick={() => { setAberto((a) => !a); setRows(null) }}
+      <button type="button" disabled={disabled} onClick={abrir}
         className={cn(sel, 'inline-flex w-72 items-center justify-between gap-1 text-left', !value && obrigatoria && 'text-muted-foreground')}>
         <span className="truncate">{rotulo}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
-      {aberto && (
-        <div className="absolute left-0 top-10 z-50 w-[34rem] max-w-[calc(100vw-4rem)] rounded-xl border bg-popover p-2 shadow-lg">
+      {aberto && (pos ? createPortal(
+        <div ref={lista} style={pos ? { left: pos.left, top: pos.top, width: pos.width } : undefined} className={cn('z-[300] rounded-xl border bg-popover p-2 shadow-xl', pos ? 'absolute' : 'absolute left-0 top-10 w-[34rem] max-w-[calc(100vw-4rem)]')}>
+          <div className="relative mb-1"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${REF_LABEL[tipo]}…`} className="h-8 pl-8" /></div>
+          <div style={pos ? { maxHeight: pos.maxH - 56 } : undefined} className="max-h-72 overflow-auto [scrollbar-gutter:stable]">
+            <div className="min-w-max">
+            {!obrigatoria && <button type="button" onClick={() => { onChange(null); setAberto(false) }} className={cn('flex w-full items-center rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted', !value && 'font-medium text-primary')}>Qualquer {REF_LABEL[tipo]}</button>}
+            {rows === null ? <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Buscando…</div>
+              : rows.length ? rows.map((r) => (
+                <button key={r.id} type="button" onClick={() => { onChange(r.id, r.nome); setAberto(false) }} className={cn('flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted', value === r.id && 'font-medium text-primary')}>
+                  <span>{r.nome}</span>{value === r.id && <Check className="ml-auto h-4 w-4 shrink-0" />}
+                </button>
+              )) : <p className="px-2 py-3 text-sm text-muted-foreground">Nada encontrado.</p>}
+            </div>
+          </div>
+        </div>
+        , pos.host) : (
+        <div ref={lista} className="absolute left-0 top-10 z-[300] w-[34rem] max-w-[calc(100vw-4rem)] rounded-xl border bg-popover p-2 shadow-xl">
           <div className="relative mb-1"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${REF_LABEL[tipo]}…`} className="h-8 pl-8" /></div>
           <div className="max-h-72 overflow-auto [scrollbar-gutter:stable]">
             <div className="min-w-max">
@@ -560,13 +593,13 @@ function RefPicker({ tipo, value, nome, obrigatoria, disabled, onChange }: {
             </div>
           </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
 /** "Testar com um aluno": avalia a regra (mesmo sem salvar) e marca cada condição ✓/✗. */
-function TestarAluno({ regra, teste, onTeste }: {
+export function TestarAluno({ regra, teste, onTeste }: {
   regra: RegraSegmento
   teste: null | { aluno: { id: string; nome: string }; corresponde: boolean }
   onTeste: (t: null | { aluno: { id: string; nome: string }; corresponde: boolean; condicoes: Record<string, boolean>; grupos: Record<string, boolean> }) => void

@@ -51,6 +51,9 @@ export function AbaGrupos({ produtoId, podeEditar }: {
   }
   useEffect(() => { recarregar() // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId])
+  // Vínculo automático feito pelo modal de Segmentos: atualiza a lista de grupos desta aba.
+  useEffect(() => { const h = () => { void recarregar(true) }; window.addEventListener('produto-acesso-mudou', h); return () => window.removeEventListener('produto-acesso-mudou', h) // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtoId])
 
   const lista = ligadosRows ?? []
   const ligados = lista.map((g) => g.id)

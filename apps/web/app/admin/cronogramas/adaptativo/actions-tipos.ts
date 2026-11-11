@@ -39,6 +39,9 @@ export interface PainelMetas {
   padrao: ParamsAdaptativo
   atualizadoEm: string | null
   alunosComPlano: number
+  /** Disciplinas com PDFull (pf) / LegProc (lp) / Juris (jp) desligados (aba Disciplinas de Revisão › Cronograma). */
+  discSemTipo: Record<string, string[]>
+  podeEditar: boolean
 }
 
 export interface SimulacaoAluno {

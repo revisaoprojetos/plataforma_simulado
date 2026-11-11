@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import {
-  Loader2, Save, Trash2, FolderOpen, FileText, Video, Link2, ClipboardList, Check, Info, ArrowRight, CalendarDays,
+  Loader2, Save, Trash2, FolderOpen, FileText, Video, Link2, ClipboardList, Check, Info, ArrowRight, CalendarDays, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -30,9 +30,11 @@ import {
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 // ═══════════════════════ Editar / novo módulo ═══════════════════════
-export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCount, onClose, onPronto }: {
+export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCount, onClose, onPronto, onSegmentos }: {
   produtoId: string; modulo: ModuloRow | null; paiId: string | null
   modulosCount?: number; aulasCount?: number; onClose: () => void; onPronto: () => void
+  /** Abre o painel de Segmento (capa / liberação por segmento) deste módulo — só ao editar. */
+  onSegmentos?: (aba: 'capa' | 'liberacao') => void
 }) {
   const criando = !modulo
   const [titulo, setTitulo] = useState(modulo?.titulo ?? '')
@@ -78,7 +80,8 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
                   <input type="checkbox" checked={ocultarTitulo} onChange={(e) => setOcultarTitulo(e.target.checked)} className="h-4 w-4 accent-[var(--brand-primary,currentColor)]" />
                   <span>Ocultar o título da disciplina sobre a imagem</span>
                 </label>
-              ) : null}</div>
+              ) : null}
+              {!criando && onSegmentos && <button type="button" onClick={() => { onClose(); onSegmentos('capa') }} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"><Users className="h-3.5 w-3.5" />Imagem por segmento</button>}</div>
             <label className="block"><span className="mb-1 block text-sm font-medium">Descrição</span>
               <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="Descrição curta do módulo (opcional)" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>
           </div>
@@ -94,6 +97,7 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
               <button type="button" onClick={() => setEditarDisp(true)} className="flex h-9 w-full items-center justify-between rounded-lg border bg-background px-2.5 text-sm hover:bg-muted">
                 <span className="capitalize">{resumoDisponibilidade(disp)}</span><ArrowRight className="h-4 w-4 text-muted-foreground" />
               </button>
+              {!criando && onSegmentos && <button type="button" onClick={() => { onClose(); onSegmentos('liberacao') }} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"><Users className="h-3.5 w-3.5" />Liberação por segmento</button>}
             </div>
           </div>
           {!criando && (modulosCount !== undefined || aulasCount !== undefined) && (

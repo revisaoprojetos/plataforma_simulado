@@ -398,8 +398,9 @@ function Fileira({ titulo, tituloNode, itens, slug, cor }: { titulo: string; tit
   )
 }
 
-function Poster({ m, nome, n, href, cor, grade, destaque }: { m: ModuloAluno; nome: string; n: number; href: string; cor: string; grade?: boolean; destaque?: boolean }) {
-  const p = progresso(m)
+export function Poster({ m, nome, n, href, cor, grade, destaque, stats }: { m: ModuloAluno; nome: string; n: number; href: string; cor: string; grade?: boolean; destaque?: boolean; stats?: { total: number; lidas: number; pct: number } }) {
+  // `stats` = progresso já calculado no servidor (quando o módulo chega sem as aulas); senão deriva do próprio módulo.
+  const p = stats ?? progresso(m)
   return (
     <Link href={href} title={m.titulo}
       className={`group/card relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-md transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl ${grade ? 'w-full' : 'w-40 shrink-0 snap-start @xl:w-48 @4xl:w-52'} ${destaque ? '@2xl:col-span-2 @2xl:aspect-[4/3]' : ''}`}>

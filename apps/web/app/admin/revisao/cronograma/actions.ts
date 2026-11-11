@@ -80,6 +80,7 @@ export async function salvarTiposBloqueadosCronograma(tipos: string[]): Promise<
   if (!r.ok) return { ok: false, error: r.error || 'Falha ao salvar.' }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'cronograma_adaptativo_cfg', entidadeId: g.tenantId, tenantId: g.tenantId, atorId: g.userId, antes: { tiposBloqueados: antes }, depois: { tiposBloqueados: novos } }).catch(() => {})
   revalidatePath(ROTA)
+  revalidatePath('/admin/cronogramas/adaptativo/metas')
   return { ok: true }
 }
 

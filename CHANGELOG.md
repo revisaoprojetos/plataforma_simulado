@@ -12,6 +12,26 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.15.0 — 2026-11-12
+
+### Conteúdos — Segmentos (visibilidade, liberação e capa por público)
+- **Modal "Segmentos"** (aulas, módulos e submódulos, 1 ou vários marcados) com 3 abas: **Visibilidade** (mostrar somente para / ocultar para), **Liberação** (padrão para todos ou datas/prazos próprios por público) e **Capa** (imagem/título/descrição diferentes por público, em massa: uma capa por módulo ou a mesma para todos).
+- **Para quem**: seleção rápida de **grupos e alunos específicos** (pop-up grande, 152+ grupos paginados, marcar página, busca de alunos) ou **segmento avançado** (editor embutido, sem pop-up). A seleção vira/reaproveita um segmento automático.
+- **Inteligência de acesso**: se os grupos/alunos escolhidos não estão em Grupos de acesso (ou sem acesso ao produto), oferece vincular direto (grupos → Grupos de acesso; alunos → acesso manual) antes de aplicar.
+- **Aluno**: liberação e capa por segmento aplicadas no currículo e na checagem de abertura; migração `20261115010000_produto_regras_por_segmento.sql`.
+- **Sinalização** de segmento (Visibilidade/Liberação/Capa) nos cards, tabela e aulas; unificação de Disponibilidade e Segmento (liberação padrão = "Todos os alunos").
+- Aba Liberação lista os públicos primeiro e "Demais alunos (padrão)" por último.
+
+### Submódulos
+- **Admin**: seção de submódulos com cards/tabela, busca, ordenação, Reordenar, seleção múltipla, barra de lote (Segmento, Ativar, Rascunho, Excluir) e paginação no servidor, em qualquer nível.
+- **Aluno**: módulo do extensivo mostra os submódulos em **lista (padrão)** ou cards, rota de submódulo, progresso por submódulo; removidos os cards-filtro "Todos/PDFull"; estatísticas no cabeçalho do módulo; busca também nas aulas dos submódulos.
+
+### Outros
+- Novo conteúdo: tipo **PDFIGHT**. Seletor de arquivos maior (3 colunas). Upload de PDF sem camada de texto deixa de falhar; erros de envio mostram o motivo real.
+- Seletor de grupo/produto/simulado dos segmentos abre por cima do pop-up, mais largo e com rolagem lateral.
+
+---
+
 ## 4.14.0 — 2026-11-11
 
 ### Conteúdos — visibilidade por segmento em lote

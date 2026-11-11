@@ -11,7 +11,7 @@ import {
 } from '@/lib/cronograma/adaptativo/liberacao'
 
 import { esquecer } from '@/lib/cache/relatorio-cache'
-import { lerCfgMetas, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
+import { lerCfgMetas, lerDiscSemTipo, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { diagnosticarCatalogo, type CatalogoMotor } from '@/lib/cronograma/adaptativo/catalogo-diagnostico'
 import { carregarConteudoBancoBase } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import { lerOverrideRow, salvarOverride } from '@/lib/cronograma/adaptativo/catalogo-override-db'
@@ -169,13 +169,16 @@ export async function obterPainelMetas(): Promise<{ ok: boolean; error?: string;
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const svc = createAdminClient()
   try {
-    const [cfg, planos] = await Promise.all([
+    const [cfg, discSemTipo, planos] = await Promise.all([
       lerCfgMetas(svc, g.tenantId),
+      lerDiscSemTipo(svc, g.tenantId),
       svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
     ])
     const { atualizadoEm, atualizadoPor: _a, ...params } = cfg
     const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
-    return { ok: true, painel: { params, padrao: PARAMS_PADRAO, atualizadoEm: atualizadoEm ?? null, alunosComPlano } }
+    const a = await getCurrentAccess()
+    const podeEditar = a.isAdmin || a.permissions.includes('*') || a.permissions.includes('cronogramas:update')
+    return { ok: true, painel: { params, padrao: PARAMS_PADRAO, atualizadoEm: atualizadoEm ?? null, alunosComPlano, discSemTipo, podeEditar } }
   } catch (e) {
     return { ok: false, error: (e as Error)?.message || 'Falha ao carregar.' }
   }
@@ -185,7 +188,10 @@ export async function salvarPainelMetas(params: Partial<ParamsAdaptativo>): Prom
   const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const svc = createAdminClient()
   const antes = await lerCfgMetas(svc, g.tenantId)
-  const depois = normalizarParams({ tiposBloqueados: antes.tiposBloqueados, ...params }) // bloqueios de tipo são geridos em Revisão › Cronograma › Regras: não zera aqui
+  // Bloqueio de tipos (tiposBloqueados) é gravado SÓ pelo card "Tipos de meta" (salvarTiposBloqueadosCronograma, usado aqui em Metas & inteligência e em
+  // Revisão › Cronograma › Regras). Este salvar ignora o que vier do cliente e preserva o valor vigente (estado do cliente pode estar defasado).
+  const { tiposBloqueados: _ignorado, ...resto } = params
+  const depois = normalizarParams({ ...resto, tiposBloqueados: antes.tiposBloqueados })
   const r = await salvarCfgMetas(svc, g.tenantId, depois, g.userId)
   if (!r.ok) return r
   await registrarAudit({

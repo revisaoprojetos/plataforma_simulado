@@ -65,7 +65,7 @@ export function resumoDisponibilidade(d: Disponibilidade | null | undefined): st
 
 // ── Tipos de conteúdo que o "Novo conteúdo" oferece (espelha o designer) ──
 export type SubtipoConteudo =
-  | 'pdfull' | 'pdflash' | 'videoaula' | 'slide' | 'legproc' | 'jurisclub'
+  | 'pdfull' | 'pdflash' | 'pdfight' | 'videoaula' | 'slide' | 'legproc' | 'jurisclub'
   | 'video' | 'documento' | 'quiz' | 'incorporacao' | 'audio' | 'texto'
   | 'simulado' | 'webinar' | 'entrega' | 'galeria' | 'flashcards' | 'scorm' | 'formulario' | 'cronograma'
 
@@ -83,6 +83,7 @@ export const SUBTIPOS: SubtipoDef[] = [
   // Materiais do Revisão
   { v: 'pdfull', nome: 'PDFULL', descricao: 'PDF completo com leitor, grifos e marca d’água', grupo: 'revisao', tipoRef: 'documento_biblioteca' },
   { v: 'pdflash', nome: 'PDFLASH', descricao: 'Resumo para revisão rápida', grupo: 'revisao', tipoRef: 'documento_biblioteca' },
+  { v: 'pdfight', nome: 'PDFIGHT', descricao: 'Fixação e prática do conteúdo', grupo: 'revisao', tipoRef: 'documento_biblioteca' },
   { v: 'videoaula', nome: 'Videoaula', descricao: 'Waid Player ou outro provedor, por bloco', grupo: 'revisao', tipoRef: 'video_url' },
   { v: 'slide', nome: 'Slide', descricao: 'Apresentação da videoaula', grupo: 'revisao', tipoRef: 'documento_biblioteca' },
   { v: 'legproc', nome: 'LegProc', descricao: 'Lei seca ligada ao assunto', grupo: 'revisao', tipoRef: 'documento_biblioteca' },

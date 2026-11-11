@@ -3,6 +3,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { materialDoItem, MATERIAIS, type Disponibilidade, type TipoRef, type MaterialChave } from './curriculo'
 import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
+import { regrasSegmentoDoAluno } from '@/lib/segmentos/regras-produto'
 import { resumoCronogramaDoAluno, type ResumoCronograma } from './resumo-cronograma'
 
 /**
@@ -84,6 +85,46 @@ export function agruparModulo(m: ModuloAluno): ModuloAgrupado {
   }
   const total = grupos.reduce((s, g) => s + g.total, 0), lidas = grupos.reduce((s, g) => s + g.lidas, 0)
   return { grupos, cronogramas, total, lidas, pct: total ? Math.round((lidas / total) * 100) : 0 }
+}
+
+/** Submódulo (ou módulo) SEM as aulas, com o progresso já calculado — o client só renderiza o card/linha. */
+export interface SubmoduloResumo { m: ModuloAluno; total: number; lidas: number; pct: number; filhos: number }
+
+export function resumirSubmodulos(m: ModuloAluno): SubmoduloResumo[] {
+  return m.submodulos.map((s) => {
+    const a = agruparModulo(s)
+    return { m: { ...s, aulas: [], submodulos: [] }, total: a.total, lidas: a.lidas, pct: a.pct, filhos: s.submodulos.length }
+  })
+}
+
+/** Localiza um módulo em qualquer nível da árvore, devolvendo o pai (null = módulo de topo) e os irmãos do mesmo nível. */
+export function localizarModulo(raiz: ModuloAluno[], id: string): { atual: ModuloAluno; pai: ModuloAluno | null; irmaos: ModuloAluno[] } | null {
+  const rec = (lista: ModuloAluno[], pai: ModuloAluno | null): { atual: ModuloAluno; pai: ModuloAluno | null; irmaos: ModuloAluno[] } | null => {
+    for (const x of lista) {
+      if (x.id === id) return { atual: x, pai, irmaos: lista }
+      const r = rec(x.submodulos, x); if (r) return r
+    }
+    return null
+  }
+  return rec(raiz, null)
+}
+
+export interface AchadoSubmodulo { id: string; titulo: string; aulas: AulaAluno[] }
+
+/** Busca por título nas aulas DENTRO dos submódulos (servidor; resultado agrupado pelo submódulo de origem e limitado). */
+export function buscarAulasEmSubmodulos(m: ModuloAluno, termo: string, limite = 60): AchadoSubmodulo[] {
+  const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const q = fold(termo.trim()); if (!q) return []
+  const out: AchadoSubmodulo[] = []
+  let n = 0
+  const rec = (x: ModuloAluno) => {
+    if (n >= limite) return
+    const aulas = x.aulas.filter((a) => a.tipoRef !== 'cronograma' && fold(a.titulo).includes(q)).slice(0, limite - n)
+    if (aulas.length) { out.push({ id: x.id, titulo: x.titulo, aulas }); n += aulas.length }
+    x.submodulos.forEach(rec)
+  }
+  m.submodulos.forEach(rec)
+  return out
 }
 
 const DIA = 86400000
@@ -187,6 +228,8 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     matriculaNoProduto(svc, tenantId, estudanteId, produtoId).catch(() => null),
   ])
   const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
+  // Liberação e capa POR SEGMENTO (migração 20261115010000): o aluno do segmento recebe a disponibilidade/capa própria do módulo/aula.
+  const porSeg = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
   const lidos = new Map<string, LeituraAluno>()
@@ -239,7 +282,8 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     const segM = visivel(m.id)
     if (segM === 'oculto') return null
     const exclusivoM = segHerdado || segM === 'cadeado'
-    const dm = normDisp(m.disponibilidade)
+    const dm = normDisp(porSeg ? porSeg.disp(m.id, m.disponibilidade) : m.disponibilidade)
+    const capaSeg = porSeg?.capa('modulo', m.id) ?? null
     const libM = maisTarde(herdado, momentoLiberacao(dm, matricula))
     const modLiberado = !libM || +libM <= agora
     if (!modLiberado && dm.antes === 'oculto') return null
@@ -248,7 +292,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       const segA = visivel(i.id)
       if (segA === 'oculto') continue
       const exclusivo = exclusivoM || segA === 'cadeado'
-      const di = normDisp(i.disponibilidade)
+      const di = normDisp(porSeg ? porSeg.disp(i.id, i.disponibilidade) : i.disponibilidade)
       const lib = maisTarde(libM, momentoLiberacao(di, matricula))
       const noPrazo = !lib || +lib <= agora
       if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
@@ -260,7 +304,8 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra
     return {
-      id: m.id, titulo: m.titulo, descricao: m.descricao ?? null, imagemUrl: m.imagem_url ?? null, ocultarTitulo: !!m.ocultar_titulo && !!m.imagem_url,
+      id: m.id, titulo: capaSeg?.titulo ?? m.titulo, descricao: capaSeg?.descricao ?? m.descricao ?? null, imagemUrl: capaSeg?.imagem_url ?? m.imagem_url ?? null,
+      ocultarTitulo: capaSeg ? (!!capaSeg.imagem_url && capaSeg.ocultar_titulo) || (!capaSeg.imagem_url && !!m.ocultar_titulo && !!m.imagem_url) : !!m.ocultar_titulo && !!m.imagem_url,
       aberto: m.exibicao !== 'recolhido', liberado: modLiberado && !exclusivoM, liberaEm: modLiberado || !libM ? null : libM.toISOString(),
       exclusivo: exclusivoM, aulas, submodulos,
     }
@@ -314,18 +359,20 @@ async function itensLiberadosPorProduto(
     const matricula = await matriculaNoProduto(svc, tenantId, estudanteId, produtoId).catch(() => null)
     // Segmentos: a aula, o módulo e o módulo pai precisam estar visíveis (nem oculto nem cadeado).
     const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
+    const porSeg = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
+    const dEf = (id: string, base: unknown) => (porSeg ? porSeg.disp(id, base) : base)
     for (const it of lista.filter((i) => i.produto_id === produtoId)) {
       if (visivel(it.id) !== 'visivel' || visivel(it.modulo_id) !== 'visivel') continue
       const { data: mod } = await svc.from('simulado_produto_modulos').select('disponibilidade, pai_id, deletado').eq('tenant_id', tenantId).eq('id', it.modulo_id).maybeSingle()
       if (!mod || (mod as any).deletado) continue
-      let lib = momentoLiberacao(normDisp(it.disponibilidade), matricula)
-      const lm = momentoLiberacao(normDisp((mod as any).disponibilidade), matricula)
+      let lib = momentoLiberacao(normDisp(dEf(it.id, it.disponibilidade)), matricula)
+      const lm = momentoLiberacao(normDisp(dEf(it.modulo_id, (mod as any).disponibilidade)), matricula)
       if (lm && (!lib || lm > lib)) lib = lm
       if ((mod as any).pai_id) {
         const { data: pai } = await svc.from('simulado_produto_modulos').select('disponibilidade, deletado').eq('tenant_id', tenantId).eq('id', (mod as any).pai_id).maybeSingle()
         if (pai && (pai as any).deletado) continue
         if (visivel((mod as any).pai_id) !== 'visivel') continue
-        const lp = pai ? momentoLiberacao(normDisp((pai as any).disponibilidade), matricula) : null
+        const lp = pai ? momentoLiberacao(normDisp(dEf((mod as any).pai_id, (pai as any).disponibilidade)), matricula) : null
         if (lp && (!lib || lp > lib)) lib = lp
       }
       if (!lib || +lib <= Date.now()) return true

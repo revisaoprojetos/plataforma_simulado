@@ -7,15 +7,15 @@
 //   • abas        — abas sublinhadas por tipo com contagem.
 // Sem coluna lateral de módulos: a navegação é por setas anterior/próximo + seletor. Agrupamento e progresso
 // vêm PRONTOS do servidor (agruparModulo); aqui só filtra por busca e renderiza.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, ChevronDown, FileText, Zap, Target, Scale, Gavel, ClipboardList, PlayCircle, FolderOpen, Lock, Search, X, CheckCircle2, LayoutGrid } from 'lucide-react'
-import type { ModuloAluno, AulaAluno, GrupoMaterial, ModuloAgrupado } from '@/lib/produtos/curriculo-aluno'
+import { useRouter, usePathname } from 'next/navigation'
+import { ChevronLeft, ChevronRight, ChevronDown, FileText, Zap, Target, Scale, Gavel, ClipboardList, PlayCircle, FolderOpen, Lock, Search, X, CheckCircle2, LayoutGrid, List } from 'lucide-react'
+import type { ModuloAluno, AulaAluno, GrupoMaterial, ModuloAgrupado, SubmoduloResumo, AchadoSubmodulo } from '@/lib/produtos/curriculo-aluno'
 import type { ModuloLayout } from '@/lib/produtos/tipos'
 import type { MaterialChave } from '@/lib/produtos/curriculo'
-import { cardGrid } from '@/components/aluno/card-grid'
-import { fold, fmtData, hrefModulo, AulaLinha, CabecalhoAulas, CardCronograma } from './curriculo'
+import { cardGrid, POSTER_MIN } from '@/components/aluno/card-grid'
+import { fold, fmtData, hrefModulo, AulaLinha, CabecalhoAulas, CardCronograma, Poster } from './curriculo'
 
 export interface NavModulo { id: string; titulo: string; liberado: boolean; lidas: number; total: number }
 
@@ -26,12 +26,30 @@ const PAGINA = 12
 
 type Filtrado = GrupoMaterial & { visiveis: AulaAluno[] }
 
-export function ModuloDetalhe({ nav, atual, agrupado, layout, slug, cor }: {
-  nav: NavModulo[]; atual: ModuloAluno; agrupado: ModuloAgrupado; layout: ModuloLayout; slug: string; cor: string
+export function ModuloDetalhe({ nav, atual, agrupado, total, submodulos, achados, qInicial, ehSub, layout, slug, cor }: {
+  nav: NavModulo[]; atual: ModuloAluno
+  agrupado: ModuloAgrupado          // aulas DIRETAS do módulo, agrupadas por material
+  total: ModuloAgrupado             // módulo inteiro (inclui submódulos) — estatísticas do cabeçalho
+  submodulos: SubmoduloResumo[]; achados: AchadoSubmodulo[]; qInicial: string; ehSub: boolean
+  layout: ModuloLayout; slug: string; cor: string
 }) {
   const router = useRouter()
-  const [busca, setBusca] = useState('')
+  const pathname = usePathname()
+  const [busca, setBusca] = useState(qInicial)
   const q = fold(busca.trim())
+  // Busca nas aulas dos submódulos é feita no SERVIDOR (?q=), com debounce; aulas diretas filtram local.
+  const primeiro = useRef(true)
+  useEffect(() => {
+    if (!submodulos.length) return
+    if (primeiro.current) { primeiro.current = false; return }
+    const t = setTimeout(() => {
+      const sp = new URLSearchParams(window.location.search)
+      if (busca.trim()) sp.set('q', busca.trim()); else sp.delete('q')
+      const s = sp.toString()
+      router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false })
+    }, 350)
+    return () => clearTimeout(t)
+  }, [busca, submodulos.length, pathname, router])
   const idx = nav.findIndex((m) => m.id === atual.id)
   const ant = idx > 0 ? nav[idx - 1] : null
   const prox = idx >= 0 && idx < nav.length - 1 ? nav[idx + 1] : null
@@ -55,7 +73,7 @@ export function ModuloDetalhe({ nav, atual, agrupado, layout, slug, cor }: {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Módulo {idx + 1} de {nav.length}</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ehSub ? 'Submódulo' : 'Módulo'} {idx + 1} de {nav.length}</div>
             <div className="flex min-w-0 items-center gap-1.5">
               <BotaoNav href={ant ? hrefModulo(slug, ant.id) : null} label="Módulo anterior" titulo={ant?.titulo}><ChevronLeft className="h-4 w-4" /></BotaoNav>
               <label className="relative min-w-0">
@@ -73,9 +91,18 @@ export function ModuloDetalhe({ nav, atual, agrupado, layout, slug, cor }: {
           {atual.descricao && <p className="mt-1 text-sm text-muted-foreground">{atual.descricao}</p>}
           {!atual.liberado && (atual.exclusivo || atual.liberaEm) && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" />{atual.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : `Libera em ${fmtData(atual.liberaEm!)}`}</p>}
           <div className="mt-3 flex items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${agrupado.pct}%`, background: cor }} /></div>
-            <span className="whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">{agrupado.lidas}/{agrupado.total} aulas · {agrupado.pct}%</span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${total.pct}%`, background: cor }} /></div>
+            <span className="whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">{total.lidas}/{total.total} aulas concluídas · {total.pct}%</span>
           </div>
+          {/* Estatísticas compactas (já calculadas no servidor): submódulos + concluídas por tipo de material */}
+          {(submodulos.length > 0 || total.grupos.length > 0) && (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              {submodulos.length > 0 && <span className="font-medium">{submodulos.length} {submodulos.length === 1 ? 'submódulo' : 'submódulos'}</span>}
+              {total.grupos.map((g, i) => (
+                <span key={g.chave}>{i > 0 || submodulos.length > 0 ? ' · ' : ''}{g.label} {g.lidas}/{g.total}</span>
+              ))}
+            </p>
+          )}
         </div>
       </div>
 
@@ -83,7 +110,7 @@ export function ModuloDetalhe({ nav, atual, agrupado, layout, slug, cor }: {
       {agrupado.cronogramas.map((a) => <CardCronograma key={a.id} a={a} cor={cor} />)}
 
       {/* Busca */}
-      {agrupado.total > 6 && (
+      {total.total > 6 && (
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar aula neste módulo…"
@@ -92,16 +119,21 @@ export function ModuloDetalhe({ nav, atual, agrupado, layout, slug, cor }: {
         </label>
       )}
 
-      {agrupado.total === 0 ? (
+      {/* Submódulos (cards/lista). Com busca ativa, vira o resultado das aulas dentro deles, agrupado pelo submódulo. */}
+      {submodulos.length > 0 && !q && <Submodulos itens={submodulos} slug={slug} cor={cor} />}
+      {submodulos.length > 0 && q && achados.length > 0 && <AchadosSub achados={achados} cor={cor} />}
+
+      {total.total === 0 && submodulos.length === 0 ? (
         agrupado.cronogramas.length === 0 && <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Sem aulas neste módulo ainda.</div>
-      ) : q && achou === 0 ? (
+      ) : q && achou === 0 && achados.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhuma aula encontrada para “{busca}”.</div>
-      ) : layout === 'colunas' ? (
-        <Colunas grupos={grupos} cor={cor} busca={!!q} />
-      ) : layout === 'abas' ? (
-        <Abas grupos={grupos} cor={cor} busca={!!q} />
-      ) : (
-        <CardsLista grupos={grupos} total={agrupado} cor={cor} busca={!!q} />
+      ) : agrupado.total === 0 ? null : (
+        <div className="space-y-3">
+          {submodulos.length > 0 && !q && <h2 className="px-1 text-sm font-bold tracking-tight">Aulas deste {ehSub ? 'submódulo' : 'módulo'}</h2>}
+          {layout === 'colunas' ? <Colunas grupos={grupos} cor={cor} busca={!!q} />
+            : layout === 'abas' ? <Abas grupos={grupos} cor={cor} busca={!!q} />
+            : <CardsLista grupos={grupos} cor={cor} busca={!!q} />}
+        </div>
       )}
 
       {/* Rodapé: navegação entre módulos */}
@@ -157,53 +189,96 @@ function Medalha({ g, cor, on }: { g: { chave: MaterialChave; lidas: number; tot
   )
 }
 
-/* ═══════ Variação 1: cards por tipo + lista ═══════ */
-function CardsLista({ grupos, total, cor, busca }: { grupos: Filtrado[]; total: ModuloAgrupado; cor: string; busca: boolean }) {
-  const [sel, setSel] = useState<'todos' | MaterialChave>('todos')
-  const ativo = sel === 'todos' ? null : grupos.find((g) => g.chave === sel) ?? null
-  const mostrar = ativo ? [ativo] : grupos.filter((g) => !busca || g.visiveis.length)
+/* ═══════ Variação 1: lista de aulas por tipo (os cards-filtro por material foram removidos; estatísticas ficam no cabeçalho) ═══════ */
+function CardsLista({ grupos, cor, busca }: { grupos: Filtrado[]; cor: string; busca: boolean }) {
+  const mostrar = grupos.filter((g) => !busca || g.visiveis.length)
   return (
-    <div className="space-y-4">
-      <div style={cardGrid(168, 12)}>
-        <button type="button" onClick={() => setSel('todos')} aria-pressed={sel === 'todos'}
-          className={`flex min-w-0 flex-col gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm transition-colors hover:bg-muted/40 ${sel === 'todos' ? 'ring-2' : ''}`}
-          style={sel === 'todos' ? { ['--tw-ring-color' as string]: cor } : undefined}>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={sel === 'todos' ? { background: cor, color: '#fff' } : { background: `color-mix(in srgb, ${cor} 12%, transparent)`, color: cor }}><LayoutGrid className="h-4 w-4" /></span>
-            <span className="min-w-0"><span className="block truncate text-sm font-bold">Todos</span><span className="block truncate text-[11px] text-muted-foreground">Todos os materiais</span></span>
-          </div>
-          <Progresso lidas={total.lidas} total={total.total} pct={total.pct} cor={cor} />
-        </button>
-        {grupos.map((g) => {
-          const on = sel === g.chave
-          return (
-            <button key={g.chave} type="button" onClick={() => setSel(g.chave)} aria-pressed={on}
-              className={`flex min-w-0 flex-col gap-2 rounded-2xl border bg-card p-3 text-left shadow-sm transition-colors hover:bg-muted/40 ${on ? 'ring-2' : ''} ${g.liberadas === 0 ? 'opacity-75' : ''}`}
-              style={on ? { ['--tw-ring-color' as string]: cor } : undefined}>
-              <div className="flex items-center gap-2.5">
-                <Medalha g={g} cor={cor} on={on} />
-                <span className="min-w-0"><span className="block truncate text-sm font-bold">{g.label}</span><span className="block truncate text-[11px] text-muted-foreground">{g.curto}</span></span>
-              </div>
-              {g.liberadas === 0
-                ? <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Lock className="h-3 w-3" />{g.liberaEm ? `libera em ${fmtData(g.liberaEm)}` : 'bloqueado'}</span>
-                : <Progresso lidas={g.lidas} total={g.total} pct={g.pct} cor={cor} />}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="space-y-5">
-        {mostrar.map((g) => <GrupoColapsavel key={g.chave} g={g} cor={cor} comTitulo={!ativo} />)}
-      </div>
+    <div className="space-y-5">
+      {mostrar.map((g) => <GrupoColapsavel key={g.chave} g={g} cor={cor} comTitulo={mostrar.length > 1} />)}
     </div>
   )
 }
 
-function Progresso({ lidas, total, pct, cor }: { lidas: number; total: number; pct: number; cor: string }) {
+/* ═══════ Submódulos: CARDS (poster do extensivo) ou LISTA — escolha persistida em localStorage ═══════ */
+const LS_SUB = 'aluno:submodulos-modo:v2' // v2: o padrão passou a ser LISTA (ignora escolhas antigas)
+function Submodulos({ itens, slug, cor }: { itens: SubmoduloResumo[]; slug: string; cor: string }) {
+  const [modo, setModo] = useState<'cards' | 'lista'>('lista')
+  useEffect(() => {
+    try { const v = localStorage.getItem(LS_SUB); if (v === 'cards' || v === 'lista') setModo(v) } catch { /* storage indisponível (iframe/privado) */ }
+  }, [])
+  const trocar = (v: 'cards' | 'lista') => { setModo(v); try { localStorage.setItem(LS_SUB, v) } catch { /* ignora */ } }
+  const [qtd, setQtd] = useState(24)
+  const fatia = itens.slice(0, qtd)
+  const btn = (v: 'cards' | 'lista', label: string, Icon: typeof List) => (
+    <button type="button" onClick={() => trocar(v)} aria-pressed={modo === v} aria-label={label} title={label}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${modo === v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+      style={modo === v ? { color: cor } : undefined}><Icon className="h-4 w-4" /></button>
+  )
   return (
-    <div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: cor }} /></div>
-      <div className="mt-1 text-[11px] tabular-nums text-muted-foreground">{lidas}/{total} concluídas</div>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h2 className="text-sm font-bold tracking-tight">Submódulos <span className="text-xs font-normal text-muted-foreground">· {itens.length}</span></h2>
+        <div className="inline-flex gap-0.5 rounded-lg bg-muted p-0.5">{btn('cards', 'Ver em cards', LayoutGrid)}{btn('lista', 'Ver em lista', List)}</div>
+      </div>
+      {modo === 'cards' ? (
+        <div style={cardGrid(POSTER_MIN, 16)}>
+          {fatia.map((s, i) => <Poster key={s.m.id} m={s.m} nome={s.m.titulo} n={i + 1} href={hrefModulo(slug, s.m.id)} cor={cor} grade stats={{ total: s.total, lidas: s.lidas, pct: s.pct }} />)}
+        </div>
+      ) : (
+        <ol className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
+          {fatia.map((s, i) => <li key={s.m.id}><SubLinha s={s} n={i + 1} slug={slug} cor={cor} /></li>)}
+        </ol>
+      )}
+      {itens.length > qtd && (
+        <button type="button" onClick={() => setQtd((n) => n + 24)} className="w-full rounded-xl border bg-background py-2 text-xs font-semibold transition-colors hover:bg-muted" style={{ color: cor }}>
+          Mostrar mais ({itens.length - qtd} restantes)
+        </button>
+      )}
+    </section>
+  )
+}
+
+function SubLinha({ s, n, slug, cor }: { s: SubmoduloResumo; n: number; slug: string; cor: string }) {
+  const m = s.m
+  const feito = m.liberado && s.total > 0 && s.lidas === s.total
+  return (
+    <Link href={hrefModulo(slug, m.id)} className={`flex items-center gap-3 p-3 transition-colors hover:bg-muted/40 ${m.liberado ? '' : 'opacity-75'}`}>
+      <span className="relative aspect-[2/3] w-9 shrink-0 overflow-hidden rounded-md"
+        style={m.imagemUrl ? undefined : { background: `linear-gradient(170deg, color-mix(in srgb, ${cor} 85%, #000), var(--pn-0b0820,#0b0820))` }}>
+        {m.imagemUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={m.imagemUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          : <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white/70">{n}</span>}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{m.titulo}</span>
+        <span className="mt-0.5 block text-[11px] text-muted-foreground">
+          {!m.liberado
+            ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>
+            : <>{s.total} {s.total === 1 ? 'aula' : 'aulas'}{s.filhos ? ` · ${s.filhos} ${s.filhos === 1 ? 'submódulo' : 'submódulos'}` : ''}</>}
+        </span>
+      </span>
+      {m.liberado && s.total > 0 && (
+        <span className="hidden w-40 shrink-0 sm:block">
+          <span className="block h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full" style={{ width: `${s.pct}%`, background: cor }} /></span>
+          <span className="mt-1 block text-right text-[11px] tabular-nums text-muted-foreground">{s.lidas}/{s.total} concluídas</span>
+        </span>
+      )}
+      {!m.liberado ? <Lock className="h-4 w-4 shrink-0 text-muted-foreground" /> : feito ? <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: cor }} /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+    </Link>
+  )
+}
+
+/* Resultado da busca nas aulas dos submódulos (vem do servidor), agrupado pelo submódulo de origem */
+function AchadosSub({ achados, cor }: { achados: AchadoSubmodulo[]; cor: string }) {
+  return (
+    <div className="space-y-4">
+      {achados.map((g) => (
+        <section key={g.id} className="space-y-2">
+          <h2 className="px-1 text-sm font-bold tracking-tight">{g.titulo} <span className="text-xs font-normal text-muted-foreground">· {g.aulas.length} {g.aulas.length === 1 ? 'aula' : 'aulas'}</span></h2>
+          <ListaPaginada aulas={g.aulas} cor={cor} />
+        </section>
+      ))}
     </div>
   )
 }
