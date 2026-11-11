@@ -52,7 +52,6 @@ export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar
           )}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
             {m.ocultar_titulo ? null : <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagem_url ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>}
-            <SinaisSegmento sinais={sinais} sobreImagem className="mt-1.5" />
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
               {m.aulas} {m.aulas === 1 ? 'aula' : 'aulas'} · {m.submodulos} {m.submodulos === 1 ? 'submódulo' : 'submódulos'}
             </div>
@@ -61,6 +60,8 @@ export function CardModulo({ m, podeEditar, marcado, onMarcar, onAbrir, onEditar
         {podeEditar && onMarcar && (
           <span className="absolute left-2 top-2 rounded-md bg-card/90 p-1 shadow-sm"><CaixaSelecao checked={!!marcado} onChange={onMarcar} label={`Selecionar ${m.titulo}`} /></span>
         )}
+        {/* Selos de segmento: logo abaixo do checkbox de seleção (não cobrem o título) */}
+        <SinaisSegmento sinais={sinais} sobreImagem compacto className="pointer-events-none absolute left-2 top-11 flex-nowrap" />
         {podeEditar && (
           <div className="absolute right-2 top-2">
             <DropdownMenu>

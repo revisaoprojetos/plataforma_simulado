@@ -224,7 +224,7 @@ function TrilhaModulos({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: s
                   <h3 className="truncate text-base font-bold tracking-tight">{m.titulo}</h3>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {!m.liberado
-                      ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>
+                      ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaRotulo ? m.liberaRotulo : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : (m.bloqueioMsg ?? 'bloqueado')}</span>
                       : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.total > 0 ? ` · ${p.pct}%` : ''}</>}
                   </div>
                   {m.liberado && p.total > 0 && (
@@ -297,7 +297,7 @@ function CardTrilha({ m, n, href, cor }: { m: ModuloAluno; n: number; href: stri
       <div className="flex flex-wrap items-center justify-center gap-3 px-4 py-3">
         {m.liberado
           ? <Link href={href} className="text-sm font-bold hover:underline" style={{ color: cor }}>{cta}</Link>
-          : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>}
+          : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaRotulo ? m.liberaRotulo : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : (m.bloqueioMsg ?? 'bloqueado')}</span>}
         <button type="button" onClick={() => setAberto((v) => !v)} aria-expanded={aberto}
           className="inline-flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/70">
           Conteúdo <ChevronDown className={`h-3.5 w-3.5 transition-transform ${aberto ? 'rotate-180' : ''}`} />
@@ -337,7 +337,7 @@ function ModuloAccordion({ m, n, slug, cor }: { m: ModuloAluno; n: number; slug:
           <span className="block truncate text-sm font-semibold">{m.titulo}</span>
           <span className="text-[11px] text-muted-foreground">
             {!m.liberado
-              ? (m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado')
+              ? (m.exclusivo ? 'conteúdo exclusivo' : m.liberaRotulo ? m.liberaRotulo : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : (m.bloqueioMsg ?? 'bloqueado'))
               : `${p.lidas}/${p.total} aulas${p.lidas ? ` · ${p.pct}%` : ''}`}
           </span>
         </span>
@@ -418,7 +418,7 @@ export function Poster({ m, nome, n, href, cor, grade, destaque, stats }: { m: M
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
         {m.ocultarTitulo ? null : <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>}
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
-          {!m.liberado ? <><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
+          {!m.liberado ? <><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaRotulo ? m.liberaRotulo : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : (m.bloqueioMsg ?? 'bloqueado')}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
         </div>
         {m.liberado && p.total > 0 && (
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[color:var(--pn-f1c232,#F1C232)]" style={{ width: `${p.pct}%` }} /></div>
@@ -462,7 +462,7 @@ export function CardCronograma({ a, cor }: { a: AulaAluno; cor: string }) {
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plano de estudo</div>
           <div className="text-sm font-semibold leading-snug">{a.titulo}{r?.temPlano && r.titulo && r.titulo !== a.titulo ? <span className="font-normal text-muted-foreground"> · {r.titulo}</span> : null}</div>
           {bloqueado ? (
-            <p className="mt-1 text-xs text-muted-foreground">{a.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : a.liberaEm ? `Libera em ${fmtData(a.liberaEm)}` : 'Indisponível no momento'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{a.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : a.liberaRotulo ? a.liberaRotulo : a.liberaEm ? `Libera em ${fmtData(a.liberaEm)}` : (a.bloqueioMsg ?? 'Indisponível no momento')}</p>
           ) : !r?.temPlano ? (
             <p className="mt-1 text-xs text-muted-foreground">Você ainda não tem um cronograma. Gere o seu para organizar o estudo semana a semana.</p>
           ) : r.modo === 'adaptativo' ? (
@@ -536,7 +536,7 @@ export function AulaLinha({ a, n, cor, tabular }: { a: AulaAluno; n: number; cor
         <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
           {rotulo && <span className={`rounded-md bg-muted px-1.5 py-px font-semibold uppercase tracking-wide ${compacto}`}>{rotulo}</span>}
           {!a.liberada && a.exclusivo && <span>conteúdo exclusivo</span>}
-          {!a.liberada && !a.exclusivo && a.liberaEm && <span>libera em {fmtData(a.liberaEm)}</span>}
+          {!a.liberada && !a.exclusivo && !a.lida && (a.liberaRotulo ? <span>{a.liberaRotulo}</span> : a.liberaEm ? <span>libera em {fmtData(a.liberaEm)}</span> : a.bloqueioMsg ? <span>{a.bloqueioMsg}</span> : null)}
           {a.lida && <span style={{ color: cor }}>lida</span>}
           {L?.onde && <span className={`font-medium text-foreground/80 ${compacto}`}>{L.onde}</span>}
           {L?.ultimo && <span className={compacto}>Último acesso: {L.ultimo}</span>}

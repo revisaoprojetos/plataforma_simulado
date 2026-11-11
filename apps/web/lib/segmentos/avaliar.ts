@@ -178,12 +178,17 @@ async function valorDoCampo(c: Condicao, ctx: ContextoAluno): Promise<Valor> {
     case 'aluno_cadastro': return { tipo: 'data', v: (await est())?.created_at ?? null }
     case 'aluno_nascimento': return { tipo: 'data', v: (await est())?.data_nascimento ?? null }
     case 'grupo': {
-      const m = c.ref ? (await ctx.grupos()).get(c.ref) : undefined
-      return { tipo: 'relacao', v: !!m && (!m.expira_em || m.expira_em > new Date().toISOString()) }
+      const ids = c.refs?.length ? c.refs : c.ref ? [c.ref] : []
+      const gr = await ctx.grupos(), agora = new Date().toISOString()
+      return { tipo: 'relacao', v: ids.some((id) => { const m = gr.get(id); return !!m && (!m.expira_em || m.expira_em > agora) }) }
     }
     case 'grupo_entrada': return { tipo: 'data', v: c.ref ? (await ctx.grupos()).get(c.ref)?.criado_em ?? null : null }
     case 'grupo_expira': return { tipo: 'data', v: c.ref ? (await ctx.grupos()).get(c.ref)?.expira_em ?? null : null }
-    case 'assinatura': return { tipo: 'relacao', v: !!(c.ref && (await ctx.assinaturaAtiva(c.ref))) }
+    case 'assinatura': {
+      const ids = c.refs?.length ? c.refs : c.ref ? [c.ref] : []
+      for (const id of ids) if (await ctx.assinaturaAtiva(id)) return { tipo: 'relacao', v: true }
+      return { tipo: 'relacao', v: false }
+    }
     case 'assinatura_inicio': {
       const a = c.ref ? await ctx.assinaturaAtiva(c.ref) : null
       return { tipo: 'data', v: a ? (a.inicio_em ?? a.criado_em) : null }
@@ -276,7 +281,7 @@ function compara(c: Condicao, val: Valor): boolean {
 export async function avaliarCondicao(c: Condicao, ctx: ContextoAluno): Promise<boolean> {
   const def = CAMPO_POR_ID[c.campo]
   if (!def) return false
-  if (def.ref && def.refObrigatoria && !c.ref) return false
+  if (def.ref && def.refObrigatoria && !c.ref && !c.refs?.length) return false
   if (!SEM_VALOR.includes(c.operador) && (c.valor === null || c.valor === undefined || c.valor === '')) return false
   return compara(c, await valorDoCampo(c, ctx))
 }

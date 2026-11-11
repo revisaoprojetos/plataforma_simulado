@@ -12,6 +12,24 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.17.0 — 2026-11-11
+
+### Cronograma — motor 3.2.0 e unificação Revisão + Adaptativo
+- **Motor Adaptativo 3.2.0** (revisão 23 do modelo 3.0): tetos de PDFull novos por semana (3/4/5/6), PDFull em qualquer dia de estudo (até 2 distintos/dia), leitura só começa se couber na mesma semana (≤3 datas), reta final. Planos antigos mantêm a regra da sua versão até recalcular.
+- **Jurisprudência opt-in** (só entra se marcada); **bloqueio de tipos de meta** pelo admin (Metas & inteligência → "Tipos de meta" e por disciplina), exibido como "(bloqueado pela equipe)" no Configurar.
+- **Novo cronograma**: o aluno escolhe entre **Revisão** (a partir dos modelos/metas do admin) e **Adaptativo**; pode ter os dois, um em foco alimenta "Metas de hoje". Modal redesenhado e centralizado; **Apagar** definitivo (substitui Arquivar), rápido.
+- **Cronograma Revisão** renderizado no mesmo iframe do Adaptativo (Hoje/Semana/Calendário/Configurar, sem reajuste), com vínculo das metas ao conteúdo da Biblioteca, **Parcial**, atrasadas e "Abrir material" idêntico; botão **Baixar** (documento + capa da Biblioteca como 1ª página, nome correto).
+- Integridade: metas estáveis por chave, grade congelada na emissão, reimport sem zerar progresso; admin "Conteúdo/Material das metas" e "Metas sem material".
+- Correções: breadcrumb "← Painel de estudos", Voltar do wizard, carregamento mais rápido (paralelização, cache, ETag, retries).
+- **Leitor (PDF)**: na última folha, "Concluir leitura" fica abaixo da folha (antes ficava ao lado).
+- Storage: fallback S3→Supabase (`STORAGE_FALLBACK_SUPABASE`); hosts no `docker-compose.portainer.yml`.
+- Dependência nova: `pdf-lib`.
+### Conteúdos / Produtos
+- Posição dos cursos no produto (`posicao-cursos`, `refs-multi`) e **liberação de aulas** (importação, decisão, match e visão do aluno; admin em Revisão › Cronograma › Liberação de aulas).
+- ⚠️ Migrações a aplicar: `20261114030000`, `20261116010000`, `20261117010000` (as `20261114010000/020000` já foram aplicadas).
+
+---
+
 ## 4.16.1 — 2026-11-12
 
 ### Segmentos — Liberação mais clara

@@ -24,6 +24,7 @@ export type DisponibilidadeTipo =
   | 'intervalo'                 // Intervalo após matrícula — libera X dias depois de cada matrícula
   | 'data_e_intervalo'          // Data específica E intervalo após matrícula — o que vier por último
   | 'dia_semana_e_intervalo'    // Dia da semana + intervalo após matrícula
+  | 'cronograma'                // Pelo cronograma do aluno (planilha × meta do plano) — só em regras por segmento
 
 export const DISPONIBILIDADE_OPCOES: { v: DisponibilidadeTipo; titulo: string; descricao: string }[] = [
   { v: 'na_matricula', titulo: 'Sempre disponível', descricao: 'Libera junto com a matrícula.' },
@@ -49,7 +50,24 @@ export interface Disponibilidade {
   dias?: number | null            // dias após a matrícula (tipos 'intervalo' / 'data_e_intervalo' / 'dia_semana_e_intervalo')
   diaSemana?: number | null       // 0..6 (tipo 'dia_semana_e_intervalo')
   antes?: DisponibilidadeAntes    // o que o aluno vê antes de liberar
+  // tipo 'cronograma':
+  sem_plano?: CronogramaSemPlano  // aluno SEM cronograma fixado
+  com_plano?: CronogramaComPlano  // aluno COM cronograma fixado
+  dias_antes?: number | null      // 0..365 (modos 'plano' / 'mais_cedo')
 }
+
+export type CronogramaSemPlano = 'planilha' | 'liberado' | 'atual'
+export type CronogramaComPlano = 'concluir_meta' | 'plano' | 'mais_cedo'
+export const CRONOGRAMA_SEM_PLANO: { v: CronogramaSemPlano; titulo: string; descricao: string }[] = [
+  { v: 'planilha', titulo: 'Pela data da planilha', descricao: 'Abre na data de liberação da aula na planilha do produto.' },
+  { v: 'liberado', titulo: 'Tudo liberado', descricao: 'Sem cronograma, a aula fica aberta desde o início.' },
+  { v: 'atual', titulo: 'Manter liberação atual', descricao: 'Segue a disponibilidade padrão do módulo/aula.' },
+]
+export const CRONOGRAMA_COM_PLANO: { v: CronogramaComPlano; titulo: string; descricao: string }[] = [
+  { v: 'concluir_meta', titulo: 'Só ao concluir a meta da aula no plano', descricao: 'A aula abre quando o aluno conclui a meta correspondente (padrão).' },
+  { v: 'plano', titulo: 'Quando a meta entra no plano', descricao: 'Abre na data da meta no plano, menos os dias de antecedência.' },
+  { v: 'mais_cedo', titulo: 'O que vier primeiro: planilha ou plano', descricao: 'Vale a data que chegar antes (menos os dias de antecedência no plano).' },
+]
 
 export const DISPONIBILIDADE_PADRAO: Disponibilidade = { tipo: 'na_matricula', antes: 'bloqueado_cadeado' }
 
@@ -60,6 +78,12 @@ export function resumoDisponibilidade(d: Disponibilidade | null | undefined): st
   if (d.tipo === 'intervalo') return `${d.dias ?? 0} dia(s) após a matrícula`
   if (d.tipo === 'data_e_intervalo') return 'data + intervalo'
   if (d.tipo === 'dia_semana_e_intervalo') return `${DIAS_SEMANA[d.diaSemana ?? 1]} + intervalo`
+  if (d.tipo === 'cronograma') {
+    const sem = d.sem_plano === 'liberado' ? 'tudo liberado' : d.sem_plano === 'atual' ? 'liberação atual' : 'data da planilha'
+    const dias = d.dias_antes ? ` (${d.dias_antes} dia(s) antes)` : ''
+    const com = d.com_plano === 'plano' ? `quando a meta entra no plano${dias}` : d.com_plano === 'mais_cedo' ? `o que vier primeiro: planilha ou plano${dias}` : 'ao concluir a meta'
+    return `Pelo cronograma: sem plano → ${sem} · com plano → ${com}`
+  }
   return 'disponível sempre'
 }
 

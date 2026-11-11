@@ -89,7 +89,7 @@ export function ModuloDetalhe({ nav, atual, agrupado, total, submodulos, achados
           </div>
           <h1 className="mt-1 text-xl font-bold leading-tight tracking-tight sm:text-2xl">{atual.titulo}</h1>
           {atual.descricao && <p className="mt-1 text-sm text-muted-foreground">{atual.descricao}</p>}
-          {!atual.liberado && (atual.exclusivo || atual.liberaEm) && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" />{atual.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : `Libera em ${fmtData(atual.liberaEm!)}`}</p>}
+          {!atual.liberado && (atual.exclusivo || atual.liberaEm || atual.bloqueioMsg || atual.liberaRotulo) && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" />{atual.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : atual.liberaRotulo ? atual.liberaRotulo : atual.liberaEm ? `Libera em ${fmtData(atual.liberaEm)}` : atual.bloqueioMsg}</p>}
           <div className="mt-3 flex items-center gap-3">
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${total.pct}%`, background: cor }} /></div>
             <span className="whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">{total.lidas}/{total.total} aulas concluídas · {total.pct}%</span>
@@ -254,7 +254,7 @@ function SubLinha({ s, n, slug, cor }: { s: SubmoduloResumo; n: number; slug: st
         <span className="block truncate text-sm font-semibold">{m.titulo}</span>
         <span className="mt-0.5 block text-[11px] text-muted-foreground">
           {!m.liberado
-            ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>
+            ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaRotulo ? m.liberaRotulo : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : (m.bloqueioMsg ?? 'bloqueado')}</span>
             : <>{s.total} {s.total === 1 ? 'aula' : 'aulas'}{s.filhos ? ` · ${s.filhos} ${s.filhos === 1 ? 'submódulo' : 'submódulos'}` : ''}</>}
         </span>
       </span>

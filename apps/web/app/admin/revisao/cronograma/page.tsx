@@ -28,6 +28,7 @@ import GeradorAcessos from './gerador/acessos'
 import GeradorImportacao from './gerador/importacao'
 import GeradorRelatorios from './gerador/relatorios'
 import GeradorLiberacao from './gerador/liberacao'
+import GeradorLiberacaoAulas from './liberacao-aulas'
 
 // Cronograma — admin "Plataforma Revisão". Só LÊ dados prontos (lib/revisao/cronograma).
 // Navegação em 2 níveis por query string: `?aba=<gerador|adaptativo>&sub=<sub-aba>`. Busca/filtro/ordenação/paginação
@@ -37,10 +38,10 @@ const BASE = '/admin/revisao/cronograma'
 
 type AbaPrincipal = 'gerador' | 'adaptativo'
 type SubAdaptativo = 'mat' | 'disc' | 'regras' | 'sprint' | 'ver' | 'faixas' | 'especial'
-type SubGerador = 'catalogo' | 'metas' | 'conteudos' | 'acessos' | 'importacao' | 'relatorios' | 'liberacao'
+type SubGerador = 'catalogo' | 'metas' | 'conteudos' | 'acessos' | 'importacao' | 'relatorios' | 'liberacao' | 'liberacao-aulas'
 const SUBS_ADAPTATIVO: SubAdaptativo[] = ['mat', 'disc', 'regras', 'sprint', 'ver', 'faixas', 'especial']
-const SUBS_GERADOR: SubGerador[] = ['catalogo', 'metas', 'conteudos', 'acessos', 'importacao', 'relatorios', 'liberacao']
-const TITULOS_GERADOR: Record<SubGerador, string> = { catalogo: 'Catálogo', metas: 'Metas', conteudos: 'Conteúdos', acessos: 'Acessos', importacao: 'Importação', relatorios: 'Relatórios', liberacao: 'Liberação' }
+const SUBS_GERADOR: SubGerador[] = ['catalogo', 'metas', 'conteudos', 'acessos', 'importacao', 'relatorios', 'liberacao', 'liberacao-aulas']
+const TITULOS_GERADOR: Record<SubGerador, string> = { catalogo: 'Catálogo', metas: 'Metas', conteudos: 'Conteúdos', acessos: 'Acessos', importacao: 'Importação', relatorios: 'Relatórios', liberacao: 'Liberação', 'liberacao-aulas': 'Liberação de aulas' }
 const PPS = [10, 14, 25, 50, 100]
 const PP_PADRAO = 14 // mesmo padrão da Biblioteca
 const porPagina = (v: string | undefined) => { const n = ParamsInt(v, PP_PADRAO); return PPS.includes(n) ? n : PP_PADRAO }
@@ -93,6 +94,7 @@ export default async function CronogramaRevisaoPage({ searchParams }: { searchPa
         {subGe === 'importacao' && <GeradorImportacao {...props} />}
         {subGe === 'relatorios' && <GeradorRelatorios {...props} />}
         {subGe === 'liberacao' && <GeradorLiberacao {...props} />}
+        {subGe === 'liberacao-aulas' && <GeradorLiberacaoAulas {...props} />}
       </div>
     )
   }

@@ -20,16 +20,17 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { CampoImagem } from '@/components/admin/campo-imagem'
 import { cn } from '@/lib/utils'
-import { resumoDisponibilidade, type Disponibilidade } from '@/lib/produtos/curriculo'
+import { resumoDisponibilidade, CRONOGRAMA_SEM_PLANO, CRONOGRAMA_COM_PLANO, type Disponibilidade, type CronogramaSemPlano, type CronogramaComPlano } from '@/lib/produtos/curriculo'
+import Link from 'next/link'
 import { EFEITO_LABEL, resumoRegra, type RegraVisibilidade, type Segmento } from '@/lib/segmentos/tipos'
 import type { AlvoLote, VisibilidadeConteudo } from './visibilidade-actions-tipos'
-import type { RegrasSegmentoAdmin, CapaSegAdmin } from './segmento-regras-tipos'
+import type { RegrasSegmentoAdmin, CapaSegAdmin, PlanilhaLiberacaoInfo } from './segmento-regras-tipos'
 import {
   aplicarVisibilidadeEmLoteAction, excluirRegraVisibilidadeAction, alternarRegraVisibilidadeAction, duplicarSegmentoAction, excluirSegmentoAction,
 } from './visibilidade-actions'
 import {
   carregarRegrasSegmentoAction, aplicarLiberacaoSegmentoAction, removerLiberacaoSegmentoAction, alternarRegraSegmentoAction,
-  salvarCapaSegmentoAction, removerCapaSegmentoAction,
+  salvarCapaSegmentoAction, removerCapaSegmentoAction, carregarPlanilhaLiberacaoAction,
 } from './segmento-regras-actions'
 import { SegmentoEditor } from './segmento-editor'
 import { PublicoRapido, usePublico, type PublicoApi } from './publico-rapido'
@@ -231,7 +232,7 @@ type Comum = {
 /** Grupos que o segmento exige ("está no grupo X") — só condições positivas de grupo. */
 function gruposDoSegmento(seg: Segmento | undefined): string[] {
   const out = new Set<string>()
-  for (const g of seg?.regra.grupos ?? []) for (const x of g.condicoes) if (x.campo === 'grupo' && x.operador === 'possui' && x.ref) out.add(x.ref)
+  for (const g of seg?.regra.grupos ?? []) for (const x of g.condicoes) if (x.campo === 'grupo' && x.operador === 'possui') { if (x.ref) out.add(x.ref); for (const r of x.refs ?? []) out.add(r) }
   return [...out]
 }
 
@@ -433,6 +434,18 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
   const [prioridade, setPrioridade] = useState(0)
   const [editarDisp, setEditarDisp] = useState(false)
   const [ocupado, setOcupado] = useState(false)
+  // Modo "Pelo cronograma do aluno" (só com público): 2 partes — sem plano × com plano fixado.
+  const [modoLib, setModoLib] = useState<'data' | 'cronograma'>('data')
+  const [semPlano, setSemPlano] = useState<CronogramaSemPlano>('planilha')
+  const [comPlano, setComPlano] = useState<CronogramaComPlano>('concluir_meta')
+  const [diasAntes, setDiasAntes] = useState(0)
+  const [planilha, setPlanilha] = useState<PlanilhaLiberacaoInfo | null>(null)
+  useEffect(() => {
+    if (modoLib !== 'cronograma' || planilha) return
+    let vivo = true
+    carregarPlanilhaLiberacaoAction(c.produtoId).then((r) => { if (vivo) setPlanilha('error' in r ? { disponivel: true, total: 0, vinculadas: 0, cfgAtiva: null } : r.info) }).catch(() => {})
+    return () => { vivo = false }
+  }, [modoLib, planilha, c.produtoId])
   useEffect(() => { if (c.preferido) setSegId(c.preferido) }, [c.preferido]) // eslint-disable-line react-hooks/exhaustive-deps
   const ids = useMemo(() => new Set(c.alvos.map((a) => a.id)), [c.alvos])
   const doAlvo = useMemo(() => (rs?.disp ?? []).filter((r) => ids.has(r.alvo_id)), [rs, ids])
@@ -442,15 +455,21 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
     return [...m.values()].sort((a, b) => a.prioridade - b.prioridade)
   }, [doAlvo])
 
+  const usaCrono = temPublico && modoLib === 'cronograma'
+  const dispCrono: Disponibilidade = { tipo: 'cronograma', sem_plano: semPlano, com_plano: comPlano, dias_antes: comPlano !== 'concluir_meta' ? diasAntes : 0, antes: 'bloqueado_cadeado' }
+  const dispEfetiva = usaCrono ? dispCrono : disp
+  const cronoBloqueado = usaCrono && planilha?.disponivel === false
+
   async function aplicar() {
+    if (cronoBloqueado) { toast.error('Aplique a migração 20261117010000 para usar o cronograma.'); return }
     if (temPublico && !(await garantirAcesso(c, pub, segId))) return // antes de criar o segmento automático
     const sr = await pub.resolver(segId); if (sr === false) return
     if (!sr) {
       if (!onAplicarBase) { toast.error('Escolha grupos/alunos ou um segmento.'); return }
       setOcupado(true); await onAplicarBase(c.alvos, disp); setOcupado(false); return
     }
-    if (c.total > 1 && !(await confirmar({ titulo: 'Aplicar liberação', mensagem: `Para “${sr.nome}”: ${resumoDisponibilidade(disp)} em ${c.plural(c.total)} (troca a regra anterior deste segmento nesses itens).`, confirmar: 'Aplicar' }))) return
-    setOcupado(true); const r = await aplicarLiberacaoSegmentoAction(c.produtoId, c.alvos, { segmento_id: sr.id, disponibilidade: disp, prioridade }); setOcupado(false)
+    if (c.total > 1 && !(await confirmar({ titulo: 'Aplicar liberação', mensagem: `Para “${sr.nome}”: ${resumoDisponibilidade(dispEfetiva)} em ${c.plural(c.total)} (troca a regra anterior deste segmento nesses itens).`, confirmar: 'Aplicar' }))) return
+    setOcupado(true); const r = await aplicarLiberacaoSegmentoAction(c.produtoId, c.alvos, { segmento_id: sr.id, disponibilidade: dispEfetiva, prioridade }); setOcupado(false)
     if ('error' in r) { toast.error(r.error); return }
     // Atualiza a lista NA HORA com o que o servidor devolveu (sem esperar outra consulta) e confere em segundo plano.
     setRs((prev) => prev && { ...prev, disp: [...prev.disp.filter((x) => !(x.segmento_id === sr.id && ids.has(x.alvo_id))), ...r.regras] })
@@ -498,8 +517,20 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
       direita={!c.podeEditar ? <p className="text-sm text-muted-foreground">Você só pode visualizar.</p> : (
         <>
           <BlocoSegmento c={c} pub={pub} valor={segId} onChange={setSegId} todosLabel={onAplicarBase ? 'Todos os alunos (padrão)' : undefined} ocupado={ocupado} setOcupado={setOcupado} />
+          {temPublico && (
+            <div role="tablist" aria-label="Tipo de liberação" className="grid grid-cols-2 rounded-xl border bg-muted/50 p-1 text-sm">
+              {([['data', 'Por data / prazo'], ['cronograma', 'Pelo cronograma do aluno']] as const).map(([k, rot]) => (
+                <button key={k} type="button" role="tab" aria-selected={modoLib === k} onClick={() => setModoLib(k)}
+                  className={cn('rounded-lg px-2 py-1.5 font-medium transition-colors', modoLib === k ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{rot}</button>
+              ))}
+            </div>
+          )}
+          {usaCrono ? (
+            <CronogramaForm produtoId={c.produtoId} planilha={planilha} semPlano={semPlano} setSemPlano={setSemPlano} comPlano={comPlano} setComPlano={setComPlano} diasAntes={diasAntes} setDiasAntes={setDiasAntes} />
+          ) : (
           <div className="space-y-1.5"><span className="text-sm font-medium">Quando libera{temPublico ? ' para este público' : ' para todos'}</span>
             <button type="button" onClick={() => setEditarDisp(true)} className="flex h-11 w-full items-center justify-between rounded-xl border bg-card px-3 text-sm hover:bg-muted"><span className="truncate capitalize">{resumoDisponibilidade(disp)}</span><Pencil className="h-4 w-4 shrink-0 text-muted-foreground" /></button></div>
+          )}
           {temPublico && <Prioridade valor={prioridade} onChange={setPrioridade} />}
           {temPublico && (
             <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={restringir} onChange={(e) => setRestringir(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
@@ -508,15 +539,56 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
                 {restringir && <select value={semAcessoRestr} onChange={(e) => setSemAcessoRestr(e.target.value as 'oculto' | 'bloqueado_cadeado')} onClick={(e) => e.stopPropagation()} className={cn(campo, 'mt-2')}><option value="bloqueado_cadeado">Demais veem com cadeado</option><option value="oculto">Demais não veem (some)</option></select>}
               </span></label>
           )}
-          {temPublico && !restringir && disp.tipo === 'na_matricula' && (
+          {temPublico && !restringir && !usaCrono && disp.tipo === 'na_matricula' && (
             <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" /><span><b>“Disponível sempre” não muda nada</b> para ninguém. Para restringir o acesso a este público, marque “Só este público acessa” ou use a aba <b>Visibilidade</b> (Mostrar somente para).</span></div>
           )}
           <Dica>{temPublico ? <>Quem está no público usa esta liberação <b>no lugar</b> da padrão. Quem não está segue “Todos os alunos”.</> : <>Liberação padrão{c.soModulos ? ' das aulas dentro dos módulos (inclui submódulos)' : ''}: vale para quem não tiver liberação própria de segmento.</>}</Dica>
-          <Button className="w-full" onClick={aplicar} disabled={ocupado || (!temPublico && !onAplicarBase)}>{ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Aplicar{c.total > 1 ? ` a ${c.total}` : ''}</Button>
+          <Button className="w-full" onClick={aplicar} disabled={ocupado || cronoBloqueado || (!temPublico && !onAplicarBase)}>{ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Aplicar{c.total > 1 ? ` a ${c.total}` : ''}</Button>
         </>
       )} />
     {editarDisp && <DisponibilidadeDialog valor={disp} escopo={c.soModulos ? 'módulo' : 'aula'} onClose={() => setEditarDisp(false)} onAplicar={(d: Disponibilidade) => { setDisp(d); setEditarDisp(false) }} />}
     </>
+  )
+}
+
+function OpcoesRadio<T extends string>({ nome, valor, onChange, itens }: { nome: string; valor: T; onChange: (v: T) => void; itens: { v: T; titulo: string; descricao: string }[] }) {
+  return (
+    <div className="space-y-1.5">
+      {itens.map((o) => (
+        <label key={o.v} className={cn('flex cursor-pointer items-start gap-2 rounded-xl border bg-card px-3 py-2', valor === o.v && 'border-primary bg-primary/5')}>
+          <input type="radio" name={nome} checked={valor === o.v} onChange={() => onChange(o.v)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+          <span><span className="block text-sm font-medium">{o.titulo}</span><span className="block text-xs text-muted-foreground">{o.descricao}</span></span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/** Formulário do tipo "Pelo cronograma do aluno": bloco da planilha + Parte 1 (sem cronograma) + Parte 2 (com cronograma fixado). */
+function CronogramaForm({ produtoId, planilha, semPlano, setSemPlano, comPlano, setComPlano, diasAntes, setDiasAntes }: {
+  produtoId: string; planilha: PlanilhaLiberacaoInfo | null
+  semPlano: CronogramaSemPlano; setSemPlano: (v: CronogramaSemPlano) => void
+  comPlano: CronogramaComPlano; setComPlano: (v: CronogramaComPlano) => void
+  diasAntes: number; setDiasAntes: (n: number) => void
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card p-3 text-xs">
+        <div className="mb-1 flex items-center gap-1.5 text-sm font-medium"><CalendarClock className="h-4 w-4 text-primary" />Planilha de liberação do produto</div>
+        {!planilha ? <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Carregando…</span>
+          : !planilha.disponivel ? <AvisoMigracao nome="20261117010000_produto_liberacao_aulas.sql" />
+          : <p className="text-muted-foreground"><b className="text-foreground">{planilha.total}</b> aula(s) com data de liberação · <b className="text-foreground">{planilha.vinculadas}</b> vinculada(s) a aulas do produto{planilha.total > planilha.vinculadas ? ` · ${planilha.total - planilha.vinculadas} sem vínculo` : ''}{planilha.cfgAtiva === false ? ' · configuração desligada' : ''}</p>}
+        <Link href={`/admin/revisao/cronograma?aba=gerador&sub=liberacao-aulas&produto=${produtoId}`} target="_blank" className="mt-1.5 inline-block font-medium text-primary hover:underline">Gerenciar planilha</Link>
+      </div>
+      <div className="space-y-1.5"><span className="text-sm font-medium">Parte 1 · Aluno sem cronograma fixado</span>
+        <OpcoesRadio nome="crono-sem" valor={semPlano} onChange={setSemPlano} itens={CRONOGRAMA_SEM_PLANO} /></div>
+      <div className="space-y-1.5"><span className="text-sm font-medium">Parte 2 · Aluno com cronograma fixado <span className="font-normal text-muted-foreground">(adaptativo ou da plataforma)</span></span>
+        <OpcoesRadio nome="crono-com" valor={comPlano} onChange={setComPlano} itens={CRONOGRAMA_COM_PLANO} /></div>
+      {comPlano !== 'concluir_meta' && (
+        <label className="flex items-center justify-between gap-3 text-sm"><span><span className="font-medium">Dias antes</span><span className="block text-xs text-muted-foreground">Abre X dias antes da data da meta no plano (0–365)</span></span>
+          <Input type="number" min={0} max={365} value={diasAntes} onChange={(e) => setDiasAntes(Math.max(0, Math.min(365, Math.floor(Number(e.target.value)) || 0)))} className="h-10 w-20 shrink-0 text-center" /></label>
+      )}
+    </div>
   )
 }
 
@@ -554,8 +626,13 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
     for (const x of rs?.capas ?? []) if (x.alvo_tipo === 'modulo' && x.alvo_id && ids.has(x.alvo_id) && x.segmento_id === segLista && x.imagem_url) m[x.alvo_id] = x.imagem_url
     return m
   }, [rs, ids, segLista])
-  useEffect(() => { setRascunho(existentes) }, [existentes])
+  // (as imagens enviadas ficam em `rascunho` até salvar — trocar o público NÃO apaga; a grade mostra rascunho ?? capa já salva do público escolhido)
   const alterados = modulos.filter((m) => rascunho[m.id] && rascunho[m.id] !== existentes[m.id])
+  const publicosComCapa = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const x of rs?.capas ?? []) if (x.alvo_tipo === 'modulo' && x.alvo_id && ids.has(x.alvo_id)) m.set(x.segmento_id, (m.get(x.segmento_id) ?? 0) + 1)
+    return [...m.entries()]
+  }, [rs, ids])
   const pendentes = modoMassa === 'unica' ? (imagemUnica ? modulos.length : 0) : alterados.length
 
   async function salvarMassa() {
@@ -575,7 +652,7 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
     }
     setRs((prev) => mesclarCapas(prev, salvas))
     setOcupado(false)
-    if (ok) { toast.success(`${ok} capa(s) salva(s).`); if (modoMassa === 'unica') setImagemUnica(''); void onRs() }
+    if (ok) { toast.success(`${ok} capa(s) salva(s).`); if (modoMassa === 'unica') setImagemUnica(''); setRascunho({}); void onRs() }
   }
 
   function limpar() { setEditId(null); setEditAlvo(null); setImagem(''); setTitulo(''); setDescricao(''); setOcultarTitulo(false); setPrioridade(0) }
@@ -625,6 +702,19 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
         esquerda={
           <>
             {!rs.disponivel && <AvisoMigracao nome="20261115010000_produto_regras_por_segmento.sql" />}
+            {publicosComCapa.length > 0 && (
+              <div className="rounded-2xl border bg-card p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Já configurado nestes módulos</div>
+                <div className="flex flex-wrap gap-2">
+                  {publicosComCapa.map(([sid, n]) => (
+                    <button key={sid} type="button" onClick={() => { pub.setModo('avancado'); setSegId(sid) }}
+                      className={cn('inline-flex max-w-full items-center gap-1.5 rounded-xl border px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted', segLista === sid && 'border-primary bg-primary/5')}>
+                      <Users className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate">{c.nomeSeg(sid)}</span><span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary">{n} capa{n === 1 ? '' : 's'}</span>
+                    </button>))}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">Clique num público para ver e editar as capas dele nestes módulos.</p>
+              </div>
+            )}
             <Dica>Envie a imagem de <b>cada módulo</b> para o segmento escolhido. Quem está no segmento vê essas capas; os demais seguem a capa base. {seg ? <>Já têm capa neste segmento: <b>{comCapa}</b> de {modulos.length}.</> : null}</Dica>
             <div role="tablist" aria-label="Modo das capas" className="inline-flex rounded-xl border bg-muted/50 p-1 text-sm">
               {([['individual', 'Uma capa por módulo'], ['unica', 'Mesma capa para todos']] as const).map(([k, rot]) => (
@@ -642,7 +732,7 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
             ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {modulos.map((m) => {
-                const base = c.imagemBase(m.id), nova = rascunho[m.id], mudou = !!nova && nova !== existentes[m.id]
+                const base = c.imagemBase(m.id), nova = rascunho[m.id] ?? existentes[m.id], mudou = !!rascunho[m.id] && rascunho[m.id] !== existentes[m.id]
                 return (
                   <div key={m.id} className={cn('rounded-2xl border bg-card p-3 shadow-sm', mudou && 'ring-2 ring-primary', existentes[m.id] && !mudou && 'border-primary/40')}>
                     <div className="mb-2 truncate text-sm font-medium" title={c.nomeAlvo(m.id)}>{c.nomeAlvo(m.id)}</div>
@@ -669,6 +759,7 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
             )}
           <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={ocultarTitulo} onChange={(e) => setOcultarTitulo(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" /><span><span className="font-medium">Ocultar o título sobre a imagem</span><span className="block text-xs text-muted-foreground">Use quando a imagem já traz o texto.</span></span></label>
             <Prioridade valor={prioridade} onChange={setPrioridade} />
+            {!temSeg && pendentes > 0 && <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">Você já enviou {pendentes} imagem(ns). Falta <b>escolher o público</b> (grupos/alunos ou segmento) para poder salvar.</p>}
             <Button className="w-full" onClick={salvarMassa} disabled={ocupado || !temSeg || !pendentes}>{ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Salvar {pendentes ? `${pendentes} capa${pendentes === 1 ? '' : 's'}` : 'capas'}</Button>
             <p className="text-xs text-muted-foreground">Para remover ou editar título/descrição de uma capa, marque só aquele módulo.</p>
           </>

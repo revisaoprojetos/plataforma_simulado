@@ -5,6 +5,7 @@ import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
+import { docBloqueadoPorLiberacaoAulas } from '@/lib/produtos/liberacao-aulas-aluno'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
 import { resolverAreas, produtoValidoDoAluno, filtrarHtmlPorAreas, type ResolucaoAreas } from './areas'
 import { mapaPastas, resolverCapaDoc } from './capa-pagina'
@@ -362,7 +363,7 @@ export async function carregarLeitura(documentoId: string, alunoId: string, opts
     if (doc.status !== 'publicado') return null
     // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
     if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
-    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
+    if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
   }
 
   // A parte CARA (trechos + HTML rico da versão) é IDÊNTICA p/ todos os alunos e depende SÓ de
@@ -453,7 +454,7 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string, o
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
-  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
+  if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
 
   const { gerarPdfDocumento } = await import('./thumb')
   const areasPdf = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
@@ -500,7 +501,7 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
   const kind = tipoOrigem as 'video' | 'audio'
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
-  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
+  if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   const arquivoKey = (ver as any)?.arquivo_key as string | undefined
   if (!arquivoKey) return null
@@ -588,7 +589,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`). UMA vez para mídia e PDF.
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
-  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
+  if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
 
   const tipoOrigem = String((doc as any).tipo_origem ?? '')
   // ÁREAS DE VISIBILIDADE (plugin do editor): quais áreas ESTE aluno não vê (por produto/grupo/segmento/aluno).
@@ -697,7 +698,7 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     if (!resDl.permitido || !resDl.permissoes.baixar) return null
     // Download só do material JÁ LIBERADO no cronograma do aluno (com o bloqueio ativo).
-    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
+    if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
   }
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null

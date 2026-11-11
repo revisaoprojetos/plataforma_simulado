@@ -8,7 +8,7 @@ import { Icon } from '@/components/nova/icons'
 import { R } from '@/lib/nova/rotas'
 import { carregarCursosReais, type CursoReal } from '@/lib/nova/cursos-reais'
 import { centralEstudosLiberada } from '@/lib/nova/central-acesso'
-import { extensivoAtalhoDoAluno } from '@/lib/nova/extensivos-aluno'
+import { extensivosCardsDoAluno } from '@/lib/nova/extensivos-aluno'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -68,17 +68,17 @@ export default async function CursosPage() {
   const sessao = await getSessaoAluno()
   // Carrega os cursos e, em paralelo, se a Central de Estudos (sub-regra de Cursos) está liberada p/ este
   // aluno. Bloqueada (padrão) → some o botão do aviso e toda a seção da Central (sem caminho morto).
-  const [cursos, centralLiberada, extensivo] = sessao
+  const [cursos, centralLiberada, extensivos] = sessao
     ? await Promise.all([
         carregarCursosReais(createAdminClient(), sessao.tenantId, sessao.estudanteId),
         centralEstudosLiberada(sessao.tenantId, sessao.estudanteId, sessao.email),
-        extensivoAtalhoDoAluno(sessao.tenantId, sessao.estudanteId),
+        extensivosCardsDoAluno(sessao.tenantId, sessao.estudanteId),
       ])
-    : [[] as CursoReal[], false, null]
-  // Extensivo só aparece se o aluno TEM extensivo (real); 1 → abre direto, 2+ → lista.
+    : [[] as CursoReal[], false, []]
+  // UM card por extensivo (cada um com a sua área). A posição vem do produto: card próprio (largura 1/2 colunas, ordem) ou agrupado dentro do card de outro.
   const ATALHOS = [
-    ...(extensivo ? [{ line: 'EXTENSIVO', sigla: extensivo.qtd > 1 ? 'Extensivos' : extensivo.titulo.slice(0, 22), grad: GR.EXT, titulo: extensivo.titulo, sub: extensivo.sub, href: extensivo.href, img: extensivo.capa ?? '/nova/extensivo-capa.jpg' }] : []),
-    ...ATALHOS_FIXOS,
+    ...extensivos.map((e) => ({ line: 'EXTENSIVO', sigla: e.titulo.slice(0, 22), grad: GR.EXT, titulo: e.titulo, sub: e.sub, href: e.href, img: e.capa ?? null, largura: e.largura, filhos: e.filhos })),
+    ...ATALHOS_FIXOS.map((a) => ({ ...a, largura: 1 as const, filhos: [] as { id: string; nome: string; href: string }[] })),
   ]
   const primeiroNome = (sessao?.nome || 'Aluno').split(' ')[0]
 
@@ -101,18 +101,31 @@ export default async function CursosPage() {
           {/* 5 por linha em tela larga (cai p/ menos em telas estreitas) */}
           <Grid gap={16} style={{ gridTemplateColumns: GRADE_CARDS }}>
             {ATALHOS.map((a) => (
-              <Link key={a.titulo} href={a.href} style={{ display: 'block' }}>
+              <div key={a.titulo} style={{ gridColumn: a.largura === 2 ? 'span 2' : undefined }}>
                 <Card pad={0} style={{ overflow: 'hidden', gap: 0, height: '100%' }}>
-                  <Media ratio="16:9" img={'img' in a ? a.img : null} fallback={<Cover line={a.line} sigla={a.sigla} grad={a.grad} big={a.sigla.length > 10 ? 18 : 22} />} />
-                  <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap', padding: 14 }}>
-                    <Col gap={2} style={{ minWidth: 0 }}>
-                      <b style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{a.titulo}</b>
-                      <Muted size={12}>{a.sub}</Muted>
+                  <Link href={a.href} style={{ display: 'block' }}>
+                    <Media ratio="16:9" img={'img' in a ? a.img : null} fallback={<Cover line={a.line} sigla={a.sigla} grad={a.grad} big={a.sigla.length > 10 ? 18 : 22} />} />
+                    <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap', padding: 14 }}>
+                      <Col gap={2} style={{ minWidth: 0 }}>
+                        <b style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{a.titulo}</b>
+                        <Muted size={12}>{a.sub}</Muted>
+                      </Col>
+                      <Icon n="chev" size={16} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
+                    </Row>
+                  </Link>
+                  {a.filhos.length > 0 && (
+                    <Col gap={0} style={{ borderTop: '1px solid var(--line)', padding: '6px 8px' }}>
+                      <div style={{ padding: '4px 6px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, color: 'var(--muted)' }}>Também neste card</div>
+                      {a.filhos.map((f) => (
+                        <Link key={f.id} href={f.href} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 6px', borderRadius: 10, fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.nome}</span>
+                          <Icon n="chev" size={14} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
+                        </Link>
+                      ))}
                     </Col>
-                    <Icon n="chev" size={16} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
-                  </Row>
+                  )}
                 </Card>
-              </Link>
+              </div>
             ))}
           </Grid>
         </Col>

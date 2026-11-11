@@ -129,10 +129,10 @@ export async function mapaDocsCronograma(svc: SupabaseClient, tenantId: string):
 }
 
 // ── Plano do aluno (datas por meta) ──────────────────────────────────────────────────────────────
-interface PlanoAluno { tem: boolean; datas: Record<string, string>; feitas: string[] }
+export interface PlanoAluno { tem: boolean; datas: Record<string, string>; feitas: string[]; semanas?: Record<string, number> }
 
 /** O plano EM FOCO do aluno (fixado; senão o mais recente não-arquivado) — o mesmo que o cronograma mostra. */
-async function planoDoAluno(svc: SupabaseClient, tenantId: string, alunoId: string): Promise<PlanoAluno> {
+export async function planoDoAluno(svc: SupabaseClient, tenantId: string, alunoId: string): Promise<PlanoAluno> {
   return remember<PlanoAluno>(kPlano(tenantId, alunoId), 60, async () => {
     const T = 'simulado_cronograma_adaptativo_plano'
     // 1ª leitura LEVE (sem o JSON da grade): id, exemplo e se as metas já estão em linhas (plano_meta). Sem a coluna → só o JSON.
@@ -148,14 +148,14 @@ async function planoDoAluno(svc: SupabaseClient, tenantId: string, alunoId: stri
     if (errLeve) ({ row: r } = await achar('id, exemplo'))
     if (!r || r.exemplo) return { tem: false, datas: {}, feitas: [] }
 
-    const datas: Record<string, string> = {}
+    const datas: Record<string, string> = {}; const semanas: Record<string, number> = {}
     if (comLinhas && r.grade_espelhada_hash) {
       // LINHAS (plano_meta): só meta_id + data — nada de baixar a grade inteira em JSON
       for (let from = 0; ; from += 1000) {
-        const { data: rows, error } = await svc.from('simulado_cronograma_adaptativo_plano_meta').select('meta_id, data_prevista')
+        const { data: rows, error } = await svc.from('simulado_cronograma_adaptativo_plano_meta').select('meta_id, data_prevista, semana')
           .eq('plano_id', r.id).order('meta_id', { ascending: true }).range(from, from + 999)
-        if (error) { for (const k of Object.keys(datas)) delete datas[k]; break } // falhou no meio → cai no JSON abaixo
-        for (const m of (rows ?? []) as Array<{ meta_id: string; data_prevista: string }>) datas[m.meta_id] = m.data_prevista
+        if (error) { for (const k of Object.keys(datas)) delete datas[k]; for (const k of Object.keys(semanas)) delete semanas[k]; break } // falhou no meio → cai no JSON abaixo
+        for (const m of (rows ?? []) as Array<{ meta_id: string; data_prevista: string; semana?: number | null }>) { datas[m.meta_id] = m.data_prevista; if (m.semana != null) semanas[m.meta_id] = m.semana }
         if (!rows || rows.length < 1000) break
       }
     }
@@ -168,7 +168,7 @@ async function planoDoAluno(svc: SupabaseClient, tenantId: string, alunoId: stri
     }
     const { data: metas } = await svc.from('simulado_cronograma_adaptativo_meta').select('meta_id')
       .eq('tenant_id', tenantId).eq('plano_id', r.id).eq('estado', 'done')
-    return { tem: true, datas, feitas: ((metas ?? []) as Array<{ meta_id: string }>).map((m) => m.meta_id) }
+    return { tem: true, datas, semanas, feitas: ((metas ?? []) as Array<{ meta_id: string }>).map((m) => m.meta_id) }
   })
 }
 

@@ -30,6 +30,7 @@ import { PRODUTO_TIPOS, VITRINE_LAYOUTS, MODULO_LAYOUTS, type ProdutoLeve, type 
 import type { InstrutorRow, ResumoProduto } from '@/lib/produtos/estudio'
 import { salvarProdutoAction } from '@/app/admin/produtos/actions'
 import { PreviaFormatoVitrine } from '@/components/admin/previa-formato-vitrine'
+import { PosicaoCursos } from './posicao-cursos'
 import { listarInstrutorCandidatosAction, adicionarInstrutorAction, removerInstrutorAction } from '../actions'
 
 const codigoCurto = (id: string) => (parseInt(id.replace(/-/g, '').slice(0, 5), 16) % 9000 + 1000).toString()
@@ -182,6 +183,11 @@ export function AbaInformacoes({
               </div>
             </div>
           </div>
+
+          <div className="border-t" />
+
+          {/* Posição na área de Cursos do aluno (card próprio × agrupado) */}
+          <PosicaoCursos produtoId={produto.id} podeEditar={podeEditar} />
         </div>
 
         {/* Cronograma / elementos da página do aluno */}

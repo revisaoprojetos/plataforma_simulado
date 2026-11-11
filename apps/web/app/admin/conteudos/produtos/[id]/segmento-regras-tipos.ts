@@ -9,3 +9,6 @@ export interface CapaSegAdmin {
   imagem_url: string | null; titulo: string | null; descricao: string | null; ocultar_titulo: boolean; prioridade: number; ativo: boolean
 }
 export interface RegrasSegmentoAdmin { disp: DispSegAdmin[]; capas: CapaSegAdmin[] }
+
+/** Estado da planilha de liberação de aulas do produto (bloco informativo do tipo "Pelo cronograma do aluno"). */
+export interface PlanilhaLiberacaoInfo { disponivel: boolean; total: number; vinculadas: number; cfgAtiva: boolean | null }

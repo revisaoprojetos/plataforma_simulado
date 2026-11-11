@@ -4,6 +4,7 @@ import { materialDoItem, MATERIAIS, type Disponibilidade, type TipoRef, type Mat
 import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 import { regrasSegmentoDoAluno } from '@/lib/segmentos/regras-produto'
+import { liberacaoAulasDoAluno, ehSentinelaMeta, MSG_AGUARDA_META } from './liberacao-aulas-aluno'
 import { resumoCronogramaDoAluno, type ResumoCronograma } from './resumo-cronograma'
 
 /**
@@ -29,6 +30,8 @@ export interface AulaAluno {
   externo: boolean          // abre em nova aba (vídeo/link)
   liberada: boolean
   liberaEm: string | null   // ISO, quando ainda bloqueada
+  bloqueioMsg?: string | null // bloqueada sem data (ex.: aguarda concluir a meta no cronograma do aluno)
+  liberaRotulo?: string | null // rótulo do cadeado conforme o cronograma ("Libera em seg., 16/11/2026 · semana 3 …"); null = usar liberaEm/bloqueioMsg
   lida: boolean             // documento já aberto pelo aluno (simulado_conteudo_leitura_progresso)
   exclusivo: boolean        // bloqueada por segmento (conteúdo exclusivo de outro público)
   quizDocId?: string | null // JurisClub: documento-âncora das questões da meta (meta.quiz_documento_id)
@@ -50,6 +53,8 @@ export interface ModuloAluno {
   aberto: boolean           // exibicao 'aberto' | 'recolhido'
   liberado: boolean
   liberaEm: string | null
+  bloqueioMsg?: string | null // bloqueado sem data (aguarda meta do cronograma)
+  liberaRotulo?: string | null // idem AulaAluno.liberaRotulo
   exclusivo: boolean        // bloqueado por segmento
   aulas: AulaAluno[]
   submodulos: ModuloAluno[]
@@ -229,7 +234,10 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   ])
   const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
   // Liberação e capa POR SEGMENTO (migração 20261115010000): o aluno do segmento recebe a disponibilidade/capa própria do módulo/aula.
-  const porSeg = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
+  const porSegBase = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
+  // Disponibilidade tipo 'cronograma' (planilha + cronograma fixado): null = nenhuma regra → nada muda.
+  const libAulas = await liberacaoAulasDoAluno(svc, tenantId, estudanteId, produtoId, { porSeg: porSegBase, modulos: mrows, itens: irows }).catch(() => null)
+  const porSeg = libAulas && porSegBase ? { ...porSegBase, disp: libAulas.disp } : libAulas ? { capa: () => null, disp: libAulas.disp } : porSegBase
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
   const lidos = new Map<string, LeituraAluno>()
@@ -286,27 +294,36 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     const capaSeg = porSeg?.capa('modulo', m.id) ?? null
     const libM = maisTarde(herdado, momentoLiberacao(dm, matricula))
     const modLiberado = !libM || +libM <= agora
+    const rotuloM = !modLiberado ? libAulas?.rotulo(m.id, m.disponibilidade) ?? null : null // família da aula: mesmo rótulo p/ módulo e itens
+    const msgM = !modLiberado && ehSentinelaMeta(libM) ? MSG_AGUARDA_META : null
     if (!modLiberado && dm.antes === 'oculto') return null
     const aulas: AulaAluno[] = []
-    for (const i of aulasPorModulo.get(m.id) ?? []) {
+    // FAMÍLIA DA AULA: os materiais da mesma aula (PDFull, PDFlash, LegProc…) seguem a MESMA liberação. Item sem data
+    // própria (na matrícula) herda a mais tardia das datas dos irmãos; data explícita no próprio item é respeitada.
+    const irmaos = aulasPorModulo.get(m.id) ?? []
+    const dispItem = (i: any) => normDisp(porSeg ? porSeg.disp(i.id, i.disponibilidade) : i.disponibilidade)
+    const libFamilia = irmaos.reduce<Date | null>((acc, i) => maisTarde(acc, momentoLiberacao(dispItem(i), matricula)), null)
+    for (const i of irmaos) {
       const segA = visivel(i.id)
       if (segA === 'oculto') continue
       const exclusivo = exclusivoM || segA === 'cadeado'
       const di = normDisp(porSeg ? porSeg.disp(i.id, i.disponibilidade) : i.disponibilidade)
-      const lib = maisTarde(libM, momentoLiberacao(di, matricula))
+      const libProprio = momentoLiberacao(di, matricula)
+      const lib = maisTarde(libM, libProprio ?? libFamilia)
       const noPrazo = !lib || +lib <= agora
+      const msgA = !noPrazo && ehSentinelaMeta(lib) ? MSG_AGUARDA_META : null
       if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
       const liberada = noPrazo && !exclusivo
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
       const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta, produtoId)
-      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), leitura: (i.ref_id && lidos.get(i.ref_id)) || null, leituraFmt: formatarLeitura((i.ref_id && lidos.get(i.ref_id)) || null), exclusivo, material: materialDoItem(i.subtipo, tipo, String(i.titulo ?? '')), quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null, cronograma: tipo === 'cronograma' && liberada ? resumoCrono : null })
+      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib || msgA ? null : lib.toISOString(), bloqueioMsg: msgA, liberaRotulo: !noPrazo && !(!!i.ref_id && lidos.has(i.ref_id)) ? rotuloM : null, lida: !!i.ref_id && lidos.has(i.ref_id), leitura: (i.ref_id && lidos.get(i.ref_id)) || null, leituraFmt: formatarLeitura((i.ref_id && lidos.get(i.ref_id)) || null), exclusivo, material: materialDoItem(i.subtipo, tipo, String(i.titulo ?? '')), quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null, cronograma: tipo === 'cronograma' && liberada ? resumoCrono : null })
     }
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra
     return {
       id: m.id, titulo: capaSeg?.titulo ?? m.titulo, descricao: capaSeg?.descricao ?? m.descricao ?? null, imagemUrl: capaSeg?.imagem_url ?? m.imagem_url ?? null,
       ocultarTitulo: capaSeg ? (!!capaSeg.imagem_url && capaSeg.ocultar_titulo) || (!capaSeg.imagem_url && !!m.ocultar_titulo && !!m.imagem_url) : !!m.ocultar_titulo && !!m.imagem_url,
-      aberto: m.exibicao !== 'recolhido', liberado: modLiberado && !exclusivoM, liberaEm: modLiberado || !libM ? null : libM.toISOString(),
+      aberto: m.exibicao !== 'recolhido', liberado: modLiberado && !exclusivoM, liberaEm: modLiberado || !libM || msgM ? null : libM.toISOString(), bloqueioMsg: msgM, liberaRotulo: rotuloM,
       exclusivo: exclusivoM, aulas, submodulos,
     }
   }
@@ -360,12 +377,18 @@ async function itensLiberadosPorProduto(
     // Segmentos: a aula, o módulo e o módulo pai precisam estar visíveis (nem oculto nem cadeado).
     const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
     const porSeg = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
-    const dEf = (id: string, base: unknown) => (porSeg ? porSeg.disp(id, base) : base)
-    for (const it of lista.filter((i) => i.produto_id === produtoId)) {
+    const doProduto = lista.filter((i) => i.produto_id === produtoId)
+    const libAulas = await liberacaoAulasDoAluno(svc, tenantId, estudanteId, produtoId, { porSeg, itens: doProduto }).catch(() => null)
+    const dEf = (id: string, base: unknown) => (libAulas ? libAulas.disp(id, base) : porSeg ? porSeg.disp(id, base) : base)
+    for (const it of doProduto) {
       if (visivel(it.id) !== 'visivel' || visivel(it.modulo_id) !== 'visivel') continue
       const { data: mod } = await svc.from('simulado_produto_modulos').select('disponibilidade, pai_id, deletado').eq('tenant_id', tenantId).eq('id', it.modulo_id).maybeSingle()
       if (!mod || (mod as any).deletado) continue
       let lib = momentoLiberacao(normDisp(dEf(it.id, it.disponibilidade)), matricula)
+      if (!lib) { // sem data própria: herda a mais tardia dos materiais irmãos da mesma aula (PDFull/PDFlash/LegProc…)
+        const { data: irm } = await svc.from('simulado_produto_modulo_itens').select('id, disponibilidade').eq('tenant_id', tenantId).eq('modulo_id', it.modulo_id).eq('deletado', false).eq('situacao', 'ativo').limit(50)
+        for (const x of (irm ?? []) as any[]) { const lx = momentoLiberacao(normDisp(dEf(x.id, x.disponibilidade)), matricula); if (lx && (!lib || lx > lib)) lib = lx }
+      }
       const lm = momentoLiberacao(normDisp(dEf(it.modulo_id, (mod as any).disponibilidade)), matricula)
       if (lm && (!lib || lm > lib)) lib = lm
       if ((mod as any).pai_id) {

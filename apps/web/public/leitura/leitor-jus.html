@@ -510,6 +510,10 @@ mark.an[data-tail]::after{content:"";display:inline-block;width:6px;height:6px;b
 /* CONTEÚDO PDF (Biblioteca): cada página = canvas + camada de texto (seleção) + overlays de grifo geométricos */
 .pdf-sec{padding:0;margin:0 0 22px;display:flex;justify-content:center;background:none;border:none}
 .pdf-sec:last-child{margin-bottom:0}
+/* Última folha: o "Concluir leitura" (.secnav) vai ABAIXO da folha, não ao lado (a section é flex em linha). */
+.pdf-sec{flex-wrap:wrap;align-items:flex-start}
+.pdf-sec>.secnav{flex:0 0 100%;order:2;margin:20px 0 8px;text-align:center}
+.app:not(.paged) .pdf-sec>.secnav-fim .done,.pdf-sec>.secnav-fim .done{display:inline-flex;width:auto;min-width:240px;margin:0 auto;text-align:center;align-items:center}
 .pdfpage{position:relative;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.16);border-radius:2px}
 .pdfpage canvas{position:absolute;inset:0;z-index:1;border-radius:2px}
 /* 'Escurecer página do PDF': inverte o canvas (texto claro em fundo escuro) preservando matiz; grifos clareiam em vez de multiplicar */

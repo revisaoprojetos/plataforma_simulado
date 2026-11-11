@@ -1,6 +1,6 @@
 'use server'
 import type { AlvoLote } from './visibilidade-actions-tipos'
-import type { RegrasSegmentoAdmin, DispSegAdmin, CapaSegAdmin } from './segmento-regras-tipos'
+import type { RegrasSegmentoAdmin, DispSegAdmin, CapaSegAdmin, PlanilhaLiberacaoInfo } from './segmento-regras-tipos'
 
 // LIBERAÇÃO e CAPA por segmento dentro do produto (tabelas da migração 20261115010000):
 //  · simulado_produto_disponibilidade_seg — módulo/aula com disponibilidade própria para quem está no segmento;
@@ -25,18 +25,45 @@ async function guard(manage = false) {
 const MIGRACAO = 'Recurso ainda não ativado no banco: aplique a migração 20261115010000_produto_regras_por_segmento.sql.'
 const faltaTabela = (msg: string | undefined) => !!msg && /simulado_produto_disponibilidade_seg|simulado_produto_capas_seg|schema cache|does not exist/i.test(msg)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const TIPOS_DISP = ['na_matricula', 'data', 'intervalo', 'data_e_intervalo', 'dia_semana_e_intervalo']
+const TIPOS_DISP = ['na_matricula', 'data', 'intervalo', 'data_e_intervalo', 'dia_semana_e_intervalo', 'cronograma']
 const chunks = <T,>(a: T[], n = 80): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
 const revalidar = (produtoId: string) => revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
 
-/** Disponibilidade validada/normalizada (mesmo formato do configurador de disponibilidade). */
-function normDisp(v: any): { tipo: string; data: string | null; dias: number | null; diaSemana: number | null; antes: 'oculto' | 'bloqueado_cadeado' } | null {
+/** Disponibilidade validada/normalizada (mesmo formato do configurador de disponibilidade; 'cronograma' = contrato fixo do motor do aluno). */
+type DispNorm = { tipo: string; data: string | null; dias: number | null; diaSemana: number | null; antes: 'oculto' | 'bloqueado_cadeado' }
+  | { tipo: 'cronograma'; sem_plano: 'planilha' | 'liberado' | 'atual'; com_plano: 'concluir_meta' | 'plano' | 'mais_cedo'; dias_antes: number; antes: 'bloqueado_cadeado' }
+function normDisp(v: any): DispNorm | null {
   if (!v || typeof v !== 'object' || !TIPOS_DISP.includes(v.tipo)) return null
+  if (v.tipo === 'cronograma') {
+    if (!['planilha', 'liberado', 'atual'].includes(v.sem_plano) || !['concluir_meta', 'plano', 'mais_cedo'].includes(v.com_plano)) return null
+    const n = Number(v.dias_antes ?? 0)
+    if (!Number.isFinite(n) || n < 0 || n > 365) return null
+    return { tipo: 'cronograma', sem_plano: v.sem_plano, com_plano: v.com_plano, dias_antes: Math.floor(n), antes: 'bloqueado_cadeado' }
+  }
   const data = v.data ? new Date(v.data) : null
   if (v.data && (!data || isNaN(+data))) return null
   const dias = v.dias == null ? null : Math.max(0, Math.min(3650, Math.floor(Number(v.dias) || 0)))
   const dsem = v.diaSemana == null ? null : Math.max(0, Math.min(6, Math.floor(Number(v.diaSemana) || 0)))
   return { tipo: v.tipo, data: data ? data.toISOString() : null, dias, diaSemana: dsem, antes: v.antes === 'oculto' ? 'oculto' : 'bloqueado_cadeado' }
+}
+
+/** Estado da planilha de liberação de aulas do produto (somente leitura). Tolerante: sem a migração 20261117010000 → disponivel=false. */
+export async function carregarPlanilhaLiberacaoAction(produtoId: string): Promise<{ ok: true; info: PlanilhaLiberacaoInfo } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  if (!UUID.test(produtoId)) return { error: 'Produto inválido.' }
+  const svc = createAdminClient()
+  const base = () => svc.from('simulado_produto_liberacao_aulas').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('ativo', true)
+  const [t, v, c] = await Promise.all([
+    base(),
+    base().not('aula_id', 'is', null),
+    svc.from('simulado_produto_liberacao_cfg').select('ativo').eq('produto_id', produtoId).eq('tenant_id', g.tenantId).maybeSingle(),
+  ])
+  if (t.error || v.error || c.error) {
+    const msg = t.error?.message ?? v.error?.message ?? c.error?.message
+    if (faltaTabela(msg) || /liberacao_aulas|liberacao_cfg/i.test(msg ?? '')) return { ok: true, info: { disponivel: false, total: 0, vinculadas: 0, cfgAtiva: null } }
+    return { error: msg ?? 'Erro ao ler a planilha.' }
+  }
+  return { ok: true, info: { disponivel: true, total: t.count ?? 0, vinculadas: v.count ?? 0, cfgAtiva: c.data ? !!(c.data as any).ativo : null } }
 }
 
 export async function carregarRegrasSegmentoAction(produtoId: string): Promise<{ ok: true; disponivel: boolean; dados: RegrasSegmentoAdmin } | { error: string }> {

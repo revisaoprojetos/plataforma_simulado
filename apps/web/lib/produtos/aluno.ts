@@ -20,6 +20,11 @@ export interface ExtensivoCard {
   capa_url: string | null
   itens: number
   expira_em: string | null
+  /** Posição na área de Cursos (migração 20261116010000): card próprio × agrupado no card de outro produto. */
+  ordem?: number
+  cursos_modo?: 'card' | 'agrupado'
+  cursos_agrupar_em?: string | null
+  cursos_largura?: 1 | 2
 }
 
 /** Junta expirações: null (sem prazo) vence; senão a mais distante. */
@@ -121,7 +126,12 @@ export async function produtosDoAluno(tenantId: string, estudanteId: string): Pr
   const uniq = [...expira.keys()]
   if (!uniq.length) return []
   const [{ data: prods }, { data: itens }] = await Promise.all([
-    svc.from('simulado_produtos').select('id, slug, nome, tipo, descricao, cor, capa_url, ordem').eq('tenant_id', tenantId).eq('ativo', true).in('id', uniq).order('ordem', { ascending: true }),
+    (async () => {
+      // Colunas de posição (migração 20261116010000) — tolerante: sem elas, cai no select antigo.
+      const r = await svc.from('simulado_produtos').select('id, slug, nome, tipo, descricao, cor, capa_url, ordem, cursos_modo, cursos_agrupar_em, cursos_largura').eq('tenant_id', tenantId).eq('ativo', true).in('id', uniq).order('ordem', { ascending: true })
+      if (!r.error) return r
+      return svc.from('simulado_produtos').select('id, slug, nome, tipo, descricao, cor, capa_url, ordem').eq('tenant_id', tenantId).eq('ativo', true).in('id', uniq).order('ordem', { ascending: true })
+    })(),
     svc.from('simulado_produto_itens').select('produto_id').eq('tenant_id', tenantId).eq('ativo', true).in('produto_id', uniq),
   ])
   const cont = new Map<string, number>()
@@ -131,8 +141,11 @@ export async function produtosDoAluno(tenantId: string, estudanteId: string): Pr
   return ((prods ?? []) as any[]).filter((p) => !foraDaJanela.has(p.id)).map((p) => ({
     id: p.id, slug: p.slug, nome: p.nome, tipo: p.tipo, descricao: p.descricao ?? null,
     cor: p.cor ?? null, capa_url: p.capa_url ?? null, itens: cont.get(p.id) ?? 0, expira_em: expira.get(p.id) ?? null,
+    ordem: Number(p.ordem ?? 0) || 0, cursos_modo: p.cursos_modo === 'agrupado' ? 'agrupado' : 'card', cursos_agrupar_em: p.cursos_agrupar_em ?? null, cursos_largura: Number(p.cursos_largura) === 2 ? 2 : 1,
   }))
 }
+
+export { organizarCardsCursos, type CardCursos } from './cursos-posicao'
 
 /**
  * Progresso do aluno NO extensivo (Fase 2.2): simulados do produto (itens diretos + simulados que

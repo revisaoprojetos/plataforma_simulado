@@ -32,6 +32,7 @@ import {
   type CampoId, type Efeito, type SemAcesso, type AlvoTipo, type RefTipo, type Juncao,
 } from '@/lib/segmentos/tipos'
 import type { SegmentoAdmin, AlvosProduto, AlvoNome } from './visibilidade-actions-tipos'
+import { RefMulti } from './refs-multi'
 import { carregarVisibilidadeAction, carregarAlvosConteudoAction, salvarSegmentoAction, duplicarSegmentoAction, excluirSegmentoAction, salvarRegraVisibilidadeAction, alternarRegraVisibilidadeAction, excluirRegraVisibilidadeAction, buscarRefsSegmentoAction, buscarAlunosSegmentoAction, testarSegmentoAction } from './visibilidade-actions'
 
 const MIGRACAO = '20261103130000_segmentos_visibilidade.sql'
@@ -460,7 +461,7 @@ export function JuncaoToggle({ valor, onChange, disabled, grande, rotulos = ['E'
   )
 }
 
-export function LinhaCondicao({ c, nomes, disabled, resultado, onChange, onNome, onRemover }: {
+export function LinhaCondicao({ c, nomes, disabled, produtoId, resultado, onChange, onNome, onRemover }: {
   c: Condicao; nomes: Record<string, string>; disabled: boolean; produtoId: string; resultado?: boolean
   onChange: (p: Partial<Condicao>) => void; onNome: (id: string, nome: string) => void; onRemover: () => void
 }) {
@@ -472,7 +473,7 @@ export function LinhaCondicao({ c, nomes, disabled, resultado, onChange, onNome,
 
   function trocarCampo(id: CampoId) {
     const novo = CAMPO_POR_ID[id]
-    onChange({ campo: id, operador: operadoresDoCampo(novo)[0], valor: null, valor2: null, dias: null, ref: novo.ref && novo.ref === def.ref ? c.ref : null })
+    onChange({ campo: id, operador: operadoresDoCampo(novo)[0], valor: null, valor2: null, dias: null, ref: novo.ref && novo.ref === def.ref ? c.ref : null, refs: novo.tipo === 'relacao' && novo.ref === def.ref ? c.refs ?? null : null })
   }
   function trocarOperador(op: string) {
     const eraDias = VALOR_EM_DIAS.includes(c.operador), viraDias = VALOR_EM_DIAS.includes(op as any)
@@ -494,7 +495,12 @@ export function LinhaCondicao({ c, nomes, disabled, resultado, onChange, onNome,
           <optgroup key={cat} label={cat}>{CAMPOS.filter((x) => x.categoria === cat).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</optgroup>
         ))}
       </select>
-      {def.ref && <RefPicker tipo={def.ref} value={c.ref ?? null} nome={c.ref ? nomes[c.ref] : undefined} obrigatoria={!!def.refObrigatoria} disabled={disabled} onChange={(id, n) => { onChange({ ref: id }); if (id && n) onNome(id, n) }} />}
+      {def.ref && def.tipo === 'relacao' && def.ref !== 'simulado' ? (
+        <RefMulti tipo={def.ref} produtoId={produtoId} ids={c.refs?.length ? c.refs : c.ref ? [c.ref] : []} nomes={nomes} disabled={disabled}
+          onChange={(itens) => { onChange({ ref: itens[0]?.id ?? null, refs: itens.length > 1 ? itens.map((x) => x.id) : null }); for (const x of itens) onNome(x.id, x.nome) }} />
+      ) : def.ref ? (
+        <RefPicker tipo={def.ref} value={c.ref ?? null} nome={c.ref ? nomes[c.ref] : undefined} obrigatoria={!!def.refObrigatoria} disabled={disabled} onChange={(id, n) => { onChange({ ref: id }); if (id && n) onNome(id, n) }} />
+      ) : null}
       <select value={c.operador} onChange={(e) => trocarOperador(e.target.value)} disabled={disabled} className={cn(sel, 'w-44')}>
         {ops.map((o) => <option key={o} value={o}>{rotuloOperador(def, o)}</option>)}
       </select>

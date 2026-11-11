@@ -37,6 +37,8 @@ export interface Condicao {
   valor2?: string | number | null   // 2º limite do "entre"
   ref?: string | null               // id do grupo / produto / simulado
   dias?: number | null              // período "nos últimos X dias" dos campos de quantidade
+  /** Vários grupos/produtos na MESMA condição (só campos de relação): vale se o aluno estiver em QUALQUER um. */
+  refs?: string[] | null
 }
 export interface GrupoCondicoes { id: string; op: Juncao; condicoes: Condicao[] }
 export interface RegraSegmento { op: Juncao; grupos: GrupoCondicoes[] }
@@ -184,6 +186,7 @@ export function normalizarRegra(v: unknown): RegraSegmento {
         .map((c: any): Condicao => ({
           id: String(c.id || novoId()), campo: c.campo, operador: c.operador,
           valor: c.valor ?? null, valor2: c.valor2 ?? null, ref: c.ref ?? null,
+          refs: Array.isArray(c.refs) ? c.refs.map(String).filter(Boolean).slice(0, 500) : null,
           dias: c.dias == null || c.dias === '' ? null : Number(c.dias),
         })),
     })).filter((g: GrupoCondicoes) => g.condicoes.length > 0),
@@ -198,7 +201,7 @@ export function validarRegra(r: RegraSegmento): string | null {
     const def = CAMPO_POR_ID[c.campo]
     if (!def) return 'Campo inválido.'
     if (!operadoresDoCampo(def).includes(c.operador)) return `Operador inválido em "${def.label}".`
-    if (def.ref && def.refObrigatoria && !c.ref) return `Escolha o ${def.ref} em "${def.label}".`
+    if (def.ref && def.refObrigatoria && !c.ref && !c.refs?.length) return `Escolha o ${def.ref} em "${def.label}".`
     if (SEM_VALOR.includes(c.operador)) continue
     const vazio = (x: unknown) => x === null || x === undefined || String(x).trim() === ''
     if (vazio(c.valor)) return `Preencha o valor em "${def.label}".`
@@ -219,7 +222,10 @@ export function resumoCondicao(c: Condicao, nomes: Record<string, string> = {}):
   const def = CAMPO_POR_ID[c.campo]
   if (!def) return '?'
   const partes = [def.label]
-  if (def.ref) partes.push(c.ref ? `“${nomes[c.ref] ?? def.ref}”` : `(qualquer ${def.ref})`)
+  if (def.ref) {
+    const ids = c.refs?.length ? c.refs : c.ref ? [c.ref] : []
+    partes.push(ids.length ? `“${ids.slice(0, 3).map((i) => nomes[i] ?? def.ref).join('”, “')}”${ids.length > 3 ? ` e mais ${ids.length - 3}` : ''}` : `(qualquer ${def.ref})`)
+  }
   partes.push(rotuloOperador(def, c.operador).toLowerCase())
   if (!SEM_VALOR.includes(c.operador)) {
     const un = def.unidade ?? ''
@@ -249,6 +255,7 @@ export function refsDaRegra(r: RegraSegmento): Record<RefTipo, string[]> {
   for (const g of r.grupos) for (const c of g.condicoes) {
     const def = CAMPO_POR_ID[c.campo]
     if (def?.ref && c.ref) out[def.ref].add(c.ref)
+    if (def?.ref && c.refs) for (const r of c.refs) out[def.ref].add(r)
   }
   return { grupo: [...out.grupo], produto: [...out.produto], simulado: [...out.simulado] }
 }
