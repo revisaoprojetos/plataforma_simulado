@@ -427,6 +427,8 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
   const [segId, setSegId] = useState('') // '' = todos os alunos
   const pub = usePublico(c)
   const temPublico = pub.modo === 'rapido' ? !pub.vazio : !!segId
+  const [restringir, setRestringir] = useState(false) // bloquear quem NÃO está no público (cria regra de Visibilidade "mostrar somente para")
+  const [semAcessoRestr, setSemAcessoRestr] = useState<'oculto' | 'bloqueado_cadeado'>('bloqueado_cadeado')
   const [disp, setDisp] = useState<Disponibilidade>(DISP_PADRAO)
   const [prioridade, setPrioridade] = useState(0)
   const [editarDisp, setEditarDisp] = useState(false)
@@ -452,6 +454,11 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
     if ('error' in r) { toast.error(r.error); return }
     // Atualiza a lista NA HORA com o que o servidor devolveu (sem esperar outra consulta) e confere em segundo plano.
     setRs((prev) => prev && { ...prev, disp: [...prev.disp.filter((x) => !(x.segmento_id === sr.id && ids.has(x.alvo_id))), ...r.regras] })
+    if (restringir) {
+      const v = await aplicarVisibilidadeEmLoteAction(c.produtoId, c.alvos, { tipo: 'aplicar', segmento_id: sr.id, efeito: 'mostrar', sem_acesso: semAcessoRestr, substituir: false })
+      if ('error' in v) toast.error(`Liberação aplicada, mas a restrição falhou: ${v.error}`)
+      else { toast.success(`Liberação aplicada e restrita a “${sr.nome}” em ${c.plural(r.alvos)}.`); void c.onMudou(); void onRs(); return }
+    }
     toast.success(`Liberação aplicada em ${c.plural(r.alvos)}.`); void onRs()
   }
   async function remover(regras: { id: string }[]) {
@@ -494,6 +501,16 @@ function AbaLiberacao({ rs, setRs, onRs, onAplicarBase, baseResumo, ...c }: Comu
           <div className="space-y-1.5"><span className="text-sm font-medium">Quando libera{temPublico ? ' para este público' : ' para todos'}</span>
             <button type="button" onClick={() => setEditarDisp(true)} className="flex h-11 w-full items-center justify-between rounded-xl border bg-card px-3 text-sm hover:bg-muted"><span className="truncate capitalize">{resumoDisponibilidade(disp)}</span><Pencil className="h-4 w-4 shrink-0 text-muted-foreground" /></button></div>
           {temPublico && <Prioridade valor={prioridade} onChange={setPrioridade} />}
+          {temPublico && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={restringir} onChange={(e) => setRestringir(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+              <span className="min-w-0 flex-1"><span className="font-medium">Só este público acessa (bloquear os demais)</span>
+                <span className="block text-xs text-muted-foreground">Liberação só define <b>quando</b> libera — não impede os outros alunos. Marque para também esconder o conteúdo de quem não está no público.</span>
+                {restringir && <select value={semAcessoRestr} onChange={(e) => setSemAcessoRestr(e.target.value as 'oculto' | 'bloqueado_cadeado')} onClick={(e) => e.stopPropagation()} className={cn(campo, 'mt-2')}><option value="bloqueado_cadeado">Demais veem com cadeado</option><option value="oculto">Demais não veem (some)</option></select>}
+              </span></label>
+          )}
+          {temPublico && !restringir && disp.tipo === 'na_matricula' && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" /><span><b>“Disponível sempre” não muda nada</b> para ninguém. Para restringir o acesso a este público, marque “Só este público acessa” ou use a aba <b>Visibilidade</b> (Mostrar somente para).</span></div>
+          )}
           <Dica>{temPublico ? <>Quem está no público usa esta liberação <b>no lugar</b> da padrão. Quem não está segue “Todos os alunos”.</> : <>Liberação padrão{c.soModulos ? ' das aulas dentro dos módulos (inclui submódulos)' : ''}: vale para quem não tiver liberação própria de segmento.</>}</Dica>
           <Button className="w-full" onClick={aplicar} disabled={ocupado || (!temPublico && !onAplicarBase)}>{ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Aplicar{c.total > 1 ? ` a ${c.total}` : ''}</Button>
         </>

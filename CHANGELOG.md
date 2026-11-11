@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.16.1 — 2026-11-12
+
+### Segmentos — Liberação mais clara
+- Aba **Liberação**: nova opção **"Só este público acessa (bloquear os demais)"**, que além da liberação cria a regra de **Visibilidade** "mostrar somente para" (demais com cadeado ou sem ver).
+- Aviso quando se aplica "Disponível sempre" a um público: isso não muda nada para ninguém; a Liberação só define *quando* libera, não bloqueia quem está fora.
+
+---
+
 ## 4.16.0 — 2026-11-12
 
 ### Conteúdos — organização interna e capas
