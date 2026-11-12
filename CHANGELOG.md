@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.18.0 — 2026-11-12
+
+### Área de Cursos — posição dos extensivos
+- **Posição na área de Cursos** (aba Informações do produto): **card próprio** (largura 1 ou 2 colunas + ordem) ou **agrupado** dentro do card de outro extensivo (faixa "Também neste card"). Migração `20261116010000_produto_posicao_cursos.sql`.
+- Página **Cursos** do aluno: **um card por extensivo** (antes um atalho único "Extensivos"); sem capa própria usa capa gerada (nome em gradiente), nunca a imagem de outro extensivo.
+
+### Segmentos
+- **Condições com vários grupos/produtos** na mesma condição ("está em qualquer um dos grupos…"), pop-up grande paginado com "marcar página"; modelo/avaliação ampliados (`refs`), segmentos antigos seguem valendo.
+- Capa por segmento: lista de públicos já configurados, imagens enviadas não somem ao escolher o público, aviso quando falta o público.
+- Etiquetas de segmento nos cards dos módulos agora logo abaixo do checkbox de seleção (só ícones).
+- Liberação: opção "Só este público acessa (bloquear os demais)" e aviso sobre "Disponível sempre".
+
+### Abertura de documentos (LegProc, PDFull e demais) — reforço e otimização
+- Leitor: gate de liberação, tema, vídeo, documento e progresso salvo em **paralelo**; dentro do documento, bloqueios por data + áreas de visibilidade + marca/pasta LegProc em paralelo.
+- **Sem 404 mudo**: tela explicando o motivo (em preparação, não publicado, sem acesso, ainda não liberado, não encontrado, falha temporária com "Tentar novamente").
+- Aulas cujo documento não está publicado/sem versão aparecem como **"Em preparação"** nas listas (em vez de link morto).
+
+---
+
 ## 4.17.0 — 2026-11-11
 
 ### Cronograma — motor 3.2.0 e unificação Revisão + Adaptativo

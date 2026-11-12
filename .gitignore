@@ -96,3 +96,5 @@ tmp-*
 # Spike dos editores Office (área de Teste): .docx de teste gravados em disco + scripts helper locais
 apps/web/.teste-docs/
 apps/web/scripts/_*
+
+.env.ssh

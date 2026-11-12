@@ -240,6 +240,15 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   const porSeg = libAulas && porSegBase ? { ...porSegBase, disp: libAulas.disp } : libAulas ? { capa: () => null, disp: libAulas.disp } : porSegBase
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
+  // Documentos que NÃO abrem para ninguém (rascunho / sem versão publicada / apagados): a aula aparece "Em preparação" em vez de um link morto.
+  const emPreparo = new Set<string>()
+  try {
+    const achados = new Set<string>()
+    const blocos: string[][] = []; for (let k = 0; k < docIds.length; k += 80) blocos.push(docIds.slice(k, k + 80))
+    const rs = await Promise.all(blocos.map((b) => svc.from('simulado_conteudo_documentos').select('id, status, versao_atual_id, deletado').eq('tenant_id', tenantId).in('id', b)))
+    for (const r of rs) for (const d of (r.data ?? []) as any[]) { achados.add(d.id); if (d.deletado || !d.versao_atual_id || d.status !== 'publicado') emPreparo.add(d.id) }
+    if (rs.every((r) => !r.error)) for (const id of docIds) if (!achados.has(id)) emPreparo.add(id) // documento inexistente
+  } catch { /* sem a checagem: comportamento anterior */ }
   const lidos = new Map<string, LeituraAluno>()
   let colunasNovas = true // tolerância à migração ausente (pagina/total_paginas/pct/concluido_em)
   for (let k = 0; k < docIds.length; k += 80) {
@@ -313,10 +322,11 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       const noPrazo = !lib || +lib <= agora
       const msgA = !noPrazo && ehSentinelaMeta(lib) ? MSG_AGUARDA_META : null
       if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
-      const liberada = noPrazo && !exclusivo
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
+      const indisponivel = tipo === 'documento_biblioteca' && !!i.ref_id && emPreparo.has(i.ref_id)
+      const liberada = noPrazo && !exclusivo && !indisponivel
       const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta, produtoId)
-      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib || msgA ? null : lib.toISOString(), bloqueioMsg: msgA, liberaRotulo: !noPrazo && !(!!i.ref_id && lidos.has(i.ref_id)) ? rotuloM : null, lida: !!i.ref_id && lidos.has(i.ref_id), leitura: (i.ref_id && lidos.get(i.ref_id)) || null, leituraFmt: formatarLeitura((i.ref_id && lidos.get(i.ref_id)) || null), exclusivo, material: materialDoItem(i.subtipo, tipo, String(i.titulo ?? '')), quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null, cronograma: tipo === 'cronograma' && liberada ? resumoCrono : null })
+      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib || msgA ? null : lib.toISOString(), bloqueioMsg: msgA ?? (indisponivel && noPrazo && !exclusivo ? 'Em preparação — será publicado em breve' : null), liberaRotulo: !noPrazo && !(!!i.ref_id && lidos.has(i.ref_id)) ? rotuloM : null, lida: !!i.ref_id && lidos.has(i.ref_id), leitura: (i.ref_id && lidos.get(i.ref_id)) || null, leituraFmt: formatarLeitura((i.ref_id && lidos.get(i.ref_id)) || null), exclusivo, material: materialDoItem(i.subtipo, tipo, String(i.titulo ?? '')), quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null, cronograma: tipo === 'cronograma' && liberada ? resumoCrono : null })
     }
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra

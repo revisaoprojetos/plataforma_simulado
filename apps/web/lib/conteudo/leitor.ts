@@ -589,11 +589,20 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`). UMA vez para mídia e PDF.
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
-  if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
-
+  // Gates de liberação (cronograma) + consultas que o resto da abertura precisa (áreas de visibilidade, marca LegProc, pasta) são
+  // INDEPENDENTES: rodam em PARALELO (antes eram ~5 idas ao banco em série). Bloqueado → devolve null como antes.
   const tipoOrigem = String((doc as any).tipo_origem ?? '')
-  // ÁREAS DE VISIBILIDADE (plugin do editor): quais áreas ESTE aluno não vê (por produto/grupo/segmento/aluno).
-  const areasAluno = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
+  const [bloqCron, bloqAulas, areasAluno, marcadoLegproc, pastaLegproc] = await Promise.all([
+    docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id),
+    docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id),
+    // ÁREAS DE VISIBILIDADE (plugin do editor): quais áreas ESTE aluno não vê (por produto/grupo/segmento/aluno).
+    areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId),
+    // LEGPROC (marca por documento, coluna leitura_legproc). Tolerante à migração pendente (coluna ausente → null → segue no PDF).
+    (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('leitura_legproc, legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
+    // Doc numa pasta de tipo LegProc (cronograma_tipo_material='legproc'): leitura em texto e legenda já vêm ligadas.
+    (async () => { if (!(doc as any).pasta_id) return false; try { const r = await svc.from(T_PASTA).select('cronograma_tipo_material').eq('tenant_id', tenantId).eq('id', (doc as any).pasta_id).maybeSingle(); return !r.error && (r.data as any)?.cronograma_tipo_material === 'legproc' } catch { return false } })(),
+  ])
+  if (bloqCron || bloqAulas) return null // liberação por data do Cronograma Adaptativo / liberação de aulas
   // MÍDIA (vídeo/áudio): player nativo. Só a URL assinada do original (gate já passou).
   if (tipoOrigem === 'video' || tipoOrigem === 'audio') {
     const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
@@ -605,14 +614,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     return { kind: 'midia', midia: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind: tipoOrigem as 'video' | 'audio', url, ext } }
   }
 
-  // LEGPROC (marca por documento, coluna leitura_legproc): leitura em TEXTO com STF/STJ recolhíveis em vez do
-  // PDF fiel. Tolerante à migração pendente (coluna ausente → false → segue no PDF). Se o HTML não estiver
-  // disponível, cai no PDF (nunca deixa o aluno sem leitura).
-  const marcadoLegproc = await (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('leitura_legproc, legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })()
-  // "Marcado como LegProc" = interruptor do documento OU o doc está numa pasta de tipo LegProc
-  // (cronograma_tipo_material='legproc'): nesses, a leitura em texto (STF/STJ recolhíveis) e a legenda de
-  // categorias já vêm ligadas, sem precisar configurar documento a documento.
-  const pastaLegproc = !!(doc as any).pasta_id && await (async () => { try { const r = await svc.from(T_PASTA).select('cronograma_tipo_material').eq('tenant_id', tenantId).eq('id', (doc as any).pasta_id).maybeSingle(); return !r.error && (r.data as any)?.cronograma_tipo_material === 'legproc' } catch { return false } })()
+  // "Marcado como LegProc" = interruptor do documento OU o doc está numa pasta LegProc.
   const ehLegproc = !!(marcadoLegproc as any)?.leitura_legproc || pastaLegproc
   const legendaLegproc = !!(marcadoLegproc as any)?.legenda_categorias || ehLegproc
   // Texto convertido (formatação do professor preservada): usado no LegProc E como RESERVA quando o PDF não pôde ser gerado.
@@ -868,4 +870,23 @@ export async function lerProgressoLeituraAluno(
   if (error || !data) return null
   const d: any = data
   return { pagina: d.pagina ?? null, pct: d.pct ?? null, concluidoEm: d.concluido_em ?? null }
+}
+
+
+/** Motivo pelo qual o leitor NÃO abriu o documento (p/ mostrar uma tela clara em vez de um 404 mudo). Só consultas leves. */
+export type MotivoFalhaLeitura = 'inexistente' | 'em_preparacao' | 'nao_publicado' | 'sem_acesso' | 'ainda_nao_liberado' | 'indisponivel'
+export async function diagnosticarFalhaLeitura(documentoId: string, alunoId: string): Promise<{ motivo: MotivoFalhaLeitura; titulo: string | null }> {
+  try {
+    const tenantId = await getCurrentTenantId()
+    if (!tenantId || !documentoId) return { motivo: 'inexistente', titulo: null }
+    const svc = createAdminClient()
+    const doc: any = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
+    if (!doc || doc.deletado || !['conteudo', 'jurisclub'].includes(doc.categoria)) return { motivo: 'inexistente', titulo: doc?.titulo ?? null }
+    const titulo = String(doc.titulo ?? '') || null
+    if (!doc.versao_atual_id) return { motivo: 'em_preparacao', titulo }
+    if (doc.status !== 'publicado' && !(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }).catch(() => false))) return { motivo: 'nao_publicado', titulo }
+    if (!(await podeLerDoc(svc, tenantId, alunoId, doc).catch(() => false))) return { motivo: 'sem_acesso', titulo }
+    if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id).catch(() => false)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id).catch(() => false))) return { motivo: 'ainda_nao_liberado', titulo }
+    return { motivo: 'indisponivel', titulo }
+  } catch { return { motivo: 'indisponivel', titulo: null } }
 }

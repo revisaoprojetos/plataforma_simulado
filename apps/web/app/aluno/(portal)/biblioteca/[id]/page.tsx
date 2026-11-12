@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { carregarDocParaLeitura, registrarLeituraAluno, lerProgressoLeituraAluno } from '@/lib/conteudo/leitor'
+import { carregarDocParaLeitura, registrarLeituraAluno, lerProgressoLeituraAluno, diagnosticarFalhaLeitura, type MotivoFalhaLeitura } from '@/lib/conteudo/leitor'
 import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
 import { paginaInicialDoDocumento } from '@/lib/conteudo/capa-pagina-server'
 import { MidiaPlayer } from '@/components/aluno/midia-player'
@@ -32,6 +32,31 @@ function MaterialBloqueado({ lib, voltarHref }: { lib: Liberacao; voltarHref: st
         <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{msg}</p>
         <div className="flex flex-col gap-2">
           <Link href="/aluno/cronograma" className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">Ir para o meu cronograma</Link>
+          <Link href={voltarHref} className="inline-flex h-11 items-center justify-center rounded-xl border px-4 text-sm font-medium">Voltar</Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Em vez do 404 mudo: diz POR QUE o material não abriu e oferece caminhos (voltar, tentar de novo, falar com o suporte). */
+function MaterialIndisponivel({ motivo, titulo, voltarHref }: { motivo: MotivoFalhaLeitura; titulo: string | null; voltarHref: string }) {
+  const [h, msg] = ({
+    em_preparacao: ['Material em preparação', 'Este material ainda está sendo preparado pela equipe e será publicado em breve. Volte mais tarde.'],
+    nao_publicado: ['Material ainda não publicado', 'Este material ainda não foi publicado. Assim que for, ele abre normalmente.'],
+    ainda_nao_liberado: ['Material ainda não liberado', 'Este material será liberado em uma data programada para o seu plano de estudos. Volte quando ele estiver liberado.'],
+    sem_acesso: ['Você não tem acesso a este material', 'Seu acesso a este conteúdo não está liberado. Se você acredita que deveria ter acesso, fale com o suporte informando o nome do material.'],
+    inexistente: ['Material não encontrado', 'Este material não existe mais ou o link está incorreto.'],
+    indisponivel: ['Não foi possível abrir agora', 'Houve um problema temporário ao carregar o material. Tente novamente em instantes; se continuar, fale com o suporte informando o nome do material.'],
+  } as Record<MotivoFalhaLeitura, [string, string]>)[motivo]
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center p-5">
+      <div className="w-full max-w-md rounded-2xl border bg-card p-7 text-center shadow-sm">
+        <h1 className="mb-2 text-lg font-bold">{h}</h1>
+        {titulo ? <p className="mb-3 text-sm font-medium text-muted-foreground">{titulo}</p> : null}
+        <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{msg}</p>
+        <div className="flex flex-col gap-2">
+          {motivo === 'indisponivel' && <a href="" className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">Tentar novamente</a>}
           <Link href={voltarHref} className="inline-flex h-11 items-center justify-center rounded-xl border px-4 text-sm font-medium">Voltar</Link>
         </div>
       </div>
@@ -72,19 +97,27 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   // LIBERAÇÃO POR DATA (Cronograma Adaptativo): material ainda não liberado no plano do aluno → tela
   // explicando QUANDO libera (em vez do 404 genérico que o gate do leitor daria).
   const tenantId = await getCurrentTenantId()
-  if (tenantId) {
-    const lib = await liberacaoDoc(createAdminClient(), tenantId, sessao.estudanteId, id)
-    if (lib.bloqueado) return <MaterialBloqueado lib={lib} voltarHref={voltarHref} />
-  }
-
+  // Tudo o que NÃO depende de outra coisa roda em PARALELO (antes: liberação → tema → doc → progresso, em série):
+  // liberação por data, tema da empresa, vídeo da leitura, o documento (gate + conteúdo) e o progresso salvo do aluno.
+  const supa = createAdminClient()
+  const paginaExplicitaP = sp?.pagina !== undefined && Number.isFinite(Number(sp.pagina))
+  const doCronogramaP = !!sp?.meta || !!sp?.partes
+  const [lib, tt, video0, doc, salvo] = await Promise.all([
+    tenantId ? liberacaoDoc(supa, tenantId, sessao.estudanteId, id) : Promise.resolve(null),
+    getTenantTheme().catch(() => null),
+    tenantId ? resolverVideoLeitura(supa, tenantId, id, sessao.estudanteId).catch(() => null) : Promise.resolve(null),
+    carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null }).catch(() => null),
+    !paginaExplicitaP && !doCronogramaP && tenantId ? lerProgressoLeituraAluno(tenantId, sessao.estudanteId, id).catch(() => null) : Promise.resolve(null),
+  ])
+  if (lib?.bloqueado) return <MaterialBloqueado lib={lib} voltarHref={voltarHref} />
   // IDENTIDADE da empresa no leitor: logo (versão clara, p/ a barra roxa) + nome.
-  const tt = await getTenantTheme().catch(() => null)
   const marca = { logo: (tt?.tema as any)?.logo_url ?? (tt?.tema as any)?.logo_dark_url ?? null, nome: tt?.tenantNome ?? '' }
-  // VÍDEO da leitura (configurado no gerenciamento do documento) — em paralelo com o carregamento do documento.
-  const videoP = tenantId ? resolverVideoLeitura(createAdminClient(), tenantId, id, sessao.estudanteId) : Promise.resolve(null)
-  const doc = await carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null })
-  if (!doc) notFound()
-  const video = doc.kind === 'midia' ? null : await videoP
+  if (!doc) {
+    // Sem 404 mudo: explica o motivo (em preparação / não publicado / sem acesso / não existe / falha temporária).
+    const d = await diagnosticarFalhaLeitura(id, sessao.estudanteId)
+    return <MaterialIndisponivel motivo={d.motivo} titulo={d.titulo} voltarHref={voltarHref} />
+  }
+  const video = doc.kind === 'midia' ? null : video0
 
   // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. O leitor ABRE direto nela, mas NÃO corta o que vem
   // antes: as páginas anteriores continuam na leitura (é só rolar para cima). Só vale na abertura NORMAL do documento.
@@ -93,7 +126,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const doCronograma = !!sp?.meta || !!sp?.partes
   const paginaExplicita = sp?.pagina !== undefined && Number.isFinite(Number(sp.pagina))
   // RETOMAR de onde parou (abertura normal, leitura ainda não concluída): usa o progresso salvo do aluno.
-  const salvo = !paginaExplicita && !doCronograma && tenantId ? await lerProgressoLeituraAluno(tenantId, sessao.estudanteId, id) : null
+  // (progresso salvo já carregado em paralelo acima: `salvo`)
   const retomar = !!salvo && !salvo.concluidoEm
   const paginaRetomar = retomar && salvo!.pagina && salvo!.pagina > 1 ? salvo!.pagina : null
   const posicaoPct = retomar && !paginaRetomar && salvo!.pct && salvo!.pct > 1 ? salvo!.pct : null
