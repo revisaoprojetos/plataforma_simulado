@@ -105,7 +105,15 @@ export async function listarHistorico(
   const q = sanear(opts.q)
   if (q) b = b.ilike('texto', `%${q}%`)
   if (opts.tipo) b = b.eq('tipo', opts.tipo)
-  const { data, count, error } = await b.order('criado_em', { ascending: false }).order('id', { ascending: true }).range(off, off + opts.porPagina - 1)
+  // Registros excluídos (soft) do novo registro de versões não aparecem; antes da migração 20261119010000 o filtro falha → refaz sem ele.
+  let res = await b.eq('deletado', false).order('criado_em', { ascending: false }).order('id', { ascending: true }).range(off, off + opts.porPagina - 1)
+  if (res.error && /deletado/.test(res.error.message)) {
+    let b2 = svc.from('simulado_conteudo_atualizacoes').select('id, documento_id, tipo, texto, avisar_alunos, criado_em', { count: 'exact' }).eq('tenant_id', tenantId)
+    if (q) b2 = b2.ilike('texto', `%${q}%`)
+    if (opts.tipo) b2 = b2.eq('tipo', opts.tipo)
+    res = await b2.order('criado_em', { ascending: false }).order('id', { ascending: true }).range(off, off + opts.porPagina - 1)
+  }
+  const { data, count, error } = res
   if (error) return { rows: [], total: 0, semTabela: SCHEMA_AUSENTE.test(error.message) }
   const rotulos = await rotulosDeMateriais(svc, tenantId, (data ?? []).map((r: any) => r.documento_id))
   return {
@@ -129,10 +137,21 @@ export async function opcoesMateriais(svc: SupabaseClient, tenantId: string, bus
  * Selo "Atualizado em" + "Novidades da versão" do aluno: última atualização do documento e as 5 mais recentes.
  * USO: leitor do aluno (painel/leitor/[materialId]/page.tsx tem TODO(dados) — trocar o texto fixo por este retorno).
  */
-export async function novidadesDoDocumento(svc: SupabaseClient, tenantId: string, documentoId: string): Promise<{ atualizadoEm: string | null; novidades: { tipo: TipoAtualizacao; texto: string; quando: string }[] }> {
+export interface NovidadeDoc { tipo: TipoAtualizacao; texto: string; quando: string; rotulo: string | null; itens: { texto: string; tipo?: TipoAtualizacao | null; local?: string | null }[] }
+export async function novidadesDoDocumento(svc: SupabaseClient, tenantId: string, documentoId: string): Promise<{ atualizadoEm: string | null; novidades: NovidadeDoc[]; /** última atualização publicada tem ≤14 dias (indicador na aba do leitor) */ recente: boolean; /** rótulo da última atualização publicada (tooltip do selo de versão) */ ultimoRotulo: string | null }> {
   try {
+    // Só PUBLICADAS e visíveis ao aluno (registro de versões). Sem a migração 20261119010000 → cai no formato legado.
+    const novo = await svc.from('simulado_conteudo_atualizacoes').select('tipo, texto, criado_em, ocorrida_em, rotulo, itens')
+      .eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('status', 'publicado').eq('visivel_aluno', true).eq('deletado', false)
+      .order('ocorrida_em', { ascending: false }).limit(5)
+    if (!novo.error) {
+      const l = (novo.data ?? []) as any[]
+      const novidades = l.map((r) => ({ tipo: r.tipo, texto: r.texto ?? '', quando: r.ocorrida_em ?? r.criado_em, rotulo: r.rotulo ?? null, itens: Array.isArray(r.itens) ? r.itens : [] }))
+      const ult = novidades[0]?.quando ?? null
+      return { atualizadoEm: ult, novidades, recente: !!ult && Date.now() - new Date(ult).getTime() <= 14 * 86400_000, ultimoRotulo: novidades[0]?.rotulo ?? null }
+    }
     const { data } = await svc.from('simulado_conteudo_atualizacoes').select('tipo, texto, criado_em').eq('tenant_id', tenantId).eq('documento_id', documentoId).order('criado_em', { ascending: false }).limit(5)
     const l = (data ?? []) as any[]
-    return { atualizadoEm: l[0]?.criado_em ?? null, novidades: l.map((r) => ({ tipo: r.tipo, texto: r.texto, quando: r.criado_em })) }
-  } catch { return { atualizadoEm: null, novidades: [] } }
+    return { atualizadoEm: l[0]?.criado_em ?? null, novidades: l.map((r) => ({ tipo: r.tipo, texto: r.texto, quando: r.criado_em, rotulo: null, itens: [] })), recente: false, ultimoRotulo: null }
+  } catch { return { atualizadoEm: null, novidades: [], recente: false, ultimoRotulo: null } }
 }

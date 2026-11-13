@@ -8,7 +8,9 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 import { chaveRelatorio, esquecerPrefixo, remember } from '@/lib/cache/relatorio-cache'
+import { paginasEfetivasDocs, type DocParaPaginas, type PaginasDoc } from '@/lib/conteudo/paginas-efetivas'
 import { tipoBaixavel } from '@/lib/conteudo/baixar-pura'
+import { lerPoliticaDownload } from '@/lib/conteudo/politica-download'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { coalescer, lerProgressoReencaixado } from './progresso-emissao'
 import {
@@ -154,26 +156,22 @@ async function resolverConteudoDasMetasBruto(
   // Metadados dos docs usados (título, versão atual -> páginas), em lotes de 80.
   const ids = [...new Set([...resolvidos.values()].map((r) => r.docId))]
   const info = new Map<string, { titulo: string; versao: string | null; baixavel: boolean }>()
+  const docsPag: DocParaPaginas[] = []
+  const polDl = await lerPoliticaDownload(svc, tenantId) // chave da PLATAFORMA: desligada → nenhum botão "Baixar" (o servidor também barra)
   try {
-    const rows = await fetchAllByIn<{ id: string; titulo: string; versao_atual_id: string | null; tipo_origem: string | null }>(ids, (chunk) =>
-      svc.from('simulado_conteudo_documentos').select('id, titulo, versao_atual_id, tipo_origem')
+    const rows = await fetchAllByIn<{ id: string; titulo: string; pasta_id: string | null; versao_atual_id: string | null; tipo_origem: string | null; pode_baixar: boolean | null }>(ids, (chunk) =>
+      svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id, versao_atual_id, tipo_origem, pode_baixar')
         .eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).in('id', chunk).order('id') as never,
     { concorrencia: 4 })
-    for (const r of rows) info.set(r.id, { titulo: r.titulo, versao: r.versao_atual_id, baixavel: tipoBaixavel(r.tipo_origem) })
+    for (const r of rows) { docsPag.push({ id: r.id, pasta_id: r.pasta_id ?? null, versao_atual_id: r.versao_atual_id ?? null }); info.set(r.id, { titulo: r.titulo, versao: r.versao_atual_id, baixavel: polDl.alunoPodeBaixar && r.pode_baixar !== false && tipoBaixavel(r.tipo_origem) }) }
   } catch (e) { throw e } // não devolver vazio: o chamador degrada SEM gravar vazio no cache
-  const versoes = [...new Set([...info.values()].map((i) => i.versao).filter(Boolean) as string[])]
-  const pags = new Map<string, number>()
-  try {
-    const vs = await fetchAllByIn<{ id: string; paginas: number | null }>(versoes, (chunk) =>
-      svc.from('simulado_conteudo_versoes').select('id, paginas').in('id', chunk).order('id') as never,
-    { concorrencia: 4 })
-    for (const v of vs) if (v.paginas) pags.set(v.id, v.paginas)
-  } catch { /* sem páginas: o aluno informa o total no Parcial */ }
+  // páginas EFETIVAS (versão atual − página inicial) pela função única compartilhada; sem contagem → null (o aluno informa o total no Parcial)
+  const pagsDoc = await paginasEfetivasDocs(svc, tenantId, docsPag).catch(() => new Map<string, PaginasDoc>())
 
   for (const [metaId, r] of resolvidos) {
     const d = info.get(r.docId)
     if (!d) continue
-    out.set(metaId, { ...r, titulo: d.titulo, paginas: d.versao ? pags.get(d.versao) ?? null : null, baixavel: d.baixavel })
+    out.set(metaId, { ...r, titulo: d.titulo, paginas: pagsDoc.get(r.docId)?.efetivas ?? null, baixavel: d.baixavel })
   }
   return out
 }

@@ -6,6 +6,7 @@ import { criarSessaoImpersonation } from '@/lib/impersonation/session'
 import { abrirLogImpersonation } from '@/lib/impersonation/logs'
 import { getModoNotificacao, notificarImpersonacaoSeNecessario } from '@/lib/impersonation/notification'
 import { checarRateLimit } from '@/lib/impersonation/ratelimit'
+import { registrarAcesso, ipDeHeaders } from '@/lib/acessos/registro'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -68,6 +69,15 @@ export async function POST(req: NextRequest) {
     sub: (est as any).id, tenantId: tenantAlvo, nome: (est as any).nome ?? 'Aluno', impersonation: true,
     impersonated_by: access.userId, session_id: sessionId, scope: perm.scope, action_level: perm.action_level,
   }, TTL)
+
+  // Registro de acessos: a visualização do admin aparece (marcada) no histórico do aluno. Best-effort.
+  try {
+    registrarAcesso({
+      tenantId: tenantAlvo, estudanteId: (est as any).id, metodo: 'impersonacao', origem: 'portal',
+      impersonadoPor: access.userId, refSeed: `imp:${sessionId}`,
+      ctx: { ip: ipDeHeaders(req.headers), ua: req.headers.get('user-agent')?.slice(0, 400) ?? null },
+    })
+  } catch { /* best-effort */ }
 
   await notificarImpersonacaoSeNecessario(tenantAlvo, (est as any).id)
 

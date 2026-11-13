@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { emitirTokenOO } from '@/lib/seguranca/token-onlyoffice'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { ArrowLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -19,9 +21,10 @@ export default async function CollaboraEditorPage({ params }: { params: Promise<
   const { id } = await params
   const collabora = process.env.NEXT_PUBLIC_COLLABORA_URL || 'http://localhost:9980'
   const wopiHost = process.env.TESTE_WOPI_HOST || 'http://host.docker.internal:3000'
+  const token = emitirTokenOO({ docId: id, escopo: 'escrever', tenantId: await getCurrentTenantId().catch(() => null) })
   const editor = await urlDoEditor(collabora)
   const wopiSrc = `${wopiHost}/api/teste/wopi/files/${id}`
-  const src = editor ? `${editor}WOPISrc=${encodeURIComponent(wopiSrc)}&access_token=teste&lang=pt-BR` : null
+  const src = editor ? `${editor}WOPISrc=${encodeURIComponent(wopiSrc)}&access_token=${encodeURIComponent(token ?? '')}&lang=pt-BR` : null
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">

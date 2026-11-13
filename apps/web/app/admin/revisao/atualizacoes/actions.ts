@@ -5,7 +5,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { resolverReporte } from '@/lib/demandas/demandas'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { destinatariosDoMaterial } from '@/lib/conteudo/atualizacoes-notificar'
 import { NOME_TIPO_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import { TIPOS_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
 
@@ -20,40 +20,6 @@ async function guard() {
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false as const, error: 'Tenant não resolvido.' }
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
-}
-
-/** Alunos que "têm" o material: acesso direto + membros de grupos (do doc e das pastas ancestrais) + quem já leu/anotou. */
-async function destinatariosDoMaterial(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, pastaId: string | null): Promise<string[]> {
-  const est = new Set<string>()
-  const grupos = new Set<string>()
-  const q = async (fn: () => PromiseLike<{ data: any[] | null }>) => { try { return ((await fn()).data ?? []) as any[] } catch { return [] as any[] } }
-  // pasta do doc + ancestrais
-  const pastas: string[] = []
-  let atual = pastaId
-  for (let i = 0; atual && i < 30; i++) {
-    pastas.push(atual)
-    const r = await q(() => svc.from('simulado_pastas').select('pai_id').eq('tenant_id', tenantId).eq('id', atual!).limit(1))
-    atual = r[0]?.pai_id ?? null
-  }
-  const [dg, de, pg, pe, lp, an] = await Promise.all([
-    q(() => svc.from('simulado_conteudo_documento_grupos').select('grupo_id').eq('tenant_id', tenantId).eq('documento_id', documentoId).limit(2000)),
-    q(() => svc.from('simulado_conteudo_documento_estudantes').select('estudante_id').eq('tenant_id', tenantId).eq('documento_id', documentoId).limit(5000)),
-    pastas.length ? q(() => svc.from('simulado_pasta_grupos').select('grupo_id').eq('tenant_id', tenantId).in('pasta_id', pastas).limit(2000)) : Promise.resolve([]),
-    pastas.length ? q(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('tenant_id', tenantId).in('pasta_id', pastas).limit(5000)) : Promise.resolve([]),
-    q(() => svc.from('simulado_conteudo_leitura_progresso').select('aluno_id').eq('tenant_id', tenantId).eq('documento_id', documentoId).limit(5000)),
-    q(() => svc.from('simulado_conteudo_anotacoes').select('aluno_id').eq('tenant_id', tenantId).eq('documento_id', documentoId).limit(5000)),
-  ])
-  for (const r of [...de, ...pe]) if (r.estudante_id) est.add(r.estudante_id)
-  for (const r of [...lp, ...an]) if (r.aluno_id) est.add(r.aluno_id)
-  for (const r of [...dg, ...pg]) if (r.grupo_id) grupos.add(r.grupo_id)
-  if (grupos.size) {
-    try {
-      const m = await fetchAllByIn<any>([...grupos], (c) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', c).order('estudante_id', { ascending: true }))
-      for (const r of m) if (r.estudante_id) est.add(r.estudante_id)
-    } catch { /* sem membros */ }
-  }
-  void fetchAll
-  return [...est].slice(0, 20000)
 }
 
 export async function registrarAtualizacaoAction(input: {

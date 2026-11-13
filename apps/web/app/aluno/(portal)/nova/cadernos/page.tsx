@@ -18,6 +18,7 @@ import { carregarFavoritosAluno } from '@/lib/aluno/favoritos'
 import { carregarMarcacoesAluno, linkLeitor, type MaterialMarcado, type Marcacao } from '@/lib/aluno/caderno-marcacoes'
 import { cadernoDeErros, progressoCadernos } from '@/lib/aluno/cadernos-aluno'
 import { CriarCadernoCard } from './criar-caderno'
+import { bibliotecaLiberada } from '@/lib/nova/area-aluno-acesso'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,8 @@ const hrefAba = (a: Aba) => (a === 'cadernos' ? R.cadernos : `${R.cadernos}?aba=
 // Grifos por material antes do "ver todos" (um aluno pode ter centenas num PDF só).
 const LIMITE_POR_MATERIAL = 30
 
-type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number; resolvidas: number; itens: number }
+type ContTipo = { comentarios: number; grifos: number; anotacoes: number }
+type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number; resolvidas: number; itens: number; porTipo: ContTipo }
 
 const fmtData = (iso: string | null) => {
   if (!iso) return ''
@@ -46,6 +48,7 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
   const { tenantId, estudanteId } = sessao
+  const bibLiberada = await bibliotecaLiberada(tenantId, estudanteId, sessao.email) // o botão "Abrir a Biblioteca" só p/ quem pode
 
   // Marcações sempre (as contagens de Grifos/Anotações saem delas); Salvos completo só na aba Salvos.
   const [{ data: cads }, materiais, salvos] = await Promise.all([
@@ -65,20 +68,25 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
   // Comentários de trecho salvos nos cadernos (tipo 'comentario'): tally por caderno, sem N+1. Erro (tabela
   // ainda sem migração) → ignora e a listagem segue só com as questões.
   const extrasPorCad: Record<string, number> = {}
+  const tiposPorCad: Record<string, ContTipo> = {}
   let erros: { ids: string[]; atualizadoEm: string | null } = { ids: [], atualizadoEm: null }
   if (aba === 'cadernos') {
     for (let i = 0; i < ids.length; i += 100) {
       const { data } = await svc.from('simulado_aluno_caderno_questoes').select('caderno_id, questao_id').in('caderno_id', ids.slice(i, i + 100))
       for (const q of (data ?? []) as any[]) itensCad.push({ caderno_id: q.caderno_id, questao_id: q.questao_id })
-      const { data: ex } = await svc.from('simulado_aluno_caderno_itens').select('caderno_id').eq('tenant_id', tenantId).in('caderno_id', ids.slice(i, i + 100))
-      for (const x of (ex ?? []) as any[]) extrasPorCad[x.caderno_id] = (extrasPorCad[x.caderno_id] ?? 0) + 1
+      const { data: ex } = await svc.from('simulado_aluno_caderno_itens').select('caderno_id, tipo').eq('tenant_id', tenantId).in('caderno_id', ids.slice(i, i + 100))
+      for (const x of (ex ?? []) as any[]) {
+        extrasPorCad[x.caderno_id] = (extrasPorCad[x.caderno_id] ?? 0) + 1
+        const t = (tiposPorCad[x.caderno_id] ??= { comentarios: 0, grifos: 0, anotacoes: 0 })
+        if (x.tipo === 'grifo') t.grifos++; else if (x.tipo === 'anotacao') t.anotacoes++; else t.comentarios++
+      }
     }
   }
   const [prog, errosRes] = aba === 'cadernos'
     ? await Promise.all([progressoCadernos(svc, tenantId, estudanteId, itensCad), cadernoDeErros(svc, tenantId, estudanteId).catch(() => erros)])
     : [{} as Record<string, { total: number; resolvidas: number }>, erros]
   erros = errosRes
-  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: prog[c.id]?.total ?? 0, resolvidas: prog[c.id]?.resolvidas ?? 0, itens: extrasPorCad[c.id] ?? 0 }))
+  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: prog[c.id]?.total ?? 0, resolvidas: prog[c.id]?.resolvidas ?? 0, itens: extrasPorCad[c.id] ?? 0, porTipo: tiposPorCad[c.id] ?? { comentarios: 0, grifos: 0, anotacoes: 0 } }))
 
   const totalGrifos = materiais.reduce((n, m) => n + m.marcacoes.length, 0)
   const comNota: MaterialMarcado[] = materiais
@@ -139,7 +147,9 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
                     <H3>{c.nome}</H3>
                     <Row gap={6}>
                       {(c.total > 0 || c.itens === 0) && <Tag kind="green">{c.total === 1 ? '1 questão' : `${c.total} questões`}</Tag>}
-                      {c.itens > 0 && <Tag kind="green">{c.itens === 1 ? '1 comentário' : `${c.itens} comentários`}</Tag>}
+                      {c.porTipo.comentarios > 0 && <Tag kind="green">{c.porTipo.comentarios === 1 ? '1 comentário' : `${c.porTipo.comentarios} comentários`}</Tag>}
+                      {c.porTipo.grifos > 0 && <Tag kind="gold">{c.porTipo.grifos === 1 ? '1 grifo' : `${c.porTipo.grifos} grifos`}</Tag>}
+                      {c.porTipo.anotacoes > 0 && <Tag kind="blue">{c.porTipo.anotacoes === 1 ? '1 anotação' : `${c.porTipo.anotacoes} anotações`}</Tag>}
                     </Row>
                     {c.total > 0 && <Bar pct={Math.round((c.resolvidas / c.total) * 100)} color="var(--gold)" />}
                     <Row style={{ justifyContent: 'space-between', gap: 8 }}>
@@ -161,7 +171,7 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
       {aba === 'anotacoes' && (
         comNota.length === 0 ? (
           <Card>
-            <Aviso icon="pen" action={<Btn kind="secondary" icon="book" href="/aluno/biblioteca">Abrir a Biblioteca</Btn>}>
+            <Aviso icon="pen" action={bibLiberada ? <Btn kind="secondary" icon="book" href="/aluno/biblioteca">Abrir a Biblioteca</Btn> : undefined}>
               Você ainda não escreveu nenhuma anotação. No leitor da Biblioteca, grife um trecho e escreva uma nota nele — ela aparece aqui.
             </Aviso>
           </Card>
@@ -175,7 +185,7 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
       {aba === 'grifos' && (
         materiais.length === 0 ? (
           <Card>
-            <Aviso icon="highlight" action={<Btn kind="secondary" icon="book" href="/aluno/biblioteca">Abrir a Biblioteca</Btn>}>
+            <Aviso icon="highlight" action={bibLiberada ? <Btn kind="secondary" icon="book" href="/aluno/biblioteca">Abrir a Biblioteca</Btn> : undefined}>
               Você ainda não marcou nenhum trecho. Abra um material no leitor da Biblioteca e selecione o texto para criar seus grifos.
             </Aviso>
           </Card>

@@ -20,6 +20,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: `Este material ainda não foi liberado no seu cronograma.${quando}` }, { status: 403 })
   }
   const url = await urlDownloadAluno(doc, sessao.estudanteId, { produtoId: new URL(request.url).searchParams.get('produto') })
-  if (!url) return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
+  if (!url) return NextResponse.json({ message: 'O download deste material não está disponível para você.' }, { status: 403 })
   return NextResponse.redirect(url)
 }

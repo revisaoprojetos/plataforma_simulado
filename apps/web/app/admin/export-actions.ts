@@ -1,5 +1,6 @@
 'use server'
 
+import { sanearBusca } from '@/lib/seguranca/email-seguro'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
@@ -26,7 +27,7 @@ export async function exportarQuestoes(f: {
         : 'id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)')
       .eq('deletado', false).eq('tenant_id', tid)
       .order('created_at', { ascending: false }).order('id', { ascending: true })
-    if (f.q) query = comCodigo ? query.or(`enunciado.ilike.%${f.q}%,codigo.ilike.%${f.q}%`) : query.ilike('enunciado', `%${f.q}%`)
+    if (f.q) query = comCodigo ? query.or(`enunciado.ilike.%${sanearBusca(f.q)}%,codigo.ilike.%${sanearBusca(f.q)}%`) : query.ilike('enunciado', `%${sanearBusca(f.q)}%`)
     if (f.status) query = query.eq('status', f.status)
     if (f.disciplina) query = query.eq('disciplina_id', f.disciplina)
     if (f.dificuldade) query = query.eq('nivel_dificuldade', f.dificuldade)

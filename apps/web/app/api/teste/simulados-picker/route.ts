@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { carregarPicker } from '@/lib/teste/simulado-dados'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 
 // Lista de simulados + pastas pro PICKER do plugin (aba de variáveis, dentro do iframe do OnlyOffice).
 export const dynamic = 'force-dynamic'
-const CORS = { 'Access-Control-Allow-Origin': '*' }
+const CORS = {}
 
 export async function GET(req: Request) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   const modo = new URL(req.url).searchParams.get('modo') === 'desafio' ? 'desafio' : 'simulado'
   try {
     const d = await carregarPicker(modo)

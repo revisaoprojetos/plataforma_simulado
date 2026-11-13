@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentTenant } from '@/lib/tenant'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 import { carregarTagsBiblioteca, normalizarTermoTag } from '@/lib/leitura/biblioteca-tags'
 import { SELOS, SELOS_APELIDO, codigoCurto } from '@/lib/leitura/selos'
 
@@ -12,7 +13,8 @@ export const dynamic = 'force-dynamic'
 const BASE = '/leitura/selos'
 const apelidosDe = (slug: string) => Object.entries(SELOS_APELIDO).filter(([, s]) => s === slug).map(([a]) => a)
 
-export async function GET() {
+export async function GET(req: Request) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   const tenant = await getCurrentTenant()
   const tags = tenant?.id ? await carregarTagsBiblioteca(tenant.id) : []
   const vistos = new Set<string>()

@@ -17,12 +17,20 @@ function autorizado(req: NextRequest): boolean {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-async function tratar(tipo: string, _payload: any): Promise<void> {
+async function tratar(tipo: string, payload: any, tenantId: string | null): Promise<void> {
   // Ganchos futuros: 'anotacao.reconciliar' c/ revisao → fila de revisão/alinhamento por IA;
   // 'aviso.criado' → notificação in-app ao aluno; 'documento.*' → invalidação de cache.
   switch (tipo) {
+    case 'documento.atualizado': {
+      // Recontagem idempotente das páginas da versão atual (no-op se já contada) + invalidação de cache. Não re-emite evento.
+      const docId = payload?.documento_id
+      if (tenantId && typeof docId === 'string') {
+        const { sincronizarPaginasDocumento } = await import('@/lib/conteudo/paginas-sync')
+        await sincronizarPaginasDocumento(createAdminClient(), tenantId, docId)
+      }
+      return
+    }
     case 'documento.importado':
-    case 'documento.atualizado':
     case 'anotacao.reconciliar':
     case 'aviso.criado':
     default:
@@ -35,12 +43,12 @@ export async function POST(req: NextRequest) {
   const limite = Math.min(Number(new URL(req.url).searchParams.get('limite')) || 100, 500)
   const svc = createAdminClient()
   const { data: eventos, error } = await svc.from('simulado_conteudo_outbox')
-    .select('id, tipo, payload').is('processado_em', null).order('criado_em', { ascending: true }).limit(limite)
+    .select('id, tenant_id, tipo, payload').is('processado_em', null).order('criado_em', { ascending: true }).limit(limite)
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
   let ok = 0
   for (const ev of eventos ?? []) {
-    try { await tratar(ev.tipo, ev.payload); await svc.from('simulado_conteudo_outbox').update({ processado_em: new Date().toISOString() }).eq('id', ev.id); ok++ }
+    try { await tratar(ev.tipo, ev.payload, (ev as { tenant_id?: string | null }).tenant_id ?? null); await svc.from('simulado_conteudo_outbox').update({ processado_em: new Date().toISOString() }).eq('id', ev.id); ok++ }
     catch (e) { console.error('[outbox] evento', ev.id, (e as Error).message) }
   }
   return NextResponse.json({ ok: true, processados: ok, total: (eventos ?? []).length })

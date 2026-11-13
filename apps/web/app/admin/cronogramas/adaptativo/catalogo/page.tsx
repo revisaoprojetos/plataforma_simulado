@@ -23,6 +23,9 @@ export default async function CatalogoMetasPage() {
         </p>
       </div>
       <AdaptativoTabs />
+      <div className="text-sm">
+        <Link href="/admin/cronogramas/adaptativo/catalogo/paginas" className="text-primary underline-offset-2 hover:underline">Divergência de páginas (planilha × Biblioteca) e recontagem →</Link>
+      </div>
 
       {c && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-2xl border bg-card px-4 py-2.5 text-sm">

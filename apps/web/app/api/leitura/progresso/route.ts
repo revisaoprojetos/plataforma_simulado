@@ -12,6 +12,7 @@ import { atualizarHomeSnapshot } from '@/lib/home/snapshot'
 import { atualizarPerfilSnapshot } from '@/lib/perfil/snapshot'
 import { invalidarLeituraAluno } from '@/lib/leitura/cache'
 import { registrarTempo } from '@/lib/desempenho/tempo-estudo'
+import { registrarAtividade } from '@/lib/acessos/registro'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -59,6 +60,10 @@ export async function POST(request: NextRequest) {
     { onConflict: 'estudante_id,documento_id,documento_versao' },
   )
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+
+  // Registro de atividade (throttled 5 min/doc): leitura em andamento e conclusão. Fire-and-forget.
+  void registrarAtividade(sessao, { tipo: 'leitura_aberta', refTipo: 'leitura_doc', refId: documento_id, meta: { pct: pctNovo, desafio: body.desafio ?? undefined } })
+  if (concluiuAgora) void registrarAtividade(sessao, { tipo: 'leitura_concluida', refTipo: 'leitura_doc', refId: documento_id, meta: { pct: pctNovo } })
 
   // MODO TESTE (acesso exclusivo): conclui a leitura normalmente (p/ liberar o quiz), mas NÃO contabiliza
   // (sem XP/streak/medalhas/ranking) — só confere a visualização.

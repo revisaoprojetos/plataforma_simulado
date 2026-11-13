@@ -4,6 +4,7 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { lerSessaoImpersonation } from '@/lib/impersonation/session'
 import { regrasSegmentoDoAluno, type RegrasSegmentoAluno } from '@/lib/segmentos/regras-produto'
+import { ContextoAluno, avaliarSegmentos } from '@/lib/segmentos/avaliar'
 import { planoFixado } from '@/lib/cronograma/fixar'
 import { planoDoAluno, mapaDocsCronograma, hojeBrt } from '@/lib/cronograma/adaptativo/liberacao'
 import { indiceAulaDaMeta, subtipoMeta } from '@/lib/cronograma/adaptativo/meta-ids'
@@ -12,8 +13,9 @@ import { chaveDisciplina, numeroAula } from '@/lib/cronograma/adaptativo/catalog
 import { addDias, offsetDesdeSegunda } from '@/lib/cronograma/datas'
 import { calendarioValido } from '@/lib/cronograma/calendario-congelado'
 import {
-  decidirLiberacao, ehDispCronograma, formatarRotuloLiberacao, paramsEfetivos, SEM_PLANO,
-  type DispCronograma, type ParamsLiberacao, type PlanoAula,
+  decidirAulaComExcecao, regraCronogramaGovernante, ehDispCronograma, formatarRotuloLiberacao, paramsEfetivos, SEM_PLANO,
+  dataBaseDaAula, excecoesAplicaveis, resolverExcecao, ROTULO_BLOQUEADO_ADMIN,
+  type DispCronograma, type ParamsLiberacao, type PlanoAula, type Decisao, type ExcecaoLib, type TrilhaDaAula,
 } from './liberacao-aulas-decisao'
 
 export { ehDispCronograma, type DispCronograma } from './liberacao-aulas-decisao'
@@ -39,6 +41,10 @@ export { ehDispCronograma, type DispCronograma } from './liberacao-aulas-decisao
 export const SENTINELA_META = '9999-12-31T00:00:00.000Z'
 export const MSG_AGUARDA_META = 'Libera ao concluir a meta no seu cronograma'
 export const ehSentinelaMeta = (d: Date | null | undefined) => !!d && d.getUTCFullYear() >= 9999
+/** Bloqueio manual (exceção 'bloquear'): ano 9998 — curriculo-aluno traduz p/ MSG_BLOQUEADO_ADMIN. */
+export const SENTINELA_BLOQUEIO = '9998-12-31T00:00:00.000Z'
+export const MSG_BLOQUEADO_ADMIN = ROTULO_BLOQUEADO_ADMIN
+export const ehSentinelaBloqueio = (d: Date | null | undefined) => !!d && d.getUTCFullYear() === 9998
 
 export interface LiberacaoAulas {
   /** Disponibilidade efetiva: segmento (prioridade) → 'cronograma' resolvido → base. */
@@ -51,9 +57,9 @@ export interface LiberacaoAulas {
   bloqueadoItem: (item: { id: string; modulo_id: string; disponibilidade?: unknown }) => boolean | null
 }
 
-type Mod = { id: string; pai_id: string | null; disponibilidade?: unknown }
-type Item = { id: string; modulo_id: string; ref_id?: string | null; tipo_ref?: string | null; disponibilidade?: unknown }
-type Linha = { aula_id: string; disciplina: string; numero_aula: number | null; data_liberacao: string; semana?: number | null }
+export type Mod = { id: string; pai_id: string | null; disponibilidade?: unknown }
+export type Item = { id: string; modulo_id: string; ref_id?: string | null; tipo_ref?: string | null; disponibilidade?: unknown }
+type Linha = { id?: string; aula_id: string; disciplina: string; numero_aula: number | null; data_liberacao: string; semana?: number | null }
 
 const SENT = Symbol('sem-regra-segmento')
 const ABERTO = { tipo: 'na_matricula', antes: 'bloqueado_cadeado' } as const
@@ -141,9 +147,94 @@ async function carregarPlano(svc: any, tenantId: string, estudanteId: string): P
   }
 }
 
+type TrilhaRow = { id: string; nome: string; offset_dias: number; segmento_ids: string[] | null }
+type DataTrilha = { data: string; trilha: string }
+
+/** Trilhas ativas do produto (compartilhado entre alunos, 60s). Tabela ausente/erro → []. */
+async function trilhasAtivas(svc: any, tenantId: string, produtoId: string): Promise<TrilhaRow[]> {
+  return remember<TrilhaRow[]>(`lib-aulas:trilhas:${tenantId}:${produtoId}`, 60, async () => {
+    try {
+      const { data, error } = await svc.from('simulado_liberacao_trilhas').select('id, nome, offset_dias, segmento_ids')
+        .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('ativo', true).order('ordem').order('id').limit(200)
+      return error ? [] : ((data ?? []) as TrilhaRow[])
+    } catch { return [] }
+  }).catch(() => [] as TrilhaRow[])
+}
+
+/**
+ * aula_id → { data (AAAA-MM-DD), trilha (nome) } para o aluno: trilhas em que ele casa (segmento_ids via avaliarSegmentos),
+ * MENOR data entre elas; trilha que não traz a aula não contribui. Aula ausente do mapa = usar a data-base da planilha.
+ * Cache 60s por aluno+produto. Sem trilhas no produto → {} sem nenhuma query por aluno.
+ */
+async function datasDeTrilhaDoAluno(svc: any, tenantId: string, estudanteId: string, produtoId: string, linhas: Linha[], ctxAluno: ContextoAluno): Promise<Record<string, DataTrilha>> {
+  const trilhas = await trilhasAtivas(svc, tenantId, produtoId)
+  if (!trilhas.length) return {}
+  return remember<Record<string, DataTrilha>>(`lib-aulas:trilha-datas:${tenantId}:${estudanteId}:${produtoId}`, 60, async () => {
+    try {
+      const todosSeg = [...new Set(trilhas.flatMap((t) => t.segmento_ids ?? []))]
+      if (!todosSeg.length) return {}
+      const noSeg = await avaliarSegmentos(ctxAluno, todosSeg)
+      const casadas = trilhas.filter((t) => (t.segmento_ids ?? []).some((id) => noSeg.get(id)))
+      if (!casadas.length) return {}
+      const ids = casadas.map((t) => t.id)
+      const linhasTA: Array<{ trilha_id: string; liberacao_aula_id: string; data_cronograma: string | null; data_manual: string | null }> = []
+      for (let k = 0; k < ids.length; k += 80) {
+        const bloco = ids.slice(k, k + 80)
+        linhasTA.push(...await fetchAll<any>(() => svc.from('simulado_liberacao_trilha_aulas')
+          .select('id, trilha_id, liberacao_aula_id, data_cronograma, data_manual').in('trilha_id', bloco).order('id') as any))
+      }
+      const aulaDeLinha = new Map<string, string>()
+      for (const l of linhas) if (l.id) aulaDeLinha.set(l.id, l.aula_id)
+      const ordem = new Map(casadas.map((t, i) => [t.id, i]))
+      const trilhaPorId = new Map(casadas.map((t) => [t.id, t]))
+      const porAula = new Map<string, TrilhaDaAula[]>()
+      for (const r of [...linhasTA].sort((a, b) => (ordem.get(a.trilha_id) ?? 0) - (ordem.get(b.trilha_id) ?? 0))) {
+        const aula = aulaDeLinha.get(r.liberacao_aula_id); const t = trilhaPorId.get(r.trilha_id)
+        if (!aula || !t) continue
+        const l = porAula.get(aula) ?? []
+        l.push({ nome: t.nome, datas: { data_cronograma: r.data_cronograma, data_manual: r.data_manual, offset_dias: t.offset_dias } })
+        porAula.set(aula, l)
+      }
+      const out: Record<string, DataTrilha> = {}
+      for (const [aula, ts] of porAula) { const r = dataBaseDaAula(ts, null); if (r.data && r.trilha) out[aula] = { data: r.data, trilha: r.trilha } }
+      return out
+    } catch { return {} }
+  }).catch(() => ({} as Record<string, DataTrilha>))
+}
+
+/** O produto tem alguma exceção ativa? (compartilhado, 60s) — evita queries por aluno quando não há nenhuma. */
+async function produtoTemExcecoes(svc: any, tenantId: string, produtoId: string): Promise<boolean> {
+  return remember<boolean>(`lib-aulas:tem-exc:${tenantId}:${produtoId}`, 60, async () => {
+    try {
+      const { data, error } = await svc.from('simulado_liberacao_excecoes').select('id').eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('ativo', true).limit(1)
+      return !error && (data ?? []).length > 0
+    } catch { return false }
+  }).catch(() => false)
+}
+
+/** Exceções do produto que valem para o aluno (dele + dos grupos dele em que é membro vigente), filtradas por vigência. */
+async function excecoesDoAluno(svc: any, tenantId: string, estudanteId: string, produtoId: string, ctxAluno: ContextoAluno): Promise<ExcecaoLib[]> {
+  try {
+    const gr = await ctxAluno.grupos() // mesmo pertencimento usado pelos Segmentos (membro e não vencido)
+    const agora = new Date().toISOString()
+    const grupos = new Set([...gr.entries()].filter(([, m]) => !m.expira_em || m.expira_em > agora).map(([id]) => id))
+    const gids = [...grupos].sort()
+    const brutas = await remember<ExcecaoLib[]>(`lib-aulas:exc:${tenantId}:${estudanteId}:${produtoId}`, 30, async () => {
+      const cols = 'alvo_tipo, alvo_id, estudante_id, grupo_id, acao, motivo, expira_em, ativo'
+      const base = () => svc.from('simulado_liberacao_excecoes').select(cols).eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('ativo', true)
+      const rs = await Promise.all([
+        base().eq('estudante_id', estudanteId).limit(2000),
+        ...Array.from({ length: Math.ceil(gids.length / 80) }, (_, k) => base().in('grupo_id', gids.slice(k * 80, k * 80 + 80)).limit(2000)),
+      ])
+      return rs.flatMap((r: any) => (r.error ? [] : ((r.data ?? []) as ExcecaoLib[])))
+    })
+    return excecoesAplicaveis(brutas, { estudanteId, grupos }, agora)
+  } catch { return [] }
+}
+
 export async function liberacaoAulasDoAluno(
   svc: any, tenantId: string, estudanteId: string, produtoId: string,
-  ctx: { porSeg?: RegrasSegmentoAluno | null; modulos?: Mod[]; itens?: Item[] } = {},
+  ctx: { porSeg?: RegrasSegmentoAluno | null; modulos?: Mod[]; itens?: Item[]; ctxAluno?: ContextoAluno } = {},
 ): Promise<LiberacaoAulas | null> {
   try {
     const modulos: Mod[] = ctx.modulos ?? await fetchAll<Mod>(() =>
@@ -158,7 +249,11 @@ export async function liberacaoAulasDoAluno(
     }
     // Há alguma regra 'cronograma' que valha para este aluno? Senão: null (nada muda, nenhuma query extra).
     const alvos: Array<[string, unknown]> = [...modulos.map((m): [string, unknown] => [m.id, m.disponibilidade]), ...itens.map((i): [string, unknown] => [i.id, i.disponibilidade])]
-    if (!alvos.some(([id, b]) => ehDispCronograma(propria(id, b).d))) return null
+    const temCrono = alvos.some(([id, b]) => ehDispCronograma(propria(id, b).d))
+    // Exceções manuais valem mesmo sem regra 'cronograma' (1 consulta compartilhada/60s por produto; sem exceções → null).
+    const temExc = await produtoTemExcecoes(svc, tenantId, produtoId)
+    if (!temCrono && !temExc) return null
+    const ctxAluno = ctx.ctxAluno ?? new ContextoAluno(svc, tenantId, estudanteId)
 
     const ver = await verTudo(svc, tenantId, estudanteId)
     const porId = new Map(modulos.map((m) => [m.id, m]))
@@ -179,6 +274,19 @@ export async function liberacaoAulasDoAluno(
       }
     }
 
+    // EXCEÇÕES manuais (aluno ou grupo): vencem trilha, planilha, plano e meta. bloquear > liberar; módulo vale p/ tudo dentro.
+    const excecoes = temExc ? await excecoesDoAluno(svc, tenantId, estudanteId, produtoId, ctxAluno) : []
+    const exMemo = new Map<string, ReturnType<typeof resolverExcecao>>()
+    const excDeModulo = (moduloId: string | undefined) => {
+      if (!moduloId || !excecoes.length) return null
+      if (exMemo.has(moduloId)) return exMemo.get(moduloId)!
+      const cadeia: string[] = []; let cur: string | null = moduloId; let g = 0
+      while (cur && g++ < 50) { cadeia.push(cur); cur = porId.get(cur)?.pai_id ?? null }
+      const r = resolverExcecao(cadeia, excecoes); exMemo.set(moduloId, r); return r
+    }
+    const excDe = (id: string) => excDeModulo(porId.has(id) ? id : itemPorId.get(id)?.modulo_id)
+
+    const montarCronograma = async (): Promise<LiberacaoAulas> => {
     const [cfgRes, linhasRes, planoFn] = await Promise.all([
       svc.from('simulado_produto_liberacao_cfg').select('sem_plano, com_plano, dias_antes').eq('tenant_id', tenantId).eq('produto_id', produtoId).maybeSingle(),
       fetchAll<Linha>(() => svc.from('simulado_produto_liberacao_aulas').select('aula_id, disciplina, numero_aula, data_liberacao, semana')
@@ -188,6 +296,9 @@ export async function liberacaoAulasDoAluno(
     const cfg = (cfgRes?.error ? null : cfgRes?.data) as Partial<ParamsLiberacao> | null
     const linhaPorAula = new Map<string, Linha>()
     for (const l of linhasRes) { const ex = linhaPorAula.get(l.aula_id); if (!ex || l.data_liberacao < ex.data_liberacao) linhaPorAula.set(l.aula_id, l) }
+    // TRILHAS: a data-base da aula passa a ser a da(s) trilha(s) em que o aluno casa (menor); nenhuma traz a aula → planilha.
+    const trilhaPorAula = await datasDeTrilhaDoAluno(svc, tenantId, estudanteId, produtoId, linhasRes, ctxAluno)
+    const dataBase = (a: string): string => trilhaPorAula[a]?.data ?? linhaPorAula.get(a)!.data_liberacao
 
     // aulas (com linha) sob o alvo: ele próprio e descendentes
     const aulasDe = (id: string): string[] => {
@@ -211,35 +322,28 @@ export async function liberacaoAulasDoAluno(
       const antes = (regra as { antes?: string })?.antes === 'oculto' ? 'oculto' : 'bloqueado_cadeado'
       const aulas = aulasDe(aulaAlvo)
       if (!aulas.length) return { aberto: true, disp: { ...ABERTO } }
-      const dec = aulas.map((a) => decidirLiberacao({ cfg: params, linha: { data_liberacao: linhaPorAula.get(a)!.data_liberacao }, plano: planoMemo.get(a) ?? SEM_PLANO, hoje }))
+      const dec: Decisao[] = aulas.map((a) => {
+        return decidirAulaComExcecao({ excecao: excDe(a), cfg: params, linha: { data_liberacao: dataBase(a) }, plano: planoMemo.get(a) ?? SEM_PLANO, hoje })
+      })
       if (dec.some((d) => d.liberada) || dec.every((d) => !d.interfere)) return { aberto: true, disp: { ...ABERTO } }
+      if (dec.every((d) => d.motivo === 'bloqueado-admin')) return { aberto: false, rotulo: ROTULO_BLOQUEADO_ADMIN, disp: { tipo: 'data', data: SENTINELA_BLOQUEIO, antes } }
       const datas = dec.map((d) => d.liberaEm).filter((x): x is string => !!x).sort()
       // rótulo: da aula bloqueada que libera primeiro (sem data = a que aguarda meta, só se nenhuma tiver data)
       const idx = dec.map((d, k) => ({ d, k })).filter((x) => !x.d.liberada).sort((a, b) => (a.d.liberaEm ?? '9').localeCompare(b.d.liberaEm ?? '9'))[0]
       let rotulo: string | null = null
       if (idx) {
-        const a = aulas[idx.k], pl = planoMemo.get(a) ?? SEM_PLANO, ln = linhaPorAula.get(a)!, d = idx.d
+        const a = aulas[idx.k], pl = planoMemo.get(a) ?? SEM_PLANO, ln = { ...linhaPorAula.get(a)!, data_liberacao: dataBase(a) }, d = idx.d
+        const tr = trilhaPorAula[a]?.trilha ?? null
+        if (d.motivo === 'bloqueado-admin') rotulo = ROTULO_BLOQUEADO_ADMIN
+        else
         if (d.motivo === 'concluir-meta') rotulo = formatarRotuloLiberacao({ origem: 'concluir', data: pl.dataMeta, semana: pl.semana, diaSemana: pl.diaSemana })
         else if (d.liberaEm && pl.tem && pl.noPlano && d.motivo !== 'fora-do-plano' && !(d.motivo === 'mais-cedo' && d.liberaEm === ln.data_liberacao)) rotulo = formatarRotuloLiberacao({ origem: 'plano', data: d.liberaEm, semana: pl.semana, diaSemana: pl.diaSemana })
-        else if (d.liberaEm) rotulo = formatarRotuloLiberacao({ origem: 'planilha', data: d.liberaEm, semana: ln.semana })
+        else if (d.liberaEm) rotulo = formatarRotuloLiberacao({ origem: 'planilha', data: d.liberaEm, semana: tr ? null : ln.semana, trilha: tr })
       }
       return { aberto: false, rotulo, disp: { tipo: 'data', data: datas[0] ? `${datas[0]}T03:00:00.000Z` : SENTINELA_META, antes } }
     }
     // Regra que governa o módulo/aula: a própria, ou (se a aula só tem a base padrão) a do ancestral mais próximo.
-    const regraDoModulo = (id: string, base: unknown): unknown | null => {
-      const p = propria(id, base)
-      if (ehDispCronograma(p.d)) return p.d
-      const baseNeutra = !p.seg && (!p.d || (p.d as { tipo?: string }).tipo === 'na_matricula')
-      if (!baseNeutra) return null
-      let cur = porId.get(id)?.pai_id ?? null; let g = 0
-      while (cur && g++ < 50) {
-        const m = porId.get(cur); if (!m) break
-        const pa = propria(m.id, m.disponibilidade)
-        if (ehDispCronograma(pa.d)) return pa.d
-        cur = m.pai_id
-      }
-      return null
-    }
+    const regraDoModulo = (id: string, base: unknown): unknown | null => regraCronogramaGovernante(id, base, porId, propria)
     const eModulo = (id: string) => porId.has(id)
 
     const dispDe = (id: string, base: unknown) => {
@@ -258,6 +362,23 @@ export async function liberacaoAulasDoAluno(
         if (!ri && !rm) return null
         return (ri ? !ri.aberto : false) || (rm ? !rm.aberto : false)
       },
+    }
+    }
+
+    const cronoLib = temCrono ? await montarCronograma() : null
+    if (!excecoes.length) return cronoLib
+    const b: LiberacaoAulas = cronoLib ?? {
+      disp: (id, base) => propria(id, base).d, bloqueado: () => null, rotulo: () => null, bloqueadoItem: () => null,
+    }
+    return {
+      disp: (id, base) => {
+        const e = excDe(id)
+        if (!e) return b.disp(id, base)
+        return e.acao === 'liberar' ? { ...ABERTO } : { tipo: 'data', data: SENTINELA_BLOQUEIO, antes: 'bloqueado_cadeado' }
+      },
+      bloqueado: (id, base) => { const e = excDe(id); return e ? e.acao === 'bloquear' : b.bloqueado(id, base) },
+      rotulo: (id, base) => { const e = excDe(id); return e ? (e.acao === 'bloquear' ? ROTULO_BLOQUEADO_ADMIN : null) : b.rotulo(id, base) },
+      bloqueadoItem: (item) => { const e = excDeModulo(item.modulo_id); return e ? e.acao === 'bloquear' : b.bloqueadoItem(item) },
     }
   } catch {
     return null // qualquer falha de infra: comportamento atual (não tranca o aluno)
@@ -288,3 +409,88 @@ export async function docBloqueadoPorLiberacaoAulas(svc: any, tenantId: string, 
     })
   } catch { return false }
 }
+
+// ───────────────────────────── EXPLICAÇÃO (admin) — MESMO núcleo de decisão do motor ─────────────────────────────
+
+export interface DetalheCronoAula {
+  /** Existe regra 'cronograma' (segmento/base/ancestral) valendo para a aula deste aluno? */
+  governada: boolean
+  regraOrigem: 'segmento' | 'base' | 'ancestral' | null
+  params: ParamsLiberacao | null
+  /** null = não governada, ou governada sem linha na planilha (o motor deixa aberto). */
+  decisao: Decisao | null
+  semLinha: boolean
+  dataPlanilha: string | null
+  dataBase: string | null
+  trilha: string | null
+  plano: PlanoAula
+  excecao: { acao: 'liberar' | 'bloquear'; motivo: string | null; alvoId: string } | null
+  rotulo: string | null
+}
+
+/**
+ * Para o painel "por que este aluno vê/não vê esta aula": reúne os MESMOS insumos do motor (cfg, planilha, trilhas do aluno,
+ * plano fixado, exceções) e decide cada aula com `decidirAulaComExcecao` — a mesma função pura que o motor usa. Não altera
+ * nada para o aluno. `verTudo` = testador global/impersonation (o motor abre tudo).
+ */
+export async function detalheCronogramaDoAluno(
+  svc: any, tenantId: string, estudanteId: string, produtoId: string,
+  ctx: { modulos: Mod[]; itens: Item[]; porSeg: RegrasSegmentoAluno | null; ctxAluno: ContextoAluno },
+): Promise<{ verTudo: boolean; detalhe: (aulaId: string, base: unknown) => DetalheCronoAula }> {
+  const { modulos, itens, porSeg, ctxAluno } = ctx
+  const ver = await verTudo(svc, tenantId, estudanteId)
+  const porId = new Map(modulos.map((m) => [m.id, m]))
+  const propria = (id: string, base: unknown): { d: unknown; seg: boolean } => {
+    const s = porSeg ? porSeg.disp(id, SENT) : SENT
+    return s !== SENT ? { d: s, seg: true } : { d: base, seg: false }
+  }
+  const docsPorModulo = new Map<string, string[]>()
+  for (const i of itens) if (i.tipo_ref === 'documento_biblioteca' && i.ref_id) { const l = docsPorModulo.get(i.modulo_id) ?? []; l.push(i.ref_id); docsPorModulo.set(i.modulo_id, l) }
+
+  const excecoes = await excecoesDoAluno(svc, tenantId, estudanteId, produtoId, ctxAluno)
+  const cadeiaDe = (moduloId: string): string[] => { const c: string[] = []; let cur: string | null = moduloId; let g = 0; while (cur && g++ < 50) { c.push(cur); cur = porId.get(cur)?.pai_id ?? null } return c }
+  const [cfgRes, linhasRes, planoFn] = await Promise.all([
+    svc.from('simulado_produto_liberacao_cfg').select('sem_plano, com_plano, dias_antes').eq('tenant_id', tenantId).eq('produto_id', produtoId).maybeSingle(),
+    fetchAll<Linha>(() => svc.from('simulado_produto_liberacao_aulas').select('id, aula_id, disciplina, numero_aula, data_liberacao, semana')
+      .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('ativo', true).not('aula_id', 'is', null).order('ordem') as any).catch(() => [] as Linha[]),
+    carregarPlano(svc, tenantId, estudanteId).catch(() => null),
+  ])
+  const cfg = (cfgRes?.error ? null : cfgRes?.data) as Partial<ParamsLiberacao> | null
+  const linhaPorAula = new Map<string, Linha>()
+  for (const l of linhasRes) { const ex = linhaPorAula.get(l.aula_id); if (!ex || l.data_liberacao < ex.data_liberacao) linhaPorAula.set(l.aula_id, l) }
+  const trilhaPorAula = await datasDeTrilhaDoAluno(svc, tenantId, estudanteId, produtoId, linhasRes, ctxAluno)
+  const hoje = hojeBrt()
+  const planoMemo = new Map<string, PlanoAula>()
+  await Promise.all([...linhaPorAula.keys()].map(async (aulaId) => {
+    if (!planoFn) { planoMemo.set(aulaId, SEM_PLANO); return }
+    const l = linhaPorAula.get(aulaId)!
+    planoMemo.set(aulaId, await planoFn({ id: aulaId, disc: l.disciplina, num: l.numero_aula }, docsPorModulo.get(aulaId) ?? []))
+  }))
+
+  const detalhe = (aulaId: string, base: unknown): DetalheCronoAula => {
+    const vazio: DetalheCronoAula = { governada: false, regraOrigem: null, params: null, decisao: null, semLinha: false, dataPlanilha: linhaPorAula.get(aulaId)?.data_liberacao ?? null, dataBase: null, trilha: null, plano: SEM_PLANO, excecao: null, rotulo: null }
+    const regra = regraCronogramaGovernante(aulaId, base, porId, propria)
+    const exc = resolverExcecao(cadeiaDe(aulaId), excecoes)
+    // Exceção vale mesmo sem regra de cronograma (o motor monta o bloqueio/abertura manual à parte).
+    if (!regra) return { ...vazio, excecao: exc }
+    const p = propria(aulaId, base)
+    const regraOrigem: DetalheCronoAula['regraOrigem'] = ehDispCronograma(p.d) ? (p.seg ? 'segmento' : 'base') : 'ancestral'
+    const params = paramsEfetivos(regra, cfg)
+    const linha = linhaPorAula.get(aulaId)
+    if (!linha) return { ...vazio, governada: true, regraOrigem, params, semLinha: true, excecao: exc }
+    const dataBase = trilhaPorAula[aulaId]?.data ?? linha.data_liberacao
+    const plano = planoMemo.get(aulaId) ?? SEM_PLANO
+    const decisao = decidirAulaComExcecao({ excecao: exc, cfg: params, linha: { data_liberacao: dataBase }, plano, hoje })
+    const tr = trilhaPorAula[aulaId]?.trilha ?? null
+    let rotulo: string | null = null
+    if (!decisao.liberada) {
+      if (decisao.motivo === 'bloqueado-admin') rotulo = ROTULO_BLOQUEADO_ADMIN
+      else if (decisao.motivo === 'concluir-meta') rotulo = formatarRotuloLiberacao({ origem: 'concluir', data: plano.dataMeta, semana: plano.semana, diaSemana: plano.diaSemana })
+      else if (decisao.liberaEm && plano.tem && plano.noPlano && decisao.motivo !== 'fora-do-plano' && !(decisao.motivo === 'mais-cedo' && decisao.liberaEm === dataBase)) rotulo = formatarRotuloLiberacao({ origem: 'plano', data: decisao.liberaEm, semana: plano.semana, diaSemana: plano.diaSemana })
+      else if (decisao.liberaEm) rotulo = formatarRotuloLiberacao({ origem: 'planilha', data: decisao.liberaEm, semana: tr ? null : linha.semana, trilha: tr })
+    }
+    return { governada: true, regraOrigem, params, decisao, semLinha: false, dataPlanilha: linha.data_liberacao, dataBase, trilha: tr, plano, excecao: exc, rotulo }
+  }
+  return { verTudo: ver, detalhe }
+}
+

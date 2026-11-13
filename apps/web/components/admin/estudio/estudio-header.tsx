@@ -3,12 +3,14 @@ import { ConteudosTabs } from '@/components/admin/conteudos-tabs'
 // Cabeçalho padrão do Estúdio de Conteúdo (AUDITORIA 4.1): eyebrow + título + ações à direita
 // e, ABAIXO, as abas da área (Produtos/Materiais/…). Todas as telas de topo usam este header,
 // então o título sempre fica ACIMA das abas — como no designer.
-export function EstudioHeader({ eyebrow = 'Conteúdos', titulo, acoes, subtabs }: {
+export function EstudioHeader({ eyebrow = 'Conteúdos', titulo, acoes, subtabs, semAbas = false }: {
   eyebrow?: string
   titulo: string
   acoes?: React.ReactNode
   /** Sub-abas da área (ex.: <MateriaisTabs/>), renderizadas abaixo das abas principais. */
   subtabs?: React.ReactNode
+  /** Telas fora do Estúdio de Conteúdo (ex.: Segurança) não mostram as abas de Conteúdos. */
+  semAbas?: boolean
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -19,7 +21,7 @@ export function EstudioHeader({ eyebrow = 'Conteúdos', titulo, acoes, subtabs }
         </div>
         {acoes && <div className="ml-auto flex flex-wrap items-center gap-2">{acoes}</div>}
       </div>
-      <ConteudosTabs />
+      {!semAbas && <ConteudosTabs />}
       {subtabs}
     </div>
   )

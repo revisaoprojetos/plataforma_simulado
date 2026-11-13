@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { registrarRegraLog } from '@/lib/produtos/regras-log'
+import { invalidarMapaRegras } from '@/lib/produtos/mapa-regras-cache'
 import { nomesDeRecursos } from '@/lib/produtos/estudio'
 import { adicionarMembrosAction } from '@/app/admin/produtos/actions'
 
@@ -27,7 +29,7 @@ const faltaTabela = (msg: string | undefined) => !!msg && /simulado_produto_disp
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TIPOS_DISP = ['na_matricula', 'data', 'intervalo', 'data_e_intervalo', 'dia_semana_e_intervalo', 'cronograma']
 const chunks = <T,>(a: T[], n = 80): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
-const revalidar = (produtoId: string) => revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+const revalidar = (produtoId: string) => { void invalidarMapaRegras(produtoId); revalidatePath(`/admin/conteudos/produtos/${produtoId}`) }
 
 /** Disponibilidade validada/normalizada (mesmo formato do configurador de disponibilidade; 'cronograma' = contrato fixo do motor do aluno). */
 type DispNorm = { tipo: string; data: string | null; dias: number | null; diaSemana: number | null; antes: 'oculto' | 'bloqueado_cadeado' }
@@ -133,6 +135,7 @@ export async function aplicarLiberacaoSegmentoAction(produtoId: string, alvos: A
     criadas.push(...((data ?? []) as DispSegAdmin[]))
   }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produto_disponibilidade_seg', entidadeId: produtoId, depois: { lote: true, segmento_id: input.segmento_id, disponibilidade: disp, prioridade, alvos: ok.map((a) => a.id) }, tenantId: g.tenantId })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'disponibilidade_seg', acao: ids.length ? 'aplicada (substituindo)' : 'aplicada', alvoRotulo: `${ok.length} conteúdo(s) · segmento ${input.segmento_id.slice(0, 8)}`, antes: { substituidas: ids.length }, depois: { segmento_id: input.segmento_id, disponibilidade: disp, prioridade }, atorId: g.userId })
   revalidar(produtoId)
   return { ok: true, alvos: ok.length, substituidas: ids.length, regras: criadas }
 }
@@ -147,6 +150,7 @@ export async function removerLiberacaoSegmentoAction(produtoId: string, ids: str
     if (error) return { error: error.message }
   }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_disponibilidade_seg', entidadeId: produtoId, depois: { ids: lista }, tenantId: g.tenantId })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'disponibilidade_seg', acao: 'removida', alvoRotulo: `${lista.length} regra(s) de segmento`, antes: { ids: lista.slice(0, 100) }, atorId: g.userId })
   revalidar(produtoId)
   return { ok: true, removidas: lista.length }
 }
@@ -158,6 +162,7 @@ export async function alternarRegraSegmentoAction(produtoId: string, tabela: 'di
   const { error } = await svc.from(tabela === 'disp' ? 'simulado_produto_disponibilidade_seg' : 'simulado_produto_capas_seg').update({ ativo: !!ativo, atualizado_em: new Date().toISOString() }).eq('id', id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: tabela === 'disp' ? 'simulado_produto_disponibilidade_seg' : 'simulado_produto_capas_seg', entidadeId: id, depois: { ativo: !!ativo }, tenantId: g.tenantId })
+  if (tabela === 'disp') await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'disponibilidade_seg', acao: ativo ? 'ativada' : 'desativada', alvoId: id, alvoRotulo: 'regra de segmento', depois: { ativo: !!ativo }, atorId: g.userId })
   revalidar(produtoId)
   return { ok: true }
 }

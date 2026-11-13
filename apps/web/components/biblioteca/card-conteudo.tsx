@@ -4,6 +4,7 @@ import { FileText, FileType, Presentation, Table2, Video, Music, ListChecks } fr
 import { cn } from '@/lib/utils'
 import { SeloTipo } from './selo-tipo'
 import { TIPOS_CONTEUDO, seloStyle, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
+import { CheckSelecao } from './selecao-lote'
 
 const ICONE: Record<KindConteudo, typeof FileText> = {
   docx: FileText, pdf: FileType, pptx: Presentation, xlsx: Table2, video: Video, audio: Music, questoes: ListChecks,
@@ -29,6 +30,7 @@ export function CardConteudo({
   acoes,
   onClick,
   className,
+  selecao,
 }: {
   kind: KindConteudo
   titulo: string
@@ -41,6 +43,8 @@ export function CardConteudo({
   acoes?: React.ReactNode
   onClick?: () => void
   className?: string
+  /** Modo de seleção (admin): mostra o checkbox e o clique no card alterna a seleção. */
+  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string }
 }) {
   const Icone = ICONE[kind]
   const tipo = TIPOS_CONTEUDO[kind]
@@ -48,13 +52,15 @@ export function CardConteudo({
   const [imgErro, setImgErro] = useState(false)
   return (
     <div
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+      onClick={selecao ? (e) => selecao.onToggle(e.shiftKey) : onClick}
+      role={selecao ? 'checkbox' : onClick ? 'button' : undefined}
+      aria-checked={selecao ? selecao.marcado : undefined}
+      tabIndex={onClick || selecao ? 0 : undefined}
+      onKeyDown={onClick || selecao ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (selecao) selecao.onToggle(e.shiftKey); else onClick?.() } } : undefined}
       className={cn(
         'group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all',
-        onClick && 'cursor-pointer hover:border-primary/30 hover:shadow-md',
+        (onClick || selecao) && 'cursor-pointer hover:border-primary/30 hover:shadow-md',
+        selecao?.marcado && 'border-primary ring-2 ring-primary/60',
         className,
       )}
     >
@@ -69,6 +75,7 @@ export function CardConteudo({
           </div>
         )}
         <div className="absolute left-2 top-2"><SeloTipo kind={kind} tamanho="sm" /></div>
+        {selecao && <div className="absolute right-2 top-2 z-10"><CheckSelecao marcado={selecao.marcado} onToggle={selecao.onToggle} rotulo={selecao.rotulo ?? `Selecionar ${titulo}`} /></div>}
         {novo && (
           <span className="absolute right-2 top-2 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground shadow">NOVO</span>
         )}

@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { jwtVerify } from 'jose'
 import { createAdminClient } from '@/lib/supabase/server'
 import { guardarOriginal, converterParaHtml } from '@/lib/conteudo/ingestao'
 import { reconciliarVersao } from '@/lib/conteudo/reconciliacao'
 import { gerarThumbDocumento } from '@/lib/conteudo/thumb'
+import { registroVersoesAtivo } from '@/lib/conteudo/atualizacoes-registro'
+import { emitirEvento } from '@/lib/conteudo/outbox'
+import { sincronizarPaginasDocumento } from '@/lib/conteudo/paginas-sync'
 
 // Hosts de onde o Document Server pode servir o .docx editado (anti-SSRF: `body.url` tem que vir dele).
 function hostsPermitidos(): Set<string> {
@@ -47,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
 
     const guardado = await guardarOriginal({ tenantId: v.tenant_id, documentoId: v.documento_id, numeroVersao: v.numero, tipo: 'docx', data: bytes, nome: 'edicao.docx' })
     if ('erro' in guardado) { console.error('[conteudo/callback] storage:', guardado.erro); return NextResponse.json({ error: 1 }) }
-    await svc.from('simulado_conteudo_versoes').update({ arquivo_key: guardado.arquivoKey, hash_arquivo: guardado.hash }).eq('id', v.id)
+    await svc.from('simulado_conteudo_versoes').update({ arquivo_key: guardado.arquivoKey, hash_arquivo: guardado.hash, paginas: null }).eq('id', v.id) // arquivo mudou → contagem de páginas invalida (recontada abaixo)
 
     const { html } = await converterParaHtml(bytes, 'docx')
     const { data: anterior } = await svc.from('simulado_conteudo_versoes')
@@ -56,9 +59,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
     if (html.trim()) await reconciliarVersao({ documentoId: v.documento_id, versaoNovaId: v.id, versaoAnteriorId: anterior?.id ?? null, html, forcar: true, tenantId: v.tenant_id })
     // REGRA: salvar no editor PUBLICA a versão editada como a ATUAL — o documento NÃO pode ficar preso
     // numa versão anterior. (callback é server-to-server, sem sessão → atualiza direto com o tenant da versão.)
-    await svc.from('simulado_conteudo_documentos')
-      .update({ versao_atual_id: v.id, status: 'publicado', atualizado_em: new Date().toISOString() })
-      .eq('tenant_id', v.tenant_id).eq('id', v.documento_id)
+    // EXCEÇÃO (tenant com `tema.registro_versoes_ativo`): o REGISTRO DE VERSÕES é a fonte de publicação — salvar grava só
+    // no rascunho (arquivo/reconciliação da versão em edição) e o professor publica ao "Registrar atualização".
+    // Falha ao ler a flag = comportamento padrão (publica), para nunca deixar o documento preso.
+    const registroAtivo = await registroVersoesAtivo(svc, v.tenant_id).catch(() => false)
+    if (!registroAtivo) {
+      await svc.from('simulado_conteudo_documentos')
+        .update({ versao_atual_id: v.id, status: 'publicado', atualizado_em: new Date().toISOString() })
+        .eq('tenant_id', v.tenant_id).eq('id', v.documento_id)
+    }
+    // Edição salva → recontagem de páginas (DOCX→PDF) FORA do caminho da resposta ao OnlyOffice. Só se a versão editada é a ATUAL
+    // (modo registro de versões: o rascunho é contado quando publicado). Invalida os caches do cronograma ao mudar.
+    if (!registroAtivo) await emitirEvento(svc, v.tenant_id, 'documento.atualizado', { documento_id: v.documento_id, versao_id: v.id, origem: 'onlyoffice' })
+    const recontar = async () => {
+      const { data: d } = await svc.from('simulado_conteudo_documentos').select('versao_atual_id').eq('tenant_id', v.tenant_id).eq('id', v.documento_id).maybeSingle()
+      if ((d as { versao_atual_id?: string | null } | null)?.versao_atual_id === v.id) await sincronizarPaginasDocumento(svc, v.tenant_id, v.documento_id, { forcar: true })
+    }
+    try { after(() => recontar().catch(() => {})) } catch { void recontar().catch(() => {}) }
     // Edição salva → regenera a miniatura FIEL do card (conteúdo/hash mudaram).
     await gerarThumbDocumento(v.tenant_id, v.documento_id, { forcar: true }).catch(() => {})
   } catch (e) {

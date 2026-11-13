@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { guardaTeste } from "@/lib/seguranca/guarda-teste"
 import { randomUUID } from 'node:crypto'
 import { salvarDoc } from '@/lib/teste/store'
 import { MODELOS } from '@/lib/teste/modelos'
@@ -7,10 +8,12 @@ import { MODELOS } from '@/lib/teste/modelos'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  { const b = await guardaTeste(); if (b) return b }
   return NextResponse.json({ modelos: Object.entries(MODELOS).map(([key, m]) => ({ key, nome: m.nome, descricao: m.descricao })) })
 }
 
 export async function POST(request: Request) {
+  { const b = await guardaTeste(); if (b) return b }
   const body = await request.json().catch(() => ({}))
   const m = MODELOS[body?.modelo as string]
   if (!m) return NextResponse.json({ error: 'modelo inválido' }, { status: 400 })

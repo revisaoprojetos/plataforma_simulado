@@ -1,6 +1,8 @@
 // Decisão PURA (sem I/O, sem 'server-only') da liberação de aulas do extensivo por planilha/cronograma.
 // Usada por liberacao-aulas-aluno.ts (servidor) e pelos testes (liberacao-aulas-decisao.test.ts).
 
+import { liberaEmTrilha, type TrilhaAulaDatas } from './liberacao-trilhas-calc'
+
 export type SemPlano = 'planilha' | 'liberado' | 'atual'
 export type ComPlano = 'concluir_meta' | 'plano' | 'mais_cedo'
 
@@ -53,6 +55,7 @@ export const SEM_PLANO: PlanoAula = { tem: false, noPlano: false, dataMeta: null
 export type MotivoDecisao =
   | 'desligado' | 'planilha' | 'liberado' | 'atual' | 'concluida'
   | 'concluir-meta' | 'plano' | 'mais-cedo' | 'fora-do-plano'
+  | 'excecao-liberar' | 'bloqueado-admin'
 
 export interface Decisao {
   liberada: boolean
@@ -109,6 +112,53 @@ export function decidirLiberacao(a: {
   }
 }
 
+/** Exceção já resolvida para a aula (resultado de resolverExcecao); null = nenhuma vigente. */
+export type ExcecaoResolvida = { acao: 'liberar' | 'bloquear'; motivo?: string | null } | null
+
+/**
+ * NÚCLEO ÚNICO da decisão de UMA aula para UM aluno: exceção manual vigente vence tudo; senão `decidirLiberacao`
+ * (planilha/trilha já resolvidas em `linha`, cronograma fixado em `plano`). Usado pelo motor do aluno
+ * (liberacao-aulas-aluno.ts) e pela consulta admin "por que este aluno vê esta aula" — mesma função, mesma decisão.
+ */
+export function decidirAulaComExcecao(a: {
+  excecao: ExcecaoResolvida
+  cfg: ParamsLiberacao & { ativo?: boolean }
+  linha: { data_liberacao: string | null } | null
+  plano: PlanoAula
+  hoje: string
+}): Decisao {
+  if (a.excecao) {
+    return a.excecao.acao === 'liberar'
+      ? { liberada: true, motivo: 'excecao-liberar', liberaEm: null, interfere: true }
+      : { liberada: false, motivo: 'bloqueado-admin', liberaEm: null, interfere: true }
+  }
+  return decidirLiberacao({ cfg: a.cfg, linha: a.linha, plano: a.plano, hoje: a.hoje })
+}
+
+/**
+ * Regra 'cronograma' que governa um módulo/aula: a própria (segmento tem prioridade sobre a base), ou — se a própria é só a
+ * base neutra (sem segmento, vazia ou 'na_matricula') — a do ancestral mais próximo. null = não governado pelo cronograma.
+ * `propria(id, base)` devolve a disponibilidade própria e se veio de segmento.
+ */
+export function regraCronogramaGovernante(
+  id: string, base: unknown,
+  porId: ReadonlyMap<string, { id: string; pai_id: string | null; disponibilidade?: unknown }>,
+  propria: (id: string, base: unknown) => { d: unknown; seg: boolean },
+): unknown | null {
+  const p = propria(id, base)
+  if (ehDispCronograma(p.d)) return p.d
+  const baseNeutra = !p.seg && (!p.d || (p.d as { tipo?: string }).tipo === 'na_matricula')
+  if (!baseNeutra) return null
+  let cur = porId.get(id)?.pai_id ?? null; let g = 0
+  while (cur && g++ < 50) {
+    const m = porId.get(cur); if (!m) break
+    const pa = propria(m.id, m.disponibilidade)
+    if (ehDispCronograma(pa.d)) return pa.d
+    cur = m.pai_id
+  }
+  return null
+}
+
 // ── Rótulo do cadeado (texto calculado no servidor; a UI só exibe) ─────────────────────────────────
 const DIA_CURTO = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.']
 const DIA_LONGO = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado']
@@ -116,6 +166,8 @@ const DIA_LONGO = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', '
 export interface RotuloEntrada {
   /** planilha = sem cronograma; plano = cronograma fixado libera; concluir = aguarda concluir a meta (previsão). */
   origem: 'planilha' | 'plano' | 'concluir'
+  /** Nome da trilha (cronograma) de onde veio a data; só vale com origem 'planilha' (a data-base do aluno = a da trilha). */
+  trilha?: string | null
   /** AAAA-MM-DD (data civil, sem fuso). */
   data?: string | null
   semana?: number | null
@@ -138,8 +190,73 @@ export function formatarRotuloLiberacao(i: RotuloEntrada): string | null {
     const quando = data ? `${DIA_CURTO[dow!]}, ${dataBr(data, false)}` : DIA_LONGO[dow!]
     return `Libera ao concluir a meta (prevista para ${quando}${sem ? ` · semana ${sem}` : ''})`
   }
+  if (i.origem === 'planilha' && i.trilha) {
+    if (!data) return null
+    // a semana da planilha-base NÃO é a da trilha: só é exibida quando o chamador a informar explicitamente
+    return `Libera em ${DIA_CURTO[dow!]}, ${dataBr(data, true)} · cronograma ${i.trilha}${sem ? ` · semana ${sem}` : ''}`
+  }
   const de = i.origem === 'plano' ? 'do seu cronograma' : 'do cronograma'
   if (data) return `Libera em ${DIA_CURTO[dow!]}, ${dataBr(data, true)}${sem ? ` · semana ${sem} ${de}` : ''}`
   if (i.origem === 'plano' && dow != null && sem) return `Libera ${dow === 0 || dow === 6 ? 'no' : 'na'} ${DIA_LONGO[dow]} da semana ${sem} ${de}`
   return null
+}
+
+export const ROTULO_BLOQUEADO_ADMIN = 'Bloqueado pelo administrador'
+
+// ── Trilhas (cronogramas por Segmento) ────────────────────────────────────────────────────────────
+export interface TrilhaDaAula { nome: string; datas: TrilhaAulaDatas }
+
+/**
+ * Data-base efetiva de UMA aula para o aluno. `trilhas` = só as trilhas em que o aluno CASA (na ordem de exibição),
+ * cada uma com as datas da aula nela (null/sem data = a trilha não traz a aula e NÃO contribui).
+ * Várias trilhas trazendo a aula → MENOR liberaEmTrilha (empate: a 1ª). Nenhuma traz → data da planilha (origem 'planilha').
+ */
+export function dataBaseDaAula(trilhas: TrilhaDaAula[], planilha: string | null): { data: string | null; trilha: string | null } {
+  let best: { data: string; trilha: string } | null = null
+  for (const t of trilhas) {
+    const d = liberaEmTrilha(t.datas)
+    if (d && (!best || d < best.data)) best = { data: d, trilha: t.nome }
+  }
+  return best ?? { data: planilha, trilha: null }
+}
+
+// ── Exceções manuais (liberar/bloquear aula ou módulo para aluno OU grupo) ─────────────────────────
+export interface ExcecaoLib {
+  alvo_tipo: 'aula' | 'modulo'
+  alvo_id: string
+  estudante_id: string | null
+  grupo_id: string | null
+  acao: 'liberar' | 'bloquear'
+  motivo?: string | null
+  expira_em?: string | null
+  ativo?: boolean
+}
+
+/** Exceções que valem para o aluno agora: ativas, não expiradas, do próprio aluno ou de grupo do qual ele é membro (ativo). */
+export function excecoesAplicaveis(excs: ExcecaoLib[], aluno: { estudanteId: string; grupos: ReadonlySet<string> }, agoraIso: string): ExcecaoLib[] {
+  return excs.filter((e) => {
+    if (e.ativo === false) return false
+    if (e.expira_em && e.expira_em <= agoraIso) return false
+    if (e.estudante_id) return e.estudante_id === aluno.estudanteId
+    return !!e.grupo_id && aluno.grupos.has(e.grupo_id)
+  })
+}
+
+/**
+ * Exceção vigente para um alvo. `cadeia` = [alvo, pai, avô…] (exceção em módulo vale para tudo dentro).
+ * PRECEDÊNCIA: bloquear (em qualquer nível da cadeia, de qualquer origem aluno/grupo) > liberar > null.
+ * Entre várias do mesmo tipo, vale a do alvo mais próximo (só afeta o motivo exibido).
+ */
+export function resolverExcecao(cadeia: string[], aplicaveis: ExcecaoLib[]): { acao: 'liberar' | 'bloquear'; motivo: string | null; alvoId: string } | null {
+  if (!aplicaveis.length) return null
+  const set = new Set(cadeia)
+  let lib: ExcecaoLib | null = null
+  for (const alvo of cadeia) {
+    for (const e of aplicaveis) {
+      if (e.alvo_id !== alvo || !set.has(e.alvo_id)) continue
+      if (e.acao === 'bloquear') return { acao: 'bloquear', motivo: e.motivo ?? null, alvoId: e.alvo_id }
+      if (!lib) lib = e
+    }
+  }
+  return lib ? { acao: 'liberar', motivo: lib.motivo ?? null, alvoId: lib.alvo_id } : null
 }

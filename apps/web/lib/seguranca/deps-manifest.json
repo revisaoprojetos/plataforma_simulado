@@ -1,0 +1,177 @@
+{
+  "gerado_em": "2026-11-13T03:34:22.146Z",
+  "deps": [
+    {
+      "nome": "@aws-sdk/client-s3",
+      "versao": "3.709.0"
+    },
+    {
+      "nome": "@aws-sdk/s3-request-presigner",
+      "versao": "3.709.0"
+    },
+    {
+      "nome": "@base-ui/react",
+      "versao": "1.6.0"
+    },
+    {
+      "nome": "@dnd-kit/core",
+      "versao": "6.3.1"
+    },
+    {
+      "nome": "@dnd-kit/sortable",
+      "versao": "10.0.0"
+    },
+    {
+      "nome": "@dnd-kit/utilities",
+      "versao": "3.2.2"
+    },
+    {
+      "nome": "@hookform/resolvers",
+      "versao": "3.10.0"
+    },
+    {
+      "nome": "@supabase/ssr",
+      "versao": "0.5.2"
+    },
+    {
+      "nome": "@supabase/supabase-js",
+      "versao": "2.108.2"
+    },
+    {
+      "nome": "@tanstack/react-query",
+      "versao": "5.101.0"
+    },
+    {
+      "nome": "@tanstack/react-query-devtools",
+      "versao": "5.101.0"
+    },
+    {
+      "nome": "bullmq",
+      "versao": "5.79.1"
+    },
+    {
+      "nome": "class-variance-authority",
+      "versao": "0.7.1"
+    },
+    {
+      "nome": "clsx",
+      "versao": "2.1.1"
+    },
+    {
+      "nome": "date-fns",
+      "versao": "4.4.0"
+    },
+    {
+      "nome": "docx",
+      "versao": "9.7.1"
+    },
+    {
+      "nome": "docx-preview",
+      "versao": "0.4.1"
+    },
+    {
+      "nome": "docxtemplater",
+      "versao": "3.71.1"
+    },
+    {
+      "nome": "exceljs",
+      "versao": "4.4.0"
+    },
+    {
+      "nome": "hls.js",
+      "versao": "1.7.4"
+    },
+    {
+      "nome": "html-to-docx",
+      "versao": "1.8.0"
+    },
+    {
+      "nome": "ioredis",
+      "versao": "5.11.1"
+    },
+    {
+      "nome": "jose",
+      "versao": "6.2.3"
+    },
+    {
+      "nome": "lucide-react",
+      "versao": "0.525.0"
+    },
+    {
+      "nome": "mammoth",
+      "versao": "1.12.0"
+    },
+    {
+      "nome": "next",
+      "versao": "16.2.9"
+    },
+    {
+      "nome": "next-themes",
+      "versao": "0.4.6"
+    },
+    {
+      "nome": "node-html-parser",
+      "versao": "9.0.0"
+    },
+    {
+      "nome": "pdf-lib",
+      "versao": "1.17.1"
+    },
+    {
+      "nome": "pdfjs-dist",
+      "versao": "6.2.108"
+    },
+    {
+      "nome": "pg",
+      "versao": "8.22.0"
+    },
+    {
+      "nome": "pizzip",
+      "versao": "3.3.0"
+    },
+    {
+      "nome": "puppeteer-core",
+      "versao": "25.3.0"
+    },
+    {
+      "nome": "react",
+      "versao": "19.2.4"
+    },
+    {
+      "nome": "react-dom",
+      "versao": "19.2.4"
+    },
+    {
+      "nome": "react-hook-form",
+      "versao": "7.80.0"
+    },
+    {
+      "nome": "recharts",
+      "versao": "2.15.4"
+    },
+    {
+      "nome": "shadcn",
+      "versao": "4.11.0"
+    },
+    {
+      "nome": "sonner",
+      "versao": "2.0.7"
+    },
+    {
+      "nome": "tailwind-merge",
+      "versao": "3.6.0"
+    },
+    {
+      "nome": "tesseract.js",
+      "versao": "7.0.0"
+    },
+    {
+      "nome": "tw-animate-css",
+      "versao": "1.4.0"
+    },
+    {
+      "nome": "zod",
+      "versao": "3.25.76"
+    }
+  ]
+}

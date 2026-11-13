@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { carregarQuestoesSimulado, slugVar } from '@/lib/teste/simulado-dados'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 
 // Variáveis REAIS de um simulado (disciplinas + pilares presentes, já com slug) pro plugin montar os
 // chips de "Variáveis deste simulado" na aba de variáveis do OnlyOffice.
 export const dynamic = 'force-dynamic'
-const CORS = { 'Access-Control-Allow-Origin': '*' }
+const CORS = {}
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   const { id } = await params
   const r = await carregarQuestoesSimulado(id)
   if (r.erro) return NextResponse.json({ erro: r.erro, disciplinas: [], pilares: [] }, { headers: CORS })

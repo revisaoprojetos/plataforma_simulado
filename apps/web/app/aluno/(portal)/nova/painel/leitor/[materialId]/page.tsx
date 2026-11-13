@@ -14,7 +14,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { novidadesDoDocumento } from '@/lib/admin-revisao/atualizacoes'
 import { formatBrt } from '@/lib/brt'
 import { redirect } from 'next/navigation'
+import { numeroDaVersao } from '@/lib/conteudo/atualizacoes-registro'
 import { ConcluirLeituraButton, ReportarButton } from './_leitor-modais'
+import { LateralTabs } from './_lateral-tabs'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +83,11 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
   }
 
   // Selo "Atualizado em" + "Novidades da versão": registros da Central de Atualizações (admin). Sem registro → não mostra.
-  const nov = await novidadesDoDocumento(createAdminClient(), sessao.tenantId, materialId)
+  const svc = createAdminClient()
+  const [nov, numeroVersao] = await Promise.all([
+    novidadesDoDocumento(svc, sessao.tenantId, materialId),
+    numeroDaVersao(svc, sessao.tenantId, leitura.versaoId), // selo "vN" ao fim do título (versão vigente)
+  ])
   const dia = (iso: string) => (formatBrt(iso) ?? '').slice(0, 10)
 
   return (
@@ -92,7 +98,10 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
       <Card>
         <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Col gap={8} style={{ minWidth: 0 }}>
-            <H2>{leitura.titulo}</H2>
+            <Row gap={10} style={{ flexWrap: 'wrap' }}>
+              <H2>{leitura.titulo}</H2>
+              {numeroVersao && <span title={[`Versão ${numeroVersao}`, nov.novidades[0]?.rotulo ?? ''].filter(Boolean).join(' · ')}><Tag kind="brand">{`v${numeroVersao}`}</Tag></span>}
+            </Row>
             <Row gap={10}>
               {nov.atualizadoEm && <Tag kind="green" icon="cal">Atualizado em {dia(nov.atualizadoEm)}</Tag>}
             </Row>
@@ -117,6 +126,7 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
       <div className="np-split" style={{ display: 'grid', gridTemplateColumns: '320px minmax(0,1fr)', gap: 24, alignItems: 'start' }}>
         {/* Sumário — TODO(dados): estrutura por página/estado de leitura (sem loader hoje) */}
         <Card>
+          <LateralTabs documentoId={materialId} recente={nov.recente}>
           <Row style={{ justifyContent: 'space-between' }}>
             <Eyebrow>Sumário</Eyebrow>
             <Muted size={12}>6 de 26 lidas</Muted>
@@ -143,17 +153,12 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
               </a>
             ))}
           </Col>
-          {nov.novidades.length > 0 && (
-            <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Row gap={8}><Icon n="info" size={14} style={{ color: 'var(--accentInk)' }} /><b style={{ fontSize: 13, color: 'var(--ink)' }}>Novidades da versão</b></Row>
-              {nov.novidades.map((n, i) => <Muted key={i} size={12}>{dia(n.quando)} · {n.texto}</Muted>)}
-            </div>
-          )}
           {/* TODO(dados): tempo de leitura real do aluno neste material (sem loader hoje) */}
           <Row style={{ justifyContent: 'space-between', padding: '10px 14px', borderRadius: 12, background: 'var(--surface2)' }}>
             <Muted size={12}>Tempo de leitura na meta</Muted>
             <b style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>00:42:18</b>
           </Row>
+          </LateralTabs>
         </Card>
 
         {/* Leitor */}

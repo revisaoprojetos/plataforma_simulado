@@ -38,15 +38,26 @@ export default async function CadernoDetalhePage({ params }: { params: Promise<{
   ])
   // Comentários de trecho salvos no caderno (já prontos no servidor; limite sensato). Tabela ausente
   // (migração pendente) → erro ignorado e a página segue só com as questões.
-  const { data: comentariosRaw } = await svc
+  const { data: comentariosRaw, error: comentariosErr } = await svc
     .from('simulado_aluno_caderno_itens')
-    .select('id, documento_id, titulo_documento, trecho, comentario, criado_em')
+    .select('id, tipo, documento_id, titulo_documento, trecho, comentario, pagina, criado_em')
     .eq('tenant_id', sessao.tenantId)
     .eq('caderno_id', id)
-    .eq('tipo', 'comentario')
     .order('criado_em', { ascending: false })
-    .limit(200)
-  const comentarios = (comentariosRaw ?? []) as { id: string; documento_id: string | null; titulo_documento: string | null; trecho: string | null; comentario: string | null; criado_em: string }[]
+    .limit(300)
+  // Se a coluna `pagina` ainda não existe (migração 20261119040000 pendente) a query erra → refaz sem ela.
+  let itensRaw: any[] | null = comentariosRaw
+  if (comentariosErr) {
+    const { data: legado } = await svc
+      .from('simulado_aluno_caderno_itens')
+      .select('id, tipo, documento_id, titulo_documento, trecho, comentario, criado_em')
+      .eq('tenant_id', sessao.tenantId).eq('caderno_id', id).order('criado_em', { ascending: false }).limit(300)
+    itensRaw = legado
+  }
+  const comentarios = (itensRaw ?? []) as { id: string; tipo: string; documento_id: string | null; titulo_documento: string | null; trecho: string | null; comentario: string | null; pagina?: number | null; criado_em: string }[]
+  const nGrifos = comentarios.filter((c) => c.tipo === 'grifo').length
+  const nAnot = comentarios.filter((c) => c.tipo === 'anotacao').length
+  const nCom = comentarios.length - nGrifos - nAnot
   const vazio = lista.length === 0 && comentarios.length === 0
   const p = prog[id] ?? { total: 0, resolvidas: 0 }
   const pct = p.total ? Math.round((p.resolvidas / p.total) * 100) : 0
@@ -61,7 +72,9 @@ export default async function CadernoDetalhePage({ params }: { params: Promise<{
         <h1 className="text-2xl font-bold tracking-tight">{caderno.nome}</h1>
         <p className="text-muted-foreground">
           {lista.length === 1 ? '1 questão' : `${lista.length} questões`}
-          {comentarios.length > 0 && <> · {comentarios.length === 1 ? '1 comentário' : `${comentarios.length} comentários`}</>} neste caderno
+          {nCom > 0 && <> · {nCom === 1 ? '1 comentário' : `${nCom} comentários`}</>}
+          {nGrifos > 0 && <> · {nGrifos === 1 ? '1 grifo' : `${nGrifos} grifos`}</>}
+          {nAnot > 0 && <> · {nAnot === 1 ? '1 anotação' : `${nAnot} anotações`}</>} neste caderno
           {lista.length > 0 && <> · {p.resolvidas} resolvida{p.resolvidas === 1 ? '' : 's'} ({pct}%)</>}
         </p>
         {lista.length > 0 && (
@@ -85,16 +98,21 @@ export default async function CadernoDetalhePage({ params }: { params: Promise<{
             <div key={c.id} className="space-y-1">
               <div className="flex justify-end"><RemoverDoCaderno cadernoId={id} itemId={c.id} /></div>
               <article className="space-y-3 rounded-lg border bg-card p-4 text-card-foreground">
+                <span className="inline-flex rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {c.tipo === 'grifo' ? 'Grifo' : c.tipo === 'anotacao' ? 'Anotação' : 'Comentário'}{c.pagina ? ` · pág. ${c.pagina}` : ''}
+                </span>
                 {c.trecho && (
                   <blockquote className="border-l-4 border-primary bg-muted/40 py-1 pl-3 text-sm italic text-muted-foreground">“{c.trecho}”</blockquote>
                 )}
-                <p className="flex gap-2 whitespace-pre-wrap text-sm">
-                  <MessageSquareQuote className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> <span>{c.comentario}</span>
-                </p>
+                {c.comentario && (
+                  <p className="flex gap-2 whitespace-pre-wrap text-sm">
+                    <MessageSquareQuote className="mt-0.5 h-4 w-4 shrink-0 text-primary" /> <span>{c.comentario}</span>
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span className="truncate">{c.titulo_documento || 'Material'}</span>
                   {c.documento_id && (
-                    <Link href={linkLeitor(c.documento_id, null, `/aluno/cadernos/${id}`)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                    <Link href={linkLeitor(c.documento_id, c.pagina ?? null, `/aluno/cadernos/${id}`)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                       <BookOpen className="h-3.5 w-3.5" /> Abrir no material
                     </Link>
                   )}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { registrarAtividade } from '@/lib/acessos/registro'
 
 // /api/leitura/anotacao — CRUD de anotações do aluno (grifos/notas).
 export const dynamic = 'force-dynamic'
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
     if ('nota' in b) patch.nota = b.nota || null
     const { error } = await svc.from('simulado_leitura_anotacoes').update(patch).eq('id', b.id).eq('estudante_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)
     if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+    // Registro de atividade: edição de nota/cor (restaurar = voltar a criar). Fire-and-forget.
+    void registrarAtividade(sessao, { tipo: b.restaurar ? 'grifo_criado' : 'nota_editada', refTipo: 'leitura_anotacao', refId: String(b.id), meta: { origem: 'leitura', restaurar: b.restaurar ? true : undefined } })
     return NextResponse.json({ ok: true, id: b.id })
   }
 
@@ -44,6 +47,7 @@ export async function POST(request: NextRequest) {
   let r = await svc.from('simulado_leitura_anotacoes').insert({ ...base, tipo }).select('id').single()
   if (r.error && /tipo/i.test(r.error.message)) r = await svc.from('simulado_leitura_anotacoes').insert(base).select('id').single()
   if (r.error) return NextResponse.json({ message: r.error.message }, { status: 500 })
+  void registrarAtividade(sessao, { tipo: tipo === 'nota' ? 'nota_editada' : 'grifo_criado', refTipo: 'leitura_doc', refId: String(b.documento_id), meta: { origem: 'leitura' } })
   return NextResponse.json({ ok: true, id: (r.data as any).id })
 }
 
@@ -58,5 +62,6 @@ export async function DELETE(request: NextRequest) {
     .update({ deletado: true, atualizado_em: new Date().toISOString() })
     .eq('id', id).eq('estudante_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  void registrarAtividade(sessao, { tipo: 'grifo_removido', refTipo: 'leitura_anotacao', refId: String(id), meta: { origem: 'leitura' } })
   return NextResponse.json({ ok: true })
 }

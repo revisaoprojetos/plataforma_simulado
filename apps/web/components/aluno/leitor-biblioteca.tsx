@@ -16,10 +16,17 @@ import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
 import { APP_VERSION } from '@/lib/version'
 import { prepararHtmlLegproc } from '@/lib/leitura/legproc-caixas'
-import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
+import { DestinoCadernoDialog } from '@/components/aluno/cadernos/destino-caderno-dialog'
+import { SalvarComentarioCaderno, normalizarComentarioCaderno, postarItemCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
+import { AvisoSaidaCaderno, type PendentesResumo } from '@/components/aluno/cadernos/aviso-saida-caderno'
+import {
+  carregarCadernos, carregarDestinos, salvarDestino, resumoSalvos, limparSalvos, DESTINOS_VAZIOS,
+  type CadernoLista, type Destino, type Destinos, type ResumoCaderno,
+} from '@/lib/aluno/cadernos-cliente'
+import { R } from '@/lib/nova/rotas'
 
 // LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
-const LEITOR_REV = 'lp59'
+const LEITOR_REV = 'lp71'
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
@@ -53,8 +60,12 @@ export type ParteCrono = { id: string; i: number; f: number; r: string }
 export function LeitorBiblioteca({
   documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
   partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false, marca, video,
-  semProgresso = false, posicaoInicialPct = 0,
+  semProgresso = false, posicaoInicialPct = 0, versaoTag, atualizacoes,
 }: {
+  /** Selo de versão ao fim do título na barra superior (ex.: 'v3') + tooltip (última atualização publicada). */
+  versaoTag?: { texto: string; titulo: string } | null
+  /** Aba lateral 'Atualizações' (carregada sob demanda pelo iframe): doc + indicador de novidade recente (calculado no servidor). */
+  atualizacoes?: { documentoId: string; recente: boolean; ultimaEm: string | null } | null
   /** NÃO grava progresso de leitura (preview/admin/impersonation). Padrão false = grava. */
   semProgresso?: boolean
   /** Texto/LegProc: % de rolagem (0..100) onde o aluno parou, para retomar. */
@@ -100,11 +111,25 @@ export function LeitorBiblioteca({
   }, [metaCrono])
   // Navega de volta (ou para a origem da meta) com a LINHA DE CARREGAMENTO acesa — client nav (SPA),
   // sem reload branco; o destino (cronograma) ainda mostra a animação de entrada. Grava o tempo antes de sair.
-  const irPara = useCallback((href: string) => {
-    salvarTempo()
+  const sairAgora = useCallback((href: string) => {
+    salvarTempo(); limparSalvos()
     try { window.dispatchEvent(new Event('navprogress:start')) } catch { /* ignore */ }
     router.push(href)
   }, [router, salvarTempo])
+  // AVISO DE SAÍDA (in-app, sem beforeunload): antes de sair, descarrega as pendências (grifos/cadernos em voo) e,
+  // se nesta leitura houve salvamentos em cadernos, mostra o resumo. "Continuar saindo" = 1 clique (forcar).
+  const [saida, setSaida] = useState<{ href: string; resumo: ResumoCaderno[]; pendentes: ComentarioParaCaderno[] } | null>(null)
+  const flushRef = useRef<() => Promise<void>>(async () => {})
+  const pendentesRef = useRef<() => Promise<ComentarioParaCaderno[]>>(async () => [])
+  const irPara = useCallback((href: string, forcar = false) => {
+    void (async () => {
+      let pend: ComentarioParaCaderno[] = []
+      try { await flushRef.current(); pend = await pendentesRef.current() } catch { /* best-effort: nunca prende a saída */ }
+      const r = resumoSalvos()
+      if (!forcar && (r.length || pend.length)) { setSaida({ href, resumo: r, pendentes: pend }); return }
+      sairAgora(href)
+    })()
+  }, [sairAgora])
   // Rede de segurança: se fechar a aba/atualizar sem concluir, ainda grava o tempo da sessão.
   useEffect(() => {
     const h = () => salvarTempo()
@@ -186,6 +211,7 @@ export function LeitorBiblioteca({
   const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
   dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase }
 
+  const inflight = useRef(new Set<Promise<unknown>>())
   const enviadosT = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
   useEffect(() => {
     enviadosT.current.clear()
@@ -270,6 +296,7 @@ export function LeitorBiblioteca({
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
         marca: marca || null,
         video: video || null,
+        versaoTag: versaoTag || null, atualizacoes: atualizacoes || null,
         modeloJuris: !!texto?.modeloJuris, // só os modelos de jurisprudência ganham o estilo próprio (títulos roxos, seções expansivas…)
         grifosRevisaoLigados: !!texto,
         ocultarLegendaDoc: !!texto && texto.ocultarLegendaTabela !== false, // tabela de legenda do início do doc (repete a barra de legendas)
@@ -279,7 +306,7 @@ export function LeitorBiblioteca({
         tempoDeterminadoSeg: d.tempoDeterminadoSeg || 0, tempoBaseSeg: d.tempoBase || 0,
       },
     }, '*')
-  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto, posicaoInicialPct])
+  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto, posicaoInicialPct, versaoTag, atualizacoes])
 
   const reconciliar = useCallback(async (grifos: GrifoEngine[]) => {
     if (busy.current) { pendente.current = grifos; return }
@@ -378,18 +405,232 @@ export function LeitorBiblioteca({
     }
   }, [])
 
+  // ---- CADERNOS: destino padrão (Leitura/Questões), salvar grifo/anotação/comentário, "já salvo" ----
+  // O host é dono dos dados (cadernos, destinos, itens já salvos) e fala com o iframe por postMessage.
+  const cad = useRef({ cadernos: [] as CadernoLista[], destinos: DESTINOS_VAZIOS as Destinos, indisponivel: false, salvos: new Set<string>(), pronto: false })
+  const cadCarregando = useRef<Promise<void> | null>(null)
+  // cad é um ref: este contador espelha mudanças dele para re-renderizar o dialog de destino.
+  const [, setCadVer] = useState(0)
+  const bumpCad = useCallback(() => setCadVer((v) => v + 1), [])
+  const [dstAberto, setDstAberto] = useState(false)
+  const [dstCor, setDstCor] = useState<string | null>(null) // cor sólida da barra superior do leitor (vem do iframe)
+  const cadUltimo = useRef(0) // timestamp do último carregamento completo (revalidação em segundo plano)
+  const destSeq = useRef<Record<string, number>>({}) // anti respostas fora de ordem do salvarDestino
+  const pendBruto = useRef<any[] | null>(null) // pendentes enviados pelo iframe no último flush
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+  const rastrear = useCallback(<T,>(p: Promise<T>): Promise<T> => {
+    inflight.current.add(p); const fim = () => { inflight.current.delete(p) }; p.then(fim, fim); return p
+  }, [])
+  useEffect(() => { limparSalvos() }, []) // o aviso de saída conta só esta sessão de leitura
+  flushRef.current = async () => {
+    // pede ao iframe que mande os grifos AGORA (ele faz debounce de 500 ms) e espera a reconciliação/POSTs em voo.
+    pendBruto.current = null
+    try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-flush' }, '*') } catch { /* ignore */ }
+    await sleep(180)
+    for (let i = 0; i < 8 && pendBruto.current === null && cad.current.pronto; i++) await sleep(100) // lista de pendentes do iframe
+    const t0 = Date.now()
+    while (Date.now() - t0 < 3000) {
+      if (!(busy.current || busyT.current || pendente.current || pendenteT.current || inflight.current.size > 0)) return
+      await sleep(120)
+    }
+  }
+  /** ids locais (do motor do leitor) dos grifos que já estão salvos em algum caderno. */
+  const idsLocaisSalvos = useCallback(() => {
+    const out: string[] = []
+    const mapa = texto ? enviadosT.current : enviados.current
+    for (const [lid, info] of mapa) if (cad.current.salvos.has(info.serverId)) out.push(lid)
+    return out
+  }, [texto])
+  const postarDestinos = useCallback(() => {
+    const c = cad.current; if (!c.pronto) return
+    try {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: 'leitor-jus-destinos', cadernos: c.cadernos.map((x) => ({ id: x.id, nome: x.nome, total: x.total })),
+        destinos: c.destinos, indisponivel: c.indisponivel, salvos: idsLocaisSalvos(),
+      }, '*')
+    } catch { /* ignore */ }
+  }, [idsLocaisSalvos])
+  const carregarCad = useCallback((): Promise<void> => {
+    if (cadCarregando.current) return cadCarregando.current
+    cadCarregando.current = (async () => {
+      const [cadernos, { destinos, indisponivel }, saved] = await Promise.all([
+        carregarCadernos(), carregarDestinos(),
+        fetch('/api/aluno/cadernos/item?documento_id=' + encodeURIComponent(documentoId), { credentials: 'same-origin' })
+          .then((r) => (r.ok ? r.json() : { itens: [] })).catch(() => ({ itens: [] })),
+      ])
+      const c = cad.current
+      c.cadernos = cadernos; c.destinos = destinos; c.indisponivel = indisponivel || !!saved?.indisponivel
+      bumpCad()
+      const itens: { grifo_ref: string | null; caderno_id: string }[] = Array.isArray(saved?.itens) ? saved.itens : []
+      for (const i of itens) if (i.grifo_ref) c.salvos.add(i.grifo_ref)
+      c.pronto = true; cadUltimo.current = Date.now()
+      bumpCad()
+      // Sinal na REABERTURA: este material já tem coisas salvas em cadernos (1x por sessão do navegador).
+      if (itens.length > 0 && !c.indisponivel) {
+        try {
+          const k = 'cad:reabrir:' + documentoId
+          if (!sessionStorage.getItem(k)) {
+            sessionStorage.setItem(k, '1')
+            const ids = [...new Set(itens.map((i) => i.caderno_id))]
+            toast(`Neste material você já salvou ${itens.length === 1 ? '1 item' : `${itens.length} itens`} em ${ids.length === 1 ? 'um caderno' : 'cadernos'}.`, {
+              action: { label: 'Ver no caderno', onClick: () => irPara(ids.length === 1 ? `/aluno/cadernos/${ids[0]}` : R.cadernos) },
+            })
+          }
+        } catch { /* storage bloqueado */ }
+      }
+    })()
+    return cadCarregando.current
+  }, [documentoId, irPara, bumpCad])
+  const aoSalvarCaderno = useCallback((caderno: { id: string; nome: string; total: number }, d: ComentarioParaCaderno) => {
+    const c = cad.current
+    c.cadernos = c.cadernos.some((x) => x.id === caderno.id) ? c.cadernos.map((x) => (x.id === caderno.id ? { ...x, total: caderno.total } : x)) : [caderno, ...c.cadernos]
+    if (d.grifo_ref) c.salvos.add(d.grifo_ref)
+    postarDestinos(); bumpCad()
+  }, [postarDestinos, bumpCad])
+  const definirDestino = useCallback(async (m: any) => {
+    const ctx: 'leitura' | 'questoes' | null = m?.contexto === 'questoes' ? 'questoes' : m?.contexto === 'leitura' ? 'leitura' : null
+    if (!ctx) return
+    const c = cad.current
+    const id = typeof m.caderno_id === 'string' && m.caderno_id ? m.caderno_id : null
+    const novo: Destino = { caderno_id: id, salvar_sem_perguntar: !!id && m.salvar_sem_perguntar === true }
+    const antes = c.destinos[ctx]
+    c.destinos = { ...c.destinos, [ctx]: novo }
+    postarDestinos(); bumpCad()
+    const seq = (destSeq.current[ctx] = (destSeq.current[ctx] ?? 0) + 1)
+    const r = await salvarDestino(ctx, novo)
+    if (!r.ok && seq === destSeq.current[ctx]) { c.destinos = { ...c.destinos, [ctx]: antes }; toast.error(r.message || 'Não consegui salvar a preferência.'); postarDestinos(); bumpCad() }
+  }, [postarDestinos, bumpCad])
+  const criarCaderno = useCallback(async (m: any): Promise<boolean> => {
+    const nome = typeof m?.nome === 'string' ? m.nome.trim().slice(0, 120) : ''
+    if (!nome) return false
+    try {
+      const r = await fetch('/api/aluno/cadernos', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ nome }) })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.caderno) { toast.error(j?.message || 'Não consegui criar o caderno agora.'); return false }
+      const c = cad.current
+      c.cadernos = [j.caderno, ...c.cadernos]
+      const novo: Destino = { caderno_id: j.caderno.id, salvar_sem_perguntar: c.destinos.leitura.salvar_sem_perguntar }
+      const antes = c.destinos.leitura
+      c.destinos = { ...c.destinos, leitura: novo }
+      postarDestinos(); bumpCad()
+      const seq = (destSeq.current.leitura = (destSeq.current.leitura ?? 0) + 1)
+      const sd = await salvarDestino('leitura', novo)
+      if (sd.ok) toast.success(`Caderno “${j.caderno.nome}” criado e definido como destino da leitura`)
+      else {
+        toast.error(sd.message || 'Caderno criado, mas não consegui defini-lo como destino.')
+        if (seq === destSeq.current.leitura) { c.destinos = { ...c.destinos, leitura: antes }; postarDestinos(); bumpCad() }
+      }
+      return true
+    } catch { toast.error('Não consegui criar o caderno agora. Verifique a conexão.'); return false }
+  }, [postarDestinos, bumpCad])
+  /** Espera o grifo ganhar id no servidor (a reconciliação é assíncrona) — até 5 s. */
+  const aguardarRef = useCallback(async (localId: string): Promise<string | null> => {
+    const t0 = Date.now()
+    for (;;) {
+      const i = (texto ? enviadosT.current : enviados.current).get(localId)
+      if (i) return i.serverId
+      if (Date.now() - t0 > 5000) return null
+      await sleep(200)
+    }
+  }, [texto])
+  /** Payload pronto p/ o servidor a partir do que o iframe mandou (resolve grifo_ref/página). null = nada a salvar. */
+  const montarPayload = useCallback(async (g: any): Promise<ComentarioParaCaderno | null> => {
+    const d = dados.current; const c = cad.current
+    const base = { documento_id: d.documentoId, documento_versao: null, titulo_documento: d.titulo || null }
+    let payload: ComentarioParaCaderno | null = null
+    if (g?.folha_sec) {
+      payload = normalizarComentarioCaderno({ ...g, tipo: 'anotacao' }, base)
+    } else {
+      payload = normalizarComentarioCaderno(g, base)
+      if (payload && !c.indisponivel) {
+        if (typeof g.local_id === 'string') {
+          const ref = await aguardarRef(g.local_id)
+          if (ref) { payload.grifo_ref = ref; payload.ref_tabela = texto ? 'simulado_conteudo_anotacoes' : 'simulado_conteudo_grifos_pdf' }
+        }
+        if (!texto) { const pg = Number(String(g.sec || '').replace(/^p/, '')); payload.pagina = pg > 0 ? Math.trunc(pg) : null }
+      }
+    }
+    if (!payload) return null
+    if (c.indisponivel) {
+      // Migração nova pendente: mantém o comportamento antigo (só comentário, sem colunas novas).
+      if (payload.tipo !== 'comentario') return null
+      payload = { ...payload, ref_tabela: null, pagina: null, rects: null, html: null, grifo_ref: null }
+    }
+    return payload
+  }, [aguardarRef, texto])
+  const tratarSalvarCaderno = useCallback(async (g: any) => {
+    const c = cad.current
+    const payload = await montarPayload(g)
+    if (!payload) return
+    const dest = c.destinos.leitura
+    const cad0 = dest.caderno_id ? c.cadernos.find((x) => x.id === dest.caderno_id) : null
+    if (cad0 && dest.salvar_sem_perguntar) {
+      const r = await postarItemCaderno(payload, { caderno_id: cad0.id })
+      if (r.ok) { if (!(g?.auto && payload.folha_sec)) toast.success(`Salvo em ${r.caderno.nome}`); aoSalvarCaderno(r.caderno, payload) } else toast.error(r.message)
+      return
+    }
+    setParaCaderno(payload)
+  }, [montarPayload, aoSalvarCaderno])
+  // Pendentes da saída: o que o iframe diz não estar em caderno, menos o que o host já sabe salvo (grifo_ref).
+  pendentesRef.current = async () => {
+    const c = cad.current
+    const bruto = pendBruto.current
+    if (!c.pronto || c.indisponivel || !bruto?.length) return []
+    const out: ComentarioParaCaderno[] = []
+    for (const g of bruto.slice(0, 300)) {
+      const p = await montarPayload(g)
+      if (!p) continue
+      if (p.grifo_ref && c.salvos.has(p.grifo_ref)) continue
+      out.push(p)
+    }
+    return out
+  }
+  /** "Salvar no caderno e sair": grava em lote (um por vez). Falhou -> nao sai, avisa e mantem o aviso aberto. */
+  const salvarPendentesESair = useCallback(async (alvo: { caderno_id: string } | { novo_nome: string }): Promise<boolean> => {
+    const lista = saida?.pendentes ?? []
+    let a = alvo; let feitos = 0; let nomeCad = ''
+    for (const p of lista) {
+      const r = await rastrear(postarItemCaderno(p, a))
+      if (!r.ok) {
+        toast.error(`${r.message}${feitos ? ` (${feitos} de ${lista.length} já salvos)` : ''}`)
+        // tira da lista o que já foi salvo, p/ não duplicar numa nova tentativa
+        setSaida((s) => (s ? { ...s, pendentes: s.pendentes.slice(feitos) } : s))
+        return false
+      }
+      aoSalvarCaderno(r.caderno, p)
+      a = { caderno_id: r.caderno.id }; nomeCad = r.caderno.nome; feitos++
+    }
+    if (feitos) toast.success(`${feitos === 1 ? '1 item salvo' : `${feitos} itens salvos`} em ${nomeCad}`)
+    const h = saida?.href
+    setSaida(null)
+    if (h) sairAgora(h)
+    return true
+  }, [saida, rastrear, aoSalvarCaderno, sairAgora])
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return
       const m = e.data; if (!m || typeof m !== 'object') return
-      if (m.type === 'leitor-jus-ready') { enviarDia(); return }
-      // Comentário de um trecho → salvar num caderno do aluno (modal escolhe/cria o caderno).
-      if (m.type === 'leitor-jus-salvar-caderno') {
-        const d = dados.current
-        const p = normalizarComentarioCaderno(m.grifo, { documento_id: d.documentoId, documento_versao: null, titulo_documento: d.titulo || null })
-        if (p) setParaCaderno(p)
+      if (m.type === 'leitor-jus-ready') { enviarDia(); void carregarCad().then(postarDestinos); return }
+      // O iframe reclama os cadernos enquanto o painel "Onde salvar" não foi inicializado (o 'ready' único podia se perder).
+      if (m.type === 'leitor-jus-cad-pedir') {
+        void carregarCad().catch(() => { cad.current.indisponivel = true; cad.current.pronto = true; cadCarregando.current = null }).then(postarDestinos)
         return
       }
+      // Grifo / nota / folha de anotações → caderno: direto (destino padrão + "sem perguntar") ou pelo modal.
+      if (m.type === 'leitor-jus-salvar-caderno') { void rastrear(tratarSalvarCaderno(m.grifo)); return }
+      if (m.type === 'leitor-jus-pendentes') { pendBruto.current = Array.isArray(m.itens) ? m.itens : []; return }
+      if (m.type === 'leitor-jus-destino-set') { void definirDestino(m); return }
+      if (m.type === 'leitor-jus-criar-caderno') { void criarCaderno(m); return }
+      if (m.type === 'leitor-jus-destino-abrir') {
+        if (typeof m.cor === 'string' && /^(rgba?\([\d\s,.%\/]+\)|#[0-9a-fA-F]{3,8})$/.test(m.cor.trim())) setDstCor(m.cor.trim())
+        setDstAberto(true)
+        // revalida em segundo plano (sem esconder a lista atual) se passaram >30 s desde o último carregamento
+        if (cad.current.pronto && Date.now() - cadUltimo.current > 30000) cadCarregando.current = null
+        void carregarCad().catch(() => { if (!cad.current.pronto) { cad.current.indisponivel = true; cad.current.pronto = true }; cadCarregando.current = null }).then(() => { postarDestinos(); bumpCad() })
+        return
+      }
+      if (m.type === 'leitor-jus-ver-cadernos') { irPara(R.cadernos); return }
       // Tema escolhido no leitor (Claro/Noite/Auto) → vale também para o portal e persiste ao voltar/avançar.
       if (m.type === 'leitor-jus-tema') { try { setTemaRef.current(m.tema === 'dark' ? 'dark' : m.tema === 'light' ? 'light' : 'system') } catch { /* ignore */ } return }
       if (m.type === 'leitor-jus-grifos') { const gs = Array.isArray(m.grifos) ? m.grifos : []; if (texto) void reconciliarTexto(gs); else void reconciliar(gs); return }
@@ -433,7 +674,7 @@ export function LeitorBiblioteca({
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [enviarDia, reconciliar, reconciliarTexto, irPara, texto])
+  }, [enviarDia, reconciliar, reconciliarTexto, irPara, texto, carregarCad, postarDestinos, tratarSalvarCaderno, definirDestino, criarCaderno, rastrear, bumpCad])
 
   // quando os metadados do PDF ficam prontos (após o 'ready'), reenvia o dia já com o PDF
   useEffect(() => { if (pdfMeta) enviarDia() }, [pdfMeta, enviarDia])
@@ -453,7 +694,22 @@ export function LeitorBiblioteca({
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
       <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia} allowFullScreen allow="fullscreen"
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
-      <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)} />
+      <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)}
+        cadernoPadraoId={cad.current.destinos.leitura.caderno_id} onSalvo={aoSalvarCaderno} />
+      <DestinoCadernoDialog cor={dstCor} open={dstAberto} onOpenChange={(o) => { setDstAberto(o); if (!o) { try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-foco-dst' }, '*') } catch { /* ignore */ } } }}
+        cadernos={cad.current.cadernos} cadernoId={cad.current.destinos.leitura.caderno_id}
+        automatico={cad.current.destinos.leitura.salvar_sem_perguntar}
+        carregando={!cad.current.pronto} erro={cad.current.indisponivel}
+        onEscolher={(id) => void definirDestino({ contexto: 'leitura', caderno_id: id, salvar_sem_perguntar: id ? cad.current.destinos.leitura.salvar_sem_perguntar : false })}
+        onAutomatico={(v) => void definirDestino({ contexto: 'leitura', caderno_id: cad.current.destinos.leitura.caderno_id, salvar_sem_perguntar: v })}
+        onCriar={(nome) => criarCaderno({ nome })}
+        onRetentar={() => { const c = cad.current; c.pronto = false; c.indisponivel = false; cadCarregando.current = null; bumpCad(); void carregarCad().catch(() => { c.indisponivel = true; c.pronto = true; cadCarregando.current = null }).then(() => { postarDestinos(); bumpCad() }) }}
+        onVer={() => { setDstAberto(false); irPara(R.cadernos) }} />
+      <AvisoSaidaCaderno resumo={saida && saida.resumo.length ? saida.resumo : null} pendentes={saida && saida.pendentes.length ? resumirPendentes(saida.pendentes) : null}
+        cadernos={cad.current.cadernos} cadernoPadraoId={cad.current.destinos.leitura.caderno_id} onSalvarESair={salvarPendentesESair}
+        onFicar={() => setSaida(null)}
+        onSair={() => { const h = saida?.href; setSaida(null); if (h) sairAgora(h) }}
+        onVer={(id) => { setSaida(null); sairAgora(`/aluno/cadernos/${id}`) }} />
       {erroPdf && (
         <div role="alert" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 20, background: 'color-mix(in srgb, var(--bg, #fbfbfc) 88%, transparent)', backdropFilter: 'blur(6px)' }}>
           <div style={{ width: 'min(420px, 100%)', borderRadius: 20, padding: '26px 22px 20px', background: 'var(--card, #fff)', color: 'var(--foreground, #1f1f1f)', boxShadow: '0 24px 60px -18px rgba(0,0,0,.35)', border: '1px solid color-mix(in srgb, currentColor 10%, transparent)', textAlign: 'center' }}>
@@ -482,6 +738,12 @@ export function LeitorBiblioteca({
       ) : null}
     </div>
   )
+}
+
+function resumirPendentes(l: ComentarioParaCaderno[]): PendentesResumo {
+  const r = { grifo: 0, comentario: 0, anotacao: 0, total: l.length }
+  for (const p of l) r[p.tipo === 'anotacao' ? 'anotacao' : p.tipo === 'grifo' ? 'grifo' : 'comentario']++
+  return r
 }
 
 const btnPri: CSSProperties = { height: 44, borderRadius: 12, border: 0, background: 'var(--primary, #6d28d9)', color: 'var(--primary-foreground, #fff)', fontSize: 15, fontWeight: 600, cursor: 'pointer' }

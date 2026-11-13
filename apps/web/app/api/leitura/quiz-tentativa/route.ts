@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 import { onLeituraConcluida, onQuizConcluido } from '@/lib/gamificacao'
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       tentativa_num: tentativaNum, acertos, total, nota, respostas: b.respostas ?? null,
     })
     if (error) return NextResponse.json({ ok: false, message: error.message })
+    void registrarAtividade(sessao, { tipo: 'quiz_tentativa', refTipo: 'leitura_doc', refId: documento_id, meta: { tentativa: tentativaNum, acertos, total } })
     // MODO TESTE (acesso exclusivo): registra a tentativa (p/ o testador ver o resultado), mas NÃO
     // contabiliza nada — sem XP/combo, sem medalhas e sem mexer no ranking.
     const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)

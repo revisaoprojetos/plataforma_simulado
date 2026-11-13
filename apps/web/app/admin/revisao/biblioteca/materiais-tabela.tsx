@@ -10,6 +10,7 @@ import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
+import { CheckSelecao } from '@/components/biblioteca/selecao-lote'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
 import { MenuDoc } from '@/components/biblioteca/menus-drive'
 import type { ColunasLista } from '@/components/biblioteca/metadados-toolbar'
@@ -53,6 +54,8 @@ export interface TabelaProps {
   categoria: 'conteudo' | 'jurisclub'
   colunas: ColunasLista
   sel: Set<string>; onSel: (id: string, v: boolean) => void; onSelPagina: (v: boolean) => void
+  /** Alternar com suporte a shift-click (intervalo). Ausente = comportamento antigo (onSel). */
+  onToggle?: (id: string, shift: boolean) => void
   sort: string; dir: 'asc' | 'desc'; onSort: (k: string) => void
   carregando: boolean
   onMudou: () => void
@@ -136,7 +139,7 @@ export function MateriaisTabela(p: TabelaProps) {
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="w-9 px-3 py-2.5">
-                  <input type="checkbox" aria-label="Selecionar todos desta página" checked={todosMarcados} onChange={(e) => p.onSelPagina(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[var(--primary)]" />
+                  <CheckSelecao marcado={todosMarcados ? true : rows.some((r) => sel.has(r.id)) ? 'mixed' : false} onToggle={() => p.onSelPagina(!todosMarcados)} rotulo="Selecionar todos desta página" />
                 </th>
                 {tipo === 'pdfull' && <Th num>Ordem</Th>}
                 <Th k="titulo">{tipo === 'pdfull' ? 'Aula' : tipo === 'legproc' ? 'Lei ou trecho' : tipo === 'questoes' ? 'Conjunto de questões' : tipo === 'jurisclub' ? 'Edição' : 'Aula'}</Th>
@@ -164,7 +167,7 @@ export function MateriaisTabela(p: TabelaProps) {
                 return (
                   <Fragment key={r.id}>
                     <tr className={cn('border-b last:border-0', sel.has(r.id) && 'bg-primary/5', !vis(r) && 'opacity-60')}>
-                      <td className="px-3 py-2.5"><input type="checkbox" aria-label={`Selecionar ${r.titulo}`} checked={sel.has(r.id)} onChange={(e) => p.onSel(r.id, e.target.checked)} className="h-4 w-4 cursor-pointer accent-[var(--primary)]" /></td>
+                      <td className="px-3 py-2.5"><CheckSelecao marcado={sel.has(r.id)} onToggle={(sh) => (p.onToggle ? p.onToggle(r.id, sh) : p.onSel(r.id, !sel.has(r.id)))} rotulo={`Selecionar ${r.titulo}`} /></td>
                       {tipo === 'pdfull' && <td className="px-3 py-2.5 text-right tabular-nums">{inicio + i + 1}</td>}
                       <td className="px-3 py-2.5">{podeEditar ? <TituloEdit r={r} onMudou={p.onMudou} /> : <span className="font-medium">{r.titulo}</span>}</td>
                       <td className="px-3 py-2.5">

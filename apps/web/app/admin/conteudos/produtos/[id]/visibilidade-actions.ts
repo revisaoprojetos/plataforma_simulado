@@ -10,6 +10,8 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { registrarRegraLog } from '@/lib/produtos/regras-log'
+import { invalidarMapaRegras } from '@/lib/produtos/mapa-regras-cache'
 import { nomesDeRecursos, buscarRecursos } from '@/lib/produtos/estudio'
 import { ContextoAluno, explicarRegra } from '@/lib/segmentos/avaliar'
 import {
@@ -33,6 +35,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 
 function revalidar(produtoId: string) {
+  void invalidarMapaRegras(produtoId) // mapa da aba Regras (cache 20 s)
   revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
 }
 
@@ -210,6 +213,7 @@ export async function salvarRegraVisibilidadeAction(produtoId: string, input: {
   if (error) return { error: faltaTabela(error.message) ? MIGRACAO : error.message }
   if (!data) return { error: 'Regra não encontrada.' }
   await registrarAudit({ operacao: input.id ? 'UPDATE' : 'INSERT', entidade: 'simulado_produto_visibilidade', entidadeId: (data as any).id, depois: { produto_id: produtoId, ...row } })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'visibilidade', acao: input.id ? 'alterada' : 'criada', alvoTipo: alvo, alvoId, alvoRotulo: `${row.efeito} · segmento ${input.segmento_id.slice(0, 8)}`, depois: row, atorId: g.userId })
   revalidar(produtoId)
   const d = data as any
   return { ok: true, regra: { id: d.id, segmento_id: d.segmento_id, alvo_tipo: d.alvo_tipo, alvo_id: d.alvo_id ?? null, efeito: d.efeito, sem_acesso: d.sem_acesso, ativo: d.ativo !== false } }
@@ -222,6 +226,7 @@ export async function alternarRegraVisibilidadeAction(produtoId: string, id: str
     .eq('id', id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_produto_visibilidade', entidadeId: id, depois: { ativo: !!ativo } })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'visibilidade', acao: ativo ? 'ativada' : 'desativada', alvoId: id, alvoRotulo: 'regra de visibilidade', depois: { ativo: !!ativo }, atorId: g.userId })
   revalidar(produtoId)
   return { ok: true }
 }
@@ -232,6 +237,7 @@ export async function excluirRegraVisibilidadeAction(produtoId: string, id: stri
   const { error } = await svc.from('simulado_produto_visibilidade').delete().eq('id', id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
   if (error) return { error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_visibilidade', entidadeId: id })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'visibilidade', acao: 'removida', alvoId: id, alvoRotulo: 'regra de visibilidade', atorId: g.userId })
   revalidar(produtoId)
   return { ok: true }
 }
@@ -324,6 +330,7 @@ export async function aplicarVisibilidadeEmLoteAction(produtoId: string, alvos: 
     operacao: 'UPDATE', entidade: 'simulado_produto_visibilidade', entidadeId: produtoId,
     depois: { lote: true, acao: acao.tipo, ...(acao.tipo === 'aplicar' ? { segmento_id: acao.segmento_id, efeito: acao.efeito, sem_acesso: acao.sem_acesso, substituir: acao.substituir } : {}), modulos: modOk, aulas: aulaOk, criadas, removidas: aRemover.length },
   })
+  await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'visibilidade', acao: acao.tipo === 'limpar' ? 'limpeza em lote' : 'aplicada em lote', alvoRotulo: `${alvosOk.length} conteúdo(s)`, antes: { removidas: aRemover.length }, depois: acao.tipo === 'aplicar' ? { segmento_id: acao.segmento_id, efeito: acao.efeito, sem_acesso: acao.sem_acesso, criadas } : { criadas }, atorId: g.userId })
   revalidar(produtoId)
   return { ok: true, alvos: alvosOk.length, criadas, removidas: aRemover.length }
 }

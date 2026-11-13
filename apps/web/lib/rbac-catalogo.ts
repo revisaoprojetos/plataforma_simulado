@@ -25,6 +25,10 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'relatorios', action: 'view' }, { resource: 'relatorios', action: 'export' },
   { resource: 'gamificacao', action: 'view' }, { resource: 'gamificacao', action: 'manage' },
   { resource: 'auditoria', action: 'view' }, { resource: 'auditoria', action: 'export' },
+  // Registro de acessos do aluno (IP/aparelho/atividade): dado pessoal (LGPD) → só quem investiga. view = ver; export = CSV; manage = encerrar sessões.
+  { resource: 'acessos', action: 'view' }, { resource: 'acessos', action: 'export' }, { resource: 'acessos', action: 'manage' },
+  // Varredura de segurança: view = ver achados/relatórios; manage = executar varredura e resolver/ignorar/aceitar.
+  { resource: 'seguranca', action: 'view' }, { resource: 'seguranca', action: 'manage' },
   { resource: 'configuracoes', action: 'view' }, { resource: 'configuracoes', action: 'manage' },
   { resource: 'api_keys', action: 'manage' },
   { resource: 'rbac', action: 'view' }, { resource: 'rbac', action: 'manage' },
@@ -59,6 +63,8 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   console: 'Console (administração global)',
   armazenamento: 'Armazenamento',
   auditoria: 'Auditoria',
+  seguranca: 'Segurança (varredura)',
+  acessos: 'Acessos de alunos (IP/aparelho)',
   relatorios: 'Relatórios',
   gamificacao: 'Gamificação',
   tenants: 'Plataformas',

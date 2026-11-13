@@ -99,9 +99,15 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Lixeira: purga DEFINITIVAMENTE os itens soft-deletados vencidos (retenção LIXEIRA_PURGE_DIAS, default 30),
   // removendo também o Storage dos documentos. Destrutivo → `?aplicar=1`. A cada 24h (idempotente).
   setInterval(() => { void chamarCron('/api/cron/lixeira-purge?aplicar=1', 'cron lixeira-purge', (j) => !!j.totalPurgados) }, 86_400_000)
+  // Retenção LGPD do registro de acessos do aluno (IP/UA): purga > ACESSOS_RETENCAO_DIAS (180). 24h, idempotente.
+  setInterval(() => { void chamarCron('/api/cron/acessos-purge', 'cron acessos-purge', (j) => !!(j.atividades || j.acessos)) }, 86_400_000)
   // O4 — monitor de egress: alerta se o SQL agregado cair (causa do incidente) ou o Redis sumir. A cada 6h;
   // o worker só destaca no log quando NÃO está saudável (o web loga sempre).
   setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false) }, 21_600_000)
+  // Varredura de segurança (runtime: banco/config/headers/probes/sinais + CVEs OSV). Diária (idempotente, dedupe por fingerprint).
+  setInterval(() => { void chamarCron('/api/cron/seguranca-varredura', 'cron seguranca-varredura', (j) => !!(j.novos || j.notificados)) }, 86_400_000)
+  // Alerta de silêncio do webhook do Guru: a cada 15min; destaca no log só quando há silêncio (o web loga o detalhe).
+  setInterval(() => { void chamarCron('/api/cron/guru-silencio', 'cron guru-silencio', (j) => j && j.ok === false) }, 900_000)
   // Backend-first: rola o snapshot do Painel (metas de hoje) de quem já usou, p/ a 1ª abertura do dia vir
   // pronta. De hora em hora (idempotente, bounded). Ver docs/ARQUITETURA-BACKEND-FIRST.md.
   setInterval(() => { void chamarCron('/api/cron/painel-roll', 'cron painel-roll', (j) => !!j.rolados) }, 3_600_000)
@@ -110,6 +116,8 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/desempenho-roll', 'cron desempenho-roll', (j) => !!j.rolados) }, 3_600_000)
   setInterval(() => { void chamarCron('/api/cron/cursos-roll', 'cron cursos-roll', (j) => !!j.rolados) }, 3_600_000)
   setInterval(() => { void chamarCron('/api/cron/perfil-roll', 'cron perfil-roll', (j) => !!j.rolados) }, 3_600_000)
+  // Cronograma Adaptativo: refresh do agregado diário da aba admin "Análise de uso" (idempotente, bounded). 1h.
+  setInterval(() => { void chamarCron('/api/cron/adaptativo-agg', 'cron adaptativo-agg', (j) => j && j.ok === false) }, 3_600_000)
   console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h; lixeira-purge 24h; egress-monitor 6h; painel/home/desempenho/cursos-roll 1h')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')

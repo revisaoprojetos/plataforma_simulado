@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { lerSessaoImpersonation } from '@/lib/impersonation/session'
 import { alunoBloqueado } from '@/lib/aluno-bloqueio'
+import { tocarAcesso, encerrarAcesso, revogadasEm, tokenRevogado } from '@/lib/acessos/registro'
 
 const COOKIE = 'aluno_session'
 const MAX_AGE = 60 * 60 * 24 * 7 // 7 dias
@@ -19,6 +20,8 @@ export interface AlunoSession {
   tenantId: string
   nome: string
   email?: string
+  /** jti da sessão = id em simulado_aluno_acessos (registro de acessos). Ausente em tokens anteriores ao registro. */
+  acessoId?: string
   /** Preenchido quando um ADMIN está VISUALIZANDO a conta (impersonation). O portal renderiza
    *  normalmente; a proteção read-only é feita globalmente no middleware. Nunca sobrepõe uma
    *  sessão real do aluno. */
@@ -79,7 +82,13 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
       if (payload.estudanteId && payload.tenantId) {
         // CS › Membros: aluno bloqueado perde a sessão já aberta (o cookie dura 7 dias).
         if (await alunoBloqueado(String(payload.estudanteId))) return null
+        // Admin encerrou todas as sessões do aluno: tokens emitidos antes disso deixam de valer.
+        if (tokenRevogado(typeof payload.iat === 'number' ? payload.iat : undefined, await revogadasEm(String(payload.estudanteId)))) return null
+        const acessoId = payload.acessoId ? String(payload.acessoId) : undefined
+        // Heartbeat barato e throttled (≤ 1 escrita / 5 min / sessão), fora do caminho crítico.
+        if (acessoId) tocarAcesso(acessoId, String(payload.tenantId), String(payload.estudanteId))
         return {
+          acessoId,
           estudanteId: String(payload.estudanteId),
           tenantId: String(payload.tenantId),
           nome: String(payload.nome ?? 'Aluno'),
@@ -96,6 +105,14 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
 export async function limparSessaoAluno(): Promise<void> {
   const emProducao = process.env.NODE_ENV === 'production'
   const jar = await cookies()
+  // Registro de acessos: marca a sessão como encerrada (logout). Best-effort.
+  try {
+    const tk = jar.get(COOKIE)?.value
+    if (tk) {
+      const { payload } = await jwtVerify(tk, secret())
+      if (payload.acessoId && payload.tenantId) encerrarAcesso(String(payload.acessoId), String(payload.tenantId), 'logout')
+    }
+  } catch { /* token inválido/sem registro */ }
   // Sobrescreve com os MESMOS atributos (inclusive Partitioned) p/ o navegador remover de fato.
   jar.set(COOKIE, '', {
     httpOnly: true,

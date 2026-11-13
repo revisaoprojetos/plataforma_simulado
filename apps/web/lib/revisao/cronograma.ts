@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { MAX_SEM, REV_OPCOES_NOVAS, REV_PADRAO } from '@/lib/cronograma/adaptativo/motor30'
+import { paginasEfetivasDocs, type PaginasDoc } from '@/lib/conteudo/paginas-efetivas'
 import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import { definicoesDoConteudo } from '@/lib/cronograma/adaptativo/meta-def'
 import { lerOverride } from '@/lib/cronograma/adaptativo/catalogo-override-db'
@@ -101,13 +102,13 @@ async function materiaisApoio(svc: SupabaseClient, tenantId: string): Promise<Ma
     fetchAll<{ id: string; nome: string }>(() => svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId).order('id'), 1000, 'revisao-cron:disciplinas'),
   ])
   const dn = new Map(discs.map((d) => [d.id, d.nome]))
-  const vers = await fetchAllByIn<{ id: string; paginas: number | null }>(docs.map((d) => d.versao_atual_id ?? '').filter(Boolean), (l) => svc.from('simulado_conteudo_versoes').select('id, paginas').in('id', l).order('id'), { chunk: 80, rotulo: 'revisao-cron:versoes' })
-  const pg = new Map(vers.map((v) => [v.id, v.paginas ?? 0]))
+  // páginas EFETIVAS (versão atual − página inicial): função única compartilhada com o Adaptativo e a Meta
+  const pg = await paginasEfetivasDocs(svc, tenantId, docs.map((d) => ({ id: d.id, pasta_id: d.pasta_id, versao_atual_id: d.versao_atual_id }))).catch(() => new Map<string, PaginasDoc>())
   for (const d of docs) {
     const n = numeroAula(d.titulo); const disc = dn.get(discDa.get(d.pasta_id) ?? ''); if (!n || !disc) continue
     const k = `${chaveDisciplina(disc)}|${n}`, t = herdado(d.pasta_id)
     const e = out.get(k) ?? { flashPag: 0, flashTem: false, fightPag: 0, fightTem: false, qDoc: false }
-    const p = d.versao_atual_id ? pg.get(d.versao_atual_id) ?? 0 : 0
+    const p = pg.get(d.id)?.efetivas ?? 0
     if (t === 'pdflash') { e.flashTem = true; e.flashPag = e.flashPag || p } else if (t === 'pdfight') { e.fightTem = true; e.fightPag = e.fightPag || p } else e.qDoc = true
     out.set(k, e)
   }

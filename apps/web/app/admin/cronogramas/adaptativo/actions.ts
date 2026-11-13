@@ -11,6 +11,8 @@ import {
 } from '@/lib/cronograma/adaptativo/liberacao'
 
 import { esquecer } from '@/lib/cache/relatorio-cache'
+import { lerPoliticaDownload, salvarPoliticaDownload } from '@/lib/conteudo/politica-download'
+import { listarDownloads, resumoDownloads, detalheDownloads, type FiltroDownloads, type VisaoDownloads, type LinhaDownloads, type ResumoDownloads, type AlunoNoConteudo, type EventoDownload } from '@/lib/conteudo/download-analise'
 import { lerCfgMetas, lerDiscSemTipo, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { diagnosticarCatalogo, type CatalogoMotor } from '@/lib/cronograma/adaptativo/catalogo-diagnostico'
 import { carregarConteudoBancoBase } from '@/lib/cronograma/adaptativo/conteudo-banco'
@@ -264,4 +266,29 @@ export async function listarDefinicoesMetas(f: FiltroDef): Promise<{ ok: boolean
   const [lista, resumo] = await Promise.all([listarMetaDef(svc, g.tenantId, f), resumoMetaDef(svc, g.tenantId)])
   if (!lista.ok) return { ok: lista.motivo === 'migracao_pendente', error: lista.motivo === 'migracao_pendente' ? undefined : lista.motivo, migrado: lista.motivo !== 'migracao_pendente', itens: [], total: 0, disciplinas: [], resumo: null }
   return { ok: true, migrado: true, itens: lista.itens, total: lista.total, disciplinas: lista.disciplinas, resumo }
+}
+
+
+// ── DOWNLOADS dos alunos: política (chave da plataforma) + dashboard de análise (geral e individual) ──
+export async function obterDashboardDownloads(f: FiltroDownloads): Promise<{ ok: boolean; error?: string; migrado: boolean; alunoPodeBaixar: boolean; itens: LinhaDownloads[]; total: number; resumo: ResumoDownloads }> {
+  const vazio = { migrado: true, alunoPodeBaixar: true, itens: [], total: 0, resumo: { baixados: 0, bloqueados: 0, alunos: 0, conteudos: 0, metas: 0 } }
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.', ...vazio }
+  const svc = createAdminClient()
+  const [pol, lista, resumo] = await Promise.all([lerPoliticaDownload(svc, g.tenantId), listarDownloads(g.tenantId, f), resumoDownloads(g.tenantId, f)])
+  return { ok: true, migrado: lista.migrado && resumo.migrado, alunoPodeBaixar: pol.alunoPodeBaixar, itens: lista.itens, total: lista.total, resumo: resumo.resumo }
+}
+
+export async function detalharDownloads(visao: VisaoDownloads, chave: string, f: Pick<FiltroDownloads, 'dias' | 'origem' | 'resultado'>): Promise<{ ok: boolean; error?: string; alunos: AlunoNoConteudo[]; eventos: EventoDownload[] }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.', alunos: [], eventos: [] }
+  const d = await detalheDownloads(g.tenantId, visao, chave, f)
+  return { ok: true, ...d }
+}
+
+export async function definirPoliticaDownload(alunoPodeBaixar: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const r = await salvarPoliticaDownload(svc, g.tenantId, alunoPodeBaixar === true, g.userId)
+  if (!r.ok) return r
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: g.tenantId, depois: { biblioteca_politica: { aluno_pode_baixar: alunoPodeBaixar } }, tenantId: g.tenantId })
+  return { ok: true }
 }

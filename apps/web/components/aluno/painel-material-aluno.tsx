@@ -36,8 +36,11 @@ export function PainelMaterialAluno({
   thumbUrl,
   aberto,
   onFechar,
+  baixarLiberado = true,
 }: {
   doc: DocAluno | null
+  /** Chave da plataforma: false → sem botão de download (o servidor também barra). */
+  baixarLiberado?: boolean
   caminho: string
   thumbUrl?: string
   aberto: boolean
@@ -160,14 +163,20 @@ export function PainelMaterialAluno({
 
           {/* 3 · Download e link */}
           <TabsContent value="download" className="space-y-3 pt-1">
-            <a
-              href={`/api/conteudo/baixar?doc=${encodeURIComponent(doc.id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
-            >
-              <Download className="h-4 w-4" />Baixar material
-            </a>
+            {baixarLiberado ? (
+              <a
+                href={`/api/conteudo/baixar?doc=${encodeURIComponent(doc.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
+              >
+                <Download className="h-4 w-4" />Baixar material
+              </a>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground">
+                O download deste material está desativado. Leia direto na plataforma.
+              </div>
+            )}
             <div className="rounded-xl border bg-muted/30 p-3">
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <Link2 className="h-3.5 w-3.5" />Link do material
@@ -207,7 +216,7 @@ export function PainelMaterialAluno({
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que você pode fazer</div>
               <PermissaoQuadros
                 kind={kind}
-                valor={{ ler: temVisualizador, baixar: true, grifar: temVisualizador }}
+                valor={{ ler: temVisualizador, baixar: baixarLiberado, grifar: temVisualizador }}
                 somenteLeitura
               />
             </div>

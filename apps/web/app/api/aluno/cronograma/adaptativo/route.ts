@@ -9,6 +9,7 @@ import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
 import { catalogoIdDoTenant } from '@/lib/cronograma/adaptativo/catalogo-override-db'
 import { lerFiltros } from '@/lib/cronograma/adaptativo/qf-db'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { registrarGeracao, type AcaoGeracao } from '@/lib/cronograma/adaptativo/log-geracao'
 import type { Cfg, DataISO } from '@/lib/cronograma/adaptativo/engine'
 import { CATALOGO_HTML, GRUPOS_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
 
@@ -153,6 +154,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: false, message: 'Ação desconhecida.' }, { status: 400 })
   } catch (e) {
+    // Falha com motivo no log de gerações (best-effort, em after). 'gerar' já é registrado dentro de gerarAdaptativo.
+    const ACOES: Record<string, AcaoGeracao> = { fixar: 'fixar', arquivar: 'arquivar', apagar: 'apagar', pausar: 'pausar', sync: 'sync' }
+    if (ACOES[acao]) registrarGeracao(svc, { tenantId, estudanteId, acao: ACOES[acao], origem: acao === 'sync' ? 'iframe' : 'aluno', planoId: typeof body.planoId === 'string' ? body.planoId : null, ok: false, erro: (e as Error)?.message || 'Erro inesperado.' })
     return NextResponse.json({ ok: false, message: (e as Error)?.message || 'Erro inesperado.' }, { status: 500 })
   }
 }

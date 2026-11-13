@@ -8,7 +8,7 @@ import { resolverCardView } from '@/lib/card-view'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash, Repeat, BookOpen, KeyRound } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash, Repeat, BookOpen, KeyRound, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type SessaoRow } from '@/components/admin/historico-estudante'
 import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
@@ -30,6 +30,7 @@ import { acessoEfetivoDoEstudante } from '@/lib/acesso/aluno-efetivo'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions-tipos'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
+import { checkPermission } from '@/lib/auth/permissions'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
@@ -330,6 +331,9 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
     }
   }
 
+  // Aba "Acessos e atividade" (registro de IP/aparelho): dado pessoal → só com acessos:view. Navega p/ página própria (paginação na URL).
+  const podeAcessos = await checkPermission('acessos:view').catch(() => false)
+
   const iniciais = (est.nome ?? '?').split(' ').filter(Boolean).slice(0, 2).map((n: string) => n[0]?.toUpperCase()).join('')
   const notaTone = (n: number) => n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 
@@ -478,6 +482,13 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
             count: acessoAtivos,
             panel: <EstudanteAcesso itens={acessoItens} />,
           },
+          ...(podeAcessos ? [{
+            key: 'acessos',
+            label: 'Acessos e atividade',
+            icon: <ShieldCheck className="h-4 w-4" />,
+            href: `/admin/estudantes/${id}/acessos`,
+            panel: null,
+          }] : []),
         ]}
       />
     </div>

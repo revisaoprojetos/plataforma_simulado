@@ -4,7 +4,8 @@ import { materialDoItem, MATERIAIS, type Disponibilidade, type TipoRef, type Mat
 import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 import { regrasSegmentoDoAluno } from '@/lib/segmentos/regras-produto'
-import { liberacaoAulasDoAluno, ehSentinelaMeta, MSG_AGUARDA_META } from './liberacao-aulas-aluno'
+import { liberacaoAulasDoAluno, ehSentinelaMeta, ehSentinelaBloqueio, MSG_AGUARDA_META, MSG_BLOQUEADO_ADMIN } from './liberacao-aulas-aluno'
+import { ContextoAluno } from '@/lib/segmentos/avaliar'
 import { resumoCronogramaDoAluno, type ResumoCronograma } from './resumo-cronograma'
 
 /**
@@ -153,7 +154,7 @@ function formatarLeitura(l: LeituraAluno | null): LeituraFmt | null {
   return f.onde || f.ultimo || f.concluida ? f : null
 }
 
-function normDisp(v: any): Disponibilidade {
+export function normDisp(v: any): Disponibilidade {
   const d = v && typeof v === 'object' ? v : {}
   return {
     tipo: d.tipo ?? 'na_matricula', data: d.data ?? null, dias: d.dias ?? null,
@@ -234,9 +235,10 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   ])
   const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
   // Liberação e capa POR SEGMENTO (migração 20261115010000): o aluno do segmento recebe a disponibilidade/capa própria do módulo/aula.
-  const porSegBase = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId).catch(() => null)
+  const ctxAluno = new ContextoAluno(svc, tenantId, estudanteId) // compartilhado: segmentos das regras, das trilhas e grupos das exceções
+  const porSegBase = await regrasSegmentoDoAluno(svc, tenantId, estudanteId, produtoId, ctxAluno).catch(() => null)
   // Disponibilidade tipo 'cronograma' (planilha + cronograma fixado): null = nenhuma regra → nada muda.
-  const libAulas = await liberacaoAulasDoAluno(svc, tenantId, estudanteId, produtoId, { porSeg: porSegBase, modulos: mrows, itens: irows }).catch(() => null)
+  const libAulas = await liberacaoAulasDoAluno(svc, tenantId, estudanteId, produtoId, { porSeg: porSegBase, modulos: mrows, itens: irows, ctxAluno }).catch(() => null)
   const porSeg = libAulas && porSegBase ? { ...porSegBase, disp: libAulas.disp } : libAulas ? { capa: () => null, disp: libAulas.disp } : porSegBase
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
@@ -304,7 +306,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     const libM = maisTarde(herdado, momentoLiberacao(dm, matricula))
     const modLiberado = !libM || +libM <= agora
     const rotuloM = !modLiberado ? libAulas?.rotulo(m.id, m.disponibilidade) ?? null : null // família da aula: mesmo rótulo p/ módulo e itens
-    const msgM = !modLiberado && ehSentinelaMeta(libM) ? MSG_AGUARDA_META : null
+    const msgM = !modLiberado ? (ehSentinelaMeta(libM) ? MSG_AGUARDA_META : ehSentinelaBloqueio(libM) ? MSG_BLOQUEADO_ADMIN : null) : null
     if (!modLiberado && dm.antes === 'oculto') return null
     const aulas: AulaAluno[] = []
     // FAMÍLIA DA AULA: os materiais da mesma aula (PDFull, PDFlash, LegProc…) seguem a MESMA liberação. Item sem data
@@ -320,7 +322,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       const libProprio = momentoLiberacao(di, matricula)
       const lib = maisTarde(libM, libProprio ?? libFamilia)
       const noPrazo = !lib || +lib <= agora
-      const msgA = !noPrazo && ehSentinelaMeta(lib) ? MSG_AGUARDA_META : null
+      const msgA = !noPrazo ? (ehSentinelaMeta(lib) ? MSG_AGUARDA_META : ehSentinelaBloqueio(lib) ? MSG_BLOQUEADO_ADMIN : null) : null
       if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
       const indisponivel = tipo === 'documento_biblioteca' && !!i.ref_id && emPreparo.has(i.ref_id)

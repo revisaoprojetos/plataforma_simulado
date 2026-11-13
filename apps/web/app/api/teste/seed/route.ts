@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { guardaTeste } from "@/lib/seguranca/guarda-teste"
 import { randomUUID } from 'node:crypto'
 import { salvarDoc } from '@/lib/teste/store'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -27,6 +28,7 @@ async function htmlParaDocx(html: string): Promise<Buffer> {
 async function guardar(buf: Buffer): Promise<string> { const id = randomUUID(); await salvarDoc(id, buf); return id }
 
 export async function POST() {
+  { const b = await guardaTeste(); if (b) return b }
   const res: Record<string, string | null> = { diagnostico: null, folha: null, leitura: null }
   const erros: Record<string, string> = {}
 

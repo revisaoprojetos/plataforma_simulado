@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentTenant } from '@/lib/tenant'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 import { paletaBlocosDoTema } from '@/lib/conteudo/blocos-palette'
 
 // Paleta dos blocos (cores da MARCA do tenant) resolvida NO SERVIDOR pelo host → o plugin OnlyOffice
@@ -7,7 +8,8 @@ import { paletaBlocosDoTema } from '@/lib/conteudo/blocos-palette'
 // localStorage. `debug` mostra de onde veio a cor (ajuda quando a marca está em chave inesperada).
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   const tenant = await getCurrentTenant()
   const tema: any = tenant?.tema ?? null
   const palette = paletaBlocosDoTema(tema)

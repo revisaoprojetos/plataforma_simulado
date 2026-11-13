@@ -141,7 +141,7 @@ export async function definirArquivoVersao(versaoId: string, arquivoKey: string,
 }
 
 /** Define a versão atual do documento (publicar). Imutável: isso não altera versões, só o ponteiro. */
-export async function definirVersaoAtual(documentoId: string, versaoId: string): Promise<{ ok: boolean; erro?: string }> {
+export async function definirVersaoAtual(documentoId: string, versaoId: string, opts?: { bytes?: Uint8Array }): Promise<{ ok: boolean; erro?: string }> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, erro: 'tenant não resolvido' }
   const svc = createAdminClient()
@@ -150,8 +150,9 @@ export async function definirVersaoAtual(documentoId: string, versaoId: string):
     .eq('tenant_id', tenantId).eq('id', documentoId)
   if (error) return { ok: false, erro: error.message }
   await emitirEvento(svc, tenantId, 'documento.atualizado', { documento_id: documentoId, versao_id: versaoId })
-  // Mede páginas do PDF (automático, fire-and-forget) p/ o Cronograma Adaptativo — import
-  // dinâmico evita ciclo de módulos. Falha silenciosa; o cron de backfill cobre o resto.
-  void import('@/lib/cronograma/adaptativo/paginas-pdf').then((m) => m.medirPaginasDocumento(svc, tenantId, documentoId)).catch(() => {})
+  // Conta as páginas da versão atual (PDF: dos bytes em memória quando o chamador os passa; DOCX: via PDF convertido) e
+  // invalida os caches do cronograma. Fire-and-forget (import dinâmico evita ciclo); o evento já foi emitido acima
+  // (emitir:false). Falha silenciosa; o outbox ('documento.atualizado') e o cron de backfill cobrem o resto.
+  void import('@/lib/conteudo/paginas-sync').then((m) => m.sincronizarPaginasDocumento(svc, tenantId, documentoId, { bytes: opts?.bytes, invalidar: true })).catch(() => {})
   return { ok: true }
 }

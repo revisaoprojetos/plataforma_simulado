@@ -1,31 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import {
+  MSG_MIGRACAO, tabelaAusente, uuid, normalizarItem, resolverCaderno, desfazerCadernoNovo, gravarItens, cadernoComTotal,
+  type ItemNormalizado,
+} from '@/lib/aluno/caderno-itens-server'
 
-// Itens de caderno que não são questão (hoje: comentário do aluno sobre um trecho do material).
-// POST   — adiciona item a um caderno existente { caderno_id, ...item }
-//          OU cria o caderno e vincula o item na MESMA chamada { novo_caderno: { nome }, ...item }.
+// Itens de caderno que não são questão: tipo 'grifo' | 'anotacao' | 'comentario' (trecho do material).
+// POST   — adiciona item(ns) a um caderno existente { caderno_id, ...item } OU { caderno_id, itens: [...] } (lote, máx. 100)
+//          OU cria o caderno e vincula na MESMA chamada { novo_caderno: { nome }, ...item }.
+//          Idempotente: dedupe por grifo_ref no caderno (sem ref, chave determinística pelo trecho/posição).
+// GET    — ?documento_id= → o que deste material já está salvo (para marcar no leitor).
 // DELETE — remove item (?caderno_id=&item_id=).
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
 export const dynamic = 'force-dynamic'
 
-const MSG_MIGRACAO = 'Recurso indisponível: falta aplicar a migração 20261105000000_aluno_caderno_itens_comentario.sql no banco.'
-
-/** Tabela ainda não criada (migração pendente) / schema cache desatualizado. */
-function tabelaAusente(err: any): boolean {
-  const code = String(err?.code ?? '')
-  const msg = String(err?.message ?? '')
-  return code === '42P01' || code === 'PGRST205' || code === 'PGRST204' || /schema cache|does not exist|Could not find the table/i.test(msg)
-}
-
-const txt = (v: unknown, max: number): string | null => {
-  if (typeof v !== 'string') return null
-  const s = v.trim()
-  return s ? s.slice(0, max) : null
-}
-const int = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.trunc(v) : null)
-const uuid = (v: unknown): string | null =>
-  typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null
+const MAX_LOTE = 100
 
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
@@ -35,105 +25,52 @@ export async function POST(request: NextRequest) {
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   if (!body || typeof body !== 'object') return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 })
 
-  // Validação do item (tamanhos limitados).
-  const comentario = txt(body.comentario, 5000)
-  const trecho = txt(body.trecho, 2000)
-  if (!comentario) return NextResponse.json({ message: 'Escreva um comentário antes de salvar.' }, { status: 400 })
-  const nomeNovo = body.novo_caderno ? txt(body.novo_caderno?.nome, 120) : null
-  if (body.novo_caderno && !nomeNovo) return NextResponse.json({ message: 'Informe um nome para o novo caderno.' }, { status: 400 })
-  if (!body.novo_caderno && !uuid(body.caderno_id)) return NextResponse.json({ message: 'Escolha um caderno.' }, { status: 400 })
-
-  const item = {
-    tipo: 'comentario' as const,
-    documento_id: uuid(body.documento_id),
-    documento_versao: int(body.documento_versao),
-    titulo_documento: txt(body.titulo_documento, 300),
-    trecho,
-    prefix: txt(body.prefix, 300),
-    suffix: txt(body.suffix, 300),
-    inicio: int(body.inicio),
-    fim: int(body.fim),
-    comentario,
-    cor: txt(body.cor, 20),
-    grifo_ref: txt(body.grifo_ref, 80),
+  // Um item (campos na raiz, compatível com o formato antigo) ou um lote em `itens`.
+  const brutos: any[] = Array.isArray(body.itens) ? body.itens.slice(0, MAX_LOTE) : [body]
+  if (!brutos.length) return NextResponse.json({ message: 'Nada para salvar.' }, { status: 400 })
+  const itens: ItemNormalizado[] = []
+  for (const b of brutos) {
+    const r = normalizarItem(b)
+    if ('erro' in r) return NextResponse.json({ message: r.erro }, { status: 400 })
+    itens.push(r.item)
   }
 
   const svc = createAdminClient()
-  let caderno: { id: string; nome: string }
-  let criadoAgora = false
+  const rc = await resolverCaderno(svc, sessao, body)
+  if ('status' in rc) return NextResponse.json({ message: rc.message }, { status: rc.status })
+  const { caderno, criadoAgora } = rc
 
-  if (nomeNovo) {
-    const { data, error } = await svc
-      .from('simulado_aluno_cadernos')
-      .insert({ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, nome: nomeNovo })
-      .select('id, nome')
-      .single()
-    if (error || !data) return NextResponse.json({ message: 'Não consegui criar o caderno.' }, { status: 500 })
-    caderno = data
-    criadoAgora = true
-  } else {
-    const { data } = await svc
-      .from('simulado_aluno_cadernos')
-      .select('id, nome')
-      .eq('id', body.caderno_id)
-      .eq('tenant_id', sessao.tenantId)
-      .eq('estudante_id', sessao.estudanteId)
-      .maybeSingle()
-    if (!data) return NextResponse.json({ message: 'Caderno não encontrado.' }, { status: 403 })
-    caderno = data
+  const res = await gravarItens(svc, sessao, caderno, itens)
+  if (!res.ok) {
+    // Falhou num caderno recém-criado → desfaz o caderno (sem caderno vazio sobrando).
+    if (criadoAgora) await desfazerCadernoNovo(svc, sessao, caderno)
+    return NextResponse.json({ message: res.message }, { status: res.status })
   }
-
-  // Se o item falhar num caderno recém-criado, desfaz o caderno (sem caderno vazio sobrando).
-  const falhar = async (status: number, message: string) => {
-    if (criadoAgora) {
-      await svc.from('simulado_aluno_cadernos').delete().eq('id', caderno.id).eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
-    }
-    return NextResponse.json({ message }, { status })
-  }
-
-  const base = { tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, caderno_id: caderno.id }
-
-  // Dedupe por grifo_ref no mesmo caderno: já existe → atualiza o comentário em vez de duplicar.
-  if (item.grifo_ref && !criadoAgora) {
-    const { data: ex, error: exErr } = await svc
-      .from('simulado_aluno_caderno_itens')
-      .select('id')
-      .eq('tenant_id', sessao.tenantId)
-      .eq('caderno_id', caderno.id)
-      .eq('grifo_ref', item.grifo_ref)
-      .maybeSingle()
-    if (exErr) return falhar(tabelaAusente(exErr) ? 503 : 500, tabelaAusente(exErr) ? MSG_MIGRACAO : 'Não consegui salvar agora.')
-    if (ex) {
-      const { data: upd, error: upErr } = await svc
-        .from('simulado_aluno_caderno_itens')
-        .update({ comentario: item.comentario, cor: item.cor, trecho: item.trecho })
-        .eq('id', ex.id).eq('tenant_id', sessao.tenantId)
-        .select('*').single()
-      if (upErr) return NextResponse.json({ message: 'Não consegui salvar agora.' }, { status: 500 })
-      return NextResponse.json({ ok: true, atualizado: true, caderno: await comTotal(svc, caderno, sessao.tenantId), item: upd })
-    }
-  }
-
-  const { data: novo, error } = await svc.from('simulado_aluno_caderno_itens').insert({ ...base, ...item }).select('*').single()
-  if (error || !novo) {
-    if (error && String((error as any).code) === '23505') {
-      // corrida: outro request inseriu o mesmo grifo_ref → trata como sucesso idempotente
-      return NextResponse.json({ ok: true, atualizado: true, caderno: await comTotal(svc, caderno, sessao.tenantId), item: null })
-    }
-    if (error && tabelaAusente(error)) return falhar(503, MSG_MIGRACAO)
-    return falhar(500, 'Não consegui salvar agora.')
-  }
-
-  return NextResponse.json({ ok: true, caderno: await comTotal(svc, caderno, sessao.tenantId), item: novo })
+  return NextResponse.json({
+    ok: true,
+    atualizado: res.criados === 0 && res.atualizados > 0,
+    criados: res.criados,
+    atualizados: res.atualizados,
+    caderno: await cadernoComTotal(svc, caderno, sessao.tenantId),
+    item: res.itens[0] ?? null,
+  })
 }
 
-/** total = questões + itens do caderno (2 COUNT head, sem trazer linhas). */
-async function comTotal(svc: any, c: { id: string; nome: string }, tenantId: string) {
-  const [q, i] = await Promise.all([
-    svc.from('simulado_aluno_caderno_questoes').select('questao_id', { count: 'exact', head: true }).eq('caderno_id', c.id),
-    svc.from('simulado_aluno_caderno_itens').select('id', { count: 'exact', head: true }).eq('caderno_id', c.id).eq('tenant_id', tenantId),
-  ])
-  return { id: c.id, nome: c.nome, total: (q.count ?? 0) + (i.count ?? 0) }
+export async function GET(request: NextRequest) {
+  const sessao = await getSessaoAluno()
+  if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
+  const documentoId = uuid(new URL(request.url).searchParams.get('documento_id'))
+  if (!documentoId) return NextResponse.json({ message: 'Informe o documento.' }, { status: 400 })
+
+  const svc = createAdminClient()
+  const { data, error } = await svc
+    .from('simulado_aluno_caderno_itens')
+    .select('id, caderno_id, tipo, grifo_ref, pagina')
+    .eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('documento_id', documentoId)
+    .limit(2000)
+  // Migração pendente: o leitor segue sem os indicadores de "já salvo".
+  if (error) return NextResponse.json({ itens: [], indisponivel: tabelaAusente(error) })
+  return NextResponse.json({ itens: data ?? [] })
 }
 
 export async function DELETE(request: NextRequest) {

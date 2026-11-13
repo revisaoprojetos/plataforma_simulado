@@ -1,0 +1,47 @@
+name: seguranca
+
+# Varredura de segurança de CÓDIGO e DEPENDÊNCIAS.
+# - Semanal (segunda 09:00 UTC): roda e ENVIA o resultado ao painel (/api/seguranca/ingest).
+# - Em PR: roda em modo --dry (somente relatório no log; sem segredos, sem envio).
+# Secrets necessários para o envio semanal: SEGURANCA_URL (ex.: https://app.exemplo.com.br) e CRON_SECRET.
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  varredura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Código e dependências (PR = dry)
+        if: github.event_name == 'pull_request'
+        working-directory: apps/web
+        run: |
+          node scripts/seguranca-codigo.mjs --dry
+          node scripts/seguranca-deps.mjs --dry
+
+      - name: Código e dependências (envia ao painel)
+        if: github.event_name != 'pull_request'
+        working-directory: apps/web
+        env:
+          SEGURANCA_URL: ${{ secrets.SEGURANCA_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          node scripts/seguranca-codigo.mjs
+          node scripts/seguranca-deps.mjs

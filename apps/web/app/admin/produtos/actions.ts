@@ -1,4 +1,6 @@
 'use server'
+import { registrarRegraLog } from '@/lib/produtos/regras-log'
+import { invalidarMapaRegras } from '@/lib/produtos/mapa-regras-cache'
 import type { EstadoProduto } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
@@ -17,7 +19,7 @@ async function guard(manage = false) {
     || access.permissions.includes('produtos:manage')
   if (!ok) return { error: 'Sem permissão.' as const }
   if (!access.tenantId) return { error: 'Tenant não resolvido — recarregue a página.' as const }
-  return { tenantId: access.tenantId }
+  return { tenantId: access.tenantId, userId: access.userId ?? null }
 }
 
 // ───────── leitura ─────────
@@ -134,9 +136,14 @@ export async function salvarVitrineAction(produtoId: string, secoes: SecaoIn[]) 
 export async function salvarGruposAction(produtoId: string, grupoIds: string[]) {
   const g = await guard(true); if ('error' in g) return { error: g.error }
   const svc = createAdminClient()
+  const antes = await svc.from('simulado_produto_itens').select('item_id').eq('produto_id', produtoId).eq('tenant_id', g.tenantId).eq('tipo_item', 'grupo').then((r: any) => (r.data ?? []).map((x: any) => x.item_id as string), () => [] as string[])
   await svc.from('simulado_produto_itens').delete().eq('produto_id', produtoId).eq('tenant_id', g.tenantId).eq('tipo_item', 'grupo')
   const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
   if (ids.length) { const { error } = await svc.from('simulado_produto_itens').insert(ids.map((item_id) => ({ tenant_id: g.tenantId, produto_id: produtoId, tipo_item: 'grupo', item_id, ativo: true }))); if (error) return { error: error.message } }
+  // Log unificado das regras do produto (aba Regras › Histórico) — best-effort.
+  const add = ids.filter((x) => !antes.includes(x)), rem = antes.filter((x: string) => !ids.includes(x))
+  void invalidarMapaRegras(produtoId, g.tenantId)
+  if (add.length || rem.length) await registrarRegraLog({ tenantId: g.tenantId, produtoId, camada: 'grupos', acao: add.length && rem.length ? 'vínculos alterados' : add.length ? 'grupo vinculado' : 'grupo desvinculado', alvoTipo: 'grupo', alvoRotulo: `+${add.length} / -${rem.length} grupo(s)`, antes: { grupos: antes }, depois: { grupos: ids }, atorId: g.userId })
   revalidatePath('/admin/produtos'); return { ok: true as const }
 }
 

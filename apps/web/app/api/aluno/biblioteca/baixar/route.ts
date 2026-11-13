@@ -1,3 +1,4 @@
+import { registrarDownload } from '@/lib/conteudo/politica-download'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -99,17 +100,21 @@ async function baixar(request: NextRequest): Promise<Response> {
   const produto = sp.get('produto')
   const produtoId = produto && UUID.test(produto) ? produto : null
 
+  const metaParam = sp.get('meta')
+  const metaId = metaParam && /^[\w:.\-]{1,120}$/.test(metaParam) ? metaParam : null
   const svc = createAdminClient()
   const lib = await liberacaoDoc(svc, sessao.tenantId, sessao.estudanteId, doc)
   if (lib.bloqueado) {
+    await registrarDownload(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: doc, origem: 'cronograma', metaId, produtoId, resultado: 'bloqueado', motivo: 'nao_liberado' })
     const quando = lib.liberaEm ? ` Ele será liberado em ${lib.liberaEm.split('-').reverse().join('/')}.` : ''
     return json(403, `Este material ainda não foi liberado no seu cronograma.${quando}`)
   }
-  const prep = await prepararDownloadAluno(doc, sessao.estudanteId, { produtoId })
+  const prep = await prepararDownloadAluno(doc, sessao.estudanteId, { produtoId, origem: 'cronograma', metaId })
   if (!prep.ok) {
     if (prep.erro === 'tipo') return json(409, 'Este material não pode ser baixado (só PDF e documentos de texto). Abra-o no leitor.')
     if (prep.erro === 'inexistente') return json(404, 'Este material não está mais disponível.')
     if (prep.erro === 'indisponivel') return json(503, 'O arquivo deste material não está disponível agora. Tente novamente em instantes.')
+    if (prep.erro === 'politica' || prep.erro === 'documento') return json(403, 'O download deste material está desativado. Abra-o no leitor da plataforma.')
     return json(403, 'Você não tem permissão para baixar este material.')
   }
 

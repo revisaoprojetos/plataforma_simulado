@@ -8,12 +8,13 @@ import { GitBranch, Eye, GitCompare, RotateCcw, CheckCircle2 } from 'lucide-reac
 import type { GestaoBase, VersaoHistorico, EventoEntrega } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import type { GestaoTipo } from '@/lib/biblioteca/gestao-tipos'
 import { EmConstrucao, Vazio, fmtDataHora } from './ui'
+import { AtualizacoesDocumento } from './atualizacoes-documento'
 
-type Sub = 'versoes' | 'acessos' | 'entregas'
+type Sub = 'versoes' | 'atualizacoes' | 'acessos' | 'entregas'
 
 export function AbaHistorico({ base, versoes, entregas, tipo }: { base: GestaoBase; versoes: VersaoHistorico[]; entregas: EventoEntrega[]; tipo: GestaoTipo }) {
   const [sub, setSub] = useState<Sub>('versoes')
-  const TABS: [Sub, string][] = [['versoes', `Versões do arquivo (${versoes.length})`], ['acessos', 'Acessos dos alunos'], ['entregas', `Entregas e permissões (${entregas.length})`]]
+  const TABS: [Sub, string][] = [['versoes', `Versões do arquivo (${versoes.length})`], ['atualizacoes', 'Atualizações'], ['acessos', 'Acessos dos alunos'], ['entregas', `Entregas e permissões (${entregas.length})`]]
 
   return (
     <div className="space-y-4">
@@ -46,6 +47,8 @@ export function AbaHistorico({ base, versoes, entregas, tipo }: { base: GestaoBa
           </div>
         )
       )}
+
+      {sub === 'atualizacoes' && <AtualizacoesDocumento documentoId={base.id} versaoId={versoes.find((v) => v.atual)?.id ?? null} />}
 
       {sub === 'acessos' && (
         <EmConstrucao titulo="Registro completo de acessos em construção">

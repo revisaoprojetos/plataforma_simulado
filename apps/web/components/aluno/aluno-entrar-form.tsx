@@ -125,7 +125,7 @@ export function AlunoEntrarForm({
     try {
       const res = await fetch('/api/aluno/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, cpf, telefone }),
+        body: JSON.stringify({ email, cpf, telefone, embed: typeof window !== 'undefined' && window.self !== window.top }),
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))

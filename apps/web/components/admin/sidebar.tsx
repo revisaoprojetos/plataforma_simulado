@@ -36,6 +36,7 @@ import {
   ServerCog,
   UserCog,
   ShieldCheck,
+  ShieldAlert,
   Megaphone,
   LogOut,
   Building2,
@@ -214,6 +215,8 @@ const navGroups: NavGroup[] = [
       { label: 'Modificações', href: '/admin/auditoria?tipo=modificacoes', icon: FilePen, perm: 'auditoria:view' },
       { label: 'Automações', href: '/admin/auditoria?tipo=automacoes', icon: Zap, perm: 'auditoria:view' },
       { label: 'Visualizações', href: '/admin/auditoria?tipo=visualizacoes', icon: Eye, perm: 'auditoria:view' },
+      { label: 'Acessos de alunos', href: '/admin/acessos', icon: ShieldCheck, perm: 'acessos:view' },
+      { label: 'Segurança', href: '/admin/seguranca', icon: ShieldAlert, perm: 'seguranca:view', matchPrefix: '/admin/seguranca' },
     ],
   },
   {

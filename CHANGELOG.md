@@ -12,6 +12,38 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## [Não lançado] — Registro de acessos do aluno (nota, sem bump de versão)
+
+- Novo **registro de acessos** (IP, aparelho, navegador, SO, método, origem, último visto) e **atividades** (leitura, grifos, quiz, simulados, jogo) por aluno — migração `20261118010000_aluno_registro_acessos.sql` (aplicar manualmente). Só coleta a partir do deploy+migração.
+- Telas: `Admin > Auditoria > Acessos de alunos` (`/admin/acessos`) e ficha do aluno > aba **Acessos e atividade** (`/admin/estudantes/[id]/acessos`), com alertas, exportação CSV e "Encerrar todas as sessões".
+- **LGPD:** IP e user-agent são dado pessoal. Acesso restrito a admins com as permissões novas `acessos:view` (ver), `acessos:export` (CSV) e `acessos:manage` (encerrar sessões) — admins de acesso total já as têm; demais perfis precisam receber na matriz de RBAC. Nunca exibido ao aluno. Retenção de 180 dias (`ACESSOS_RETENCAO_DIAS`), purga diária via `/api/cron/acessos-purge` (worker).
+
+---
+
+## 4.19.0 — 2026-11-13
+
+### Liberação de aulas do extensivo (Cronograma › Gerador › Liberação de aulas)
+- Nova área com abas **Aulas | Cronogramas | Regras | Alunos | Exceções | Log**: importação da planilha "primeira aparição" (268 aulas × 6 cronogramas), data por aula, data manual por cronograma, recálculo da data-base.
+- **Regras por condição (segmentos)**: cada cronograma escolhe os segmentos que o ativam; **Passaporte Vitalício** casa em todos e usa a **menor data**; contagem de alunos por cronograma.
+- **Exceções por aluno/grupo** (liberar ou bloquear aula/módulo) + log de alterações. Motor do aluno: exceção > plano fixado > menor data entre cronogramas > planilha.
+- Regra "Pelo cronograma do aluno" em Segmentos › Liberação; rótulo do cadeado mostra a data/semana; PDFlash e demais materiais da aula seguem a mesma liberação.
+- ⚠️ Migrações `20261117010000_produto_liberacao_aulas` e `20261118020000_liberacao_trilhas_excecoes`.
+
+### Cadernos do aluno (leitor)
+- **Salvar nos cadernos**: botão no painel "Meus grifos" abre um seletor (busca, lista com rolagem, criar caderno na hora, trocar a qualquer momento) no padrão dos outros modais.
+- **Modo automático**: grifos, notas e anotações (folha) vão direto ao caderno escolhido.
+- **Aviso ao sair** (Voltar/Concluir) com o que ficou sem salvar, escolha do caderno e "Salvar e sair".
+- ⚠️ Migrações `20261119040000_caderno_destinos_itens` e `20261119060000_caderno_itens_alinhar_colunas` (a tabela de itens estava em formato antigo).
+
+### Correções
+- **Cronograma adaptativo**: tela de "primeiro acesso" não pisca mais antes de carregar o plano fixado.
+- **Voltar do leitor/questões** retorna ao cronograma em estudo (não à lista de cronogramas).
+- **Leitor**: barra de ferramentas (barra colorida cortava o ícone); selo de versão no topo só aparece com o **rótulo criado pelo admin** (some o "v3" automático).
+- **Guru**: busca, filtros e paginação nos eventos; coluna "Cód. produto" em Eventos e Recebidos.
+- **Capas**: capa do professor nos submódulos e segmento "Capa Black" em módulos/submódulos.
+
+---
+
 ## 4.18.0 — 2026-11-12
 
 ### Área de Cursos — posição dos extensivos

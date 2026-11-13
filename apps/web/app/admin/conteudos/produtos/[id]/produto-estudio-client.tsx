@@ -5,7 +5,7 @@
 // e abas sublinhadas (Informações · Conteúdos · Vitrine · Grupos de acesso · Visibilidade).
 // Reusa as actions de produção (salvarProdutoAction/salvarGruposAction/...) e as tabelas novas do currículo.
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Boxes, Copy, FolderInput, Trash2, MoreVertical, Eye, Check, ChevronDown, Wrench, Loader2, Save, Globe,
@@ -30,9 +30,11 @@ import { AbaGrupos } from './aba-grupos'
 import { AbaVitrine } from './aba-vitrine'
 import { AbaPaginaEntrada } from './aba-pagina-entrada'
 import { AbaVisibilidade } from './aba-visibilidade'
+import { AbaRegras } from './aba-regras'
+import { AbaAtualizacoes } from './aba-atualizacoes'
 import { listarPastasProdutoAction } from './lazy-actions'
 
-type Aba = 'informacoes' | 'conteudos' | 'vitrine' | 'grupos' | 'visibilidade'
+type Aba = 'informacoes' | 'conteudos' | 'vitrine' | 'grupos' | 'visibilidade' | 'regras' | 'atualizacoes'
 
 /** Payload COMPLETO do produto (salvarProdutoAction é replace total — tudo que não for enviado volta ao default). */
 function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<Produto> & { id: string } {
@@ -44,7 +46,7 @@ function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<P
   }
 }
 
-const ABAS: Aba[] = ['informacoes', 'conteudos', 'vitrine', 'grupos', 'visibilidade']
+const ABAS: Aba[] = ['informacoes', 'conteudos', 'vitrine', 'grupos', 'visibilidade', 'regras', 'atualizacoes']
 
 export function ProdutoEstudioClient({
   tenantId, podeEditar, produto, instrutores, resumo, breadcrumb,
@@ -58,6 +60,15 @@ export function ProdutoEstudioClient({
   const searchParams = useSearchParams()
   const inicial = (searchParams.get('aba') as Aba) || 'informacoes'
   const [aba, setAba] = useState<Aba>(ABAS.includes(inicial) ? inicial : 'informacoes')
+  // CAUSA-RAIZ do "Editar na tela dona da regra" não funcionar: os links da aba Regras só trocam a QUERY (?aba=conteudos…) na MESMA rota,
+  // o componente não remonta e o estado inicial `aba` (lido uma única vez) ignorava a URL. Aqui a aba segue o ?aba= sempre que ele muda.
+  const abaDaUrl = searchParams.get('aba') as Aba | null
+  useEffect(() => {
+    if (abaDaUrl && ABAS.includes(abaDaUrl)) {
+      setAba(abaDaUrl)
+      setVisitadas((p) => (p.has(abaDaUrl) ? p : new Set(p).add(abaDaUrl)))
+    }
+  }, [abaDaUrl])
   // Abas pesadas só montam (e só buscam seus dados) na 1ª abertura; depois ficam montadas/ocultas (sem recarregar).
   const [visitadas, setVisitadas] = useState<Set<Aba>>(() => new Set([ABAS.includes(inicial) ? inicial : 'informacoes']))
   const [mover, setMover] = useState(false)
@@ -75,7 +86,12 @@ export function ProdutoEstudioClient({
 
   // Barra de carregamento do topo: voltar navega (start); trocar aba é estado local (start + done).
   function voltar() { navProgressStart(); router.push('/admin/conteudos/produtos') }
-  function trocarAba(k: Aba) { if (k === aba) return; setAba(k); setVisitadas((p) => (p.has(k) ? p : new Set(p).add(k))); navProgressStart(); navProgressDone() }
+  function trocarAba(k: Aba) {
+    if (k === aba) return
+    setAba(k); setVisitadas((p) => (p.has(k) ? p : new Set(p).add(k))); navProgressStart(); navProgressDone()
+    // Mantém o ?aba= em dia (links "para a mesma aba" voltam a funcionar e a URL fica compartilhável).
+    try { const u = new URL(window.location.href); u.searchParams.set('aba', k); u.searchParams.delete('rg'); window.history.replaceState(null, '', u) } catch { /* sem history */ }
+  }
 
   async function excluir() {
     if (!(await confirmar({ titulo: 'Mover para a Lixeira', mensagem: `Enviar "${produto.nome}" para a Lixeira? As fontes, seções e liberações são apagadas; o acesso já concedido aos alunos não é removido automaticamente.`, confirmar: 'Enviar para a Lixeira', destrutivo: true }))) return
@@ -139,6 +155,8 @@ export function ProdutoEstudioClient({
     ['vitrine', 'Página do extensivo', null],
     ['grupos', 'Grupos de acesso', resumo.grupos],
     ['visibilidade', 'Visibilidade', null],
+    ['regras', 'Regras', null],
+    ['atualizacoes', 'Atualizações', null],
   ]
 
   return (
@@ -245,6 +263,15 @@ export function ProdutoEstudioClient({
         </div>
       </div>
 
+      {/* Atalho cruzado: as telas que editam regras apontam para o mapa único */}
+      {(aba === 'conteudos' || aba === 'grupos' || aba === 'visibilidade') && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Esta tela edita uma parte das regras do produto.{' '}
+          <button type="button" onClick={() => trocarAba('regras')} className="font-medium text-primary hover:underline">Ver mapa de regras</button>
+          {' '}para enxergar todas as camadas (grupos, segmentos, visibilidade, cronograma e exceções) em um só lugar.
+        </p>
+      )}
+
       {/* Corpo da aba */}
       {aba === 'informacoes' && (
         <AbaInformacoes
@@ -267,6 +294,14 @@ export function ProdutoEstudioClient({
       )}
       {visitadas.has('visibilidade') && (
         <div hidden={aba !== 'visibilidade'}><AbaVisibilidade produtoId={produto.id} produtoNome={produto.nome} podeEditar={podeEditar} /></div>
+      )}
+
+      {visitadas.has('regras') && (
+        <div hidden={aba !== 'regras'}><AbaRegras produtoId={produto.id} produtoNome={produto.nome} ativa={aba === 'regras'} podeEditar={podeEditar} /></div>
+      )}
+
+      {visitadas.has('atualizacoes') && (
+        <div hidden={aba !== 'atualizacoes'}><AbaAtualizacoes produtoId={produto.id} podeEditar={podeEditar} /></div>
       )}
 
       {mover && arvore !== null && <MoverDialog open onClose={() => setMover(false)} arvore={arvore} alvo={{ kind: 'produto', id: produto.id, nome: produto.nome }} onMovido={() => router.refresh()} />}

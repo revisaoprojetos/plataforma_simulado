@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { rankearSimulado } from '@/lib/ranking'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { contextoNota, calcularNota } from '@/lib/simulado/nota'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
@@ -199,6 +200,9 @@ export async function POST(request: NextRequest) {
       marcarPerfilDesatualizado(supabase, sessao.tenant_id, sessao.estudante_id),
     ]).catch(() => {})
   }
+
+  // Registro de atividade: fim de simulado (só na finalização deste request). Fire-and-forget.
+  if (finalizouAgora) void registrarAtividade({ tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id }, { tipo: 'simulado_finalizado', refTipo: 'simulado', refId: sessao.simulado_id, meta: { sessao_id, pessoal: pessoal || undefined } })
 
   // Posição final do aluno (após o recálculo).
   const { data: ranked } = await supabase

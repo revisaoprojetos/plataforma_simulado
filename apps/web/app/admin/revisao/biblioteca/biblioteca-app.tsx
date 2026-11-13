@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { AlertTriangle, ChevronRight, Eye, EyeOff, FolderInput, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronRight, CircleDot, Eye, EyeOff, FolderInput, History, Settings2, Users2, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
+import { LoteDialog, type InicialLote } from '@/components/biblioteca/lote-dialogs'
+import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
+import type { AlvoLote, AcaoLote, ResultadoLote } from '@/app/admin/biblioteca/lote-actions-tipos'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
@@ -104,6 +107,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
   const [moverLote, setMoverLote] = useState(false)
   const [metaLote, setMetaLote] = useState(false)
   const [emLote, setEmLote] = useState<string | null>(null)
+  // Ações em lote unificadas (mesmo LoteDialog/lote-actions da Biblioteca do Drive): status, acesso, configurar, registrar atualização
+  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: AcaoLote['tipo'][]; config?: boolean; inicial?: InicialLote } | null>(null)
+  const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
+  const ancora = useRef<string | null>(null)
   const [subQ, setSubQ] = useState<SubAbaQ>(subQInicial)
   const [totalBancoQ, setTotalBancoQ] = useState<number | null>(inicial.resumo.bancoQuestoes ?? null)
   // Banco: estado inicial reaplicável (links vindos de Etiquetas/Classificação/Unificar) + seleção que atravessa as sub-abas
@@ -186,6 +193,33 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
 
   // ── seleção ──
   const onSel = (id: string, v: boolean) => setSel((s) => { const n = new Set(s); if (v) n.add(id); else n.delete(id); return n })
+  const onToggle = (id: string, shift: boolean) => {
+    const ordem = dados.rows.map((r) => r.id); const a = ancora.current
+    setSel((prev) => {
+      const n = new Set(prev)
+      if (shift && a && a !== id) {
+        const i = ordem.indexOf(a), j = ordem.indexOf(id)
+        if (i >= 0 && j >= 0) { const marcar = !prev.has(id); for (let k = Math.min(i, j); k <= Math.max(i, j); k++) { if (marcar) n.add(ordem[k]); else n.delete(ordem[k]) } return n }
+      }
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+    ancora.current = id
+  }
+  const alvoSel = (): AlvoLote => ({ docIds: [...sel], pastaIds: [], incluirSubpastas: false, categoria })
+  const abrirLote = (titulo: string, secoes: AcaoLote['tipo'][], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo: alvoSel(), secoes, ...extra })
+  const configurarPasta = (id: string, nome: string) => setLoteDlg({ titulo: `Configurar pasta “${nome}”`, alvo: { docIds: [], pastaIds: [id], incluirSubpastas: true, categoria }, secoes: ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], config: true })
+  function loteConcluido(r: ResultadoLote) {
+    setLoteDlg(null)
+    const falhos = r.itens.filter((i) => !i.ok).map((i) => i.id)
+    setSel(new Set(falhos)); void recarregar()
+  }
+  useEffect(() => {
+    if (sel.size === 0) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loteDlg && !regAtualizacao && !moverLote && !metaLote) setSel(new Set()) }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [sel.size, loteDlg, regAtualizacao, moverLote, metaLote])
   const onSelPagina = (v: boolean) => setSel((s) => { const n = new Set(s); for (const r of dados.rows) { if (v) n.add(r.id); else n.delete(r.id) } return n })
 
   // ── ações em massa (REUSAM as actions do legado; 5 em paralelo) ──
@@ -341,7 +375,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
         </div>
       )}
 
-      {podeEditar && sel.size > 0 && createPortal(
+      {podeEditar && sel.size > 0 && !loteDlg && !regAtualizacao && createPortal(
         <div className="fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-card px-3 py-2 shadow-xl" role="toolbar" aria-label="Ações em massa">
           <b className="mr-1 text-sm">{sel.size} {sel.size === 1 ? 'selecionado' : 'selecionados'}</b>
           <Button size="sm" variant="outline" disabled={!!emLote || !resumo.temOculto} onClick={() => void lote('Mostrando ao aluno', ids, (id) => definirVisibilidadeConteudo(id, true), 'Visíveis ao aluno')}><Eye />Mostrar ao aluno</Button>
@@ -350,6 +384,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setMetaLote(true)}><Tags />Editar metadados</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void lote('Publicando', ids, (id) => publicarDocumento(id), 'Publicados')}><SquarePen />Publicar</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void lote('Marcando como LegProc', ids, (id) => salvarLeituraLegproc(id, true), 'Marcados como LegProc')}><Layers />Leitura LegProc</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Alterar status', ['status'])}><CircleDot />Status</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar acesso', ['acesso'])}><Users2 />Acesso</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setRegAtualizacao(alvoSel())}><History />Registrar atualização</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar em lote', ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], { config: true })}><Settings2 />Configurar em lote…</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void arquivarLote()}>Arquivar</Button>
           <Button size="sm" variant="destructive" disabled={!!emLote} onClick={() => void excluirLote()}><Trash2 />Excluir</Button>
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSel(new Set())}><X />Limpar seleção</Button>
@@ -377,6 +415,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <PastasPainel arvore={arv?.arvore ?? null} pasta={st.pasta} onPasta={abrirPasta} onPrefetch={(id) => prefetch({ ...st, pasta: id, page: 1 })} podeEditar={podeEditar}
             ocultarVazias={ocultarVazias} onOcultarVazias={setOcultarVazias} onMudou={() => void recarregar()}
             onAcessoPasta={(id, nome) => setAcessoPasta({ id, nome })} onCapaPasta={(id) => setCapa({ tipo: 'pasta', id })} carregando={carregando}
+            onConfigurarPasta={podeEditar ? configurarPasta : undefined}
             cabecalho={podeEditar ? (
               <div className="px-2 pb-1.5">
                 <Button type="button" variant="outline" size="sm" className="w-full justify-start" onClick={() => setUnificar(true)} title="Juntar disciplinas (pastas) repetidas ou parecidas"><Merge />Unificar disciplinas</Button>
@@ -388,7 +427,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
 
           {docsVisiveis && (
             <MateriaisTabela tipo={st.aba} rows={dados.rows} inicio={(st.page - 1) * st.pp} podeEditar={podeEditar} controleVisivel={resumo.temOculto} rotuloTipo={tipoAtual.nome}
-              categoria={categoria} colunas={colunas} sel={sel} onSel={onSel} onSelPagina={onSelPagina} sort={st.sort} dir={st.dir} onSort={ordenar} carregando={carregando}
+              categoria={categoria} colunas={colunas} sel={sel} onSel={onSel} onToggle={onToggle} onSelPagina={onSelPagina} sort={st.sort} dir={st.dir} onSort={ordenar} carregando={carregando}
               onMudou={() => void recarregar()} onDetalhe={setDetalheId} onAcessoDoc={setAcessoDoc} onCapa={(id) => setCapa({ tipo: 'documento', id })} mostrarPasta={!pastaReal || st.sub} />
           )}
 
@@ -420,6 +459,13 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           onEditarOffice={async () => { const r = await abrirEdicaoDocx(detalheId); if (!r.ok || !r.versaoId) return toast.error(r.error || 'Edição no editor disponível só para .docx.'); window.location.href = `/admin/biblioteca/editar/${r.versaoId}?origem=${encodeURIComponent(window.location.pathname + window.location.search)}` }}
           onBaixar={async () => { const r = await urlDownloadDocumento(detalheId); if (!r.ok || !r.url) return toast.error(r.error || 'Falha ao gerar o link.'); window.open(r.url, '_blank') }} />
       )}
+      {loteDlg && (
+        <LoteDialog titulo={loteDlg.titulo} alvoBase={loteDlg.alvo} secoes={loteDlg.secoes} config={loteDlg.config} inicial={loteDlg.inicial}
+          pausado={!!capa || !!regAtualizacao} onFechar={() => setLoteDlg(null)} onConcluido={loteConcluido}
+          onCapa={loteDlg.alvo.pastaIds.length === 1 ? () => setCapa({ tipo: 'pasta', id: loteDlg.alvo.pastaIds[0] }) : undefined}
+          onAtualizacao={(alvo) => setRegAtualizacao(alvo)} />
+      )}
+      {regAtualizacao && <RegistrarAtualizacaoLote alvo={regAtualizacao} onFechar={() => setRegAtualizacao(null)} onDone={() => void recarregar()} />}
       {capa && <CapaPaginaDialog alvo={capa} onFechar={() => setCapa(null)} onSalvo={() => void recarregar()} />}
       {acessoPasta && <DriveAcessoWrapper pastaId={acessoPasta.id} categoria={categoria} onFechar={() => { setAcessoPasta(null); void recarregar() }} />}
       {acessoDoc && (

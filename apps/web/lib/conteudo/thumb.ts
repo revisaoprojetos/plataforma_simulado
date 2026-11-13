@@ -5,6 +5,8 @@ import { uploadArquivo, getStorage } from '@/lib/storage'
 import { resolverBucketConteudo, urlAssinadaOriginal, baixarOriginal } from './ingestao'
 import { filtrarDocxPorAreas, type ResolucaoAreas } from './areas'
 import { urlFonteOnlyOffice } from './fonte-onlyoffice'
+import { contarPaginasPdf } from '@/lib/cronograma/adaptativo/paginas-pdf'
+import { invalidarCachesPaginas } from './paginas-sync'
 
 // Miniatura FIEL do card: converte o .docx na imagem PNG da 1ª página via ConvertService do OnlyOffice
 // (o mesmo Document Server do editor). Assim o card mostra o documento com blocos/cores reais — igual
@@ -152,7 +154,7 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string, a
     const { data: doc } = await svc.from('simulado_conteudo_documentos')
       .select('tipo_origem, versao_atual_id').eq('tenant_id', tenantId).eq('id', documentoId).eq('deletado', false).maybeSingle()
     if (!doc) return null
-    const campos = 'id, arquivo_key, hash_arquivo'
+    const campos = 'id, arquivo_key, hash_arquivo, paginas'
     let ver: any = null
     if ((doc as any).versao_atual_id) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('id', (doc as any).versao_atual_id).maybeSingle()).data
     if (!ver) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', documentoId).order('numero', { ascending: false }).limit(1).maybeSingle()).data
@@ -183,6 +185,16 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string, a
     if (!pdf) return null
     try {
       await uploadArquivo({ tenantId, bucket, path, data: pdf, contentType: 'application/pdf', nome: 'doc.pdf', publico: false, criadoPor: null })
+      // Contagem de páginas do DOCX (PDF sem variante de áreas = doc inteiro): grava na versão e invalida os caches do cronograma.
+      if (!areas?.temAreas) {
+        try {
+          const n = await contarPaginasPdf(new Uint8Array(pdf))
+          if (n && n !== (ver.paginas ?? null)) {
+            await svc.from('simulado_conteudo_versoes').update({ paginas: n }).eq('id', ver.id)
+            await invalidarCachesPaginas(tenantId)
+          }
+        } catch { /* contagem best-effort */ }
+      }
       const url = await urlAssinadaOriginal(path, 3600)
       if (url) return url
     } catch { /* cache best-effort */ }

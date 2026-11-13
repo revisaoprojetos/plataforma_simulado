@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Sincroniza o "último simulado selecionado" entre o plugin do OnlyOffice (aba de variáveis) e o Laboratório
 // da prévia: o plugin SALVA (POST) ao selecionar; o Lab LÊ (GET) ao abrir e já carrega o mesmo simulado.
 // Guardado em simulado_tenants.tema.lab_ultimo_sim (jsonb, sem migração). Resolve tenant por host (igual às
-// outras rotas do plugin). CORS liberado porque o plugin roda dentro do iframe do OnlyOffice.
+// outras rotas do plugin). Same-origin (sem CORS): exige access_token do plugin ou sessão admin.
 export const dynamic = 'force-dynamic'
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'content-type' }
+const CORS = {}
 
-export function OPTIONS() { return new NextResponse(null, { headers: CORS }) }
 
-export async function GET() {
+export async function GET(req: Request) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   try {
     const tenantId = await getCurrentTenantId()
     if (!tenantId) return NextResponse.json({ sim: null }, { headers: CORS })
@@ -25,6 +26,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  { const n = await exigirAcessoOO(req, { escopo: 'ler' }); if (n) return n }
   try {
     const tenantId = await getCurrentTenantId()
     if (!tenantId) return NextResponse.json({ ok: false }, { headers: CORS })

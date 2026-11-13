@@ -957,7 +957,7 @@ function toast(msg) {
    GET /api/aluno/biblioteca/baixar?doc=<id>: o servidor confere o acesso, põe a CAPA da Biblioteca como 1ª folha (se houver)
    e devolve o arquivo com o NOME do documento (Content-Disposition). Aqui só baixamos o blob e damos o nome do cabeçalho. */
 const ICDL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;margin-right:5px;vertical-align:-2px"><path d="M8 2.5v7M5 7l3 3 3-3M3 13h10"/></svg>';
-const botaoBaixar = doc => (doc ? `<button type="button" class="btn sm ghost" data-acao="baixar" data-doc="${esc(doc)}" title="Baixar o documento desta meta">${ICDL}Baixar</button>` : '');
+const botaoBaixar = (doc, meta) => (doc ? `<button type="button" class="btn sm ghost" data-acao="baixar" data-doc="${esc(doc)}" data-meta="${esc(meta || '')}" title="Baixar o documento desta meta">${ICDL}Baixar</button>` : '');
 function nomeDoCabecalho(h) {
   const m8 = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(h || ''); if (m8) { try { return decodeURIComponent(m8[1].trim()); } catch (e) {} }
   const m = /filename\s*=\s*"([^"]+)"/i.exec(h || ''); return m ? m[1] : 'documento';
@@ -968,7 +968,7 @@ document.addEventListener('click', async e => {
   if (b.disabled) return;
   const rot = b.innerHTML; b.disabled = true; b.innerHTML = 'Preparando…';
   try {
-    const u = '/api/aluno/biblioteca/baixar?doc=' + encodeURIComponent(b.dataset.doc), opt = { credentials: 'same-origin', cache: 'no-store' };
+    const u = '/api/aluno/biblioteca/baixar?doc=' + encodeURIComponent(b.dataset.doc) + (b.dataset.meta ? '&meta=' + encodeURIComponent(b.dataset.meta) : ''), opt = { credentials: 'same-origin', cache: 'no-store' };
     let r; try { r = await fetch(u, opt); } catch (er1) { await new Promise(ok => setTimeout(ok, 1200)); r = await fetch(u, opt); } /* 1 nova tentativa se a conexão cair */
     if (!r.ok || /json|html/i.test(r.headers.get('Content-Type') || '')) {
       if (r.ok) { toast('Não foi possível baixar agora. Tente novamente.'); return; } let msg = 'Não foi possível baixar agora. Tente novamente.'; try { const j = await r.json(); if (j && j.message) msg = j.message; } catch (er) {} toast(msg); return; }
@@ -1440,7 +1440,7 @@ function linksQ(i, id) {
  *  Meta já concluída = modo "rever": não manda `meta` (sem cronômetro nem "concluir"), igual ao leitor. */
 function abrirQuestoesPlat(id) {
   const i = info(id), k = i && QFAULAS && QFAULAS[i.idx]; if (!k) return;
-  const qs = ['k=' + encodeURIComponent(k), 'voltar=' + encodeURIComponent('/aluno/cronograma'), 't=' + encodeURIComponent(String(i.tema || '').slice(0, 120))];
+  const qs = ['k=' + encodeURIComponent(k), 'voltar=' + encodeURIComponent('/aluno/cronograma?ver=adaptativo'), 't=' + encodeURIComponent(String(i.tema || '').slice(0, 120))];
   if (!(S.prog[id] && S.prog[id].s === 'done')) {
     qs.push('meta=' + encodeURIComponent(id));
     const tseg = (S.prog[id] && S.prog[id].t) || 0; if (tseg > 0) qs.push('tseg=' + tseg);
@@ -1534,7 +1534,7 @@ function cartao(id, opts = {}) {
         <button type="button" class="btn sm ok ${s === 'done' ? 'on' : ''}" data-acao="feito" data-id="${id}" aria-pressed="${s === 'done'}">${ICK} ${s === 'done' ? 'Concluída' : 'Concluir'}</button>
         <button type="button" class="btn sm parc ${PARCIAL === id || (S.prog[id]?.parou && s !== 'done') ? 'on' : ''}" data-acao="parcial" data-id="${id}" aria-pressed="${PARCIAL === id || !!(S.prog[id]?.parou && s !== 'done')}">Parcial</button> <button type="button" class="btn sm miss ${s === 'missed' ? 'on' : ''}" data-acao="faltou" data-id="${id}" aria-pressed="${s === 'missed'}">Não realizado</button>${PARCIAL === id ? formParcial(id) : ''}
         <span class="sep"></span>
-        <button type="button" class="btn sm ghost" data-acao="abrir" data-id="${id}">Anotações${temNota(id) ? ' •' : ''}</button>${i.doc && i.tipo !== 'qu' && i.tipo !== 'rq' ? botaoBaixar(i.doc) : ''}
+        <button type="button" class="btn sm ghost" data-acao="abrir" data-id="${id}">Anotações${temNota(id) ? ' •' : ''}</button>${i.doc && i.tipo !== 'qu' && i.tipo !== 'rq' ? botaoBaixar(i.doc, id) : ''}
       </div>
     </div>
   </article>`;
@@ -2812,6 +2812,9 @@ if (CRIAR) {
   const loc = carregarLocal(); if (loc && loc.perfil) S.perfil = { ...loc.perfil };
 } else S = (TESTE || REVFIXO ? null : carregarLocal()) || novoEstado();
 if (REVFIXO) S.exemplo = false; /* sem onboarding: o plano chega pronto do servidor */
+/* Sem cache local: o estado inicial é o de "primeiro acesso". Não mostrar essa tela antes de o servidor responder
+   (o aluno com plano fixado via o onboarding piscar); o loader sai em carregarDoServidor (sucesso ou falha). */
+if (!CRIAR && !TESTE && !REVFIXO && S.exemplo && !S.perfil) document.body.classList.add('rv-carregando');
 S.extras ||= []; S.detalhes ||= {};
 S.atualizado ||= { estado: 0, progresso: 0, notas: 0 };
 indexar();
@@ -2951,7 +2954,7 @@ body.embed .flut{display:none}
  function urlMaterial(id, rever){
    const i = info(id); if (!i || !i.doc) return null;
    const f = faixaPaginas(id), qs = [];
-   qs.push('voltar=' + encodeURIComponent('/aluno/cronograma')); // "Voltar" no leitor retorna ao cronograma, não à Biblioteca
+   qs.push('voltar=' + encodeURIComponent('/aluno/cronograma?ver=adaptativo')); // "Voltar" no leitor retorna ao cronograma, não à Biblioteca
    if (!rever) { // modo REVER (meta já concluída): abre só a leitura, SEM sessão/cronômetro/"concluir" — evita desmarcar sem querer
      qs.push('meta=' + encodeURIComponent(id)); // meta aberta → cronômetro no leitor + concluir de volta
      const tseg = (S.prog[id] && S.prog[id].t) || 0; if (tseg > 0) qs.push('tseg=' + tseg); // tempo já acumulado nesta meta
@@ -3190,7 +3193,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       <div class="c-acoes">
         ${acoesHtml(id, s, m)}
         <span class="sep"></span>
-        <button type="button" class="btn sm ghost" data-acao="abrir" data-id="${id}">Anotações${temNota(id) ? ' •' : ''}</button>${m && m.doc && m.doc.baixavel ? botaoBaixar(m.doc.id) : ''}
+        <button type="button" class="btn sm ghost" data-acao="abrir" data-id="${id}">Anotações${temNota(id) ? ' •' : ''}</button>${m && m.doc && m.doc.baixavel ? botaoBaixar(m.doc.id, id) : ''}
       </div>
     </div>
   </article>`;
@@ -3650,6 +3653,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
   function falhaCarga(tentativa, motivo) {
     if (tentativa < 3) { marcarSync(false, 'Tentando novamente…'); setTimeout(function () { carregarDoServidor(tentativa + 1); }, 3000 * tentativa); return; }
     marcarSync(false, 'Sem conexão com o servidor');
+    document.body.classList.remove('rv-carregando');
     try {
       // Aviso FIXO sobre qualquer tela (inclusive #configurar, onde #tela-hoje fica oculta): nunca tela em branco.
       var ant = document.getElementById('carga-erro'); if (ant) ant.remove();
@@ -3677,6 +3681,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       if (!j || j.ok === false) throw new Error((j && j.message) || 'resposta inválida');
       limparErroCarga();
       if (j && j.conteudo) aplicarConteudo(j.conteudo);
+      if (!(j && j.ok && j.estado) || CRIAR) document.body.classList.remove('rv-carregando'); /* sem plano: onboarding legítimo */
       if (CRIAR) {
         // Modo criar: só o CONTEÚDO do servidor; o plano existente é ignorado (não hidrata S, não grava cache).
         R = null; PREV = null; indexar(); renderTudo(); marcarSync(false, 'Novo cronograma · salvo ao gerar'); pedirTema();
@@ -3695,6 +3700,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
         indexar();
         if (!TELAS.includes(location.hash.slice(1))) irPara(S.exemplo ? 'configurar' : 'hoje', true);
         renderTudo();
+        document.body.classList.remove('rv-carregando');
         marcarSync(true, 'Salvo na sua conta');
       } else {
         // Sem plano no servidor: primeiro acesso -> começa pela configuração (com o conteúdo real já aplicado).

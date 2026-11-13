@@ -29,10 +29,26 @@ export async function lerOverride(svc: SupabaseClient, tenantId: string): Promis
   return (await lerOverrideRow(svc, tenantId))?.dados ?? null
 }
 
-/** Id do catálogo EFETIVO (base + versão do overlay): é o que os planos carimbam em `cfg.catalogo`. */
+/**
+ * Flag do tenant `tema.cronograma_paginas_reais` (default false): recálculo OPT-IN dos planos existentes com as páginas REAIS da
+ * Biblioteca. Ligada, o id efetivo do catálogo ganha o sufixo `-pr<rev>` (rev = `tema.cronograma_paginas_reais_rev`, incrementado a
+ * cada ativação) → cada plano migra LAZY (1x, ao ser aberto pelo aluno) via migrarPlano, com backup e preservando o feito.
+ * Desligada: nenhum sufixo, planos intocados (a exibição de páginas independe da flag).
+ */
+export async function lerPaginasReais(svc: SupabaseClient, tenantId: string): Promise<{ ativo: boolean; rev: number }> {
+  return remember<{ ativo: boolean; rev: number }>(`crono-pag-reais:${tenantId}`, 30, async () => {
+    try {
+      const { data } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+      const t = (data as { tema?: Record<string, unknown> | null } | null)?.tema
+      return { ativo: t?.cronograma_paginas_reais === true, rev: Math.max(1, Math.trunc(Number(t?.cronograma_paginas_reais_rev)) || 1) }
+    } catch { return { ativo: false, rev: 1 } }
+  })
+}
+
+/** Id do catálogo EFETIVO (base + versão do overlay + flag de páginas reais): é o que os planos carimbam em `cfg.catalogo`. */
 export async function catalogoIdDoTenant(svc: SupabaseClient, tenantId: string): Promise<string> {
-  const row = await lerOverrideRow(svc, tenantId)
-  return catalogoIdEfetivo(CATALOGO_HTML.id, row?.versao ?? 0)
+  const [row, pr] = await Promise.all([lerOverrideRow(svc, tenantId), lerPaginasReais(svc, tenantId)])
+  return catalogoIdEfetivo(CATALOGO_HTML.id, row?.versao ?? 0) + (pr.ativo ? `-pr${pr.rev}` : '')
 }
 
 /** Grava o overlay com checagem otimista: `versaoBase` = a versão que o admin carregou (0 = ainda não existia). */

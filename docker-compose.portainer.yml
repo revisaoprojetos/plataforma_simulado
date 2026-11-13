@@ -133,6 +133,8 @@ services:
       - NEXT_PUBLIC_ONLYOFFICE_URL=https://${ONLYOFFICE_HOST:-onlyoffice.revisaopge.com.br}
       - CONTEUDO_WOPI_HOST=${CONTEUDO_WOPI_HOST:-https://simulado.revisaopge.com.br}
       - ONLYOFFICE_INTERNAL_URL=${ONLYOFFICE_INTERNAL_URL:-http://onlyoffice}
+      # Segredo HMAC dos access_token das rotas /api/teste/* (OnlyOffice/WOPI/plugin). Opcional: sem ele deriva de APP_ENCRYPTION_KEY.
+      - ONLYOFFICE_ACCESS_SECRET=${ONLYOFFICE_ACCESS_SECRET:-}
     networks:
       - default
       - traefik

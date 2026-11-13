@@ -1,6 +1,8 @@
 import { OnlyOfficeEditor } from './onlyoffice-editor'
 import { PreviaLab } from './previa-lab'
 import { versaoDoc } from '@/lib/teste/store'
+import { emitirTokenOO } from '@/lib/seguranca/token-onlyoffice'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +17,12 @@ export default async function OnlyOfficeEditorPage({ params, searchParams }: { p
   // Chave ESTÁVEL por versão (muda só quando o conteúdo é salvo) — evita sessões concorrentes/salvar vazio
   // E, na prévia, invalida o cache do OnlyOffice quando o template é editado (senão carrega render antigo).
   const versao = await versaoDoc(id)
+  // Tokens HMAC p/ o Document Server (sem cookie): edição/callback (escrever) só no editor; leitura na prévia/lab.
+  const tenantId = await getCurrentTenantId().catch(() => null)
+  const tokenEscrita = emitirTokenOO({ docId: id, escopo: 'escrever', tenantId })
+  const tokenLeitura = emitirTokenOO({ docId: id, escopo: 'ler', tenantId })
   if (preview === '1') {
-    return <PreviaLab id={id} onlyofficeUrl={onlyofficeUrl} wopiHost={wopiHost} docVersao={versao} />
+    return <PreviaLab id={id} onlyofficeUrl={onlyofficeUrl} wopiHost={wopiHost} docVersao={versao} token={tokenLeitura} />
   }
-  return <OnlyOfficeEditor id={id} onlyofficeUrl={onlyofficeUrl} wopiHost={wopiHost} preview={false} docVersao={versao} />
+  return <OnlyOfficeEditor id={id} onlyofficeUrl={onlyofficeUrl} wopiHost={wopiHost} preview={false} docVersao={versao} token={tokenEscrita} pluginToken={tokenLeitura} />
 }

@@ -8,9 +8,13 @@ import {
   FolderPlus, Upload, Folder, FileText, FileType2, FileCode2, LayoutGrid, List as ListIcon,
   ChevronRight, ChevronLeft, MoreVertical, Loader2, X, CircleCheck, CircleDashed, Archive,
   Download, Pencil, Info, Trash2, FolderInput, Layers, Link2, RotateCcw, Clock, ExternalLink, Users2,
-  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music, Image as ImageIcon,
+  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music, Image as ImageIcon, SquareCheckBig,
 } from 'lucide-react'
 import { CapaPaginaDialog } from '@/components/biblioteca/capa-pagina-dialog'
+import { CheckSelecao, BarraLote, useSelecaoIds, type AcaoBarra } from '@/components/biblioteca/selecao-lote'
+import { LoteDialog, type InicialLote } from '@/components/biblioteca/lote-dialogs'
+import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
+import type { AlvoLote, AcaoLote, ResultadoLote } from './lote-actions-tipos'
 import type { AlvoCP } from './capa-actions-tipos'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -168,7 +172,17 @@ export function BibliotecaClient() {
   const [uploads, setUploads] = useState<DriveUploadItem[] | null>(null) // painel de progresso do import
   const [, start] = useTransition()
 
+  // ── Seleção múltipla + ações em lote (persiste ao alternar card/tabela; limpa ao trocar de pasta/coleção) ──
+  const [modoSel, setModoSel] = useState(false)
+  const selDocs = useSelecaoIds()
+  const selPastas = useSelecaoIds()
+  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: AcaoLote['tipo'][]; config?: boolean; inicial?: InicialLote } | null>(null)
+  const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
+  const limparSelecao = () => { selDocs.limpar(); selPastas.limpar() }
+  const sairSelecao = () => { limparSelecao(); setModoSel(false) }
+
   async function carregar(pastaId: string | null, cat: Categoria = categoria, push = true) {
+    if (pastaId !== pastaAtual || cat !== categoria) { selDocs.limpar(); selPastas.limpar() }
     setCarregando(true)
     try {
       const r = await listarArvore(pastaId, cat)
@@ -198,6 +212,7 @@ export function BibliotecaClient() {
     // Base da coleção = raiz, sem empilhar histórico; marca a entrada atual como raiz (_bibPasta:null)
     // para o "Voltar" do navegador reconhecer o fundo da pilha da Biblioteca.
     if (typeof window !== 'undefined') { try { window.history.replaceState({ ...(window.history.state || {}), _bibPasta: null }, '') } catch { /* no-op */ } }
+    selDocs.limpar(); selPastas.limpar()
     carregar(null, categoria, false) /* eslint-disable-next-line */
   }, [categoria])
 
@@ -225,6 +240,54 @@ export function BibliotecaClient() {
     else ord.sort((a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em)))
     return ord
   }, [docs, busca, filtro, tipo, ordenar, metadados, filtrosMeta])
+
+  // ── Lote: ordem visível (p/ shift-click), alvo, ações da barra e Esc ──
+  const ordemDocs = useMemo(() => docsFiltrados.map((d) => d.id), [docsFiltrados])
+  const ordemPastas = useMemo(() => pastas.map((p) => p.id), [pastas])
+  const nSelDocs = selDocs.sel.size, nSelPastas = selPastas.sel.size
+  const totalVisivel = ordemDocs.length + ordemPastas.length
+  const todosMarcados = totalVisivel > 0 && ordemDocs.every((i) => selDocs.sel.has(i)) && ordemPastas.every((i) => selPastas.sel.has(i))
+  const alvoSelecao = (): AlvoLote => ({ docIds: [...selDocs.sel], pastaIds: [...selPastas.sel], incluirSubpastas: false, categoria })
+  const selecionarTodos = () => {
+    if (todosMarcados) { limparSelecao(); return }
+    selDocs.manter(ordemDocs); selPastas.manter(ordemPastas)
+  }
+  function acaoLote(a: AcaoBarra) {
+    const alvo = alvoSelecao()
+    if (a === 'atualizacao') { setRegAtualizacao(alvo); return }
+    const abrir = (titulo: string, secoes: AcaoLote['tipo'][], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo, secoes, ...extra })
+    if (a === 'mover') abrir('Mover para a pasta', ['mover'])
+    else if (a === 'status') abrir('Alterar status', ['status'])
+    else if (a === 'categoria') abrir('Alterar categoria', ['categoria'])
+    else if (a === 'acesso') abrir('Configurar acesso', ['acesso'])
+    else if (a === 'visibilidade_mostrar') abrir('Mostrar ao aluno', ['visibilidade'], { inicial: { oculto: false } })
+    else if (a === 'visibilidade_ocultar') abrir('Ocultar do aluno', ['visibilidade'], { inicial: { oculto: true } })
+    else if (a === 'legenda') abrir('Legenda de grifos', ['legenda'])
+    else if (a === 'lixeira') abrir('Enviar para a lixeira', ['lixeira'])
+    else abrir('Configurar em lote', ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], { config: true })
+  }
+  function configurarPasta(p: PastaConteudo) {
+    setLoteDlg({
+      titulo: `Configurar pasta “${p.nome}”`,
+      alvo: { docIds: [], pastaIds: [p.id], incluirSubpastas: true, categoria },
+      secoes: ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], config: true,
+    })
+  }
+  function loteConcluido(r: ResultadoLote) {
+    setLoteDlg(null)
+    // Mantém selecionados só os documentos que falharam (para repetir); pastas saem da seleção.
+    const falhos = r.itens.filter((i) => !i.ok).map((i) => i.id)
+    if (falhos.length === 0) sairSelecao(); else { selPastas.limpar(); selDocs.manter(falhos) }
+    carregar(pastaAtual)
+  }
+  const dialogoAberto = !!(loteDlg || regAtualizacao || capaDlg || acessoDrive || detalheId || acessoDoc || acessoPasta || gerenciarAberto || importAberto || uploads)
+  useEffect(() => {
+    if (!modoSel) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !dialogoAberto) sairSelecao() }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [modoSel, dialogoAberto])
 
   async function novaPasta() {
     const nome = await pedirTexto({ titulo: 'Nova pasta', placeholder: 'Nome da pasta', confirmar: 'Criar' })
@@ -620,6 +683,11 @@ export function BibliotecaClient() {
               <option value="criados">Ordenar: Criados</option>
               <option value="nome">Ordenar: Nome</option>
             </select>
+            <button
+              type="button" aria-pressed={modoSel}
+              onClick={() => { if (modoSel) sairSelecao(); else setModoSel(true) }}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${modoSel ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            ><SquareCheckBig className="h-4 w-4" />Selecionar</button>
             <div className="flex items-center rounded-lg border p-0.5">
               <button onClick={() => setView('grid')} aria-label="Grade" className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><LayoutGrid className="h-4 w-4" /></button>
               <button onClick={() => setView('lista')} aria-label="Lista" className={`rounded-md p-1.5 ${view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><ListIcon className="h-4 w-4" /></button>
@@ -681,6 +749,7 @@ export function BibliotecaClient() {
                       </span>
                     ) : undefined}
                     onClick={() => carregar(p.id)}
+                    selecao={modoSel ? { marcado: selPastas.sel.has(p.id), onToggle: (sh) => selPastas.alternar(p.id, sh, ordemPastas), rotulo: `Selecionar pasta ${p.nome}` } : undefined}
                     acoes={
                       <MenuPasta
                         p={p}
@@ -698,6 +767,7 @@ export function BibliotecaClient() {
                         onRemoverDisciplinaCron={() => removerDisciplinaCron(p)}
                         onTipoMaterialCron={(t) => definirTipoMaterialCron(p, t)}
                         onLegendaTabela={(o) => definirLegendaTabela(p, o)}
+                        onConfigurar={ehModelo ? undefined : () => configurarPasta(p)}
                       />
                     }
                   />
@@ -728,6 +798,7 @@ export function BibliotecaClient() {
                     categoria={categoria}
                     thumbInicial={thumbs[d.id]}
                     restrito={restritoDoc[d.id]}
+                    selecao={modoSel ? { marcado: selDocs.sel.has(d.id), onToggle: (sh) => selDocs.alternar(d.id, sh, ordemDocs), rotulo: `Selecionar ${d.titulo}` } : undefined}
                     onAbrir={() => { if (d.tipo_origem === 'questoes') { routerTopo.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`) } else setDetalheId(d.id) }}
                     onAcesso={() => setAcessoDoc(d)}
                     onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })}
@@ -747,7 +818,12 @@ export function BibliotecaClient() {
                 <table className="w-full min-w-max text-sm">
                   <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="sticky left-0 z-10 bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] px-4 py-2.5 font-semibold shadow-[inset_-1px_0_0_var(--border)]">Documento</th>
+                      <th className="sticky left-0 z-10 bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] px-4 py-2.5 font-semibold shadow-[inset_-1px_0_0_var(--border)]">
+                        <span className="flex items-center gap-2">
+                          <CheckSelecao marcado={ordemDocs.length > 0 && ordemDocs.every((i) => selDocs.sel.has(i)) ? true : ordemDocs.some((i) => selDocs.sel.has(i)) ? 'mixed' : false} onToggle={() => { setModoSel(true); selDocs.todos(ordemDocs) }} rotulo="Selecionar todos os documentos da lista" />
+                          Documento
+                        </span>
+                      </th>
                       {colunas.tipo && <th className="px-4 py-2.5 text-center font-semibold">Tipo</th>}
                       {!ehModelo && colunas.status && <th className="px-4 py-2.5 text-center font-semibold">Status</th>}
                       {!ehModelo && CAMPOS_META.map((c) => colunas[c.k] && <th key={c.k} className="whitespace-nowrap px-4 py-2.5 font-semibold">{c.rot}</th>)}
@@ -759,8 +835,8 @@ export function BibliotecaClient() {
                     {docsFiltrados.map((d) => {
                       const Icone = ICONE_TIPO[d.tipo_origem] ?? FileText
                       return (
-                        <tr key={d.id} onClick={() => setDetalheId(d.id)} className="group cursor-pointer border-b last:border-0 hover:bg-muted/40">
-                          <td className="sticky left-0 z-10 min-w-[16rem] max-w-[26rem] bg-card px-4 py-2.5 shadow-[inset_-1px_0_0_var(--border)] group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]"><span className="flex items-center gap-2"><Icone className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate font-medium" title={d.titulo}>{d.titulo}</span></span></td>
+                        <tr key={d.id} onClick={(e) => { if (modoSel) selDocs.alternar(d.id, e.shiftKey, ordemDocs); else setDetalheId(d.id) }} aria-selected={modoSel ? selDocs.sel.has(d.id) : undefined} className={`group cursor-pointer border-b last:border-0 hover:bg-muted/40 ${modoSel && selDocs.sel.has(d.id) ? 'bg-primary/5' : ''}`}>
+                          <td className="sticky left-0 z-10 min-w-[16rem] max-w-[26rem] bg-card px-4 py-2.5 shadow-[inset_-1px_0_0_var(--border)] group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]"><span className="flex items-center gap-2"><CheckSelecao marcado={selDocs.sel.has(d.id)} onToggle={(sh) => { setModoSel(true); selDocs.alternar(d.id, sh, ordemDocs) }} rotulo={`Selecionar ${d.titulo}`} /><Icone className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate font-medium" title={d.titulo}>{d.titulo}</span></span></td>
                           {colunas.tipo && <td className="px-4 py-2.5 text-center"><SeloTipo kind={docKind(d.tipo_origem)} tamanho="sm" /></td>}
                           {!ehModelo && colunas.status && <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>}
                           {!ehModelo && CAMPOS_META.map((c) => colunas[c.k] && (
@@ -791,6 +867,22 @@ export function BibliotecaClient() {
         </div>
       )}
 
+      {modoSel && !loteDlg && !regAtualizacao && (
+        <BarraLote
+          nDocs={nSelDocs} nPastas={nSelPastas} totalVisivel={totalVisivel} todosMarcados={todosMarcados} ehModelo={ehModelo}
+          onTodos={selecionarTodos} onLimpar={limparSelecao} onSair={sairSelecao} onAcao={acaoLote}
+        />
+      )}
+      {loteDlg && (
+        <LoteDialog
+          titulo={loteDlg.titulo} alvoBase={loteDlg.alvo} secoes={loteDlg.secoes} config={loteDlg.config} inicial={loteDlg.inicial} ehModelo={ehModelo}
+          pausado={!!capaDlg || !!regAtualizacao}
+          onFechar={() => setLoteDlg(null)} onConcluido={loteConcluido}
+          onCapa={loteDlg.alvo.pastaIds.length === 1 && !ehModelo ? () => setCapaDlg({ tipo: 'pasta', id: loteDlg.alvo.pastaIds[0] }) : undefined}
+          onAtualizacao={(alvo) => setRegAtualizacao(alvo)}
+        />
+      )}
+      {regAtualizacao && <RegistrarAtualizacaoLote alvo={regAtualizacao} onFechar={() => setRegAtualizacao(null)} onDone={() => { carregar(pastaAtual) }} />}
       {capaDlg && <CapaPaginaDialog alvo={capaDlg} onFechar={() => setCapaDlg(null)} onSalvo={() => carregar(pastaAtual)} />}
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
       {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)}
@@ -843,8 +935,9 @@ export function BibliotecaClient() {
 
 
 /** Card de documento (grid) — CardConteudo + selo por tipo + capa lazy (thumb docx) + menu "…". */
-function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onCapaPagina, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
+function DocCard({ d, categoria, thumbInicial, restrito, selecao, onAbrir, onAcesso, onCapaPagina, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
   d: Doc; categoria: Categoria; thumbInicial?: string; restrito?: boolean
+  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string }
   onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onEditarOffice: () => void; onBaixar: () => void
   onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
@@ -858,6 +951,7 @@ function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onCa
       titulo={d.titulo}
       capaUrl={capaUrl}
       onClick={onAbrir}
+      selecao={selecao}
       pilulas={categoria === 'modelo_caderno' ? undefined : <><BadgeStatus s={d.status} /><AccessLabel restrito={restrito} /></>}
       acoes={<MenuDoc d={d} categoria={categoria} onAbrir={onAbrir} onAcesso={onAcesso} onCapaPagina={onCapaPagina} onEditarOffice={onEditarOffice} onBaixar={onBaixar} onRenomear={onRenomear} onMover={onMover} onArquivar={onArquivar} onDuplicar={onDuplicar} />}
     />

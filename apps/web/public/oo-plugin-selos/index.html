@@ -137,6 +137,7 @@
 })();
 </script>
 <script>
+var OOT=''; try{OOT=localStorage.getItem('oo_plugin_token')||'';}catch(e){}
 /* ============================================================================================
    Plugin "Selos" (OnlyOffice, Word, painel).
    CONTRATO (o servidor depende — NÃO MUDAR): o selo é uma TAG DE TEXTO `<codigo>` (ou `<codigo sm|ic>`) no
@@ -159,7 +160,7 @@ function imgDe(s, v){ return v==='sm' && s.imgSm ? s.imgSm : v==='ic' && s.imgIc
 
 /* ---------- biblioteca ---------- */
 function carregar(){
-  fetch('/api/teste/selos-biblioteca', { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(d){
+  fetch('/api/teste/selos-biblioteca', { cache:'no-store', headers: OOT ? {'x-oo-token':OOT} : {} }).then(function(r){ return r.json(); }).then(function(d){
     SELOS = (d && d.selos) || [];
     MAPA = {};
     SELOS.forEach(function(s){

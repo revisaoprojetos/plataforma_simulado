@@ -61,12 +61,14 @@ export function SeloCronograma({ p }: { p: PastaConteudo }) {
 
 /** Dropdown em PORTAL (document.body, posição fixed ancorada no botão) — fica ACIMA de qualquer card/seção,
  *  sem ser preso por contexto de empilhamento/overflow de ancestrais (o bug do clique cair no card de baixo). */
-export function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onCapaPagina, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir, onDisciplinaCron, onRemoverDisciplinaCron, onTipoMaterialCron, onLegendaTabela }: {
+export function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onCapaPagina, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir, onDisciplinaCron, onRemoverDisciplinaCron, onTipoMaterialCron, onLegendaTabela, onConfigurar }: {
   p: PastaConteudo; categoria: Categoria; ancestralEhDisciplina: boolean
   onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onRenomear: () => void; onMudarCor: (cor: string | null) => void
   onMover: (destinoId: string | null) => void; onCopiarLink: () => void; onExcluir: () => void
   onDisciplinaCron: (classificacao: string | null) => void; onRemoverDisciplinaCron: () => void; onTipoMaterialCron: (tipo: string | null) => void
   onLegendaTabela: (ocultar: boolean | null) => void
+  /** Opcional: "Configurar pasta…" (ação em lote nos documentos da pasta). */
+  onConfigurar?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
@@ -98,6 +100,7 @@ export function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAces
           <DropdownMenuItem onClick={onAbrir}><FolderInput className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
           {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
           {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onCapaPagina}><ImageIcon className="mr-2 h-4 w-4" /> Capa e página inicial…</DropdownMenuItem>}
+          {onConfigurar && <DropdownMenuItem onClick={onConfigurar}><Settings2 className="mr-2 h-4 w-4" /> Configurar pasta…</DropdownMenuItem>}
           <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onCopiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>

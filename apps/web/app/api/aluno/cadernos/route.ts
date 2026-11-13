@@ -23,14 +23,24 @@ export async function GET() {
   const [{ data: itens }, { data: extras }] = ids.length
     ? await Promise.all([
         svc.from('simulado_aluno_caderno_questoes').select('caderno_id').in('caderno_id', ids),
-        svc.from('simulado_aluno_caderno_itens').select('caderno_id').eq('tenant_id', sessao.tenantId).in('caderno_id', ids),
+        svc.from('simulado_aluno_caderno_itens').select('caderno_id, tipo').eq('tenant_id', sessao.tenantId).in('caderno_id', ids),
       ])
     : [{ data: [] as any[] }, { data: [] as any[] }]
-  const contagem: Record<string, number> = {}
-  for (const i of [...(itens ?? []), ...(extras ?? [])]) contagem[i.caderno_id] = (contagem[i.caderno_id] ?? 0) + 1
+  // Contagem por tipo (questões, comentários, grifos, anotações) — um tally só, sem N+1.
+  type Cont = { questoes: number; comentarios: number; grifos: number; anotacoes: number }
+  const porTipo: Record<string, Cont> = {}
+  const cont = (id: string) => (porTipo[id] ??= { questoes: 0, comentarios: 0, grifos: 0, anotacoes: 0 })
+  for (const q of itens ?? []) cont(q.caderno_id).questoes++
+  for (const i of extras ?? []) {
+    const c = cont(i.caderno_id)
+    if (i.tipo === 'grifo') c.grifos++; else if (i.tipo === 'anotacao') c.anotacoes++; else c.comentarios++
+  }
 
   return NextResponse.json({
-    cadernos: (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, total: contagem[c.id] ?? 0 })),
+    cadernos: (cadernos ?? []).map((c: any) => {
+      const t = porTipo[c.id] ?? { questoes: 0, comentarios: 0, grifos: 0, anotacoes: 0 }
+      return { id: c.id, nome: c.nome, total: t.questoes + t.comentarios + t.grifos + t.anotacoes, ...t }
+    }),
   })
 }
 

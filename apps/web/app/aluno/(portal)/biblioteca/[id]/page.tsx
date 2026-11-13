@@ -3,6 +3,8 @@ import { after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { carregarDocParaLeitura, registrarLeituraAluno, lerProgressoLeituraAluno, diagnosticarFalhaLeitura, type MotivoFalhaLeitura } from '@/lib/conteudo/leitor'
 import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
+import { novidadesDoDocumento } from '@/lib/admin-revisao/atualizacoes'
+import { formatBrt } from '@/lib/brt'
 import { paginaInicialDoDocumento } from '@/lib/conteudo/capa-pagina-server'
 import { MidiaPlayer } from '@/components/aluno/midia-player'
 import { getCurrentTenantId } from '@/lib/tenant'
@@ -11,6 +13,7 @@ import { resolverVideoLeitura } from '@/lib/conteudo/video-leitura'
 import { createAdminClient } from '@/lib/supabase/server'
 import { liberacaoDoc, type Liberacao } from '@/lib/cronograma/adaptativo/liberacao'
 import Link from 'next/link'
+import { bibliotecaLiberada, DESTINO_SEM_ACESSO } from '@/lib/nova/area-aluno-acesso'
 
 const fmtData = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}` }
 
@@ -83,13 +86,21 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const metaAtual = typeof sp?.meta === 'string' ? sp.meta.slice(0, 40) : ''
   // ?voltar=/aluno/... — para onde o "Voltar" do leitor retorna (do cronograma volta ao cronograma,
   // não à Biblioteca). Só aceita rota interna /aluno/ (segurança). Padrão: Biblioteca.
-  const voltarHref = typeof sp?.voltar === 'string' && sp.voltar.startsWith('/aluno/') ? sp.voltar.slice(0, 200) : '/aluno/biblioteca'
+  const voltarPedido = typeof sp?.voltar === 'string' && sp.voltar.startsWith('/aluno/') && !sp.voltar.startsWith('//') ? sp.voltar.slice(0, 200) : null
   // ?tseg=N — tempo (segundos) já acumulado nesta meta; o cronômetro do leitor conta a partir dele.
   const tempoBase = Math.max(0, Math.min(999999, Math.trunc(Number(sp?.tseg)) || 0))
   // ?tdet=N — TEMPO DETERMINADO da meta (planejado, em segundos); o leitor mostra contagem regressiva.
   const tempoDeterminadoSeg = Math.max(0, Math.min(999999, Math.trunc(Number(sp?.tdet)) || 0))
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
+
+  // "VOLTAR" SEGURO: a Biblioteca (navegação) é área restrita (allowlist). Quem NÃO é liberado nunca volta para ela —
+  // nem pelo padrão do leitor nem por um ?voltar=/aluno/biblioteca: cai no Painel de estudos (de onde costuma ter vindo).
+  const bibLiberada = await bibliotecaLiberada(sessao.tenantId, sessao.estudanteId, sessao.email)
+  const apontaBiblioteca = (h: string) => h === '/aluno/biblioteca' || h.startsWith('/aluno/biblioteca?') || h.startsWith('/aluno/biblioteca#')
+  const voltarHref = voltarPedido && !(apontaBiblioteca(voltarPedido) && !bibLiberada)
+    ? voltarPedido
+    : (bibLiberada ? '/aluno/biblioteca' : DESTINO_SEM_ACESSO)
 
   // LOADER UNIFICADO: 1 fetch do doc + 1 decisão de acesso (cacheada 60s), ramifica mídia/PDF.
   // Antes eram DUAS passagens (carregarMidiaAluno + carregarLeituraPdf), cada uma re-buscando o doc +
@@ -102,12 +113,14 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const supa = createAdminClient()
   const paginaExplicitaP = sp?.pagina !== undefined && Number.isFinite(Number(sp.pagina))
   const doCronogramaP = !!sp?.meta || !!sp?.partes
-  const [lib, tt, video0, doc, salvo] = await Promise.all([
+  const [lib, tt, video0, doc, salvo, nov] = await Promise.all([
     tenantId ? liberacaoDoc(supa, tenantId, sessao.estudanteId, id) : Promise.resolve(null),
     getTenantTheme().catch(() => null),
     tenantId ? resolverVideoLeitura(supa, tenantId, id, sessao.estudanteId).catch(() => null) : Promise.resolve(null),
     carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null }).catch(() => null),
     !paginaExplicitaP && !doCronogramaP && tenantId ? lerProgressoLeituraAluno(tenantId, sessao.estudanteId, id).catch(() => null) : Promise.resolve(null),
+    // Novidades da versão (registro de atualizações PUBLICADAS e visíveis ao aluno).
+    tenantId ? novidadesDoDocumento(supa, tenantId, id).catch(() => null) : Promise.resolve(null),
   ])
   if (lib?.bloqueado) return <MaterialBloqueado lib={lib} voltarHref={voltarHref} />
   // IDENTIDADE da empresa no leitor: logo (versão clara, p/ a barra roxa) + nome.
@@ -137,11 +150,20 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   // roda APÓS a resposta (`after`), tirando o upsert + o write-behind do caminho crítico da abertura.
   const estudanteId = sessao.estudanteId
   const versaoId = doc.kind === 'midia' ? doc.midia.versaoId : doc.kind === 'texto' ? doc.texto.versaoId : doc.pdf.versaoId
+  // SELO DE VERSÃO na barra do leitor: número da versão VIGENTE (simulado_conteudo_versoes.numero, cacheado 1h por versaoId).
+  // Tooltip = rótulo + data da última atualização publicada (já carregada acima em `nov`, sem query extra).
+  // O selo mostra SÓ o rótulo que o admin/professor criou ao publicar a atualização do documento (ex.: "Versão 2026.2");
+  // o número interno da versão (auto-incrementado a cada reimportação) NÃO aparece mais para o aluno.
+  const rotuloVersao = (nov?.ultimoRotulo ?? '').trim()
+  const tooltipVersao = [rotuloVersao, nov?.atualizadoEm ? `atualizado em ${(formatBrt(nov.atualizadoEm) ?? '').slice(0, 10)}` : ''].filter(Boolean).join(' · ')
+  const versaoTag = rotuloVersao ? { texto: rotuloVersao.length > 28 ? `${rotuloVersao.slice(0, 27)}…` : rotuloVersao, titulo: tooltipVersao } : null
+  // Aba lateral "Atualizações": o iframe carrega a lista sob demanda (GET /api/aluno/atualizacoes?documentoId=); aqui só o indicador.
+  const atualizacoes = { documentoId: id, recente: !!nov?.recente, ultimaEm: nov?.atualizadoEm ?? null }
   after(() => registrarLeituraAluno(id, estudanteId, versaoId).catch(() => {}))
 
   // MÍDIA (vídeo/áudio): player nativo.
   if (doc.kind === 'midia') {
-    return <MidiaPlayer titulo={doc.midia.titulo} url={doc.midia.url} kind={doc.midia.kind} voltarHref={voltarHref} />
+    return <MidiaPlayer titulo={doc.midia.titulo} url={doc.midia.url} kind={doc.midia.kind} voltarHref={voltarHref} podeBaixar={doc.midia.podeBaixar} versaoTag={versaoTag} />
   }
 
   // DOCUMENTO LEGPROC (marca no admin): leitor do Juris em modo TEXTO, com os entendimentos STF/STJ
@@ -157,6 +179,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       }))
     return (
       <LeitorBiblioteca
+      versaoTag={versaoTag}
+      atualizacoes={atualizacoes}
       marca={marca}
       video={video}
         documentoId={t.documentoId}
@@ -180,6 +204,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const leitura = doc.pdf
   return (
     <LeitorBiblioteca
+      versaoTag={versaoTag}
+      atualizacoes={atualizacoes}
       marca={marca}
       video={video}
       documentoId={leitura.documentoId}

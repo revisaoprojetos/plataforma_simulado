@@ -7,6 +7,7 @@ import type { ItemLP } from './motor28'
 import { catalogoLegProc } from './lp-catalogo'
 import { carregarPastasCP } from '@/lib/conteudo/capa-pagina-server'
 import { mapaPastas, resolverPaginaInicialDoc } from '@/lib/conteudo/capa-pagina'
+import { descontarPaginaInicial } from '@/lib/conteudo/paginas-efetivas'
 import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
 import { lerOverride } from './catalogo-override-db'
 import { lerDiscSemTipo } from './config-metas'
@@ -206,6 +207,8 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
 
   const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
 
+  // PRIORIDADE DE PÁGINAS por aula: REAL da Biblioteca (versão atual − página inicial) > override EXPLÍCITO do admin (Catálogo de
+  //  metas, aplicado depois em comOverride) > planilha/modelo (catalogo-html) > 40. A planilha NÃO vence mais o real.
   // 5) monta AS agrupado por disciplina (ordem alfabética-natural do título).
   //    A POSIÇÃO em AS é o id das metas dos planos (pf:<i>) → a montagem (ordem das disciplinas do banco +
   //    título) NÃO muda. O que vem do modelo (catalogo-html) enriquece cada aula: nome canônico da disciplina,
@@ -213,7 +216,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   const porDisc = new Map<string, Array<{ id: string; titulo: string; pags: number | null }>>()
   for (const d of aulaDocs) {
     const pagsTotal = (d.versaoId && pagPorVersao.get(d.versaoId)) || null
-    const pags = pagsTotal ? Math.max(1, pagsTotal - ((inicioPorDoc.get(d.id) ?? 1) - 1)) : null // sem a parte anterior à página inicial
+    const pags = descontarPaginaInicial(pagsTotal, inicioPorDoc.get(d.id) ?? 1) // sem a parte anterior à página inicial (função única compartilhada)
     const arr = porDisc.get(d.discNome) || []; arr.push({ id: d.id, titulo: d.titulo, pags }); porDisc.set(d.discNome, arr)
   }
   const ASout: AS = []
@@ -229,7 +232,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
       const i = ASout.length, h = aulaHTML(di.nome, a.titulo)
       if (h && !daPlanilha.has(h.idx)) {
         daPlanilha.set(h.idx, i)
-        ASout.push([nome, h.numero, h.tema, h.paginas || a.pags || PAG_PADRAO, h.qc, h.tec, a.id]); modeloIdx.push(h.idx)
+        ASout.push([nome, h.numero, h.tema, a.pags || h.paginas || PAG_PADRAO, h.qc, h.tec, a.id]); modeloIdx.push(h.idx)
       } else {
         // 7º campo = id do doc da Biblioteca → abre no leitor v2 (/aluno/biblioteca/<id>).
         ASout.push([nome, String(numeroAula(a.titulo) ?? k + 1), a.titulo, a.pags || PAG_PADRAO, '', '', a.id]); modeloIdx.push(-1)

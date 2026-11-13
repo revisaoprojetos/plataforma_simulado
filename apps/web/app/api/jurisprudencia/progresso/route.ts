@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { checkPermission } from '@/lib/auth/permissions'
 import { temAcessoDesafio, perfilAlunos, lerDesafioJogo } from '@/lib/jurisprudencia/conteudo'
 import { ehTestadorModulo } from '@/lib/leitura/testadores'
@@ -201,6 +202,7 @@ export async function POST(request: NextRequest) {
     { onConflict: 'desafio_id,estudante_id' },
   )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  void registrarAtividade(sessao, { tipo: 'jogo_progresso', refTipo: 'jurisprudencia_desafio', refId: String(desafioId), meta: { recorde } })
 
   // NB: a SEQUÊNCIA do juris NÃO é mais marcada aqui. Antes, cada save/re-sync do arcade gravava um marcador
   // de "dia ativo" — então só interagir com o arcade (ou um re-sync do localStorage) já contava como

@@ -42,7 +42,7 @@ function rotuloDia(iso: string): { label: string; idx: number } {
 
 function metaView(m: MetaDatada, emissaoId: string): MetaView {
   const { label, idx } = rotuloDia(m.data)
-  const resolverHref = (m.qtdQuestoes ?? 0) > 0 ? `/aluno/cronograma/resolver/${m.id}?voltar=/aluno/cronograma` : null
+  const resolverHref = (m.qtdQuestoes ?? 0) > 0 ? `/aluno/cronograma/resolver/${m.id}?voltar=${encodeURIComponent(`/aluno/cronograma/${emissaoId}`)}` : null
   return { id: m.id, day: idx, dayLabel: label, type: goalDe(m.tipoDef?.slug || m.tipo), title: m.titulo, dur: m.duracao || '', resolverHref }
 }
 

@@ -8,9 +8,14 @@ import { lerAulasProduto, lerCfg, lerResumo, listarMaterias, listarPagina, lista
 import { ConfigPainel, SeletorProduto } from './config-painel'
 import { TabelaLiberacao } from './tabela-liberacao'
 import { dataBr, PPS_LIBERACAO, PP_PADRAO_LIBERACAO, type FiltrosLiberacao } from './tipos'
+import { VIS_LIBERACAO, type VisLiberacao } from './tipos-trilhas'
+import { hrefMapaRegras } from '@/lib/produtos/mapa-regras-tipos'
+import { AbaCronogramas } from './cronogramas/aba-cronogramas'
+import { AbaRegras } from './regras/aba-regras'
+import AlunosExcecoesLog from './alunos'
 
 // Sub-aba "Liberação de aulas" do Gerador de Cronograma: consulta e edição da data em que cada aula do extensivo
-// abre para o aluno. Só LÊ dados prontos (./dados): filtro, ordenação e paginação no banco. Param: ?produto=…&q&disc&vinc&ativo&de&ate&ord&dir&pag&pps.
+// abre para o aluno. Navegação interna por ?vis= (aulas | cronogramas | regras | alunos | excecoes | log). Só LÊ dados prontos (./dados): filtro, ordenação e paginação no banco. Param: ?produto=…&q&disc&vinc&ativo&de&ate&ord&dir&pag&pps.
 
 type SP = Record<string, string | string[] | undefined>
 const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -30,7 +35,12 @@ export default async function GeradorLiberacaoAulas({ sp, tenantId, basePath }: 
   const produtos = await listarProdutos(svc, tenantId)
   const produtoId = qs.produto && UUID_RE.test(qs.produto) && produtos.some((p) => p.id === qs.produto) ? qs.produto : ''
 
-  const seletor = <SeletorProduto produtos={produtos} atual={produtoId} />
+  const seletor = (
+    <div className="flex flex-wrap items-center justify-between gap-x-4">
+      <SeletorProduto produtos={produtos} atual={produtoId} />
+      {produtoId && <Link href={hrefMapaRegras(produtoId)} className="mb-4 text-sm font-medium text-primary hover:underline">Ver mapa de regras deste produto</Link>}
+    </div>
+  )
   if (!produtoId) {
     return (
       <div className="w-full">
@@ -39,6 +49,22 @@ export default async function GeradorLiberacaoAulas({ sp, tenantId, basePath }: 
       </div>
     )
   }
+
+  const vis: VisLiberacao = VIS_LIBERACAO.some((v) => v.id === qs.vis) ? (qs.vis as VisLiberacao) : 'aulas'
+  const manter = ['aba', 'sub', 'produto', 'pps']
+  const abas = (
+    <nav role="tablist" aria-label="Liberação de aulas" className="mb-4 flex flex-wrap gap-x-5 border-b">
+      {VIS_LIBERACAO.map((v) => (
+        <Link key={v.id} role="tab" aria-selected={vis === v.id} href={hrefCom(pathname, Object.fromEntries(manter.map((k) => [k, qs[k]])), { vis: v.id === 'aulas' ? undefined : v.id })}
+          className={`-mb-px border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors ${vis === v.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+          {v.titulo}
+        </Link>
+      ))}
+    </nav>
+  )
+  if (vis === 'cronogramas') return <div className="w-full">{seletor}{abas}<AbaCronogramas svc={svc} tenantId={tenantId} produtoId={produtoId} qs={qs} pathname={pathname} podeEditar={podeEditar} /></div>
+  if (vis === 'regras') return <div className="w-full">{seletor}{abas}<AbaRegras svc={svc} tenantId={tenantId} produtoId={produtoId} podeEditar={podeEditar} /></div>
+  if (vis === 'alunos' || vis === 'excecoes' || vis === 'log') return <div className="w-full">{seletor}{abas}<AlunosExcecoesLog produtoId={produtoId} vis={vis} sp={sp} basePath={basePath} /></div>
 
   const dir = qs.dir === 'desc' ? 'desc' : 'asc'
   const pagina = ParamsInt(qs.pag, 1)
@@ -65,6 +91,7 @@ export default async function GeradorLiberacaoAulas({ sp, tenantId, basePath }: 
   return (
     <div className="w-full">
       {seletor}
+      {abas}
       {!tabelasOk && <Nota tipo="aviso">As tabelas da liberação de aulas ainda não existem neste banco: aplique a migração 20261117010000_produto_liberacao_aulas.sql (e recarregue o schema). Até lá esta aba fica somente para consulta e nada é gravado.</Nota>}
 
       <KpiGrid cols={4}>

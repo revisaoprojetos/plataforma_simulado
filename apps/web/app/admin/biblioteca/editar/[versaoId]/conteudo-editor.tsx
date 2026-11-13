@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Eye } from 'lucide-react'
+import { ArrowLeft, Eye, ClipboardPen } from 'lucide-react'
 import type { PaletaBlocos } from '@/lib/conteudo/blocos-palette'
+import { RegistrarAtualizacaoDialog } from '@/components/biblioteca/gestao/registrar-atualizacao-dialog'
 
 declare global { interface Window { DocsAPI?: any } }
 
@@ -15,9 +16,14 @@ const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
 const PLUGIN_AREAS_GUID = 'asc.{8B2D5E71-4F3A-4C19-9A60-D1E7A2B3C4F5}'
 const PLUGIN_EXPANSOR_GUID = 'asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}'
 
-export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca' }: {
-  versaoId: string; documentoId?: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string
+export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca', ooToken = null, podeRegistrar = false, registroAtivo = false }: {
+  versaoId: string; documentoId?: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string; ooToken?: string | null
+  /** Mostra "Registrar atualização" (ponto de versão do professor). */
+  podeRegistrar?: boolean
+  /** Tenant usa o registro de versões como fonte de publicação: salvar NÃO publica; publicar é feito ao registrar. */
+  registroAtivo?: boolean
 }) {
+  const [registrando, setRegistrando] = useState(false)
   const montado = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -31,6 +37,7 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
     const pluginExpansorConfig = `${origin}/oo-plugin-expansor/config.json`
     const pluginSelosConfig = `${origin}/oo-plugin-selos/config.json`
     try { localStorage.setItem('teste_oo_docid', versaoId) } catch { /* sem storage, prévia do plugin degrada */ }
+    try { if (ooToken) localStorage.setItem('oo_plugin_token', ooToken) } catch { /* plugin sem token: só funciona com sessão admin */ }
     // id do DOCUMENTO (não da versão): o plugin Expansor usa p/ abrir o leitor do aluno ("Abrir no leitor do aluno").
     try { if (documentoId) localStorage.setItem('oo_documento_id', documentoId) } catch { /* botão do plugin avisa */ }
     // Paleta dos blocos derivada da MARCA do tenant → o plugin usa estas cores (fallback = navy+dourado).
@@ -97,8 +104,11 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
           <>
             <Link href={voltarHref} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {voltarLabel}</Link>
             <span className="text-sm font-semibold">{titulo}</span>
-            <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">Rascunho · salvar re-reconcilia os grifos</span>
-            <a href={`/admin/biblioteca/editar/${versaoId}?preview=1`} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><Eye className="h-4 w-4" /> Ver com valores</a>
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">{registroAtivo ? 'Rascunho · o aluno só vê ao publicar em “Registrar atualização”' : 'Rascunho · salvar re-reconcilia os grifos'}</span>
+            {podeRegistrar && documentoId && (
+              <button type="button" onClick={() => setRegistrando(true)} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><ClipboardPen className="h-4 w-4" /> Registrar atualização</button>
+            )}
+            <a href={`/admin/biblioteca/editar/${versaoId}?preview=1`} target="_blank" rel="noopener noreferrer" className={`${podeRegistrar && documentoId ? '' : 'ml-auto '}inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary`}><Eye className="h-4 w-4" /> Ver com valores</a>
           </>
         )}
       </header>
@@ -107,6 +117,9 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
           <div className="max-w-lg rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"><p className="font-semibold">OnlyOffice não carregou.</p><p className="mt-2">{erro}</p></div>
         </div>
       ) : <div className="min-h-0 flex-1"><div id="oo-conteudo" className="h-full w-full" /></div>}
+      {podeRegistrar && documentoId && (
+        <RegistrarAtualizacaoDialog documentoIds={[documentoId]} versaoId={versaoId} open={registrando} onOpenChange={setRegistrando} />
+      )}
     </div>
   )
 }

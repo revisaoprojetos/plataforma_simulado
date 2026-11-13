@@ -1,4 +1,6 @@
+import { emailSeguro, filtroEmailOr } from '@/lib/seguranca/email-seguro'
 import { NextRequest, NextResponse } from 'next/server'
+import { registrarAcesso, registrarAtividade, ipDeHeaders, type MetodoAcesso } from '@/lib/acessos/registro'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
@@ -120,13 +122,14 @@ export async function POST(request: NextRequest) {
   const metodo = (simulado.metodo_identificacao as string) ?? 'email'
   // Identifica por e-mail PRINCIPAL ou por qualquer SECUNDÁRIO (mesmo perfil). deletado=false +
   // limit(1): ignora cadastros soft-deletados e tolera duplicata (mesmo e-mail).
-  const emailNorm = email.toLowerCase().trim()
+  const emailNorm = emailSeguro(email)
+  if (!emailNorm) return bloqueio(tenantId, 'bloqueio_identidade', { simulado: tituloSimulado })
   const { data: estudantesMatch } = await supabase
     .from('simulado_estudantes')
     .select('id, nome, email, user_id, cpf, telefone, classificacao')
     .eq('tenant_id', simulado.tenant_id)
     .eq('deletado', false)
-    .or(`email.ilike.${emailNorm},emails_secundarios.cs.{${emailNorm}}`)
+    .or(filtroEmailOr(emailNorm))
     .order('id')
     .limit(1)
   const estudante = estudantesMatch?.[0]
@@ -355,6 +358,8 @@ export async function POST(request: NextRequest) {
     }
 
     sessaoId = novaSessao.id
+    // Registro de atividade: início de simulado (fire-and-forget; testador marcado em meta).
+    void registrarAtividade({ tenantId, estudanteId: estudante.id }, { tipo: 'simulado_iniciado', refTipo: 'simulado', refId: simulado.id, titulo: tituloSimulado, meta: { sessao_id: sessaoId, teste: ehTeste || undefined } })
 
     // Notifica sistemas externos só na prova REAL (não em sessão de teste).
     if (!ehTeste) {
@@ -369,6 +374,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Registro de acessos (IP/aparelho): 1 linha por sessão de prova (retomadas só atualizam o "visto").
+  try {
+    registrarAcesso({
+      tenantId, estudanteId: estudante.id, metodo: (['email', 'email_cpf', 'email_telefone'].includes(metodo) ? metodo : 'outro') as MetodoAcesso,
+      origem: 'embed', refSeed: `embed:${sessaoId}`,
+      ctx: { ip: ipDeHeaders(request.headers), ua: request.headers.get('user-agent')?.slice(0, 400) ?? null },
+    })
+  } catch { /* best-effort */ }
   // Auditoria: acesso do aluno ao simulado (entrada na prova).
   await registrarAudit({
     operacao: 'LOGIN', entidade: 'simulado_acesso', entidadeId: estudante.id, atorTipo: 'estudante', tenantId,

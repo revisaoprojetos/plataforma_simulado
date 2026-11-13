@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { registrarAtividade } from '@/lib/acessos/registro'
 
 // Grifos do aluno sobre o PDF FIEL da Biblioteca. Scope SEMPRE por (estudante, tenant); gate: documento
 // publicado do tenant. Âncora por (página + retângulos normalizados 0..1), independente de zoom.
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     nota: b.nota ? String(b.nota).slice(0, 4000) : null, texto: b.texto ? String(b.texto).slice(0, 4000) : null,
   }).select('id').single()
   if (r.error) return NextResponse.json({ message: r.error.message }, { status: 500 })
+  void registrarAtividade(sessao, { tipo: 'grifo_criado', refTipo: 'conteudo_doc', refId: String(b.documento_id), meta: { origem: 'pdf' } })
   return NextResponse.json({ ok: true, id: (r.data as any).id })
 }
 
@@ -53,6 +55,7 @@ export async function PATCH(request: NextRequest) {
   const svc = createAdminClient()
   const { error } = await svc.from(T_G).update(patch).eq('id', b.id).eq('aluno_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  if (patch.nota !== undefined) void registrarAtividade(sessao, { tipo: 'nota_editada', refTipo: 'conteudo_grifo', refId: String(b.id), meta: { origem: 'pdf' } })
   return NextResponse.json({ ok: true })
 }
 
@@ -64,5 +67,6 @@ export async function DELETE(request: NextRequest) {
   const svc = createAdminClient()
   const { error } = await svc.from(T_G).delete().eq('id', id).eq('aluno_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  void registrarAtividade(sessao, { tipo: 'grifo_removido', refTipo: 'conteudo_grifo', refId: String(id), meta: { origem: 'pdf' } })
   return NextResponse.json({ ok: true })
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 
 /**
  * Feed de atividade para o sino do admin: alunos que finalizaram simulados
@@ -13,11 +13,28 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('simulados:view'))) {
-    return NextResponse.json({ items: [] })
+  const svc = createAdminClient()
+
+  // Notificações de SEGURANÇA (persistentes, lidas no servidor): só para quem tem seguranca:view.
+  let segItems: any[] = []
+  if (access.userId && accessCan(access, 'seguranca:view')) {
+    const { data: ns } = await svc.from('seguranca_notificacoes').select('id, titulo, mensagem, severidade, link, lida, criado_em').order('criado_em', { ascending: false }).limit(30)
+    segItems = (ns ?? []).map((n: any) => ({
+      id: `seg-${n.id}`,
+      tipo: 'seguranca' as const,
+      nome: n.titulo as string,
+      email: null,
+      descricao: `Segurança (${n.severidade}) · ${n.mensagem ?? ''}`.trim(),
+      em: n.criado_em as string,
+      href: (n.link as string) || '/admin/seguranca',
+      lida: !!n.lida,
+    }))
   }
 
-  const svc = createAdminClient()
+  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('simulados:view'))) {
+    return NextResponse.json({ items: segItems })
+  }
+
   const { data } = await svc
     .from('simulado_sessoes_prova')
     .select('id, estudante_id, simulado_id, finalizado_em, nota, estudantes:simulado_estudantes(nome, email), simulados:simulado_simulados(titulo)')
@@ -39,5 +56,6 @@ export async function GET() {
     href: (s.estudante_id && s.simulado_id) ? `/admin/estudantes/${s.estudante_id}/simulado/${s.simulado_id}?tentativa=${s.id}` : null,
   }))
 
-  return NextResponse.json({ items })
+  const todos = [...segItems, ...items].sort((a, b) => new Date(b.em).getTime() - new Date(a.em).getTime())
+  return NextResponse.json({ items: todos })
 }

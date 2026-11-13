@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
+import { exigirAcessoOO } from '@/lib/seguranca/guarda-onlyoffice'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
 import { docExiste, lerDoc, lerPrevia } from '@/lib/teste/store'
 import { DADOS_PREVIA } from '@/lib/teste/previa-dados'
@@ -72,8 +73,10 @@ async function docxAviso(linhas: { texto: string; forte?: boolean }[]): Promise<
   return Packer.toBuffer(doc)
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const negado = await exigirAcessoOO(req, { docId: id, escopo: 'ler' })
+  if (negado) return negado
   if (!docExiste(id)) return new NextResponse('not found', { status: 404 })
   const buf = await lerDoc(id)
   let out: Buffer = buf

@@ -14,13 +14,15 @@ export const RAIZ = '__raiz__'
 
 /** Painel de PASTAS e SUBPASTAS (disciplina = pasta; tipo de material = subpasta). Menu "⋮" = o MESMO MenuPasta da Biblioteca
  *  (acesso, capa, renomear, cor, mover, cronograma/tipo de material, legenda, excluir), com as MESMAS actions do legado. */
-export function PastasPainel({ arvore, pasta, onPasta, onPrefetch, podeEditar, ocultarVazias, onOcultarVazias, onMudou, onAcessoPasta, onCapaPasta, carregando, rotulos, totalGeral: totalFixo, cabecalho, iconeNo, dicaNo }: {
+export function PastasPainel({ arvore, pasta, onPasta, onPrefetch, podeEditar, ocultarVazias, onOcultarVazias, onMudou, onAcessoPasta, onCapaPasta, carregando, rotulos, onConfigurarPasta, totalGeral: totalFixo, cabecalho, iconeNo, dicaNo }: {
   arvore: ArvoreBib | null; pasta: string | null; onPasta: (id: string | null) => void; onPrefetch?: (id: string | null) => void; podeEditar: boolean
   ocultarVazias: boolean; onOcultarVazias: (v: boolean) => void; onMudou: () => void
   onAcessoPasta: (id: string, nome: string) => void; onCapaPasta: (id: string) => void; carregando: boolean
   /** Reuso para outras árvores (ex.: taxonomia do banco de questões): rótulos, total geral explícito, slot sob o título e ícone/dica por nó. */
   rotulos?: { titulo: string; todas: string; sem: string; ocultar: string; vazio: string; aria: string }
   totalGeral?: number; cabecalho?: React.ReactNode
+  /** "Configurar pasta…" (ações em lote sobre a pasta e subpastas). Ausente = item não aparece. */
+  onConfigurarPasta?: (id: string, nome: string) => void
   iconeNo?: (n: NoPasta, aberto: boolean) => React.ReactNode; dicaNo?: (n: NoPasta) => string
 }) {
   const [abertos, setAbertos] = useState<Set<string>>(new Set())
@@ -77,6 +79,7 @@ export function PastasPainel({ arvore, pasta, onPasta, onPrefetch, podeEditar, o
           {podeEditar && (
             <span className="shrink-0 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <MenuPasta p={p} categoria={categoria} ancestralEhDisciplina={ancestralDisc(n)}
+                onConfigurar={onConfigurarPasta ? () => onConfigurarPasta(n.id, n.nome) : undefined}
                 onAbrir={() => onPasta(n.id)} onAcesso={() => onAcessoPasta(n.id, n.nome)} onCapaPagina={() => onCapaPasta(n.id)}
                 onRenomear={async () => { const nome = await pedirTexto({ titulo: 'Renomear pasta', valorInicial: n.nome, confirmar: 'Salvar' }); if (nome) await ok(await renomearPasta(n.id, nome), 'Pasta renomeada.') }}
                 onMudarCor={async (c) => ok(await definirCorPasta(n.id, c), '')}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 export interface PerfilTab {
@@ -9,6 +10,8 @@ export interface PerfilTab {
   icon: ReactNode
   count?: number | null
   panel: ReactNode
+  /** Quando definido, a aba NAVEGA para outra página (dados paginados na URL) em vez de trocar o painel. */
+  href?: string
 }
 
 /**
@@ -17,7 +20,7 @@ export interface PerfilTab {
  * `inicial` casa com o deep-link `?tab=` (ex.: vindo de Assinaturas & Engajamento).
  */
 export function EstudantePerfilTabs({ tabs, inicial }: { tabs: PerfilTab[]; inicial?: string }) {
-  const valido = tabs.some((t) => t.key === inicial)
+  const valido = tabs.some((t) => t.key === inicial && !t.href)
   const [ativa, setAtiva] = useState(valido ? inicial! : tabs[0]?.key)
 
   return (
@@ -25,6 +28,18 @@ export function EstudantePerfilTabs({ tabs, inicial }: { tabs: PerfilTab[]; inic
       <div className="flex flex-wrap gap-1 rounded-xl border bg-card p-1 shadow-sm">
         {tabs.map((t) => {
           const on = ativa === t.key
+          const cls = cn(
+            'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
+            on ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )
+          if (t.href) {
+            return (
+              <Link key={t.key} href={t.href} className={cls}>
+                <span className="flex h-4 w-4 items-center justify-center">{t.icon}</span>
+                {t.label}
+              </Link>
+            )
+          }
           return (
             <button
               key={t.key}
@@ -52,7 +67,7 @@ export function EstudantePerfilTabs({ tabs, inicial }: { tabs: PerfilTab[]; inic
           (cards apareciam fora de sequência e o painel visível entrava atrasado). A entrada em si é do
           CascataEntrada/root da página — sem animação por painel aqui. Trocar de aba reinicia o estado
           interno (busca/filtros), o que é aceitável. */}
-      {tabs.filter((t) => t.key === ativa).map((t) => (
+      {tabs.filter((t) => t.key === ativa && !t.href).map((t) => (
         <div key={t.key}>{t.panel}</div>
       ))}
     </div>

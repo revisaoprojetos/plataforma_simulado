@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const id = (url.searchParams.get('id') || '').replace(/[^a-z0-9-]/gi, '')
-  const o = url.searchParams.get('o') || url.origin // origem do nosso app (alcançável pelo navegador)
+  const o = url.origin // origem do nosso app (nunca confiar em ?o= — evitaria injetar plugin externo)
   const idx = `${o}/oo-plugin/index.html${id ? `?id=${id}` : ''}`
   const res = `${o}/oo-plugin/resources`
   const config = {
@@ -44,5 +44,5 @@ export async function GET(request: Request) {
       },
     ],
   }
-  return NextResponse.json(config, { headers: { 'Access-Control-Allow-Origin': '*' } })
+  return NextResponse.json(config, { headers: { 'Access-Control-Allow-Origin': '*' } }) // config pública (sem dados): CORS necessário, o editor está em outra origem
 }

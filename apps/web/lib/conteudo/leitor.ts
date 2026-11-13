@@ -1,4 +1,5 @@
 import 'server-only'
+import { bloqueioDeDownload, registrarDownload, type OrigemDownload } from './politica-download'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
@@ -487,6 +488,15 @@ export interface MidiaAluno {
   tipoOrigem: string; kind: 'video' | 'audio'
   /** URL assinada do arquivo ORIGINAL (1h). null se o storage não gerar o link. */ url: string | null
   /** Extensão do arquivo_key (minúscula; '' se não houver). */ ext: string
+  /** Chaves de download (plataforma + documento + permissão do aluno): false → sem botão "Baixar" e sem download nativo. */ podeBaixar: boolean
+}
+
+/** O aluno pode BAIXAR esta mídia? (testador global sempre; senão: chaves plataforma/documento + permissão por atribuição). */
+async function podeBaixarMidia(svc: any, tenantId: string, alunoId: string, doc: any): Promise<boolean> {
+  if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
+  if (await bloqueioDeDownload(svc, tenantId, doc.id)) return false
+  const res = await avaliarDocAluno(svc, tenantId, alunoId, doc).catch(() => null)
+  return !!res?.permitido && !!res.permissoes.baixar
 }
 
 export async function carregarMidiaAluno(documentoId: string, alunoId: string): Promise<MidiaAluno | null> {
@@ -508,7 +518,7 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
   const { urlAssinadaOriginal } = await import('./ingestao')
   const url = await urlAssinadaOriginal(arquivoKey, 3600)
   const ext = arquivoKey.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
-  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind, url, ext }
+  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind, url, ext, podeBaixar: await podeBaixarMidia(svc, tenantId, alunoId, doc) }
 }
 
 // ─────────── LOADER UNIFICADO (abrir material: mídia OU PDF) ───────────
@@ -611,7 +621,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     const { urlAssinadaOriginal } = await import('./ingestao')
     const url = await urlAssinadaOriginal(arquivoKey, 3600)
     const ext = arquivoKey.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
-    return { kind: 'midia', midia: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind: tipoOrigem as 'video' | 'audio', url, ext } }
+    return { kind: 'midia', midia: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind: tipoOrigem as 'video' | 'audio', url, ext, podeBaixar: await podeBaixarMidia(svc, tenantId, alunoId, doc) } }
   }
 
   // "Marcado como LegProc" = interruptor do documento OU o doc está numa pasta LegProc.
@@ -687,20 +697,26 @@ async function ajustesLeituraTexto(svc: any, tenantId: string, html: string, ehJ
 }
 
 /** URL assinada do arquivo ORIGINAL para o aluno BAIXAR — só se tiver acesso (gate). null se negado. */
-export async function urlDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<string | null> {
+export async function urlDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null; origem?: OrigemDownload; metaId?: string | null } = {}): Promise<string | null> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
-  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria, tipo_origem')
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
+  const origemDl: OrigemDownload = opts.origem ?? (opts.produtoId ? 'produto' : 'biblioteca')
+  const regDl = (resultado: 'baixado' | 'bloqueado', motivo?: string) =>
+    registrarDownload(svc, { tenantId, estudanteId: alunoId, documentoId, titulo: (doc as any).titulo, origem: origemDl, metaId: opts.metaId, produtoId: opts.produtoId, tipoOrigem: (doc as any).tipo_origem, resultado, motivo })
   // TESTADOR GLOBAL: baixa qualquer material (fura "não publicado" + gate + permissão de baixar).
   if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
     if (doc.status !== 'publicado') return null
+    // Chaves de download: da PLATAFORMA (tema) e do DOCUMENTO (pode_baixar).
+    const blq = await bloqueioDeDownload(svc, tenantId, documentoId)
+    if (blq) { await regDl('bloqueado', blq); return null }
     // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
-    if (!resDl.permitido || !resDl.permissoes.baixar) return null
+    if (!resDl.permitido || !resDl.permissoes.baixar) { await regDl('bloqueado', 'permissao'); return null }
     // Download só do material JÁ LIBERADO no cronograma do aluno (com o bloqueio ativo).
-    if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
+    if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'nao_liberado'); return null } // liberação por data do Cronograma Adaptativo
   }
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null
@@ -711,31 +727,39 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
     const { data: vv } = await svc.from('simulado_conteudo_versoes').select('hash_arquivo').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
     const { chaveDocxVariante } = await import('./thumb')
     const kv = await chaveDocxVariante(tenantId, doc.versao_atual_id, (ver as any).arquivo_key, (vv as any)?.hash_arquivo ?? '', areasDl)
-    return kv ? urlAssinadaOriginal(kv, 600) : null // sem variante pronta NÃO entrega o original
+    if (!kv) return null // sem variante pronta NÃO entrega o original
+    await regDl('baixado')
+    return urlAssinadaOriginal(kv, 600)
   }
+  await regDl('baixado')
   return urlAssinadaOriginal((ver as any).arquivo_key, 600)
 }
 
 export type PreparoDownload =
   | { ok: true; titulo: string; tipoOrigem: 'pdf' | 'docx'; urlOriginal: string; urlPdf: () => Promise<string | null> }
-  | { ok: false; erro: 'negado' | 'tipo' | 'indisponivel' | 'inexistente' }
+  | { ok: false; erro: 'negado' | 'politica' | 'documento' | 'tipo' | 'indisponivel' | 'inexistente' }
 
 /**
  * Fonte do download do aluno (rota /api/aluno/biblioteca/baixar). MESMO gate de `urlDownloadAluno` (publicado + pasta/doc com
  * herança + permissão BAIXAR + liberação do cronograma; testador global fura) e MESMAS áreas de visibilidade (docx filtrado).
  * Só PDF/DOCX; demais tipos → 'tipo'. `urlPdf()` converte o DOCX (variante por áreas) em PDF só quando a rota precisa (capa).
  */
-export async function prepararDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<PreparoDownload> {
+export async function prepararDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null; origem?: OrigemDownload; metaId?: string | null } = {}): Promise<PreparoDownload> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return { ok: false, erro: 'negado' }
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria, tipo_origem')
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return { ok: false, erro: 'inexistente' }
+  const origemDl: OrigemDownload = opts.origem ?? 'cronograma'
+  const regDl = (resultado: 'baixado' | 'bloqueado', motivo?: string) =>
+    registrarDownload(svc, { tenantId, estudanteId: alunoId, documentoId, titulo: (doc as any).titulo, origem: origemDl, metaId: opts.metaId, produtoId: opts.produtoId, tipoOrigem: (doc as any).tipo_origem, resultado, motivo })
   if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
     if (doc.status !== 'publicado') return { ok: false, erro: 'negado' }
+    const blq = await bloqueioDeDownload(svc, tenantId, documentoId)
+    if (blq) { await regDl('bloqueado', blq); return { ok: false, erro: blq === 'politica' ? 'politica' : 'documento' } }
     const res = await avaliarDocAluno(svc, tenantId, alunoId, doc)
-    if (!res.permitido || !res.permissoes.baixar) return { ok: false, erro: 'negado' }
-    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return { ok: false, erro: 'negado' }
+    if (!res.permitido || !res.permissoes.baixar) { await regDl('bloqueado', 'permissao'); return { ok: false, erro: 'negado' } }
+    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return { ok: false, erro: 'negado' } }
   }
   const tipo = String((doc as any).tipo_origem ?? '')
   if (tipo !== 'pdf' && tipo !== 'docx') return { ok: false, erro: 'tipo' }
@@ -753,6 +777,7 @@ export async function prepararDownloadAluno(documentoId: string, alunoId: string
   }
   const urlOriginal = await urlAssinadaOriginal(chaveFonte, 600)
   if (!urlOriginal) return { ok: false, erro: 'indisponivel' }
+  await regDl('baixado')
   return {
     ok: true, titulo: String((doc as any).titulo ?? ''), tipoOrigem: tipo, urlOriginal,
     urlPdf: async () => {

@@ -12,6 +12,7 @@ import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/a
 import { AbaFlashcards } from './flashcards-tab'
 import { AbaAreas } from './areas-tab'
 import { AbaVideo } from './video-tab'
+import { AtualizacoesDocumento } from '@/components/biblioteca/gestao/atualizacoes-documento'
 
 // PORTE 1:1 do protótipo `Entregas.dc.html` (handoff 03b) — mesma estrutura, blocos e textos. Cores de
 // MARCA via token (white-label) + semânticas fixas (emerald/amber/rose) e selos por tipo. Onde ainda não
@@ -532,13 +533,14 @@ function AbaUso({ dados }: { dados: GestaoDados }) {
 function AbaHistorico({ dados }: { dados: GestaoDados }) {
   const versoes = dados.historico?.versoes ?? []
   const entregas = dados.historico?.entregas ?? []
-  const [sub, setSub] = useState<'ver' | 'ent'>('ver')
+  const [sub, setSub] = useState<'ver' | 'ent' | 'atu'>('ver')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="seg" role="tablist">
           <button className={sub === 'ver' ? 'sg on' : 'sg'} onClick={() => setSub('ver')} role="tab" aria-selected={sub === 'ver'}>Versões do arquivo</button>
           <button className={sub === 'ent' ? 'sg on' : 'sg'} onClick={() => setSub('ent')} role="tab" aria-selected={sub === 'ent'}>Entregas e permissões</button>
+          <button className={sub === 'atu' ? 'sg on' : 'sg'} onClick={() => setSub('atu')} role="tab" aria-selected={sub === 'atu'}>Atualizações</button>
         </div>
       </div>
       {sub === 'ver' && (
@@ -556,6 +558,7 @@ function AbaHistorico({ dados }: { dados: GestaoDados }) {
           ))}
         </div>
       )}
+      {sub === 'atu' && dados.base && <AtualizacoesDocumento documentoId={dados.base.id} />}
       {sub === 'ent' && (
         <div className="kc" style={{ gap: 0, padding: '6px 18px' }}>
           {entregas.length === 0 && <div style={{ padding: 16, fontSize: 13, color: 'var(--muted-foreground)' }}>Sem eventos de entrega/permissão registrados.</div>}

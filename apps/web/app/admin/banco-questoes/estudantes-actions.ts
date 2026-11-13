@@ -1,4 +1,5 @@
 'use server'
+import { sanearBusca } from '@/lib/seguranca/email-seguro'
 import type { AlunoBusca, DetalhesVinc, GrupoBancoOpc } from './estudantes-actions-tipos'
 
 import { createHash } from 'crypto'
@@ -50,7 +51,7 @@ export async function buscarEstudantesLote(
   if (!g.ok) return g
   const svc = createAdminClient()
   const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50)
-  const busca = (opts.busca ?? '').trim().replace(/[%,]/g, ' ')
+  const busca = sanearBusca(opts.busca ?? '')
   const { rows, total, temMais } = await carregarLote<any>(svc, 'simulado_estudantes', {
     cols: 'id, nome, email, telefone, classificacao',
     tenantId: g.tenantId,

@@ -179,6 +179,25 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 .toc-tab{flex:1;padding:6px 8px;border:0;background:none;border-radius:7px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;transition:background .15s,color .15s}
 .toc-tab:hover{color:var(--ink)}
 .toc-tab.on{background:var(--raise);color:var(--ink);box-shadow:var(--shadow-1)}
+.toc-tab[hidden]{display:none}
+.toc-tab .upd-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:5px;vertical-align:middle}
+.toc-tab .upd-dot[hidden]{display:none}
+/* aba "Atualizações" (Biblioteca): registro de versões do documento, carregado sob demanda */
+.upd-pane{display:flex;flex-direction:column;gap:10px;padding:2px 2px 8px}
+.upd-pane[hidden]{display:none}
+.upd-it{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:var(--raise);display:flex;flex-direction:column;gap:5px}
+.upd-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.upd-rot{font-size:12.5px;font-weight:700;color:var(--ink)}
+.upd-dt{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.upd-tx{font-size:12.5px;line-height:1.45;color:var(--ink-2);margin:0}
+.upd-ul{margin:0;padding-left:17px;display:flex;flex-direction:column;gap:2px;font-size:12.5px;line-height:1.4;color:var(--ink-2)}
+.upd-ul em{font-style:normal;color:var(--ink-3)}
+.upd-msg{font-size:12.5px;color:var(--ink-3);text-align:center;padding:18px 8px;line-height:1.5}
+.upd-more{align-self:center;border:1px solid var(--line);background:var(--raise);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.upd-more:disabled{opacity:.6;cursor:default}
+/* selo de versão (v3) ao fim do nome do documento na barra superior */
+.ver-tag{flex:none;font-size:11px;font-weight:700;line-height:1;padding:3px 8px;border-radius:99px;background:var(--hover);color:var(--ink-2);cursor:default}
+.app.brand-on .ver-tag{background:rgba(255,255,255,.2);color:#fff}
 .side-foot{border-top:1px solid var(--line);padding:14px 22px calc(14px + env(safe-area-inset-bottom,0px));width:272px;display:flex;flex-direction:column;gap:10px}
 .goal-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .goal-row b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -716,10 +735,28 @@ body.pdf-reading .scroller{overflow-x:clip}
 .item .acts{display:flex;opacity:0;transition:opacity .15s}
 .item:hover .acts,.item:focus-within .acts{opacity:1}
 @media (hover:none){.item .acts{opacity:1}}
+@media (pointer:coarse){.item .acts button{width:40px;height:40px}.item .acts svg{width:18px;height:18px}.chip{height:36px;padding:0 12px;font-size:13px}}
+.an-q{width:100%;height:34px;margin:0 0 8px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+.an-q:focus{outline:2px solid var(--accent,var(--ink-2));outline-offset:1px}
 .item .acts button{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--ink-3)}
 .item .acts button:hover{background:var(--hover);color:var(--ink)}
 .item .acts svg{width:14px;height:14px}
 .empty{font-size:13px;color:var(--ink-3);line-height:1.55;padding:20px 4px;text-align:center;margin:0}
+.dst{display:none;flex:none}
+.dst.on{display:block}
+.dst-h{--dst-bg:var(--brand-top-bg,var(--brand-top,var(--accent)));display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:7px 8px 7px 8px;text-align:left;font-size:13px;color:#fff;border:0;border-radius:8px;background:var(--dst-bg);box-shadow:0 1px 2px rgba(20,10,40,.18);transition:filter .15s,box-shadow .15s}
+.dst-h:hover{filter:brightness(1.1);box-shadow:0 3px 10px -3px rgba(20,10,40,.35)}
+.dst-h:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.dst-h .ic{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,.16);color:#fff;flex:none}
+.dst-h .ic .i{width:16px;height:16px}
+.dst-h .tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.dst-h .tx small{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.dst-h .tx b{font-size:13.5px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dst-h .au{flex:none;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.2);font-size:11px;font-weight:600;color:#fff}
+.dst-h .al{flex:none;display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:600;color:#fff}
+.dst-h:hover .al{background:rgba(255,255,255,.3)}
+.dst-erro{padding:6px 2px;color:var(--ink-3);font-size:12px}
+.item .acts button.on{color:var(--accent)}
 .nb-foot{border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:8px}
 .btn{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--line-2);font-weight:500;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:7px;color:var(--ink-2);background:var(--raise);white-space:nowrap}
 .btn:hover{border-color:var(--ink-3);color:var(--ink)}
@@ -1190,6 +1227,66 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
 ::-webkit-scrollbar-thumb:hover{background:var(--ink-3);background-clip:padding-box;border:3px solid transparent}
 .toast{background:var(--raise);color:var(--ink);border:1px solid var(--line)}
 .toast button{color:var(--accent);background:var(--accent-soft)}
+
+/* ===== TOPBAR ROTULADA =====
+   >=1280: ícone + rótulo lado a lado | 768-1279: rótulo pequeno sob o ícone | <768: essencial + menu "Mais" */
+.top{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.top .crumbs{flex:0 1 auto;min-width:0;overflow:hidden}
+.top .crumbs #crDay{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .fill{min-width:0}
+.top .tb,.top .cta,.top .searchbtn,.top .timer{flex:none}
+.top .tb .lbl,.top .cta .lbl{white-space:nowrap}
+.top .tb:focus-visible,.top .cta:focus-visible,.top .searchbtn:focus-visible,.more-menu button:focus-visible,#anbar .tl:focus-visible,#anbar .cd:focus-visible,#anbar .cdw:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.more-wrap{position:relative;display:none}
+.more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:220px;padding:6px;background:var(--raise);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-2);z-index:60}
+.more-menu[hidden]{display:none}
+.more-menu:not([hidden]){display:flex;flex-direction:column;gap:2px}
+.more-menu button{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--ink);text-align:left;white-space:nowrap}
+.more-menu button:hover{background:var(--hover)}
+.more-menu .i{width:18px;height:18px;flex:none}
+/* barra de ferramentas de anotação: nome sob cada ícone */
+#anbar{overscroll-behavior-x:contain;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+#anbar .tl[data-n]{width:auto;min-width:44px;height:46px;padding:6px 4px 0;display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px}
+#anbar .tl[data-n]::before{content:attr(data-n);font-size:10px;line-height:11px;font-weight:600;letter-spacing:.01em;white-space:nowrap;color:inherit;opacity:.85}
+#anbar .tl[data-n][data-colored]::after,#anbar .tl[data-n].on[data-colored]::after{top:auto;bottom:2px}
+#anbar .tl[data-n]{height:50px}
+#anbar .tl[data-n] .i{flex:none}
+#anbar .tg{flex:none}
+@media (hover:none),(pointer:coarse){#anbar .cd,#anbar .cdw{width:36px;height:36px}}
+@media (min-width:1280px){
+  .app .top .tb .lbl,.app.brand-on .top .tb .lbl{display:inline;font-size:13px}
+  .app .top .tb.focusbar .lbl{display:inline}
+  .app.brand-on .searchbtn{width:150px}
+}
+@media (min-width:768px) and (max-width:1279px){
+  .app .top .tb,.app.brand-on .top .tb{flex-direction:column;gap:2px;height:44px;min-width:48px;padding:0 6px}
+  .app .top .tb .lbl,.app.brand-on .top .tb .lbl{display:block;font-size:10.5px;line-height:11px;font-weight:600}
+  .app .top .tb .i{width:18px;height:18px}
+  .app .top .tb .badge{position:absolute;top:2px;right:0;min-width:16px;height:16px;font-size:9.5px}
+  .app .top .tb.focusbar{flex-direction:row;height:34px;gap:6px}
+  .app .top .cta .lbl-x{display:none}
+  .app .top .cta{height:36px;padding:0 12px}
+  .app .top .cta .lbl{display:inline;font-size:13px}
+}
+@media (min-width:768px) and (max-width:999px){
+  .app .top .searchbtn,.app.brand-on .top .searchbtn{width:52px;height:44px;flex-direction:column;justify-content:center;gap:2px;padding:0 6px;border:0;background:transparent;font-size:10.5px;font-weight:600;line-height:11px}
+  .app .top .searchbtn span{flex:none;text-align:center}
+  .app .top .searchbtn:hover{background:rgba(255,255,255,.16)}
+  .app .top .timer{height:28px;padding:0 8px}
+}
+@media (max-width:767px){
+  .app .top .tb,.app.brand-on .top .tb,.app .top .searchbtn{min-width:40px;height:40px}
+  .app .top .searchbtn span{display:none}
+  .app .top .searchbtn{width:40px;padding:0;justify-content:center;border:0;background:transparent}
+  .app .top .cta{width:40px;height:40px;padding:0;justify-content:center}
+  #btnType,#btnFocus,#btnMirror{display:none!important}
+  .more-wrap{display:block}
+  .more-wrap .lbl{display:none}
+  .app .top .tb .lbl{display:none}
+  #anbar{padding-inline:max(8px,env(safe-area-inset-left,0px)) max(8px,env(safe-area-inset-right,0px))}
+  #anbar .tl[data-n]{min-width:48px}
+}
+@media (prefers-reduced-motion:reduce){#anbar{scroll-behavior:auto}}
 </style>
 <style id="legproc-caixas-css">
 /* LEGPROC (modo texto da Biblioteca): entendimentos STF/STJ RECOLHÍVEIS — mesmo acordeão da Lei Seca (lib/leitura/caixas.ts
@@ -1354,7 +1451,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
 <div class="app" id="app">
   <header class="top">
     <button class="tb back" id="btnBack" title="Voltar"><svg class="i"><use href="#i-left"/></svg><span class="lbl">Voltar</span></button>
-    <button class="tb" id="btnSide" title="Abrir sumário" aria-label="Abrir sumário"><svg class="i"><use href="#i-sidebar"/></svg></button>
+    <button class="tb" id="btnSide" title="Abrir sumário" aria-label="Abrir sumário"><svg class="i"><use href="#i-sidebar"/></svg><span class="lbl">Sumário</span></button>
     <span class="brand hide-sm" id="brand" hidden><img id="brandLogo" alt=""></span>
     <span class="vsep back-sep"></span>
     <nav class="crumbs" aria-label="Você está em">
@@ -1365,7 +1462,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
     <button class="timer" id="timerChip" title="Sessão de estudo"><i></i><span id="timerTxt">25:00</span></button>
     <button class="searchbtn hide-in-focus" id="btnSearch"><svg class="i"><use href="#i-search"/></svg><span>Buscar</span><kbd>/</kbd></button>
     <div style="position:relative">
-      <button class="tb" id="btnType" title="Aparência (T)" aria-label="Aparência da leitura"><svg class="i"><use href="#i-type"/></svg><span class="lbl">Modo de leitura</span></button>
+      <button class="tb" id="btnType" title="Tipografia e aparência (T)" aria-label="Tipografia e aparência" aria-haspopup="dialog"><svg class="i"><use href="#i-type"/></svg><span class="lbl">Tipografia</span></button>
       <div class="menu" id="mnType" role="dialog" aria-label="Aparência da leitura">
         <div class="grp"><div class="lab">Modo de leitura</div><div class="seg" id="optMode"><button data-v="scroll">Contínuo</button><button data-v="paged">Um tema por vez</button></div></div>
         <div class="grp"><div class="lab">Tema</div><div class="seg" id="optTheme"><button data-v="auto">Auto</button><button data-v="light"><i class="sw" style="background:#fff"></i>Claro</button><button data-v="sepia"><i class="sw" style="background:var(--pn-f4ecda,#f4ecda)"></i>Sépia</button><button data-v="night"><i class="sw" style="background:#0c0c0f"></i>Noite</button></div></div>
@@ -1390,7 +1487,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       </div>
     </div>
     <div style="position:relative">
-      <button class="tb" id="btnFocus" title="Pomodoro (F abre o modo foco)" aria-label="Pomodoro e foco"><svg class="i"><use href="#i-focus"/></svg><span class="lbl">Pomodoro</span></button>
+      <button class="tb" id="btnFocus" title="Foco e Pomodoro (F)" aria-label="Foco e Pomodoro" aria-haspopup="dialog"><svg class="i"><use href="#i-focus"/></svg><span class="lbl">Foco</span></button>
       <div class="menu" id="mnFocus" role="dialog" aria-label="Pomodoro">
         <div class="grp" id="cronGrp" hidden>
           <div class="lab">Cronometro</div>
@@ -1417,12 +1514,27 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       </div>
     </div>
     <button class="tb focusbar on" id="btnExitFocus" title="Sair do foco (Esc)"><svg class="i"><use href="#i-x"/></svg><span class="lbl">Sair do foco</span></button>
-    <button class="tb hide-in-focus" id="btnMirror" title="Anotações (M)" aria-label="Anotações"><svg class="i"><use href="#i-mirror"/></svg><span class="lbl">Anotações</span></button>
-    <button class="tb hide-in-focus" id="btnNb" title="Meus Grifos (B)" aria-label="Meus Grifos"><svg class="i"><use href="#i-nb"/></svg><span class="lbl">Meus Grifos</span><span class="badge" id="nbBadge" hidden>0</span></button>
+    <button class="tb hide-in-focus" id="btnMirror" title="Anotações ao lado do texto (M)" aria-label="Anotações ao lado do texto"><svg class="i"><use href="#i-mirror"/></svg><span class="lbl">Anotações</span></button>
+    <button class="tb hide-in-focus" id="btnNb" title="Meus grifos (B)" aria-label="Meus grifos"><svg class="i"><use href="#i-nb"/></svg><span class="lbl">Meus grifos</span><span class="badge" id="nbBadge" hidden>0</span></button>
+    <div class="more-wrap hide-in-focus" id="moreWrap"><button class="tb" id="btnMore" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="i"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg><span class="lbl">Mais</span></button>
+      <div class="more-menu" id="moreMenu" role="menu" hidden>
+        <button type="button" role="menuitem" data-more="btnType"><svg class="i"><use href="#i-type"/></svg>Tipografia</button>
+        <button type="button" role="menuitem" data-more="btnFocus"><svg class="i"><use href="#i-focus"/></svg>Foco e Pomodoro</button>
+        <button type="button" role="menuitem" data-more="btnMirror"><svg class="i"><use href="#i-mirror"/></svg>Anotações ao lado</button>
+      </div></div>
     <span class="vsep hide-in-focus"></span>
-    <button class="cta hide-in-focus" id="btnQuest"><svg class="i"><use href="#i-quiz"/></svg><span class="lbl">Concluir leitura</span></button>
+    <button class="cta hide-in-focus" id="btnQuest" title="Concluir leitura" aria-label="Concluir leitura"><svg class="i"><use href="#i-quiz"/></svg><span class="lbl">Concluir<span class="lbl-x"> leitura</span></span></button>
     <div class="hairline"><i id="hair"></i></div>
   </header>
+  <script>/* TOPBAR ROTULADA: menu "Mais" (só celular). Apenas delega o clique aos botões existentes. */
+  (function(){var b=document.getElementById('btnMore'),m=document.getElementById('moreMenu');if(!b||!m)return;
+    function shut(){m.hidden=true;b.setAttribute('aria-expanded','false');b.classList.remove('on')}
+    b.addEventListener('click',function(e){e.stopPropagation();var o=m.hidden;if(o){document.querySelectorAll('.menu.show').forEach(function(x){x.classList.remove('show')})}m.hidden=!o;b.setAttribute('aria-expanded',o?'true':'false');b.classList.toggle('on',o)});
+    m.addEventListener('click',function(e){var t=e.target.closest('[data-more]');if(!t)return;e.stopPropagation();shut();var x=document.getElementById(t.getAttribute('data-more'));if(x)x.click()});
+    document.addEventListener('click',function(e){if(!m.hidden&&!e.target.closest('#moreWrap'))shut()});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!m.hidden){shut();b.focus()}});
+    window.addEventListener('resize',function(){if(innerWidth>=768)shut()});
+  })();</script>
 
   <aside class="side" id="side" aria-label="Sumário">
     <div class="side-h"><h2>Sumário</h2><span class="sp"></span><span id="sideCount"></span><button class="icb side-x" id="btnSideClose" title="Fechar sumário" aria-label="Fechar sumário"><svg class="i"><use href="#i-sidebar"/></svg></button></div>
@@ -1435,8 +1547,10 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       <div class="toc-tabs" id="tocTabs" role="tablist" hidden>
         <button class="toc-tab on" data-toc="indices" role="tab">Índices</button>
         <button class="toc-tab" data-toc="paginas" role="tab">Páginas</button>
+        <button class="toc-tab" data-toc="atualizacoes" id="tabUpd" role="tab" hidden>Atualizações<i class="upd-dot" id="updDot" hidden></i></button>
       </div>
       <ol class="toc" id="toc"></ol>
+      <div class="upd-pane" id="updPane" hidden></div>
     </div>
     <div class="side-foot">
       <div class="goal-row"><span id="goalLab">Leitura hoje</span><span><b id="goalMin">0</b> de <span id="goalAlvo">30</span> min</span></div>
@@ -1450,16 +1564,16 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       <div class="anbar" id="anbar" role="toolbar" aria-label="Ferramentas de marcação">
         <div class="anbar-in">
           <div class="tg">
-            <button class="tl" data-tool="select" title="Selecionar · V"><svg class="i"><use href="#t-cursor"/></svg></button>
+            <button class="tl" data-tool="select" data-n="Selecionar" aria-label="Selecionar" title="Selecionar · V"><svg class="i"><use href="#t-cursor"/></svg></button>
           </div>
           <div class="tg">
-            <button class="tl" data-tool="hl" data-colored title="Marca-texto · H"><svg class="i"><use href="#t-hl"/></svg></button>
-            <button class="tl" data-tool="ul" data-colored title="Sublinhado · U"><svg class="i"><use href="#t-ul"/></svg></button>
-            <button class="tl" data-tool="wv" data-colored title="Sublinhado ondulado · W"><svg class="i"><use href="#t-wv"/></svg></button>
-            <button class="tl" data-tool="st" data-colored title="Tachado · S"><svg class="i"><use href="#t-st"/></svg></button>
-            <button class="tl" data-tool="bd" title="Negrito · K"><svg class="i"><use href="#t-bd"/></svg></button>
-            <button class="tl" data-tool="tc" data-colored title="Cor do texto · A"><svg class="i"><use href="#t-tc"/></svg></button>
-            <button class="tl" data-tool="bx" data-colored title="Contorno · O"><svg class="i"><use href="#t-bx"/></svg></button>
+            <button class="tl" data-tool="hl" data-colored data-n="Marca-texto" aria-label="Marca-texto" title="Marca-texto · H"><svg class="i"><use href="#t-hl"/></svg></button>
+            <button class="tl" data-tool="ul" data-colored data-n="Sublinhar" aria-label="Sublinhado" title="Sublinhado · U"><svg class="i"><use href="#t-ul"/></svg></button>
+            <button class="tl" data-tool="wv" data-colored data-n="Ondulado" aria-label="Sublinhado ondulado" title="Sublinhado ondulado · W"><svg class="i"><use href="#t-wv"/></svg></button>
+            <button class="tl" data-tool="st" data-colored data-n="Tachado" aria-label="Tachado" title="Tachado · S"><svg class="i"><use href="#t-st"/></svg></button>
+            <button class="tl" data-tool="bd" data-n="Negrito" aria-label="Negrito" title="Negrito · K"><svg class="i"><use href="#t-bd"/></svg></button>
+            <button class="tl" data-tool="tc" data-colored data-n="Cor do texto" aria-label="Cor do texto" title="Cor do texto · A"><svg class="i"><use href="#t-tc"/></svg></button>
+            <button class="tl" data-tool="bx" data-colored data-n="Contorno" aria-label="Contorno" title="Contorno · O"><svg class="i"><use href="#t-bx"/></svg></button>
           </div>
           <div class="tg" id="anColors">
             <button class="cd" data-c="y" title="Amarelo · Núcleo da tese"><i></i></button>
@@ -1471,10 +1585,10 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
             <button class="cdw" id="cdCustom" type="button" title="Outra cor…" aria-label="Escolher outra cor" aria-haspopup="dialog"><i></i></button>
           </div>
           <div class="tg">
-            <button class="tl" data-tool="eraser" title="Borracha · E"><svg class="i"><use href="#t-eraser"/></svg></button>
-            <button class="tl" id="anUndo" title="Desfazer · Ctrl Z" disabled><svg class="i"><use href="#t-undo"/></svg></button>
-            <button class="tl" id="anRedo" title="Refazer · Ctrl Shift Z" disabled><svg class="i"><use href="#t-redo"/></svg></button>
-            <button class="tl" id="anClear" title="Apagar marcações deste tema"><svg class="i"><use href="#i-trash"/></svg></button>
+            <button class="tl" data-tool="eraser" data-n="Borracha" aria-label="Borracha" title="Borracha · E"><svg class="i"><use href="#t-eraser"/></svg></button>
+            <button class="tl" id="anUndo" data-n="Desfazer" aria-label="Desfazer" title="Desfazer · Ctrl Z" disabled><svg class="i"><use href="#t-undo"/></svg></button>
+            <button class="tl" id="anRedo" data-n="Refazer" aria-label="Refazer" title="Refazer · Ctrl Shift Z" disabled><svg class="i"><use href="#t-redo"/></svg></button>
+            <button class="tl" id="anClear" data-n="Limpar" aria-label="Apagar marcações deste tema" title="Apagar marcações deste tema"><svg class="i"><use href="#i-trash"/></svg></button>
           </div>
           <span class="vdsep" id="vdSep" aria-hidden="true" hidden></span>
           <span class="anhint" id="anHint"></span>
@@ -1595,7 +1709,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
           <div class="sk-wrap" id="skWrap" hidden><canvas id="sk" width="1400" height="1960" aria-label="Área de esquema à mão livre"></canvas></div>
         </div>
       </div>
-      <div class="mr-foot"><span id="mrWords">0 palavras</span><span class="saved" id="mrSaved"></span><span class="sp"></span><button class="btn sm" id="mrCopy"><svg class="i"><use href="#i-copy"/></svg>Copiar folha</button></div>
+      <div class="mr-foot"><span id="mrWords">0 palavras</span><span class="saved" id="mrSaved"></span><span class="sp"></span><button class="btn sm" id="mrCad" style="display:none" title="Salvar esta folha de anotações num caderno"><svg class="i"><use href="#i-bm"/></svg>Salvar no caderno</button><button class="btn sm" id="mrCopy"><svg class="i"><use href="#i-copy"/></svg>Copiar folha</button></div>
       <div class="tplmenu" id="tplMenu">
         <button data-tpl="ficha">Ficha do julgado<small>Tese, fundamentos, pegadinhas, dispositivos e revisão</small></button>
         <button data-tpl="cornell">Método Cornell<small>Perguntas-chave ao lado das notas e resumo no fim</small></button>
@@ -1615,8 +1729,8 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       <button data-tab="pomo">Pomodoro</button>
       <span id="nRv" hidden></span>
     </div>
-    <div class="pane on" id="p-hl"><div class="chips" id="hlFilter"></div><div id="hlList" style="display:flex;flex-direction:column;gap:8px"></div></div>
-    <div class="pane" id="p-nt"><div id="ntList" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    <div class="pane on" id="p-hl"><div class="dst" aria-label="Onde salvar nos cadernos"></div><input type="search" class="an-q" id="anQ" placeholder="Buscar nas marcações e notas" aria-label="Buscar nas marcações e notas" autocomplete="off"><div class="chips" id="hlFilter"></div><div id="hlList" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    <div class="pane" id="p-nt"><div class="dst" aria-label="Onde salvar nos cadernos"></div><div id="ntList" style="display:flex;flex-direction:column;gap:8px"></div></div>
     <div class="pane" id="p-pomo"><div class="pomo-view">
       <div class="pomo-big" id="pomoBigSide">25:00</div>
       <div class="pomo-sub" id="pomoSubSide">Foco · 0 sessões hoje</div>
@@ -1768,7 +1882,9 @@ const nav=(to)=>{try{if(window.parent!==window)window.parent.postMessage({type:'
   const href=to==='questoes'?CFG.questoesHref:CFG.voltarHref;if(window.parent===window&&href)location.href=href};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 let dayKey='dia';const GLOBAL_KEYS=new Set(['set','time','pcycle','psess','pomoView','cronMode','corHist','vdPos','vdSpeed']);
-const skey=k=>'rv4:'+(GLOBAL_KEYS.has(k)?'':dayKey+':')+k;
+// O localStorage é do NAVEGADOR, não da conta: sem o id do aluno na chave, quem usa o mesmo aparelho/navegador
+// herdava grifos, notas e cartões de OUTRO aluno (e a migração 1x os subia para a conta errada). Por isso a chave é POR ALUNO.
+const skey=k=>'rv4:'+(CFG.uid?String(CFG.uid).slice(0,40)+':':'')+(GLOBAL_KEYS.has(k)?'':dayKey+':')+k;
 const store={get(k,d){try{const v=localStorage.getItem(skey(k));return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(skey(k),JSON.stringify(v))}catch(e){}}};
 const app=$('#app'),scroller=$('#scroller'),article=$('#article'),doc=$('#doc'),reader=$('#reader');
 const COLORS=new Proxy({y:'Núcleo',g:'Complemento',b:'Conceito',v:'Prazos',r:'Exceção',p:'Rosa',k:'Tinta'},{get:(t,k)=>(k in t)?t[k]:(/^#[0-9a-f]{6}$/i.test(String(k))?'Cor personalizada':undefined)});
@@ -1900,7 +2016,8 @@ const tagsDoTema=(titulo)=>{if(!TOPICOS)return null;let k=slug(titulo).slice(0,6
 function renderBiblioteca(){
   const titulo=(CFG.titulo||'Documento');
   $('#crSubj').textContent=titulo;{const d=$('#crDay');if(d){const c=d.previousElementSibling;if(c&&c.classList.contains('chev'))c.remove();d.remove()}} /* só o título do documento na barra (sem "› Leitura") */
-  
+  try{initVersaoEAtualizacoes()}catch(e){}
+
   /* identidade da empresa: logo + barra roxa (só na leitura da Biblioteca) */
   try{const app0=$('#app');app0.classList.add('brand-on');
   try{if(window.parent!==window&&(S.set.theme==='light'||S.set.theme==='night')){S.set.theme='auto';saveSet()}}catch(e){}
@@ -2416,6 +2533,64 @@ function bibSyncSoon(){clearTimeout(_bibT);_bibT=setTimeout(bibSync,500)}
 const save=k=>{store.set(k,S[k]);if(k==='an'&&CFG.modo==='biblioteca')bibSyncSoon()};
 const saveSet=()=>save('set');
 
+/* ===== CADERNOS · "Onde salvar" + salvar grifo/nota/folha no caderno (modo biblioteca) =====
+   O HOST (leitor-biblioteca.tsx) é dono dos dados: manda 'leitor-jus-destinos' {cadernos,destinos,salvos,indisponivel}.
+   Só então a seção aparece (CAD.on) — no Juris/outros hosts nada muda. Daqui saem: 'leitor-jus-destino-set',
+   'leitor-jus-criar-caderno', 'leitor-jus-ver-cadernos' e 'leitor-jus-salvar-caderno' (grifo|comentario|anotacao).
+   O host decide: destino padrão + "sem perguntar" → grava direto; senão abre o modal já com o padrão marcado. */
+var CAD={on:false,open:false,cadernos:[],dest:{leitura:{caderno_id:null,salvar_sem_perguntar:false},questoes:{caderno_id:null,salvar_sem_perguntar:false}},salvos:{}};
+function cadSend(m){try{window.parent.postMessage(m,'*')}catch(_){}}
+function cadNome(id){const c=CAD.cadernos.find(x=>x.id===id);return c?c.nome:''}
+function cadOpts(sel){return '<option value="">Perguntar sempre</option>'+CAD.cadernos.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.nome)}</option>`).join('')}
+function cadMsg(a,nota,anc){return {tipo:nota?'comentario':'grifo',comentario:nota||'',trecho:String(a.text||'').slice(0,2000),prefix:anc?anc.prefix:'',suffix:anc?anc.suffix:'',
+  inicio:anc?anc.inicio:(typeof a.s==='number'?a.s:null),fim:anc?anc.fim:(typeof a.e==='number'?a.e:null),cor:corToHex(a.c),grifo_ref:(typeof GRIFO_SERVER!=='undefined'&&GRIFO_SERVER)?(a.srvId||null):null,
+  local_id:a.id,sec:a.sec||'',pid:a.pid||'',rects:a.rects||null}}
+/* MODO AUTOMÁTICO: com destino de leitura + "salvar sem perguntar", todo grifo/nota novo vai direto ao caderno
+   (debounce p/ juntar grifo+nota; reenvia só se a nota mudou; o host dedupe por grifo_ref). */
+var _autoT={},_autoSig={};
+function cadAutoOn(){const d=CAD.dest.leitura;return !!(CAD.on&&CFG.modo==='biblioteca'&&d&&d.caderno_id&&d.salvar_sem_perguntar)}
+function cadAuto(a){if(!a||!cadAutoOn())return;clearTimeout(_autoT[a.id]);_autoT[a.id]=setTimeout(()=>{
+  if(!cadAutoOn()||S.an.indexOf(a)<0)return;const sig=String(a.note||'').trim();if(_autoSig[a.id]===sig)return;_autoSig[a.id]=sig;cadSalvarAn(a)},1500)}
+/* pendentes p/ o aviso de saída: marcações não salvas em caderno + folhas com texto ainda não salvas. */
+var _folhaSig={};
+function cadPendentes(){const out=[];if(!CAD.on)return out;
+  (S.an||[]).forEach(a=>{if(CAD.salvos[a.id])return;out.push(cadMsg(a,String(a.note||'').trim(),null))});
+  try{Object.keys(S.sheets||{}).forEach(k=>{const sc=document.getElementById(k)||{id:k,dataset:{}};const sh=S.sheets[k];if(!sh||!sh.html)return;const tmp=document.createElement('div');tmp.innerHTML=sh.html;const tx=(tmp.innerText||tmp.textContent||'').trim();
+    if(!tx||_folhaSig[sc.id]===sh.html)return;out.push({tipo:'anotacao',comentario:tx.slice(0,5000),html:String(sh.html).slice(0,100000),trecho:String(sc.dataset.title||'').slice(0,300),folha_sec:String(sc.id),ref_tabela:'folha_local'})})}catch(_){}
+  return out.slice(0,300)}
+/* FOLHA de anotações no modo automático: ~2 s depois de parar de digitar, grava (upsert por folha no servidor)
+   só se o conteúdo mudou desde o último envio (_folhaSig). Folha vazia não é enviada. */
+var _folhaT={};
+function cadFolhaMsg(sec,auto){const sh=S.sheets&&S.sheets[sec];if(!sh||!sh.html)return null;const tmp=document.createElement('div');tmp.innerHTML=sh.html;const tx=(tmp.innerText||tmp.textContent||'').trim();if(!tx)return null;
+  const so=document.getElementById(sec);return {tipo:'anotacao',comentario:tx.slice(0,5000),html:String(sh.html).slice(0,100000),trecho:String(so&&so.dataset?so.dataset.title||'':'').slice(0,300),folha_sec:String(sec),ref_tabela:'folha_local',auto:!!auto}}
+function cadAutoFolha(sec){if(!sec||!cadAutoOn())return;clearTimeout(_folhaT[sec]);_folhaT[sec]=setTimeout(()=>{
+  if(!cadAutoOn())return;const sh=S.sheets&&S.sheets[sec];if(!sh||_folhaSig[sec]===sh.html)return;const m=cadFolhaMsg(sec,true);if(!m)return;_folhaSig[sec]=sh.html;cadSend({type:'leitor-jus-salvar-caderno',grifo:m})},2000)}
+function cadSalvarAn(a){cadSend({type:'leitor-jus-salvar-caderno',grifo:cadMsg(a,String(a.note||'').trim(),null)})}
+function dstCorSolida(){try{const t=document.querySelector('.top');const cs=t?getComputedStyle(t):null;const rgb=/rgba?\(\s*\d+[\s,]+\d+[\s,]+\d+[^)]*\)/;
+  let c=cs?cs.backgroundColor:'';if(c&&!/rgba\(0,\s*0,\s*0,\s*0\)|transparent/.test(c))return c;
+  const g=cs?rgb.exec(cs.backgroundImage||''):null;if(g)return g[0];
+  const x=document.querySelector('.cta');c=x?getComputedStyle(x).color:'';return c||''}catch(_){return ''}}
+function renderDst(){const boxes=$$('.dst');const mc=document.getElementById('mrCad');if(mc)mc.style.display=CAD.on?'':'none';
+  boxes.forEach(b=>b.classList.toggle('on',CAD.on||!!CAD.err));
+  if(!CAD.on){if(CAD.err)boxes.forEach(b=>{b.innerHTML='<div class="dst-erro">Salvar em cadernos indisponível agora. Recarregue a página.</div>'});return}
+  const d0=CAD.dest.leitura;const cn=d0.caderno_id?cadNome(d0.caderno_id):'';const tem=!!cn;const nome=tem?cn:(CAD.cadernos.length?(d0.caderno_id?'Caderno removido · perguntar sempre':'Perguntar sempre'):'Nenhum caderno ainda');
+  const rot=tem?'Salvando em':'Caderno de destino';const auto=!!(tem&&d0.salvar_sem_perguntar);
+  boxes.forEach(b=>{b.innerHTML=`<button type="button" class="dst-h" data-dst-tg aria-haspopup="dialog" title="Escolher ou criar o caderno onde salvar"><span class="ic"><svg class="i"><use href="#i-bm"/></svg></span><span class="tx"><small>${rot}</small><b>${esc(nome)}</b></span>${auto?'<span class="au">Automático</span>':''}<span class="al">${CAD.cadernos.length?'Alterar':'Criar'}</span></button>`})}
+/* O modal de escolher/criar caderno é do HOST (React/shadcn): aqui só o botão que o pede. */
+document.addEventListener('click',e=>{const t=e.target;if(!t||!t.closest)return;if(t.closest('[data-dst-tg]'))cadSend({type:'leitor-jus-destino-abrir',cor:dstCorSolida()})});
+window.addEventListener('message',e=>{if(e.source!==window.parent)return;const m=e&&e.data;if(!m||typeof m!=='object')return;
+  if(m.type==='leitor-jus-destinos'){CAD.on=!m.indisponivel;CAD.err=!!m.indisponivel;CAD.cadernos=Array.isArray(m.cadernos)?m.cadernos:[];
+    ['leitura','questoes'].forEach(k=>{const d=m.destinos&&m.destinos[k];if(d)CAD.dest[k]={caderno_id:d.caderno_id||null,salvar_sem_perguntar:!!d.salvar_sem_perguntar&&!!d.caderno_id}});
+    if(Array.isArray(m.salvos)){CAD.salvos={};m.salvos.forEach(i=>{CAD.salvos[i]=1})}
+    CAD._vis=1;
+    renderDst();try{renderPanels()}catch(_){}return}
+  if(m.type==='leitor-jus-foco-dst'){const b=Array.from(document.querySelectorAll('[data-dst-tg]')).find(x=>x.offsetParent!==null);if(b)b.focus();return}
+  if(m.type==='leitor-jus-flush'){try{clearTimeout(_bibT);if(CFG.modo==='biblioteca')bibSync()}catch(_){}try{cadSend({type:'leitor-jus-pendentes',itens:cadPendentes()})}catch(_){}return}
+  if(m.type==='leitor-jus-cad-salvos'){(Array.isArray(m.ids)?m.ids:[]).forEach(i=>{CAD.salvos[i]=1});try{renderPanels()}catch(_){}}});
+
+/* Pede os cadernos ao host até a 1ª resposta (o 'ready' único pode se perder na montagem). */
+(function(){let n=0;const iv=setInterval(()=>{if(CAD._vis||++n>12){clearInterval(iv);return}cadSend({type:'leitor-jus-cad-pedir'})},1500)})();
+
 /* ===== JURIS v2 · grifos persistidos no SERVIDOR (âncora text-quote, igual ao leitor de Lei Seca) =====
    O #article NUNCA é mutado para ancorar: a âncora é por offset de caractere na "espinha" (concatenação
    do texto) + fallback {exact,prefix,suffix}. Isso sobrevive à edição do documento (grifo que não casa
@@ -2480,7 +2655,7 @@ function grupoAn(a){return (GRIFO_SERVER&&a&&a.gid)?S.an.filter(x=>x.gid===a.gid
 // como pendente e envia o 'upd' assim que o 'leitor-jus-grifo-saved' chegar (senão cor/nota se perdiam).
 const GRIFO_PEND=new Set();
 function setCorGrupo(a,c){grupoAn(a).forEach(x=>{x.c=c;anMarks(x.id).forEach(m=>m.dataset.c=c)});if(GRIFO_SERVER){if(a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(c),nota:(a.note||null)});else if(a.gid)GRIFO_PEND.add(a.gid)}}
-function setNotaGrupo(a,nota){a.note=nota;refreshTail(a);if(GRIFO_SERVER){if(a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(a.c),nota:(nota||null)});else if(a.gid)GRIFO_PEND.add(a.gid)}}
+function setNotaGrupo(a,nota){a.note=nota;refreshTail(a);try{cadAuto(a)}catch(_){}if(GRIFO_SERVER){if(a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(a.c),nota:(nota||null)});else if(a.gid)GRIFO_PEND.add(a.gid)}}
 // id do servidor chega de volta → casa pelo cid (=gid do grupo) e marca todos os segmentos.
 window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-saved'||!m.cid||!m.id)return;const grp=(S.an||[]).filter(a=>a.gid===m.cid);grp.forEach(a=>{a.srvId=m.id});
   if(GRIFO_PEND.has(m.cid)&&grp.length){GRIFO_PEND.delete(m.cid);const h=grp.find(x=>x.note)||grp[0];emitGrifo('upd',{id:m.id,cor:corToHex(grp[0].c),nota:(h.note||null)})}});
@@ -2658,8 +2833,52 @@ $('#toc').addEventListener('click',e=>{const b=e.target.closest('[data-sub]');if
 function marcarAreaToc(sec,y){try{const pp=sec.querySelector('.pdfpage');if(!pp)return;pp.querySelectorAll('.toc-mark').forEach(n=>n.remove());
   const d=document.createElement('div');d.className='toc-mark';d.style.top=Math.max(0,y-6)+'px';pp.appendChild(d);setTimeout(()=>d.remove(),4200)}catch(e){}}
 $('#toc').addEventListener('click',e=>{const b=e.target.closest('[data-pdfpage]');if(!b)return;e.preventDefault();const sec=$('#p'+b.dataset.pdfpage);if(!sec)return;const st=scroller.getBoundingClientRect().top;{const y0=+b.dataset.pdfy||0,pp0=sec.querySelector('.pdfpage')||sec,k0=pp0.offsetWidth?pp0.getBoundingClientRect().width/pp0.offsetWidth:1,base=pp0.getBoundingClientRect().top-st+scroller.scrollTop;scroller.scrollTo({top:y0>0?Math.max(0,base+y0*k0-scroller.clientHeight/2+30):Math.max(0,base-24),behavior:'smooth'})}marcarAreaToc(sec,+b.dataset.pdfy||0);if(isSmall())app.classList.remove('sb-open')});
-// Abas do sumário: alterna entre Índices (títulos) e Páginas.
-$$('#tocTabs .toc-tab').forEach(b=>b.onclick=()=>{tocModo=b.dataset.toc;$$('#tocTabs .toc-tab').forEach(x=>x.classList.toggle('on',x===b));renderToc()});
+// Abas do sumário: alterna entre Índices (títulos), Páginas e Atualizações (registro de versões, só Biblioteca).
+function mostrarPainelToc(){const u=tocModo==='atualizacoes';const t=$('#toc'),p=$('#updPane');if(t)t.style.display=u?'none':'';if(p)p.hidden=!u;if(u)abrirAtualizacoes()}
+$$('#tocTabs .toc-tab').forEach(b=>b.onclick=()=>{tocModo=b.dataset.toc;$$('#tocTabs .toc-tab').forEach(x=>x.classList.toggle('on',x===b));mostrarPainelToc();if(tocModo!=='atualizacoes')renderToc()});
+/* ATUALIZAÇÕES (Biblioteca): selo "vN" ao fim do título + aba lateral com o registro de versões do documento.
+   Lista carregada SOB DEMANDA (GET /api/aluno/atualizacoes?documentoId=…), paginada no servidor, mais recente primeiro. */
+const UPD={pg:0,total:0,busy:false,erro:false,ini:false};
+const updFmt=iso=>{try{return new Date(iso).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(_){return ''}};
+function initVersaoEAtualizacoes(){
+  const vt=CFG.versaoTag;
+  if(vt&&vt.texto&&!$('#crVer')){const s=document.createElement('span');s.id='crVer';s.className='ver-tag';s.textContent=vt.texto;if(vt.titulo)s.title=vt.titulo;$('#crSubj').after(s)}
+  const A=CFG.atualizacoes;if(!A||!A.documentoId)return;
+  const tabs=$('#tocTabs'),tab=$('#tabUpd');if(!tabs||!tab)return;
+  tabs.hidden=false;tab.hidden=false;
+  if(!CFG.pdf){const pg=$('#tocTabs [data-toc="paginas"]');if(pg)pg.hidden=true} /* texto: sem "Páginas" */
+  try{const vis=localStorage.getItem('upd-visto:'+A.documentoId);if(A.recente&&A.ultimaEm&&vis!==A.ultimaEm)$('#updDot').hidden=false}catch(_){if(A.recente)$('#updDot').hidden=false}
+}
+function renderUpd(rows,anexar){
+  const p=$('#updPane');if(!p)return;
+  if(!anexar)p.innerHTML='';
+  p.querySelectorAll('.upd-more,.upd-msg').forEach(n=>n.remove());
+  rows.forEach(r=>{
+    const itens=(r.itens||[]).map(i=>'<li>'+esc(i.texto||'')+(i.local?' <em>— '+esc(i.local)+'</em>':'')+'</li>').join('');
+    const d=document.createElement('div');d.className='upd-it';
+    d.innerHTML='<div class="upd-hd"><span class="upd-rot">'+esc(r.rotulo||'Atualização')+'</span><span class="upd-dt">'+esc(updFmt(r.ocorridaEm))+'</span></div>'+(r.texto?'<p class="upd-tx">'+esc(r.texto)+'</p>':'')+(itens?'<ul class="upd-ul">'+itens+'</ul>':'');
+    p.appendChild(d)});
+  if(!p.querySelector('.upd-it')){const m=document.createElement('div');m.className='upd-msg';m.textContent=UPD.erro?'Não foi possível carregar as atualizações agora. Tente de novo em instantes.':'Este material ainda não teve atualizações publicadas. Quando houver, elas aparecem aqui.';p.appendChild(m);if(UPD.erro){const b=document.createElement('button');b.type='button';b.className='upd-more';b.textContent='Tentar de novo';b.onclick=()=>carregarUpd();p.appendChild(b)}}
+  const n=p.querySelectorAll('.upd-it').length;
+  if(n<UPD.total){const b=document.createElement('button');b.type='button';b.className='upd-more';b.textContent='Carregar mais';b.onclick=()=>carregarUpd();p.appendChild(b)}
+}
+async function carregarUpd(){
+  const A=CFG.atualizacoes;if(!A||UPD.busy)return;UPD.busy=true;
+  const mais=$('#updPane .upd-more');if(mais){mais.disabled=true;mais.textContent='Carregando…'}
+  else if(!UPD.ini){$('#updPane').innerHTML='<div class="upd-msg">Carregando…</div>'}
+  try{
+    const r=await fetch('/api/aluno/atualizacoes?documentoId='+encodeURIComponent(A.documentoId)+'&page='+(UPD.pg+1)+'&pp=10',{credentials:'same-origin'});
+    if(!r.ok)throw new Error('http '+r.status);
+    const j=await r.json();UPD.erro=false;UPD.total=+j.total||0;UPD.pg=UPD.pg+1;UPD.ini=true;renderUpd(j.rows||[],UPD.pg>1);
+  }catch(_){UPD.erro=true;if(!UPD.ini){renderUpd([],false)}else{const m=$('#updPane .upd-more');if(m){m.disabled=false;m.textContent='Tentar de novo'}}}
+  finally{UPD.busy=false}
+}
+function abrirAtualizacoes(){
+  const A=CFG.atualizacoes;if(!A)return;
+  try{if(A.ultimaEm)localStorage.setItem('upd-visto:'+A.documentoId,A.ultimaEm)}catch(_){}
+  const dot=$('#updDot');if(dot)dot.hidden=true;
+  if(!UPD.ini&&!UPD.busy)carregarUpd();
+}
 function onScroll(){const vh=scroller.clientHeight,top=scroller.getBoundingClientRect().top;let changed=false;
   secs.forEach(s=>{if(s.offsetParent===null)return;const r=s.getBoundingClientRect();if(r.bottom<top||r.top>top+vh)return;const v=Math.max(0,Math.min(1,(top+vh-r.top)/r.height));if(v>(S.seen[s.id]||0)+.004){S.seen[s.id]=v;changed=true}});
   if(!app.classList.contains('paged')){let cur=secs[0].id;secs.forEach(s=>{if(s.getBoundingClientRect().top<top+vh*.35)cur=s.id});if(cur!==S.cur){S.cur=cur;save('cur');changed=true;onSecChange()}}
@@ -2863,7 +3082,8 @@ if(GRIFO_SERVER){
   S.an=srv;
   if(GRIFO_ORFAOS)setTimeout(()=>{try{toast(GRIFO_ORFAOS+(GRIFO_ORFAOS===1?' anotação não pôde':' anotações não puderam')+' ser localizada(s): o texto do material foi atualizado')}catch(_){}},2500);
   // Migração 1x: aluno tinha grifos só no localStorage e o servidor está vazio → sobe p/ o servidor.
-  if(!srv.length&&legacy.length&&!store.get('an_migr',false)){
+  // Só migra se a chave é DESTE aluno (CFG.uid): dados sem dono conhecido (chave antiga compartilhada) NUNCA sobem.
+  if(CFG.uid&&!srv.length&&legacy.length&&!store.get('an_migr',false)){
     legacy.forEach(a=>{try{const anc=ancoraDoGrifo(a);if(!anc)return;a.gid=a.gid||('m'+a.id);S.an.push(a);emitGrifo('add',{cid:a.gid,a:grifoPayload(a,anc)})}catch(_){}});
     store.set('an_migr',true);
   }
@@ -2873,9 +3093,33 @@ S.an.forEach(paint);
 /* Histórico (desfazer/refazer) */
 const undoStack=[],redoStack=[];
 function commit(){undoStack.push(JSON.stringify(S.an));if(undoStack.length>80)undoStack.shift();redoStack.length=0;updUndo()}
-function undo(){if(!undoStack.length)return;redoStack.push(JSON.stringify(S.an));S.an=JSON.parse(undoStack.pop());afterHist('Desfeito')}
-function redo(){if(!redoStack.length)return;undoStack.push(JSON.stringify(S.an));S.an=JSON.parse(redoStack.pop());afterHist('Refeito')}
-function afterHist(msg){save('an');repaintAll();renderPanels();updUndo();toast(msg)}
+function undo(){if(!undoStack.length)return;const prev=S.an;redoStack.push(JSON.stringify(S.an));S.an=JSON.parse(undoStack.pop());afterHist('Desfeito',prev)}
+function redo(){if(!redoStack.length)return;const prev=S.an;undoStack.push(JSON.stringify(S.an));S.an=JSON.parse(redoStack.pop());afterHist('Refeito',prev)}
+// Undo/redo também sincroniza o SERVIDOR (antes: desfazer + recarregar reexibia o grifo). Compara por gid:
+// sumiu → del; reapareceu → add (novo srvId volta pelo 'saved'); cor/nota mudou → upd.
+const SRVMAP={};
+function syncHistServidor(prev){if(!GRIFO_SERVER)return;try{
+  (prev||[]).forEach(a=>{if(a.gid&&a.srvId)SRVMAP[a.gid]=a.srvId});
+  const grp=arr=>{const m=new Map();(arr||[]).forEach(a=>{if(!a.gid)return;(m.get(a.gid)||m.set(a.gid,[]).get(a.gid)).push(a)});return m};
+  const antes=grp(prev),depois=grp(S.an);
+  antes.forEach((g,gid)=>{if(!depois.has(gid)){const id=SRVMAP[gid];if(id){emitGrifo('del',{id});delete SRVMAP[gid]}}});
+  depois.forEach((g,gid)=>{
+    if(!antes.has(gid)){g.forEach(a=>{delete a.srvId});const anc=ancoraDoGrifo(g[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(g[0],anc)});return}
+    const id=SRVMAP[gid]||g[0].srvId;if(id)g.forEach(a=>{a.srvId=id});
+    const h=g.find(x=>x.note)||g[0],o=antes.get(gid),ho=o.find(x=>x.note)||o[0];
+    if(id&&(g[0].c!==o[0].c||(h.note||'')!==(ho.note||'')))emitGrifo('upd',{id,cor:corToHex(g[0].c),nota:(h.note||null)})})
+}catch(_){}}
+function afterHist(msg,prev){save('an');repaintAll();syncHistServidor(prev);renderPanels();updUndo();toast(msg)}
+// Indicador de sincronização dos grifos (o host faz retry/backoff e informa o estado).
+(function(){let chip=null,tm=null;
+  function mk(){if(chip)return chip;chip=document.createElement('div');chip.id='syncChip';chip.setAttribute('role','status');chip.setAttribute('aria-live','polite');
+    chip.style.cssText='position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:90;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:500;background:var(--raise);border:1px solid var(--line);color:var(--ink-2);box-shadow:var(--shadow-2);display:none;min-height:28px;align-items:center';
+    document.body.appendChild(chip);return chip}
+  window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-status')return;const c=mk();clearTimeout(tm);
+    if(m.estado==='sync'){c.textContent='Salvando…';c.style.color='var(--ink-2)';c.style.display='flex'}
+    else if(m.estado==='ok'){c.textContent='Salvo';c.style.color='var(--ok)';c.style.display='flex';tm=setTimeout(()=>{c.style.display='none'},1800)}
+    else{c.textContent='Não foi possível salvar. Verifique a conexão';c.style.color='var(--bad)';c.style.display='flex';try{toast('Falha ao salvar anotação. Verifique a conexão e tente novamente.')}catch(_){}tm=setTimeout(()=>{c.style.display='none'},6000)}})
+})();
 function updUndo(){$('#anUndo').disabled=!undoStack.length;$('#anRedo').disabled=!redoStack.length}
 $('#anUndo').onclick=undo;$('#anRedo').onclick=redo;
 
@@ -3070,7 +3314,7 @@ function paintPdf(a){const sec=$('#'+a.sec);if(!sec)return;const pp=$('.pdfpage'
   (a.rects||[]).forEach(r=>{const d=document.createElement('div');d.className='pdfov';d.dataset.aid=a.id;d.dataset.t=a.t;d.dataset.c=a.c;
     d.style.cssText=`left:${r.x0*100}%;top:${r.y0*100}%;width:${(r.x1-r.x0)*100}%;height:${(r.y1-r.y0)*100}%`;pp.appendChild(d)})}
 function applyPdf(t,c){const i=pendingSel;if(!i||!i._all)return null;commit();let last=null;
-  for(const [sec,rects] of i._all){const a={id:uid(),sec,rects,t,c:t==='bd'?'k':c,note:'',text:i.text};S.an.push(a);paintPdf(a);last=a}
+  for(const [sec,rects] of i._all){const a={id:uid(),sec,rects,t,c:t==='bd'?'k':c,note:'',text:i.text};S.an.push(a);paintPdf(a);last=a;try{cadAuto(a)}catch(_){}}
   save('an');getSelection().removeAllRanges();hideTool();renderPanels();return last}
 function erasePdf(i){if(!i||!i._all)return;const rem=new Set();
   for(const [sec,rects] of i._all)S.an.filter(a=>a.sec===sec&&(a.rects||[]).some(gr=>rects.some(sr=>gr.x0<sr.x1&&gr.x1>sr.x0&&gr.y0<sr.y1&&gr.y1>sr.y0))).forEach(a=>rem.add(a.id));
@@ -3209,7 +3453,9 @@ function apply(t,c,silent){if(ehPdf())return applyPdf(t,c);const i=pendingSel;if
   segs.forEach(sg=>{S.an.filter(a=>a.pid===sg.pid&&a.t===t&&a.s<sg.e&&a.e>sg.s).forEach(a=>removeAn(a.id,false,true));
     const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
   save('an');getSelection().removeAllRanges();hideTool();renderPanels();
+  try{created.forEach(cadAuto)}catch(_){}
   if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}
+  try{if(created.length&&navigator.vibrate&&matchMedia('(pointer:coarse)').matches&&!matchMedia('(prefers-reduced-motion:reduce)').matches)navigator.vibrate(8)}catch(_){}
   if(!silent)toast(TOOLS[t]+' aplicado',{label:'Desfazer',fn:undo});return created[0]||null}
 function removeAn(id,render=true,quiet){let ids=[id],srvId=null;
   if(GRIFO_SERVER){const a0=S.an.find(x=>x.id===id);if(a0&&a0.gid){ids=S.an.filter(a=>a.gid===a0.gid).map(a=>a.id);srvId=a0.srvId}}
@@ -3239,7 +3485,7 @@ function toggleNoSel(t,c){const i=pendingSel;if(!i)return;const segs=selSegs(i),
   else{const cc=(t==='bd'?'k':c),gid='g'+uid(),created=[];
     segs.forEach(sg=>{S.an.filter(a=>a.pid===sg.pid&&a.t===t&&a.s<sg.e&&a.e>sg.s).forEach(a=>removeAn(a.id,false,true));
       const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
-    save('an');renderPanels();
+    save('an');renderPanels();try{created.forEach(cadAuto)}catch(_){}
     if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}}
   showTool(i.rect,false);marcarAtivos()}                                       // MANTÉM a barra no mesmo trecho
 $$('.cd',tool).forEach(d=>d.onclick=()=>{const c=d.dataset.c;
@@ -3264,22 +3510,26 @@ tool.addEventListener('click',e=>{const b=e.target.closest('.tbtn');if(!b)return
 
 /* ================= POPOVERS ================= */
 const pop=$('#pop');
-function placePop(rect){pop.classList.add('show');const w=pop.offsetWidth,h=pop.offsetHeight;const x=Math.max(16,Math.min(innerWidth-w-16,rect.left+rect.width/2-w/2));let y=rect.bottom+10;if(y+h>innerHeight-12)y=rect.top-h-10;y=Math.max(64,Math.min(y,innerHeight-h-12));pop.style.left=x+'px';pop.style.top=y+'px'}
-function closePop(){pop.classList.remove('show');pop.dataset.kind=''}
-function openNote(a){const m=anMarks(a.id)[0];if(!m)return;pop.dataset.kind='note';pop.dataset.c=a.c;
+// vh = altura VISÍVEL (visualViewport desconta o teclado virtual no iOS/tablet); sem isso a nota ficava sob o teclado.
+function placePop(rect){pop.classList.add('show');const w=pop.offsetWidth,h=pop.offsetHeight;const vv=window.visualViewport,vh=vv?vv.height:innerHeight,vt=vv?vv.offsetTop:0;const x=Math.max(16,Math.min(innerWidth-w-16,rect.left+rect.width/2-w/2));let y=rect.bottom+10;if(y+h>vt+vh-12)y=rect.top-h-10;y=Math.max(vt+64,Math.min(y,vt+vh-h-12));pop.style.left=x+'px';pop.style.top=y+'px'}
+// Rascunho de nota: fechar o popover (clique fora/Esc/X) SALVA o que foi digitado em vez de descartar em silêncio.
+function closePop(){if(pop.dataset.kind==='note'&&pop._na){const a0=pop._na;pop._na=null;const t=document.getElementById('pnT');if(t&&S.an.indexOf(a0)>=0&&t.value.trim()!==(a0.note||'')){setNotaGrupo(a0,t.value.trim());save('an');renderPanels()}}
+  pop.classList.remove('show');pop.dataset.kind=''}
+(function(){const vv=window.visualViewport;if(!vv)return;const re=()=>{if(pop.classList.contains('show')&&pop.dataset.kind==='note'){const t=document.getElementById('pnT');if(t&&document.activeElement===t){const r=t.getBoundingClientRect();const b=pop.getBoundingClientRect();if(b.bottom>vv.offsetTop+vv.height-8){pop.style.top=Math.max(vv.offsetTop+8,vv.offsetTop+vv.height-b.height-8)+'px'}}}};vv.addEventListener('resize',re);vv.addEventListener('scroll',re)})();
+function openNote(a){const m=anMarks(a.id)[0];if(!m)return;if(pop.dataset.kind==='note')closePop();pop.dataset.kind='note';pop.dataset.c=a.c;pop._na=a;
   pop.innerHTML=`<div class="pop-h"><span>Nota · ${TOOLS[a.t]}</span><button class="icb" id="pnX" aria-label="Fechar"><svg class="i"><use href="#i-x"/></svg></button></div>
    <div class="pop-b" style="font-family:var(--f-ui)"><div class="quote">${esc(a.text.length>140?a.text.slice(0,140)+'…':a.text)}</div><label for="pnT" class="sr-only">Nota</label><textarea id="pnT" placeholder="Por que isso importa? Ligação com outro tema, pegadinha, artigo relacionado">${esc(a.note||'')}</textarea></div>
    <div class="pop-f"><span><kbd>Ctrl</kbd> <kbd>↵</kbd> salva</span><span style="display:flex;gap:6px">${a.note?'<button class="btn" id="pnDel">Apagar</button>':''}<button class="btn" id="pnCad" title="Salvar este comentário e o trecho num caderno"${(a.note||'').trim()?'':' style="display:none"'}>Salvar no caderno</button><button class="btn pri" id="pnOk">Salvar nota</button></span></div>`;
   placePop(m.getBoundingClientRect());$('#pnT').focus();$('#pnX').onclick=closePop;
   $('#pnOk').onclick=()=>{setNotaGrupo(a,$('#pnT').value.trim());save('an');renderPanels();closePop();toast(a.note?'Nota salva':'Nota removida')};
-  const d=$('#pnDel');if(d)d.onclick=()=>{setNotaGrupo(a,'');save('an');renderPanels();closePop()};
+  const d=$('#pnDel');if(d)d.onclick=()=>{pop._na=null;setNotaGrupo(a,'');save('an');renderPanels();closePop()};
   $('#pnT').oninput=()=>{$('#pnCad').style.display=$('#pnT').value.trim()?'':'none'};
   $('#pnCad').onclick=()=>{const val=$('#pnT').value.trim();if(!val)return;
     if(GRIFO_SERVER&&!a.srvId){toast('Sincronizando o grifo… tente de novo em instantes');return}
     setNotaGrupo(a,val);save('an');renderPanels();
     const g=grupoAn(a);let anc=null;if(GRIFO_SERVER)anc=ancoraDoGrifo(a);
     const trecho=g.map(x=>x.text||'').filter(Boolean).join(' ')||a.text||'';
-    try{window.parent.postMessage({type:'leitor-jus-salvar-caderno',grifo:{comentario:val,trecho:trecho.slice(0,2000),prefix:anc?anc.prefix:'',suffix:anc?anc.suffix:'',inicio:anc?anc.inicio:null,fim:anc?anc.fim:null,cor:corToHex(a.c),grifo_ref:GRIFO_SERVER?(a.srvId||null):null}},'*')}catch(_){}
+    try{const gm=cadMsg(a,val,anc);gm.trecho=trecho.slice(0,2000);gm.tipo='comentario';window.parent.postMessage({type:'leitor-jus-salvar-caderno',grifo:gm},'*')}catch(_){}
     closePop()};
   $('#pnT').onkeydown=e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))$('#pnOk').click()}}
 function showLei(el){const l=$('#'+el.dataset.law);if(!l)return;pop.dataset.kind='lei';const lab=l.dataset.label||'';const a=null;const par=(el.dataset.par||'').replace(/\s+/g,' ').toLowerCase();
@@ -3310,7 +3560,8 @@ function renderNotes(){const M=$('#margin');M.innerHTML='';if(!notesOn)return;
   $$('.mnote',M).map(n=>[n,anMarks(n.dataset.aid)[0].getBoundingClientRect().top-base]).sort((a,b)=>a[1]-b[1]).forEach(([n,y])=>{const t=Math.max(y,last+12);n.style.top=t+'px';last=t+n.offsetHeight})}
 
 /* ================= CADERNO ================= */
-let anFilter='all';
+let anFilter='all',anQ='';
+{const qi=document.getElementById('anQ');if(qi){let tq;qi.addEventListener('input',()=>{clearTimeout(tq);tq=setTimeout(()=>{anQ=qi.value;renderPanels()},180)})}}
 const ord=pid=>pid?(+pid.slice(1)||0):0;
 // Ordena por SEÇÃO (página/tema) e depois pela posição: no PDF (grifo geométrico) usa o y do 1º retângulo;
 // no texto usa pid/offset. Robusto p/ grifos sem pid (PDF).
@@ -3320,18 +3571,19 @@ function sorted(list){return list.slice().sort((a,b)=>{
   return ord(a.pid)-ord(b.pid)||(a.s||0)-(b.s||0);
 })}
 function item(a){return `<div class="item" data-aid="${a.id}" data-c="${a.c}"><q>${esc(a.text)}</q>${a.note?`<div class="nt">${esc(a.note)}</div>`:''}
-  <div class="meta"><span>${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}${a.ex?' · exemplo':''}</span><span class="sp"></span><span class="acts"><button data-act="note" title="Nota"><svg class="i"><use href="#i-note"/></svg></button><button data-act="card" title="Criar cartão"><svg class="i"><use href="#i-cards"/></svg></button><button data-act="sheet" title="Levar para a folha"><svg class="i"><use href="#t-send"/></svg></button><button data-act="del" title="Remover"><svg class="i"><use href="#i-trash"/></svg></button></span></div></div>`}
+  <div class="meta"><span>${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}${a.ex?' · exemplo':''}</span><span class="sp"></span><span class="acts">${CAD.on?`<button data-act="cad" class="${CAD.salvos[a.id]?'on':''}" title="${CAD.salvos[a.id]?'Já salvo em caderno · salvar de novo':'Salvar no caderno'}" aria-label="Salvar no caderno"><svg class="i"><use href="#i-bm"/></svg></button>`:''}<button data-act="note" title="Nota"><svg class="i"><use href="#i-note"/></svg></button><button data-act="card" title="Criar cartão"><svg class="i"><use href="#i-cards"/></svg></button><button data-act="sheet" title="Levar para a folha"><svg class="i"><use href="#t-send"/></svg></button><button data-act="del" title="Remover"><svg class="i"><use href="#i-trash"/></svg></button></span></div></div>`}
 function grouped(list){return secs.map((s,i)=>{const hs=sorted(list.filter(a=>a.sec===s.id));return hs.length?`<div class="group-h">Tema ${pad(i+1)}</div>`+hs.map(item).join(''):''}).join('')}
 function renderPanels(){const counts={};S.an.forEach(a=>counts[a.t]=(counts[a.t]||0)+1);
   $('#hlFilter').innerHTML=`<button class="chip ${anFilter==='all'?'on':''}" data-f="all">Todas <small>${S.an.length}</small></button>`+Object.keys(TOOLS).filter(t=>counts[t]).map(t=>`<button class="chip ${anFilter===t?'on':''}" data-f="${t}">${TOOLS[t]} <small>${counts[t]}</small></button>`).join('');
-  const list=S.an.filter(a=>anFilter==='all'||a.t===anFilter);
-  $('#hlList').innerHTML=list.length?grouped(list):'<p class="empty">Nenhuma marcação ainda.<br>Escolha uma ferramenta na barra acima do texto e selecione um trecho.</p>';
+  const qn=(anQ||'').trim().toLowerCase();
+  const list=S.an.filter(a=>(anFilter==='all'||a.t===anFilter)&&(!qn||((a.text||'')+' '+(a.note||'')+' '+(COLORS[a.c]||'')).toLowerCase().includes(qn)));
+  $('#hlList').innerHTML=list.length?grouped(list):(qn?'<p class="empty">Nenhuma marcação encontrada.</p>':'<p class="empty">Nenhuma marcação ainda.<br>Escolha uma ferramenta na barra acima do texto e selecione um trecho.</p>');
   const notes=S.an.filter(a=>a.note);
   $('#ntList').innerHTML=notes.length?grouped(notes):'<p class="empty">Suas notas aparecem aqui e na margem do texto.</p>';
   $('#nHl').textContent=S.an.length;$('#nNt').textContent=notes.length;renderNotes();renderCards()}
 $('#hlFilter').onclick=e=>{const c=e.target.closest('.chip');if(c){anFilter=c.dataset.f;renderPanels()}};
 ['#hlList','#ntList'].forEach(sel=>$(sel).onclick=e=>{const it=e.target.closest('.item');if(!it)return;const a=S.an.find(x=>x.id===it.dataset.aid);if(!a)return;const b=e.target.closest('[data-act]');
-  if(b){e.stopPropagation();const k=b.dataset.act;if(k==='del'){commit();removeAn(a.id);toast('Marcação removida',{label:'Desfazer',fn:undo})}if(k==='card')openCardFrom(a);if(k==='sheet')sendToSheet(a);if(k==='note'){jumpAn(a);setTimeout(()=>openNote(a),420)}return}jumpAn(a)});
+  if(b){e.stopPropagation();const k=b.dataset.act;if(k==='del'){commit();removeAn(a.id);toast('Marcação removida',{label:'Desfazer',fn:undo})}if(k==='cad'){cadSalvarAn(a);return}if(k==='card')openCardFrom(a);if(k==='sheet')sendToSheet(a);if(k==='note'){jumpAn(a);setTimeout(()=>openNote(a),420)}return}jumpAn(a)});
 function jumpAn(a){const m=anMarks(a.id)[0];if(!m)return;if(!isWide())setNb(false);goto(a.sec,{el:m});setTimeout(()=>{anMarks(a.id).forEach(x=>x.classList.add('flash'));setTimeout(()=>anMarks(a.id).forEach(x=>x.classList.remove('flash')),1400)},300)}
 function copyAll(){const out=secs.map((s,i)=>{const hs=sorted(S.an.filter(a=>a.sec===s.id));return hs.length?`Tema ${pad(i+1)} · ${s.dataset.title}\n`+hs.map(a=>`- [${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}] ${a.text}${a.note?`\n  Nota: ${a.note}`:''}`).join('\n'):''}).filter(Boolean).join('\n\n');copy(out||'Sem marcações ainda.','Resumo copiado')}
 function allToSheet(){const hs=sorted(S.an.filter(a=>a.sec===S.cur));if(!hs.length)return toast('Nenhuma marcação neste tema');
@@ -3392,7 +3644,7 @@ function onSecChange(){if(app.classList.contains('mirror')&&S.set.follow&&sheetS
 function loadSheet(id){flushSheet();sheetSec=id;$('#mrSec').value=id;const sh=sheetOf(id);ed.innerHTML=sh.html||'';drawSketch(sh.sketch);updWords();$('#mrSaved').innerHTML=sh.at?'<i></i>Salvo às '+sh.at:''}
 let sT2;
 function flushSheet(){if(!sheetSec)return;clearTimeout(sT2);const sh=sheetOf(sheetSec);const html=ed.innerHTML.trim();if(html!==(sh.html||'')){sh.html=html;sh.at=hhmm();save('sheets')}}
-function saveSheetSoon(){$('#mrSaved').textContent='Salvando…';clearTimeout(sT2);sT2=setTimeout(()=>{const sh=sheetOf(sheetSec);sh.html=ed.innerHTML.trim();sh.at=hhmm();save('sheets');$('#mrSaved').innerHTML='<i></i>Salvo às '+sh.at},450);updWords()}
+function saveSheetSoon(){cadAutoFolha(sheetSec);$('#mrSaved').textContent='Salvando…';clearTimeout(sT2);sT2=setTimeout(()=>{const sh=sheetOf(sheetSec);sh.html=ed.innerHTML.trim();sh.at=hhmm();save('sheets');$('#mrSaved').innerHTML='<i></i>Salvo às '+sh.at},450);updWords()}
 function updWords(){const n=(ed.innerText.trim().match(/\S+/g)||[]).length;$('#mrWords').textContent=n+(n===1?' palavra':' palavras')}
 ed.addEventListener('input',()=>{mdShortcuts();saveSheetSoon()});
 $('#mrScroll').addEventListener('click',e=>{if(e.target===$('#mrScroll')||e.target===paper){if(mrMode==='text'){ed.focus();placeCaretEnd()}}});
@@ -3449,6 +3701,8 @@ function insertIntoSheet(html,secId,atCaret){if(!app.classList.contains('mirror'
   else{const last=ed.lastElementChild;if(last&&last.tagName==='P'&&!last.textContent.trim()&&!last.querySelector('img'))last.remove();ed.insertAdjacentHTML('beforeend',html);placeCaretEnd()}
   saveSheetSoon();
   const sc=$('#mrScroll'),sr=getSelection();if(sr.rangeCount){const rr=sr.getRangeAt(0).getBoundingClientRect(),br=sc.getBoundingClientRect();if(rr.bottom>br.bottom-40||rr.top<br.top)sc.scrollTop+=rr.top-br.top-br.height/2}}
+$('#mrCad').onclick=()=>{if(!sheetSec)return;flushSheet();const html=(sheetOf(sheetSec).html||'').trim();const tx=(ed.innerText||'').trim();if(!tx)return toast('A folha está vazia');
+  const so=secs.find(x=>x.id===sheetSec);_folhaSig[sheetSec]=html;cadSend({type:'leitor-jus-salvar-caderno',grifo:{tipo:'anotacao',comentario:tx.slice(0,5000),html:html.slice(0,100000),trecho:so&&so.dataset?String(so.dataset.title||'').slice(0,300):'',folha_sec:String(sheetSec),ref_tabela:'folha_local'}})};
 $('#mrCopy').onclick=()=>copy((mrMode==='text'?ed.innerText:'')||'Folha vazia','Folha copiada');
 /* esquema à mão livre */
 let sk={tool:'pen',c:'k',size:4,drawing:false,last:null,hist:[]};

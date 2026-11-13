@@ -13,6 +13,9 @@ interface NotifItem {
   em: string
   /** Link do admin (perfil do aluno naquele simulado/tentativa) — null se não aplicável. */
   href: string | null
+  /** 'seguranca' = notificação persistente (leitura controlada no servidor). */
+  tipo?: string
+  lida?: boolean
 }
 
 const LAST_SEEN_KEY = 'admin_notif_last_seen'
@@ -38,6 +41,7 @@ export function NotificationBell() {
   // Snapshot do "última leitura" no momento em que o painel abriu — abrir marca tudo como lido (some
   // o badge), então guardamos esse marcador p/ ainda destacar/filtrar as que eram novas nesta abertura.
   const [marcador, setMarcador] = useState(0)
+  const [segMarcador, setSegMarcador] = useState<Set<string>>(new Set())
   const ref = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
@@ -72,25 +76,32 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [aberto])
 
-  const naoLidas = items.filter((i) => new Date(i.em).getTime() > lastSeen).length
+  const naoLida = (i: NotifItem) => (i.tipo === 'seguranca' ? !i.lida : new Date(i.em).getTime() > lastSeen)
+  const naoLidas = items.filter(naoLida).length
 
   function marcarLidas() {
     const agora = Date.now()
     localStorage.setItem(LAST_SEEN_KEY, String(agora))
     setLastSeen(agora)
+    // Segurança: marca lida NO SERVIDOR (persistente) e reflete localmente.
+    if (items.some((i) => i.tipo === 'seguranca' && !i.lida)) {
+      setItems((cur) => cur.map((i) => (i.tipo === 'seguranca' ? { ...i, lida: true } : i)))
+      void fetch('/api/admin/seguranca/notificacoes/lidas', { method: 'POST' }).catch(() => {})
+    }
   }
 
   function toggle() {
     const abrindo = !aberto
     if (abrindo) {
       setMarcador(lastSeen)          // snapshot ANTES de marcar (p/ destacar/filtrar as novas)
+      setSegMarcador(new Set(items.filter((i) => i.tipo === 'seguranca' && !i.lida).map((i) => i.id)))
       setBusca(''); setFiltro('todas')
       if (naoLidas > 0) marcarLidas()
     }
     setAberto(abrindo)
   }
 
-  const ehNova = (i: NotifItem) => new Date(i.em).getTime() > marcador
+  const ehNova = (i: NotifItem) => (i.tipo === 'seguranca' ? segMarcador.has(i.id) : new Date(i.em).getTime() > marcador)
   const q = busca.trim().toLowerCase()
   const visiveis = items.filter((i) =>
     (filtro === 'todas' || ehNova(i)) &&

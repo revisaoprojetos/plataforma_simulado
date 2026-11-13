@@ -1,4 +1,5 @@
 'use server'
+import { sanearBusca } from '@/lib/seguranca/email-seguro'
 import type { Categoria, PastaConteudo, EstudanteAcessoLinha, GrupoAtribuido, NoAcesso, ModoAcessoDTO, OrigemDTO, PermsDTO, DriveNodeDTO, PermissoesAluno, VinculoLeitor, AcessoLinhaSidebar, EventoHistorico } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
@@ -504,7 +505,7 @@ async function ingerirBytes(data: Buffer, input: {
   if (rec.erro) return { ok: false, error: rec.erro, documentoId: criado.documentoId }
   // No modelo Drive, subir = já disponível: torna a versão atual e publica o documento (status=publicado).
   // Sem isto, o doc fica 'rascunho' c/ versao_atual_id nulo e NUNCA aparece para o aluno (gate em leitor.ts).
-  await definirVersaoAtual(criado.documentoId, criado.versaoId)
+  await definirVersaoAtual(criado.documentoId, criado.versaoId, tipo === 'pdf' ? { bytes: data } : undefined)
   await registrarAudit({ tenantId: input.tenantId, atorId: input.atorId, entidade: 'simulado_conteudo_documentos', operacao: 'INSERT', entidadeId: criado.documentoId, depois: { titulo: input.titulo, trechos: rec.trechos, publicado: true } }).catch(() => {})
   // Pré-aquece SÓ a CAPA (1ª página, leve) p/ a rota lazy achá-la cacheada. O PDF do doc INTEIRO (OnlyOffice
   // ~45s) NÃO é gerado no import (era brutal em import de massa) — é gerado sob demanda ao ABRIR o documento.
@@ -653,7 +654,7 @@ export async function publicarNovaVersao(input: {
   if (erro || !html.trim()) return { ok: false, error: erro || 'Conversão vazia.' }
   const rec = await reconciliarVersao({ documentoId: input.documentoId, versaoNovaId: nv.versaoId, versaoAnteriorId: nv.anteriorId, html })
   if (rec.erro) return { ok: false, error: rec.erro }
-  if (input.publicar) await definirVersaoAtual(input.documentoId, nv.versaoId)
+  if (input.publicar) await definirVersaoAtual(input.documentoId, nv.versaoId, tipo === 'pdf' ? { bytes: data } : undefined)
   await registrarAudit({ tenantId: g.tenantId, atorId: g.atorId, entidade: 'simulado_conteudo_versoes', operacao: input.publicar ? 'LIBERAR' : 'INSERT', entidadeId: nv.versaoId, depois: { numero: nv.numero, reconciliacao: rec } }).catch(() => {})
   // Pré-gera a miniatura da nova versão (se publicada, é a que o card vai mostrar).
   await gerarThumbDocumento(g.tenantId, input.documentoId, { forcar: true }).catch(() => {})
@@ -1071,7 +1072,7 @@ export async function buscarAlunosBiblioteca(q = '', offset = 0, limit = 30): Pr
   const g = await guard('view'); if (!g.ok) return g
   const svc = createAdminClient()
   let query = svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor', { count: 'exact' }).eq('tenant_id', g.tenantId)
-  const term = (q ?? '').trim().replace(/[%,]/g, ' ')
+  const term = sanearBusca(q ?? '')
   if (term) query = query.or(`nome.ilike.%${term}%,email.ilike.%${term}%`)
   const { data, count, error } = await query.order('nome', { ascending: true }).range(offset, offset + limit - 1)
   if (error) return { ok: false, error: error.message }

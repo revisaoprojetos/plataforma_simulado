@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { comTokenOO } from '@/lib/seguranca/url-token-oo'
 import { ArrowLeft, Eye, Loader2, SlidersHorizontal, RotateCcw, FolderOpen, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { obterDisciplinasDoSimulado, aplicarPreviaSimulado, resetarPrevia } from './previa-actions'
 import { SimuladoPickerDialog } from './simulado-picker-dialog'
@@ -10,7 +11,7 @@ declare global { interface Window { DocsAPI?: any } }
 
 type Disc = { nome: string; total: number; assuntos: string; acertos: number }
 
-export function PreviaLab({ id, onlyofficeUrl, wopiHost, docVersao }: { id: string; onlyofficeUrl: string; wopiHost: string; docVersao: string }) {
+export function PreviaLab({ id, onlyofficeUrl, wopiHost, docVersao, token = null }: { id: string; onlyofficeUrl: string; wopiHost: string; docVersao: string; token?: string | null }) {
   const [simId, setSimId] = useState('')
   const [titulo, setTitulo] = useState('')
   const [pickerAberto, setPickerAberto] = useState(false)
@@ -24,6 +25,7 @@ export function PreviaLab({ id, onlyofficeUrl, wopiHost, docVersao }: { id: stri
   const [recarregando, setRecarregando] = useState(false)
   const [recolhida, setRecolhida] = useState(false)
 
+  const tokenRef = useRef(token); tokenRef.current = token // ref: token novo (re-render do servidor) não recria o editor
   const editorRef = useRef<any>(null)
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const questoesRef = useRef<{ disciplina: string; assunto: string; pilar: string; ordem: number }[]>([])
@@ -36,7 +38,7 @@ export function PreviaLab({ id, onlyofficeUrl, wopiHost, docVersao }: { id: stri
     const key = `${id}_pv_${ver}`.replace(/[^a-z0-9_-]/gi, '')
     editorRef.current = new window.DocsAPI.DocEditor('oo-previa', {
       documentType: 'word',
-      document: { fileType: 'docx', key, title: `${id} · prévia.docx`, url: `${wopiHost}/api/teste/docs/${id}/preview`, permissions: { edit: false, download: true } },
+      document: { fileType: 'docx', key, title: `${id} · prévia.docx`, url: comTokenOO(`${wopiHost}/api/teste/docs/${id}/preview`, tokenRef.current), permissions: { edit: false, download: true } },
       editorConfig: { lang: 'pt', mode: 'view', user: { id: 'admin', name: 'Admin (teste)' } },
       events: { onDocumentReady: () => setRecarregando(false) },
       width: '100%', height: '100%',

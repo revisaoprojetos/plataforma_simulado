@@ -7,6 +7,7 @@ import { Tag } from '@/components/nova/ui'
 import { Icon } from '@/components/nova/icons'
 import { R } from '@/lib/nova/rotas'
 import type { DocCurso, SubCurso } from '@/lib/nova/cursos'
+import AtualizacoesCurso from './_atualizacoes'
 
 function tipoLabel(tipo: string): string {
   const t = (tipo || '').toLowerCase()
@@ -16,7 +17,7 @@ function tipoLabel(tipo: string): string {
   return 'Material'
 }
 
-type TabKey = 'modulos' | 'pdfs' | 'legproc' | 'questoes'
+type TabKey = 'modulos' | 'pdfs' | 'legproc' | 'questoes' | 'atualizacoes'
 
 function Circle({ lido }: { lido: boolean }) {
   return lido
@@ -73,6 +74,7 @@ export default function Conteudo({ cursoId, documentos, subpastas, breadcrumb }:
     { k: 'pdfs', label: 'PDFs', count: documentos.length },
     { k: 'legproc', label: 'LegProc', count: 0 },
     { k: 'questoes', label: 'Questões', count: 0 },
+    { k: 'atualizacoes', label: 'Atualizações', count: 0 },
   ]
 
   return (
@@ -123,6 +125,8 @@ export default function Conteudo({ cursoId, documentos, subpastas, breadcrumb }:
           {/* TODO(dados): vínculo curso→legislação não existe; a legislação anotada vive na Central. */}
           A legislação anotada deste curso fica no <a href={R.legproc} style={{ color: 'var(--brand)', fontWeight: 700 }}>LegProc</a>.
         </Vazio>
+      ) : tab === 'atualizacoes' ? (
+        <AtualizacoesCurso cursoId={cursoId} />
       ) : (
         <Vazio>
           {/* TODO(dados): vínculo curso→banco de questões não existe; o banco é por disciplina na Central. */}

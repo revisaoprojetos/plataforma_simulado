@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { comTokenOO } from '@/lib/seguranca/url-token-oo'
 import { ArrowLeft, Eye } from 'lucide-react'
 
 declare global { interface Window { DocsAPI?: any } }
@@ -10,7 +11,7 @@ const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
 const PLUGIN_AREAS_GUID = 'asc.{8B2D5E71-4F3A-4C19-9A60-D1E7A2B3C4F5}'
 const PLUGIN_EXPANSOR_GUID = 'asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}'
 
-export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false, docVersao = '0' }: { id: string; onlyofficeUrl: string; wopiHost: string; preview?: boolean; docVersao?: string }) {
+export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false, docVersao = '0', token = null, pluginToken = null }: { id: string; onlyofficeUrl: string; wopiHost: string; preview?: boolean; docVersao?: string; token?: string | null; pluginToken?: string | null }) {
   const montado = useRef(false)
   const editorRef = useRef<any>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -27,6 +28,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
     const pluginAreasConfig = `${origin}/oo-plugin-areas/config.json`
     const pluginExpansorConfig = `${origin}/oo-plugin-expansor/config.json`
     try { localStorage.setItem('teste_oo_docid', id) } catch { /* sem storage, prévia degrada */ }
+    try { if (pluginToken) localStorage.setItem('oo_plugin_token', pluginToken) } catch { /* plugin cai p/ sessão admin */ }
     const criar = () => {
       try {
         if (!window.DocsAPI) { setErro('api.js carregou mas DocsAPI não existe.'); return }
@@ -38,7 +40,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
         if (preview) {
           editorConfig.mode = 'view'
         } else {
-          editorConfig.callbackUrl = `${wopiHost}/api/teste/onlyoffice/callback/${id}`
+          editorConfig.callbackUrl = comTokenOO(`${wopiHost}/api/teste/onlyoffice/callback/${id}`, token)
           editorConfig.plugins = { autostart: [PLUGIN_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig] }
           // Salvamento MANUAL: desliga o autosave (que salvava direto, às vezes um estado vazio por cima)
           // e liga o botão Salvar / Ctrl+S (force-save). Você salva quando o conteúdo está pronto.
@@ -49,7 +51,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
           document: {
             fileType: 'docx', key,
             title: preview ? `${id} · prévia (valores).docx` : `${id}.docx`,
-            url: preview ? `${wopiHost}/api/teste/docs/${id}/preview` : `${wopiHost}/api/teste/docs/${id}`,
+            url: comTokenOO(preview ? `${wopiHost}/api/teste/docs/${id}/preview` : `${wopiHost}/api/teste/docs/${id}`, token),
             permissions: { edit: !preview, download: true },
           },
           editorConfig,
@@ -64,7 +66,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
     s.onload = criar
     s.onerror = () => setErro(`Não carregou ${scriptSrc}. Suba o OnlyOffice e confira NEXT_PUBLIC_ONLYOFFICE_URL.`)
     document.body.appendChild(s)
-  }, [id, onlyofficeUrl, wopiHost, preview, docVersao])
+  }, [id, onlyofficeUrl, wopiHost, preview, docVersao, token, pluginToken])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">

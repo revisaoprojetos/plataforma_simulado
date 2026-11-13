@@ -31,8 +31,10 @@ const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const SELO_LABELS: Record<string, string> = Object.fromEntries(Object.entries(SELOS).map(([k, v]) => [k, v.nome]))
 
 export function LeitorJus({
-  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff = [], grifoRevisaoOff = false, anotacoes = [],
+  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff = [], grifoRevisaoOff = false, anotacoes = [], alunoId,
 }: {
+  /** Id do aluno logado — chave do localStorage do leitor (isola grifos locais entre contas no mesmo navegador). */
+  alunoId?: string
   html: string
   titulo: string
   sobretitulo?: string
@@ -54,8 +56,8 @@ export function LeitorJus({
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [paraCaderno, setParaCaderno] = useState<ComentarioParaCaderno | null>(null)
   // Mantém os dados num ref para o listener de mensagem sempre ver o valor atual sem re-registrar.
-  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes })
-  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes }
+  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes, alunoId })
+  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes, alunoId }
 
   // O leitor é um iframe isolado → quem fala com a API é o host. Grava progresso/conclusão da leitura.
   const postProgresso = useCallback((body: Record<string, unknown>) => {
@@ -94,6 +96,7 @@ export function LeitorJus({
         grifoRevisaoOff: !!d.grifoRevisaoOff,
         // Grifos persistidos no servidor (fonte da verdade): o leitor pinta por âncora text-quote e
         // sincroniza cada criação/edição/remoção de volta pelo host → /api/leitura/anotacao.
+        uid: d.alunoId ?? null, // escopa o localStorage do iframe por aluno (aparelho compartilhado não mistura contas)
         grifosServer: !!(d.documentoId && d.versao),
         grifos: (d.anotacoes ?? []).map((a) => ({
           id: a.id, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix,
@@ -104,9 +107,31 @@ export function LeitorJus({
   }, [])
 
   // Relay de persistência de grifos: o iframe é isolado → o host fala com a API.
-  const grifoFetch = useCallback((init: RequestInit & { method: string }, qs = '') => {
-    return fetch('/api/leitura/anotacao' + qs, { credentials: 'same-origin', ...init })
-      .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+  // Fila com retry/backoff (rede instável no celular/tablet; 5xx transitório). Antes a falha era 100% silenciosa.
+  // Informa o iframe (leitor-jus-grifo-status) p/ ele mostrar "Salvando… / Salvo / Erro ao salvar".
+  const pendGrifosRef = useRef(0)
+  const grifoFetch = useCallback(async (init: RequestInit & { method: string }, qs = ''): Promise<any> => {
+    const avisar = (estado: 'sync' | 'ok' | 'erro') => {
+      try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-grifo-status', estado, pendentes: pendGrifosRef.current }, '*') } catch { /* iframe fechado */ }
+    }
+    pendGrifosRef.current += 1
+    avisar('sync')
+    const esperas = [1500, 5000, 15000, 30000]
+    let resultado: any = null
+    let falhou = true
+    for (let i = 0; i <= esperas.length; i++) {
+      try {
+        const r = await fetch('/api/leitura/anotacao' + qs, { credentials: 'same-origin', ...init })
+        if (r.ok) { resultado = await r.json().catch(() => ({})); falhou = false; break }
+        // 4xx (exceto 408/429) não adianta repetir (sessão/permissão/validação).
+        if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) break
+      } catch { /* rede caiu: tenta de novo */ }
+      if (i < esperas.length) await new Promise((res) => setTimeout(res, esperas[i]))
+    }
+    pendGrifosRef.current = Math.max(0, pendGrifosRef.current - 1)
+    if (falhou) avisar('erro')
+    else if (pendGrifosRef.current === 0) avisar('ok')
+    return resultado
   }, [])
   const salvarGrifo = useCallback((m: any) => {
     const d = dadosRef.current

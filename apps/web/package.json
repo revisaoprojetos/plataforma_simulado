@@ -14,7 +14,11 @@
     "lint:egress": "node scripts/check-egress-guardrails.mjs",
     "lint:egress:ratchet": "node scripts/check-egress-guardrails.mjs --ratchet",
     "clean": "rm -rf .next",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seguranca:codigo": "node scripts/seguranca-codigo.mjs",
+    "seguranca:deps": "node scripts/seguranca-deps.mjs",
+    "seguranca:manifest": "node scripts/seguranca-manifest.mjs",
+    "seguranca:tudo": "node scripts/seguranca-codigo.mjs && node scripts/seguranca-deps.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.709.0",

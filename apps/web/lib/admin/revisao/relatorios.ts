@@ -196,9 +196,10 @@ async function cronograma(c: Ctx): Promise<Pick<RelatorioRevisao, 'kpis' | 'barr
        SELECT pm.estudante_id FROM ${META} JOIN simulado_cronograma_adaptativo_plano pl ON pl.id = pm.plano_id AND ${PL}
         WHERE pm.tenant_id = $1 AND pm.data_prevista < @HOY AND coalesce(m.estado, '') <> 'done'${fg(x, 'pm.estudante_id')}
         GROUP BY pm.estudante_id HAVING count(*) >= 5) z`),
-    q<{ n: string | null }>(c, (x) => `SELECT count(*)::text AS n FROM simulado_cronograma_adaptativo_plano pl,
-       LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(pl.extras) = 'array' THEN pl.extras ELSE '[]'::jsonb END) e
-       WHERE ${PL} AND e->>'data' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND (e->>'data')::date BETWEEN @INI AND @HOY${fg(x, 'pl.estudante_id')}`),
+    // sessões fora do cronograma: tabela filha plano_extra (a coluna jsonb `extras` é só o legado do dual-write)
+    q<{ n: string | null }>(c, (x) => `SELECT count(*)::text AS n FROM simulado_cronograma_adaptativo_plano_extra e
+       JOIN simulado_cronograma_adaptativo_plano pl ON pl.id = e.plano_id AND ${PL}
+       WHERE e.tenant_id = $1 AND e.data BETWEEN @INI AND @HOY${fg(x, 'pl.estudante_id')}`),
     q<{ sem: string; tot: string; ok: string }>(c, (x) => `SELECT date_trunc('week', pm.data_prevista)::date::text AS sem, count(*)::text AS tot, count(*) FILTER (WHERE m.estado = 'done')::text AS ok
        FROM ${META} JOIN simulado_cronograma_adaptativo_plano pl ON pl.id = pm.plano_id AND ${PL}
       WHERE pm.tenant_id = $1 AND pm.data_prevista BETWEEN '${semIni}'::date AND @HOY${fg(x, 'pm.estudante_id')}

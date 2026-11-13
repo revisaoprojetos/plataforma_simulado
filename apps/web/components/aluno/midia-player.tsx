@@ -14,8 +14,9 @@ import { useState } from 'react'
 import { ArrowLeft, Download, Loader2, Music, Video } from 'lucide-react'
 import { navProgressStart } from '@/lib/nav-progress'
 
-export function MidiaPlayer({ titulo, url, kind, voltarHref }: {
-  titulo: string; url: string | null; kind: 'video' | 'audio'; voltarHref: string
+export function MidiaPlayer({ titulo, url, kind, voltarHref, podeBaixar = true, versaoTag }: {
+  /** Selo de versão ao fim do título (ex.: 'v3'). */ versaoTag?: { texto: string; titulo: string } | null
+  titulo: string; url: string | null; kind: 'video' | 'audio'; voltarHref: string; podeBaixar?: boolean
 }) {
   const router = useRouter()
   const Icone = kind === 'video' ? Video : Music
@@ -64,7 +65,8 @@ export function MidiaPlayer({ titulo, url, kind, voltarHref }: {
         </button>
         <Icone className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-foreground" title={titulo}>{titulo}</h1>
-        {url && (
+        {versaoTag && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground" title={versaoTag.titulo}>{versaoTag.texto}</span>}
+        {url && podeBaixar && (
           <a
             href={url}
             download
@@ -93,6 +95,7 @@ export function MidiaPlayer({ titulo, url, kind, voltarHref }: {
             <video
               src={url}
               controls
+              controlsList={podeBaixar ? undefined : 'nodownload'}
               preload="metadata"
               playsInline
               onLoadedData={prontoOuErro}
@@ -123,6 +126,7 @@ export function MidiaPlayer({ titulo, url, kind, voltarHref }: {
             <audio
               src={url}
               controls
+              controlsList={podeBaixar ? undefined : 'nodownload'}
               preload="metadata"
               onLoadedData={prontoOuErro}
               onCanPlay={prontoOuErro}

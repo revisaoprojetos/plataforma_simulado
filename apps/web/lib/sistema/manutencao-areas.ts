@@ -58,7 +58,10 @@ export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   // cobre tanto /aluno/questoes quanto /aluno/recomendado.
   { key: 'questoes', label: 'Banco de Questões (Questões Revisão + Recomendados)', descricao: 'Banco de questões e, na Revisão, a aba unificada de Recomendados (/aluno/questoes + /aluno/recomendado).', href: '/aluno/questoes', hrefs: ['/aluno/recomendado'] },
   // Biblioteca do aluno (ler conteúdos liberados + grifar). Nasce BLOQUEADA — libere por allowlist.
-  { key: 'biblioteca', label: 'Biblioteca', descricao: 'Leitura dos materiais liberados, com grifos salvos (/aluno/biblioteca).', href: '/aluno/biblioteca', padraoBloqueado: true },
+  { key: 'biblioteca', label: 'Biblioteca', descricao: 'Leitura dos materiais liberados, com grifos salvos (/aluno/biblioteca).', href: '/aluno/biblioteca', padraoBloqueado: true,
+    // exact: bloqueia só a NAVEGAÇÃO da Biblioteca (/aluno/biblioteca). O LEITOR (/aluno/biblioteca/[id]) é usado por
+    // Cronograma, Cursos, Painel e JurisClub e já tem gate próprio por documento/produto — não pode cair em "manutenção" no F5.
+    exact: true },
 
   // ── Início — as 2 áreas (nova + legada). A legada usa match EXATO (/aluno é a raiz do portal). ──
   { key: 'nova_inicio', label: 'Início (nova)', descricao: 'Página inicial nova da Revisão (/aluno/nova/inicio).', href: '/aluno/nova/inicio' },

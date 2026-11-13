@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { guardaTeste } from "@/lib/seguranca/guarda-teste"
 import { randomUUID } from 'node:crypto'
 import { salvarDoc } from '@/lib/teste/store'
 
@@ -7,6 +8,7 @@ import { salvarDoc } from '@/lib/teste/store'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  { const b = await guardaTeste(); if (b) return b }
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')
   if (!(file instanceof File)) return NextResponse.json({ error: 'arquivo ausente' }, { status: 400 })

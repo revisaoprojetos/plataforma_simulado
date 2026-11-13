@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { guardaTeste } from "@/lib/seguranca/guarda-teste"
 import { randomUUID } from 'node:crypto'
 import { salvarDoc } from '@/lib/teste/store'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -36,6 +37,7 @@ async function montarTemplate(): Promise<Buffer> {
 }
 
 export async function POST() {
+  { const b = await guardaTeste(); if (b) return b }
   try {
     const templateBuf = await montarTemplate()
 

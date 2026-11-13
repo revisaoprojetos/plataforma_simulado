@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
-import { DownloadCloud, CreditCard, ChevronRight } from 'lucide-react'
+import { DownloadCloud, CreditCard, ChevronRight, AlertTriangle } from 'lucide-react'
+import { verificarSilencioWebhook, formatarSilencio } from '@/lib/integracoes/silencio'
 import { SemPermissao } from '@/components/ui/alert-box'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,8 @@ export default async function IntegracoesPage() {
   const svc = createAdminClient()
   const { data: cfgs } = await svc.from('simulado_integracao_config').select('provider, ativo').eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
   const statusPorProvider = new Map((cfgs ?? []).map((c: any) => [c.provider, c.ativo]))
+  // Alerta de silêncio: Guru ativo mas sem NENHUMA requisição além do tolerado (ver lib/integracoes/silencio.ts).
+  const silencioGuru = statusPorProvider.get('guru') && access.tenantId ? await verificarSilencioWebhook(svc, access.tenantId, 'guru') : null
 
   return (
     <div className="animate-page space-y-6">
@@ -34,6 +37,19 @@ export default async function IntegracoesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Integrações</h1>
         <p className="text-muted-foreground">Conecte plataformas externas (Curseduca, Guru) para importar alunos e conceder acesso automaticamente.</p>
       </div>
+
+      {silencioGuru?.emSilencio && silencioGuru.silencioMin != null && (
+        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div>
+            <p className="font-semibold text-destructive">O Guru não envia nada à plataforma há {formatarSilencio(silencioGuru.silencioMin)}</p>
+            <p className="text-muted-foreground">
+              A última requisição chegou há mais que o tolerado ({formatarSilencio(silencioGuru.limiteMin)}). Compras feitas agora podem não liberar acesso.
+              Confira a URL e o token do webhook no Guru (<Link href="/admin/integracoes/guru" className="font-medium text-primary underline">configuração do Guru</Link>).
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {PROVIDERS.map(({ id, nome, desc, cor, Icon }) => {

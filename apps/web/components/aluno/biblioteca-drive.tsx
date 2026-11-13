@@ -22,7 +22,7 @@ function normaliza(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
-export function BibliotecaDrive({ inicial }: { inicial: ArvoreAluno }) {
+export function BibliotecaDrive({ inicial, baixarLiberado = true }: { inicial: ArvoreAluno; baixarLiberado?: boolean }) {
   const [arvore, setArvore] = useState<ArvoreAluno>(inicial)
   const [carregando, setCarregando] = useState(false)
   const [valor, setValor] = useState('')
@@ -207,6 +207,7 @@ export function BibliotecaDrive({ inicial }: { inicial: ArvoreAluno }) {
         thumbUrl={docSelecionado ? arvore.thumbs[docSelecionado.id] : undefined}
         aberto={!!docSelecionado}
         onFechar={() => setSelId(null)}
+        baixarLiberado={baixarLiberado}
       />
     </div>
   )
