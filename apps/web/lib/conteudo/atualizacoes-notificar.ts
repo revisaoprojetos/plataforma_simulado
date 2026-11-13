@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 import { NOME_TIPO_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
+import { montarTagAtualizacao, prefixarTag } from './atualizacoes-tipos'
 
 /** Alunos que "têm" o material: acesso direto + membros de grupos (do doc e das pastas ancestrais) + quem já leu/anotou. */
 export async function destinatariosDoMaterial(svc: SupabaseClient, tenantId: string, documentoId: string, pastaId: string | null): Promise<string[]> {
@@ -40,24 +41,28 @@ export async function destinatariosDoMaterial(svc: SupabaseClient, tenantId: str
 /** Aviso in-app (sino do aluno) + "Novidades do Início" de um ponto de versão PUBLICADO. Best-effort, nunca lança. */
 export async function notificarPontoDeVersao(
   svc: SupabaseClient, tenantId: string,
-  o: { documentoId: string; pastaId: string | null; titulo: string; tipo: TipoAtualizacao; rotulo: string | null; resumo: string; primeiroItem: string | null; avisarAlunos: boolean; mostrarInicio: boolean },
+  o: { documentoId: string; pastaId: string | null; titulo: string; tipo: TipoAtualizacao; rotulo: string | null; resumo: string; primeiroItem: string | null; avisarAlunos: boolean; mostrarInicio: boolean; ocorridaEm?: string | null; exibirData?: boolean; exibirHora?: boolean; exibirRotulo?: boolean },
 ): Promise<number> {
   let avisados = 0
   const detalhe = (o.resumo || o.primeiroItem || '').slice(0, 200)
   const nomeTipo = NOME_TIPO_ATUALIZACAO[o.tipo]
+  // Mesma regra de exibição do aluno (helper compartilhado): "10/11/2026: texto"; sem tag -> "Tipo: texto" (ou só o texto se o rótulo está oculto).
+  const t = montarTagAtualizacao({ ocorridaEm: o.ocorridaEm, exibirData: o.exibirData, exibirHora: o.exibirHora, exibirRotulo: o.exibirRotulo, rotulo: o.rotulo })
+  const msg = o.ocorridaEm && t.tag ? prefixarTag(t.tag, detalhe) : o.exibirRotulo === false ? detalhe : `${nomeTipo}: ${detalhe}`
+  const sufixo = t.rotulo ? ` (${t.rotulo})` : ''
   const link = `/aluno/nova/painel/leitor/${o.documentoId}`
   try {
     if (o.avisarAlunos) {
       const dest = await destinatariosDoMaterial(svc, tenantId, o.documentoId, o.pastaId)
       avisados = await criarNotificacoesEmMassa(svc, tenantId, dest, {
-        tipo: 'material_atualizado', titulo: `Material atualizado: ${o.titulo}${o.rotulo ? ` (${o.rotulo})` : ''}`,
-        mensagem: `${nomeTipo}: ${detalhe}`, link,
+        tipo: 'material_atualizado', titulo: `Material atualizado: ${o.titulo}${sufixo}`,
+        mensagem: msg, link,
       })
     }
     if (o.mostrarInicio) {
       await svc.from('simulado_novidades').insert({
-        tenant_id: tenantId, categoria: 'materiais', titulo: `Material atualizado: ${o.titulo}${o.rotulo ? ` (${o.rotulo})` : ''}`,
-        descricao: `${nomeTipo}: ${detalhe}`.slice(0, 400), destaque: false, ativo: true,
+        tenant_id: tenantId, categoria: 'materiais', titulo: `Material atualizado: ${o.titulo}${sufixo}`,
+        descricao: msg.slice(0, 400), destaque: false, ativo: true,
         cta_label: 'Abrir o material', cta_url: link, publicado_em: new Date().toISOString(),
       })
     }

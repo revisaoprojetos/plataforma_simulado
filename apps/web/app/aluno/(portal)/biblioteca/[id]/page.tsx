@@ -155,7 +155,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   // O selo mostra SÓ o rótulo que o admin/professor criou ao publicar a atualização do documento (ex.: "Versão 2026.2");
   // o número interno da versão (auto-incrementado a cada reimportação) NÃO aparece mais para o aluno.
   const rotuloVersao = (nov?.ultimoRotulo ?? '').trim()
-  const tooltipVersao = [rotuloVersao, nov?.atualizadoEm ? `atualizado em ${(formatBrt(nov.atualizadoEm) ?? '').slice(0, 10)}` : ''].filter(Boolean).join(' · ')
+  const tooltipVersao = [rotuloVersao, nov?.seloData ? `atualizado em ${nov.seloData}` : ''].filter(Boolean).join(' · ')
   const versaoTag = rotuloVersao ? { texto: rotuloVersao.length > 28 ? `${rotuloVersao.slice(0, 27)}…` : rotuloVersao, titulo: tooltipVersao } : null
   // Aba lateral "Atualizações": o iframe carrega a lista sob demanda (GET /api/aluno/atualizacoes?documentoId=); aqui só o indicador.
   const atualizacoes = { documentoId: id, recente: !!nov?.recente, ultimaEm: nov?.atualizadoEm ?? null }

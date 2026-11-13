@@ -1,10 +1,9 @@
 'use client'
-// Aba "Atualizações" do curso: pontos de versão PUBLICADOS dos materiais (data e hora de Brasília, rótulo, itens e
+// Aba "Atualizações" do curso: pontos de versão PUBLICADOS dos materiais (tag data/hora e rótulo já filtrados no servidor, itens e
 // link para o material). Dado vem de GET /api/aluno/atualizacoes (paginado no servidor; rota de API p/ domínio custom/iframe).
 import * as React from 'react'
 import { Tag } from '@/components/nova/ui'
 import { R } from '@/lib/nova/rotas'
-import { formatBrt } from '@/lib/brt'
 import { NOME_TIPO_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import type { AtualizacaoAluno } from '@/lib/conteudo/atualizacoes-tipos'
 
@@ -40,14 +39,15 @@ export default function AtualizacoesCurso({ cursoId, produtoId }: { cursoId?: st
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {rows.map((a) => (
         <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <b style={{ fontSize: 14.5, color: 'var(--ink)' }}>{a.rotulo ?? NOME_TIPO_ATUALIZACAO[a.tipo]}</b>
-            <Tag kind="green">{NOME_TIPO_ATUALIZACAO[a.tipo]}</Tag>
-            {a.produtoNome ? <Tag kind="red">{a.produtoNome}</Tag> : null}
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{formatBrt(a.ocorridaEm)}</span>
-          </div>
+          {(a.rotuloExibido || a.produtoNome) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {a.rotuloExibido && <b style={{ fontSize: 14.5, color: 'var(--ink)' }}>{a.rotuloExibido}</b>}
+              {a.rotuloExibido && <Tag kind="green">{NOME_TIPO_ATUALIZACAO[a.tipo]}</Tag>}
+              {a.produtoNome ? <Tag kind="red">{a.produtoNome}</Tag> : null}
+            </div>
+          )}
           <a href={R.painelLeitor(a.documentoId)} style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>{a.material}</a>
-          {a.texto ? <span style={{ fontSize: 13, color: 'var(--ink)' }}>{a.texto}</span> : null}
+          {(a.tag || a.texto) ? <span style={{ fontSize: 13, color: 'var(--ink)' }}>{a.tag ? <b style={{ fontVariantNumeric: 'tabular-nums' }}>{a.tag}{a.texto ? ': ' : ''}</b> : null}{a.texto}</span> : null}
           {a.itens.length > 0 && (
             <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>
               {a.itens.map((it, k) => <li key={k} style={{ fontSize: 13, color: 'var(--muted)' }}>{it.texto}{it.local ? ` — ${it.local}` : ''}</li>)}

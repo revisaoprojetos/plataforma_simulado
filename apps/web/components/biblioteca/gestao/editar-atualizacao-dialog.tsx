@@ -11,9 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { BRT_LABEL, isoParaBrtLocal } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
-import type { LinhaAtualizacao, TipoAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
+import { separarDataHoraBrt, type LinhaAtualizacao, type TipoAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
+import { CamposQuando, type ExibicaoState } from './atualizacao-exibicao'
 import { editarPontoVersaoAction } from '@/app/admin/conteudos/atualizacoes-actions'
 
 type Item = { texto: string; local: string }
@@ -21,7 +21,7 @@ type Item = { texto: string; local: string }
 export function EditarAtualizacaoDialog({ registro, onClose, onDone }: { registro: LinhaAtualizacao | null; onClose: () => void; onDone: () => void }) {
   const [rotulo, setRotulo] = useState('')
   const [tipo, setTipo] = useState<TipoAtualizacao>('legislacao')
-  const [quando, setQuando] = useState('')
+  const [quando, setQuando] = useState<ExibicaoState>({ data: '', hora: '', exibirData: true, exibirHora: true, exibirRotulo: true })
   const [resumo, setResumo] = useState('')
   const [itens, setItens] = useState<Item[]>([])
   const [visivel, setVisivel] = useState(true)
@@ -29,7 +29,7 @@ export function EditarAtualizacaoDialog({ registro, onClose, onDone }: { registr
 
   useEffect(() => {
     if (!registro) return
-    setRotulo(registro.rotulo ?? ''); setTipo(registro.tipo); setQuando(isoParaBrtLocal(registro.ocorridaEm)); setResumo(registro.texto)
+    setRotulo(registro.rotulo ?? ''); setTipo(registro.tipo); setQuando({ ...separarDataHoraBrt(registro.ocorridaEm), exibirData: registro.exibirData, exibirHora: registro.exibirHora, exibirRotulo: registro.exibirRotulo }); setResumo(registro.texto)
     setItens(registro.itens.length ? registro.itens.map((i) => ({ texto: i.texto, local: i.local ?? '' })) : [{ texto: '', local: '' }])
     setVisivel(registro.visivelAluno); setSalvando(false)
   }, [registro])
@@ -38,7 +38,7 @@ export function EditarAtualizacaoDialog({ registro, onClose, onDone }: { registr
     if (!registro) return
     setSalvando(true)
     const r = await editarPontoVersaoAction({
-      id: registro.id, rotulo, tipo, resumo, ocorridaEm: quando || null, visivelAluno: visivel,
+      id: registro.id, rotulo, tipo, resumo, data: quando.data || null, hora: quando.hora || null, exibirData: quando.exibirData, exibirHora: quando.exibirHora, exibirRotulo: quando.exibirRotulo, visivelAluno: visivel,
       itens: itens.filter((i) => i.texto.trim()).map((i) => ({ texto: i.texto.trim(), local: i.local.trim() || null })),
     }).catch(() => ({ ok: false as const, error: 'Falha de rede ao salvar.' }))
     setSalvando(false)
@@ -55,12 +55,9 @@ export function EditarAtualizacaoDialog({ registro, onClose, onDone }: { registr
           <DialogDescription className="truncate">{registro?.material}</DialogDescription>
         </DialogHeader>
         <div className="-mx-1 max-h-[60vh] space-y-4 overflow-y-auto px-1">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-sm"><span className="font-medium">Rótulo da versão</span>
-              <Input value={rotulo} onChange={(e) => setRotulo(e.target.value)} maxLength={120} placeholder="Ex.: v2.1" /></label>
-            <label className="space-y-1.5 text-sm"><span className="font-medium">Data e hora <span className="font-normal text-muted-foreground">· {BRT_LABEL}</span></span>
-              <Input type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} /></label>
-          </div>
+          <label className="block space-y-1.5 text-sm"><span className="font-medium">Rótulo da versão</span>
+            <Input value={rotulo} onChange={(e) => setRotulo(e.target.value)} maxLength={120} placeholder="Ex.: v2.1" /></label>
+          <CamposQuando v={quando} onChange={(p) => setQuando((q) => ({ ...q, ...p }))} rotulo={rotulo} tipo={tipo} texto={resumo || itens.find((i) => i.texto.trim())?.texto || ''} disponivel={registro?.exibicaoDisponivel ?? false} />
           <div className="flex flex-wrap gap-1.5">
             {TIPOS_ATUALIZACAO.map((t) => (
               <button key={t.id} type="button" onClick={() => setTipo(t.id)}

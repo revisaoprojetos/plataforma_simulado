@@ -11,14 +11,14 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { brtLocalParaIso } from '@/lib/brt'
+import { hojeBrtISO } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import {
-  LIMITES_ATUALIZACAO, normalizarItens,
+  LIMITES_ATUALIZACAO, combinarDataHoraBrt, normalizarItens,
   type FiltroAtualizacoes, type ItemAlteracao, type LinhaAtualizacao, type StatusAtualizacao, type TipoAtualizacao,
 } from '@/lib/conteudo/atualizacoes-tipos'
 import {
-  AVISO_MIGRACAO_PONTOS, listarAtualizacoes, listarDocumentosDoProduto, registroVersoesAtivo,
+  AVISO_MIGRACAO_EXIBICAO, AVISO_MIGRACAO_PONTOS, colunasExibicaoExistem, comFallbackFlags, listarAtualizacoes, listarDocumentosDoProduto, registroVersoesAtivo,
 } from '@/lib/conteudo/atualizacoes-registro'
 import { notificarPontoDeVersao } from '@/lib/conteudo/atualizacoes-notificar'
 import { rotulosDeMateriais } from '@/lib/admin-revisao/atualizacoes'
@@ -42,14 +42,24 @@ async function guard(acao: 'view' | 'edit'): Promise<Falha | { ok: true; tenantI
 const tipoOk = (t: unknown): t is TipoAtualizacao => TIPOS_ATUALIZACAO.some((x) => x.id === t)
 const msgErro = (m: string | undefined) => (m && SCHEMA_AUSENTE.test(m) ? AVISO_MIGRACAO_PONTOS : m || 'Falha ao salvar.')
 
-/** Data/hora exibida ao aluno: aceita "YYYY-MM-DDTHH:mm" (Brasília) ou ISO; vazio = agora. Rejeita futuro distante. */
-function resolverOcorrida(v: string | null | undefined): { iso: string } | { erro: string } {
-  if (!v) return { iso: new Date().toISOString() }
-  const iso = brtLocalParaIso(v)
-  if (!iso) return { erro: 'Data/hora inválida.' }
+/** Data (YYYY-MM-DD) + hora opcional (HH:mm), ambas em Brasília. Data vazia = hoje (BRT); hora vazia = 00:00. Rejeita futuro distante. */
+function resolverOcorrida(data: string | null | undefined, hora: string | null | undefined): { iso: string } | { erro: string } {
+  const d = (data ?? '').trim()
+  const h = (hora ?? '').trim()
+  if (!d && !h) return { iso: new Date().toISOString() }
+  if (h && !/^([01]\d|2[0-3]):[0-5]\d$/.test(h)) return { erro: 'Hora inválida (use HH:MM).' }
+  const iso = combinarDataHoraBrt(d || hojeBrtISO(), h)
+  if (!iso) return { erro: 'Data inválida.' }
   if (new Date(iso).getTime() > Date.now() + 24 * 3600_000) return { erro: 'A data da atualização não pode estar no futuro.' }
   return { iso }
 }
+
+/** Interruptores de exibição ao aluno (padrão ligado). Hora vazia → a hora nunca é exibida. */
+function lerFlags(i: { exibirData?: boolean; exibirHora?: boolean; exibirRotulo?: boolean }, hora: string | null | undefined) {
+  return { exibir_data: i.exibirData !== false, exibir_hora: i.exibirHora !== false && !!(hora ?? '').trim(), exibir_rotulo: i.exibirRotulo !== false }
+}
+/** Exige a migração só se o admin realmente ocultou data/rótulo (hora vazia não conta: já é "sem hora"). */
+const exigeMigracao = (f: { exibir_data: boolean; exibir_rotulo: boolean }) => !f.exibir_data || !f.exibir_rotulo
 
 // ───────────────────────────── Leituras ─────────────────────────────
 
@@ -72,12 +82,12 @@ export async function listarDocumentosProdutoAction(produtoId: string, q: string
 
 /** Contexto do dialog: rótulo dos documentos, flag do tenant e (editor) estado da versão em edição. */
 export async function contextoRegistroAction(documentoIds: string[], versaoId?: string | null): Promise<
-  { ok: true; materiais: { id: string; rotulo: string }[]; registroAtivo: boolean; versao: { id: string; numero: number; atual: boolean } | null } | Falha
+  { ok: true; materiais: { id: string; rotulo: string }[]; registroAtivo: boolean; exibicaoDisponivel: boolean; versao: { id: string; numero: number; atual: boolean } | null } | Falha
 > {
   const g = await guard('view'); if (!g.ok) return g
   const ids = [...new Set((documentoIds ?? []).filter((i) => UUID.test(i)))].slice(0, LIMITES_ATUALIZACAO.documentos)
   const svc = createAdminClient()
-  const [rot, ativo] = await Promise.all([rotulosDeMateriais(svc, g.tenantId, ids), registroVersoesAtivo(svc, g.tenantId)])
+  const [rot, ativo, exibicaoDisponivel] = await Promise.all([rotulosDeMateriais(svc, g.tenantId, ids), registroVersoesAtivo(svc, g.tenantId), colunasExibicaoExistem(svc)])
   let versao: { id: string; numero: number; atual: boolean } | null = null
   if (versaoId && UUID.test(versaoId) && ids.length === 1) {
     const [{ data: v }, { data: d }] = await Promise.all([
@@ -86,7 +96,7 @@ export async function contextoRegistroAction(documentoIds: string[], versaoId?: 
     ])
     if (v) versao = { id: (v as any).id, numero: (v as any).numero, atual: (d as any)?.versao_atual_id === versaoId }
   }
-  return { ok: true, materiais: ids.map((id) => ({ id, rotulo: rot.get(id) ?? 'Material' })), registroAtivo: ativo, versao }
+  return { ok: true, materiais: ids.map((id) => ({ id, rotulo: rot.get(id) ?? 'Material' })), registroAtivo: ativo, exibicaoDisponivel, versao }
 }
 
 // ───────────────────────────── Escrita ─────────────────────────────
@@ -102,8 +112,13 @@ interface RegistrarPontoInput {
   itens?: ItemAlteracao[]
   /** Override por documento (multisseleção). */
   porDocumento?: Record<string, { resumo?: string; itens?: ItemAlteracao[] }>
-  /** "YYYY-MM-DDTHH:mm" em Brasília (ou ISO). Vazio = agora. */
-  ocorridaEm?: string | null
+  /** "YYYY-MM-DD" (Brasília). Vazio = hoje. */
+  data?: string | null
+  /** "HH:mm" (Brasília), opcional. Vazio = 00:00 e a hora não é exibida. */
+  hora?: string | null
+  exibirData?: boolean
+  exibirHora?: boolean
+  exibirRotulo?: boolean
   avisarAlunos?: boolean
   mostrarInicio?: boolean
   visivelAluno?: boolean
@@ -122,7 +137,10 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
   const resumoGeral = String(input.resumo ?? '').trim()
   if (resumoGeral.length > LIMITES_ATUALIZACAO.resumo) return { ok: false, error: `O resumo passou de ${LIMITES_ATUALIZACAO.resumo} caracteres.` }
   const itensGerais = normalizarItens(input.itens)
-  const ocorrida = resolverOcorrida(input.ocorridaEm); if ('erro' in ocorrida) return { ok: false, error: ocorrida.erro }
+  const ocorrida = resolverOcorrida(input.data, input.hora); if ('erro' in ocorrida) return { ok: false, error: ocorrida.erro }
+  const flags = lerFlags(input, input.hora)
+  const flagsOk = await colunasExibicaoExistem(createAdminClient())
+  if (!flagsOk && exigeMigracao(flags)) return { ok: false, error: AVISO_MIGRACAO_EXIBICAO }
   const status: StatusAtualizacao = input.status === 'rascunho' ? 'rascunho' : 'publicado'
   const produtoId = input.produtoId && UUID.test(input.produtoId) ? input.produtoId : null
 
@@ -156,7 +174,7 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
     linhas.push({
       tenant_id: g.tenantId, documento_id: d.id, versao_id: versaoPublicar ?? d.versao_atual_id ?? null, produto_id: produtoId, lote_id: loteId,
       tipo: input.tipo, rotulo, texto, itens, ocorrida_em: ocorrida.iso, status, visivel_aluno: input.visivelAluno !== false,
-      avisar_alunos: !!input.avisarAlunos, mostrar_inicio: input.mostrarInicio !== false,
+      avisar_alunos: !!input.avisarAlunos, mostrar_inicio: input.mostrarInicio !== false, ...(flagsOk ? flags : {}),
       publicado_em: status === 'publicado' ? agora : null, criado_por: g.atorId,
     })
   }
@@ -181,7 +199,7 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
 
   await Promise.all((data as any[]).map((r, i) => registrarAudit({
     operacao: 'INSERT', entidade: T, entidadeId: r.id, atorId: g.atorId, tenantId: g.tenantId,
-    depois: { documento_id: r.documento_id, tipo: input.tipo, rotulo, status, lote_id: loteId, produto_id: produtoId, itens: linhas[i].itens.length, publicou_versao: !!versaoPublicar },
+    depois: { documento_id: r.documento_id, tipo: input.tipo, rotulo, status, lote_id: loteId, produto_id: produtoId, ...(flagsOk ? flags : {}), itens: linhas[i].itens.length, publicou_versao: !!versaoPublicar },
   }).catch(() => {})))
 
   // Avisos só de registro PUBLICADO; fora do caminho da resposta (best-effort).
@@ -191,6 +209,7 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
         await notificarPontoDeVersao(svc, g.tenantId, {
           documentoId: d.id, pastaId: d.pasta_id ?? null, titulo: d.titulo ?? 'material', tipo: input.tipo, rotulo,
           resumo: linhas[i].texto, primeiroItem: linhas[i].itens[0]?.texto ?? null, avisarAlunos: !!input.avisarAlunos, mostrarInicio: input.mostrarInicio !== false,
+          ocorridaEm: ocorrida.iso, exibirData: flags.exibir_data, exibirHora: flags.exibir_hora, exibirRotulo: flags.exibir_rotulo,
         })
       }
     }
@@ -201,7 +220,8 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
 }
 
 export async function editarPontoVersaoAction(input: {
-  id: string; rotulo?: string; tipo: TipoAtualizacao; resumo?: string; itens?: ItemAlteracao[]; ocorridaEm?: string | null; visivelAluno?: boolean
+  id: string; rotulo?: string; tipo: TipoAtualizacao; resumo?: string; itens?: ItemAlteracao[]; data?: string | null; hora?: string | null; visivelAluno?: boolean
+  exibirData?: boolean; exibirHora?: boolean; exibirRotulo?: boolean
 }): Promise<{ ok: true } | Falha> {
   const g = await guard('edit'); if (!g.ok) return g
   if (!UUID.test(input.id)) return { ok: false, error: 'Registro inválido.' }
@@ -210,13 +230,17 @@ export async function editarPontoVersaoAction(input: {
   if (texto.length > LIMITES_ATUALIZACAO.resumo) return { ok: false, error: `O resumo passou de ${LIMITES_ATUALIZACAO.resumo} caracteres.` }
   const itens = normalizarItens(input.itens)
   if (!texto && !itens.length) return { ok: false, error: 'Descreva o que mudou (resumo ou ao menos um item).' }
-  const ocorrida = resolverOcorrida(input.ocorridaEm); if ('erro' in ocorrida) return { ok: false, error: ocorrida.erro }
+  const ocorrida = resolverOcorrida(input.data, input.hora); if ('erro' in ocorrida) return { ok: false, error: ocorrida.erro }
   const svc = createAdminClient()
-  const { data: antes } = await svc.from(T).select('id, tipo, rotulo, texto, itens, ocorrida_em, visivel_aluno, status').eq('tenant_id', g.tenantId).eq('id', input.id).eq('deletado', false).maybeSingle()
+  const flags = lerFlags(input, input.hora)
+  const flagsOk = await colunasExibicaoExistem(svc)
+  if (!flagsOk && exigeMigracao(flags)) return { ok: false, error: AVISO_MIGRACAO_EXIBICAO }
+  const colsEd = 'id, tipo, rotulo, texto, itens, ocorrida_em, visivel_aluno, status'
+  const { data: antes } = await comFallbackFlags((f) => svc.from(T).select(f ? `${colsEd}, exibir_data, exibir_hora, exibir_rotulo` : colsEd).eq('tenant_id', g.tenantId).eq('id', input.id).eq('deletado', false).maybeSingle())
   if (!antes) return { ok: false, error: 'Registro não encontrado.' }
   const patch = {
     tipo: input.tipo, rotulo: String(input.rotulo ?? '').trim().slice(0, LIMITES_ATUALIZACAO.rotulo) || null, texto, itens,
-    ocorrida_em: ocorrida.iso, visivel_aluno: input.visivelAluno !== false, atualizado_em: new Date().toISOString(), atualizado_por: g.atorId,
+    ocorrida_em: ocorrida.iso, ...(flagsOk ? flags : {}), visivel_aluno: input.visivelAluno !== false, atualizado_em: new Date().toISOString(), atualizado_por: g.atorId,
   }
   const { error } = await svc.from(T).update(patch).eq('tenant_id', g.tenantId).eq('id', input.id)
   if (error) return { ok: false, error: msgErro(error.message) }
@@ -237,7 +261,8 @@ export async function alterarEstadoPontoAction(ids: string[], acao: 'publicar' |
       : acao === 'rascunho' ? { status: 'rascunho' }
         : acao === 'ocultar' ? { visivel_aluno: false } : { visivel_aluno: true }
   patch.atualizado_em = agora; patch.atualizado_por = g.atorId
-  const { data: antes } = await svc.from(T).select('id, documento_id, tipo, rotulo, texto, itens, status, visivel_aluno, avisar_alunos, mostrar_inicio').eq('tenant_id', g.tenantId).eq('deletado', false).in('id', lista)
+  const colsSt = 'id, documento_id, tipo, rotulo, texto, itens, status, visivel_aluno, avisar_alunos, mostrar_inicio, ocorrida_em'
+  const { data: antes } = await comFallbackFlags((f) => svc.from(T).select(f ? `${colsSt}, exibir_data, exibir_hora, exibir_rotulo` : colsSt).eq('tenant_id', g.tenantId).eq('deletado', false).in('id', lista))
   const alvo = ((antes ?? []) as any[]).filter((r) => (acao === 'publicar' ? r.status !== 'publicado' : true))
   if (!alvo.length) return { ok: true, alterados: 0 }
   const { error } = await svc.from(T).update(patch).eq('tenant_id', g.tenantId).in('id', alvo.map((r) => r.id))
@@ -258,6 +283,7 @@ export async function alterarEstadoPontoAction(ids: string[], acao: 'publicar' |
         await notificarPontoDeVersao(svc, g.tenantId, {
           documentoId: r.documento_id, pastaId: d?.pasta_id ?? null, titulo: d?.titulo ?? 'material', tipo: r.tipo, rotulo: r.rotulo ?? null,
           resumo: r.texto ?? '', primeiroItem: Array.isArray(r.itens) ? r.itens[0]?.texto ?? null : null, avisarAlunos: !!r.avisar_alunos, mostrarInicio: r.mostrar_inicio !== false,
+          ocorridaEm: r.ocorrida_em ?? null, exibirData: r.exibir_data !== false, exibirHora: r.exibir_hora !== false, exibirRotulo: r.exibir_rotulo !== false,
         })
       }
     }

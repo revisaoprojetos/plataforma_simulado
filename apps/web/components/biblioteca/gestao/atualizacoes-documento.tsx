@@ -16,6 +16,7 @@ import type { LinhaAtualizacao, StatusAtualizacao } from '@/lib/conteudo/atualiz
 import { alterarEstadoPontoAction, excluirPontoAction, listarAtualizacoesAction } from '@/app/admin/conteudos/atualizacoes-actions'
 import { RegistrarAtualizacaoDialog } from './registrar-atualizacao-dialog'
 import { EditarAtualizacaoDialog } from './editar-atualizacao-dialog'
+import { OcultoAoAluno } from './atualizacao-exibicao'
 
 export function AtualizacoesDocumento({ documentoId, versaoId = null, podeEditar = true }: { documentoId: string; versaoId?: string | null; podeEditar?: boolean }) {
   const [rows, setRows] = useState<LinhaAtualizacao[]>([])
@@ -83,6 +84,7 @@ export function AtualizacoesDocumento({ documentoId, versaoId = null, podeEditar
                 <span className="text-sm font-semibold">{r.rotulo ?? NOME_TIPO_ATUALIZACAO[r.tipo]}</span>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{NOME_TIPO_ATUALIZACAO[r.tipo]}</span>
                 <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', r.status === 'publicado' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>{r.status === 'publicado' ? 'Publicado' : 'Rascunho'}</span>
+                <OcultoAoAluno r={r} />
                 {!r.visivelAluno && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><EyeOff className="h-3 w-3" />oculto ao aluno</span>}
                 <span className="ml-auto text-xs tabular-nums text-muted-foreground">{formatBrt(r.ocorridaEm)}</span>
               </div>

@@ -3,9 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { rotulosDeMateriais } from '@/lib/admin-revisao/atualizacoes'
 import { remember } from '@/lib/cache/relatorio-cache'
-import type { TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
+import { NOME_TIPO_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
 import {
-  normalizarItens, type AtualizacaoAluno, type FiltroAtualizacoes, type LinhaAtualizacao, type StatusAtualizacao,
+  COLUNA_FLAG, comFallbackFlags, montarTagAtualizacao, normalizarItens, type AtualizacaoAluno, type FiltroAtualizacoes, type LinhaAtualizacao, type StatusAtualizacao,
 } from './atualizacoes-tipos'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
@@ -16,7 +16,21 @@ import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 const T = 'simulado_conteudo_atualizacoes'
 const SCHEMA_AUSENTE = /relation .* does not exist|could not find the table|schema cache|does not exist|column .* does not exist|could not find the .* column/i
 export const AVISO_MIGRACAO_PONTOS = 'Aplique a migração 20261119010000 (Registro de atualizações) para usar o registro de versões.'
-const COLS = 'id, lote_id, documento_id, versao_id, produto_id, tipo, rotulo, texto, itens, ocorrida_em, status, visivel_aluno, avisar_alunos, criado_em'
+const COLS_BASE = 'id, lote_id, documento_id, versao_id, produto_id, tipo, rotulo, texto, itens, ocorrida_em, status, visivel_aluno, avisar_alunos, criado_em'
+const COLS_FLAGS = `${COLS_BASE}, exibir_data, exibir_hora, exibir_rotulo`
+export { COLUNA_FLAG, comFallbackFlags }
+export const AVISO_MIGRACAO_EXIBICAO = 'Aplique a migração 20261120010000 para ocultar data, hora ou rótulo ao aluno.'
+
+let flagsOk = false
+/** As colunas de exibição existem? (sonda 1 vez; só cacheia o "sim" — se faltar, volta a checar após aplicar a migração). */
+export async function colunasExibicaoExistem(svc: SupabaseClient): Promise<boolean> {
+  if (flagsOk) return true
+  try {
+    const { error } = await svc.from(T).select('exibir_data').limit(1)
+    if (!error) flagsOk = true
+    return !error
+  } catch { return false }
+}
 const SORT_COL: Record<string, string> = { ocorrida_em: 'ocorrida_em', rotulo: 'rotulo', tipo: 'tipo', status: 'status', criado_em: 'criado_em' }
 
 const sanear = (q: string | undefined | null) => sanearBusca(q, 80)
@@ -35,6 +49,7 @@ function mapLinha(r: any, rotulos: Map<string, string>): LinhaAtualizacao {
     id: r.id, loteId: r.lote_id ?? null, documentoId: r.documento_id, material: rotulos.get(r.documento_id) ?? 'Material',
     produtoId: r.produto_id ?? null, tipo: r.tipo as TipoAtualizacao, rotulo: r.rotulo ?? null, texto: r.texto ?? '',
     itens: normalizarItens(r.itens), ocorridaEm: r.ocorrida_em ?? r.criado_em, status: (r.status ?? 'publicado') as StatusAtualizacao,
+    exibirData: r.exibir_data !== false, exibirHora: r.exibir_hora !== false, exibirRotulo: r.exibir_rotulo !== false, exibicaoDisponivel: 'exibir_data' in r,
     visivelAluno: r.visivel_aluno !== false, avisarAlunos: !!r.avisar_alunos, criadoEm: r.criado_em, versaoId: r.versao_id ?? null,
   }
 }
@@ -117,7 +132,7 @@ async function paginarIds(
 
 async function linhasPorIds(svc: SupabaseClient, tenantId: string, ids: string[]): Promise<any[]> {
   if (!ids.length) return []
-  const { data, error } = await svc.from(T).select(COLS).eq('tenant_id', tenantId).in('id', ids)
+  const { data, error } = await comFallbackFlags((f) => svc.from(T).select(f ? COLS_FLAGS : COLS_BASE).eq('tenant_id', tenantId).in('id', ids))
   if (error) throw error
   const ordem = new Map(ids.map((id, i) => [id, i]))
   return ((data ?? []) as any[]).sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0))
@@ -179,8 +194,14 @@ export async function atualizacoesParaAluno(
       rows: brutos.map((r) => ({
         id: r.id, documentoId: r.documento_id, material: (rotulos.get(r.documento_id) ?? 'Material').replace(/^.*? · /, ''),
         produtoId: o.produtoId ?? r.produto_id ?? null, produtoNome: nomes.get(r.produto_id) ?? null,
-        tipo: r.tipo, rotulo: r.rotulo ?? null, texto: r.texto ?? '', itens: normalizarItens(r.itens), ocorridaEm: r.ocorrida_em ?? r.criado_em,
+        tipo: r.tipo, texto: r.texto ?? '', itens: normalizarItens(r.itens), ...tagAluno(r),
       })),
     }
   } catch { return { rows: [], total: 0 } }
+}
+
+/** Tag e rótulo que o ALUNO vê (flags aplicadas aqui, no servidor; a data/hora ocultas nem saem no payload). */
+function tagAluno(r: any): { tag: string | null; rotuloExibido: string | null } {
+  const t = montarTagAtualizacao({ ocorridaEm: r.ocorrida_em ?? r.criado_em, exibirData: r.exibir_data !== false, exibirHora: r.exibir_hora !== false, exibirRotulo: r.exibir_rotulo !== false, rotulo: r.rotulo })
+  return { tag: t.tag, rotuloExibido: t.rotulo ?? (r.exibir_rotulo === false ? null : NOME_TIPO_ATUALIZACAO[r.tipo as TipoAtualizacao] ?? null) }
 }

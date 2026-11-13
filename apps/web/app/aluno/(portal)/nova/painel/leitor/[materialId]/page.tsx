@@ -12,7 +12,6 @@ import { carregarLeitura, urlDownloadAluno } from '@/lib/conteudo/leitor'
 import { minhaAvaliacao } from '@/lib/demandas/demandas'
 import { createAdminClient } from '@/lib/supabase/server'
 import { novidadesDoDocumento } from '@/lib/admin-revisao/atualizacoes'
-import { formatBrt } from '@/lib/brt'
 import { redirect } from 'next/navigation'
 import { numeroDaVersao } from '@/lib/conteudo/atualizacoes-registro'
 import { ConcluirLeituraButton, ReportarButton } from './_leitor-modais'
@@ -88,7 +87,6 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
     novidadesDoDocumento(svc, sessao.tenantId, materialId),
     numeroDaVersao(svc, sessao.tenantId, leitura.versaoId), // selo "vN" ao fim do título (versão vigente)
   ])
-  const dia = (iso: string) => (formatBrt(iso) ?? '').slice(0, 10)
 
   return (
     <>
@@ -103,7 +101,7 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
               {numeroVersao && <span title={[`Versão ${numeroVersao}`, nov.novidades[0]?.rotulo ?? ''].filter(Boolean).join(' · ')}><Tag kind="brand">{`v${numeroVersao}`}</Tag></span>}
             </Row>
             <Row gap={10}>
-              {nov.atualizadoEm && <Tag kind="green" icon="cal">Atualizado em {dia(nov.atualizadoEm)}</Tag>}
+              {nov.seloData && <Tag kind="green" icon="cal">Atualizado em {nov.seloData}</Tag>}
             </Row>
           </Col>
           {/* Concluir leitura → abre a avaliação 0 a 5 (pré-preenchida com a nota atual do aluno) */}

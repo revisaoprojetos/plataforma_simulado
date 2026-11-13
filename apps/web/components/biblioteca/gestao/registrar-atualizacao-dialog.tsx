@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { BRT_LABEL, isoParaBrtLocal } from '@/lib/brt'
+import { hojeBrtISO } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import type { ItemAlteracao, TipoAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
+import { CamposQuando, type ExibicaoState } from './atualizacao-exibicao'
 import { contextoRegistroAction, registrarPontoVersaoAction } from '@/app/admin/conteudos/atualizacoes-actions'
 
 type Item = { texto: string; local: string }
@@ -34,13 +35,13 @@ export interface RegistrarAtualizacaoDialogProps {
   onDone?: (r?: Resultado) => void
 }
 
-const agoraLocal = () => isoParaBrtLocal(new Date().toISOString())
+const exibicaoInicial = (): ExibicaoState => ({ data: hojeBrtISO(), hora: '', exibirData: true, exibirHora: true, exibirRotulo: true })
 
 export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, versaoId = null, open, onOpenChange, onDone }: RegistrarAtualizacaoDialogProps) {
-  const [ctx, setCtx] = useState<{ materiais: { id: string; rotulo: string }[]; registroAtivo: boolean; versao: { id: string; numero: number; atual: boolean } | null } | null>(null)
+  const [ctx, setCtx] = useState<{ materiais: { id: string; rotulo: string }[]; registroAtivo: boolean; exibicaoDisponivel: boolean; versao: { id: string; numero: number; atual: boolean } | null } | null>(null)
   const [rotulo, setRotulo] = useState('')
   const [tipo, setTipo] = useState<TipoAtualizacao>('legislacao')
-  const [quando, setQuando] = useState(agoraLocal())
+  const [quando, setQuando] = useState<ExibicaoState>(exibicaoInicial())
   const [resumo, setResumo] = useState('')
   const [itens, setItens] = useState<Item[]>([{ texto: '', local: '' }])
   const [porDoc, setPorDoc] = useState<Record<string, { resumo: string; itens: string }>>({})
@@ -55,12 +56,12 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
   const idsKey = documentoIds.join(',')
   useEffect(() => {
     if (!open) return
-    setCtx(null); setRotulo(''); setTipo('legislacao'); setQuando(agoraLocal()); setResumo(''); setItens([{ texto: '', local: '' }])
+    setCtx(null); setRotulo(''); setTipo('legislacao'); setQuando(exibicaoInicial()); setResumo(''); setItens([{ texto: '', local: '' }])
     setPorDoc({}); setPersonalizar(false); setAvisar(true); setInicio(true); setVisivel(true); setPublicar(true); setPublicarVersao(true); setSalvando(false)
     let vivo = true
     contextoRegistroAction(documentoIds, versaoId).then((r) => {
       if (!vivo) return
-      if (r.ok) setCtx({ materiais: r.materiais, registroAtivo: r.registroAtivo, versao: r.versao })
+      if (r.ok) setCtx({ materiais: r.materiais, registroAtivo: r.registroAtivo, exibicaoDisponivel: r.exibicaoDisponivel, versao: r.versao })
       else { toast.error(r.error); onOpenChange(false) }
     }).catch(() => { if (vivo) { toast.error('Falha ao carregar os materiais.'); onOpenChange(false) } })
     return () => { vivo = false }
@@ -84,7 +85,7 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
     }
     setSalvando(true)
     const r = await registrarPontoVersaoAction({
-      documentoIds, produtoId, rotulo, tipo, resumo, itens: gerais, porDocumento: override, ocorridaEm: quando || null,
+      documentoIds, produtoId, rotulo, tipo, resumo, itens: gerais, porDocumento: override, data: quando.data || null, hora: quando.hora || null, exibirData: quando.exibirData, exibirHora: quando.exibirHora, exibirRotulo: quando.exibirRotulo,
       avisarAlunos: avisar && publicar, mostrarInicio: inicio && publicar, visivelAluno: visivel, status: publicar ? 'publicado' : 'rascunho',
       publicarVersaoId: podePublicarVersao && publicarVersao && publicar ? versaoId : null,
     }).catch(() => ({ ok: false as const, error: 'Falha de rede ao registrar.' }))
@@ -102,7 +103,7 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
           <DialogTitle>Registrar atualização</DialogTitle>
           <DialogDescription>
             {lote ? `Ponto de versão para ${documentoIds.length} materiais. ` : 'Ponto de versão do material. '}
-            O aluno vê a data, o rótulo e a lista de alterações em “Novidades da versão”.
+            O aluno vê a data, o rótulo e a lista de alterações em “Novidades da versão” (você escolhe o que aparece).
           </DialogDescription>
         </DialogHeader>
 
@@ -118,16 +119,11 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
               </ul>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1.5 text-sm">
-                <span className="font-medium">Rótulo da versão</span>
-                <Input value={rotulo} onChange={(e) => setRotulo(e.target.value)} maxLength={120} placeholder="Ex.: v2.1 ou Atualização de Nov/2026" />
-              </label>
-              <label className="space-y-1.5 text-sm">
-                <span className="font-medium">Data e hora <span className="font-normal text-muted-foreground">· {BRT_LABEL}</span></span>
-                <Input type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} />
-              </label>
-            </div>
+            <label className="block space-y-1.5 text-sm">
+              <span className="font-medium">Rótulo da versão</span>
+              <Input value={rotulo} onChange={(e) => setRotulo(e.target.value)} maxLength={120} placeholder="Ex.: v2.1 ou Atualização de Nov/2026" />
+            </label>
+            <CamposQuando v={quando} onChange={(p) => setQuando((q) => ({ ...q, ...p }))} rotulo={rotulo} tipo={tipo} texto={resumo || itensValidos[0]?.texto || ''} disponivel={ctx.exibicaoDisponivel} />
 
             <div className="space-y-1.5 text-sm">
               <span className="font-medium">Tipo</span>

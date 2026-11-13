@@ -17,6 +17,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { DataTable, type DataTableColumn } from '@/components/admin/data-table'
 import { RegistrarAtualizacaoDialog } from '@/components/biblioteca/gestao/registrar-atualizacao-dialog'
 import { EditarAtualizacaoDialog } from '@/components/biblioteca/gestao/editar-atualizacao-dialog'
+import { OcultoAoAluno } from '@/components/biblioteca/gestao/atualizacao-exibicao'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { navProgressStart } from '@/lib/nav-progress'
@@ -82,7 +83,7 @@ export function AbaAtualizacoes({ produtoId, podeEditar }: { produtoId: string; 
   }
 
   const columns: DataTableColumn<LinhaAtualizacao>[] = [
-    { key: 'ocorrida_em', header: 'Data e hora', sortable: true, width: '10.5rem', render: (r) => <span className="tabular-nums">{formatBrt(r.ocorridaEm) ?? '—'}</span> },
+    { key: 'ocorrida_em', header: 'Data e hora', sortable: true, width: '11.5rem', render: (r) => <span className="inline-flex flex-col"><span className="tabular-nums">{formatBrt(r.ocorridaEm) ?? '—'}</span><OcultoAoAluno r={r} /></span> },
     { key: 'rotulo', header: 'Rótulo', sortable: true, width: '11rem', render: (r) => r.rotulo ?? <span className="text-muted-foreground">—</span> },
     { key: 'material', header: 'Material', render: (r) => r.material, title: (r) => r.material },
     { key: 'tipo', header: 'Tipo', sortable: true, width: '9rem', render: (r) => NOME_TIPO_ATUALIZACAO[r.tipo] },

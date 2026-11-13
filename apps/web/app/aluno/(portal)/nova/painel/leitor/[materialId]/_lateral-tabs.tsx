@@ -2,11 +2,11 @@
 
 // Lateral esquerda do leitor (Sumário | Atualizações). A aba "Atualizações" lista o registro de versões PUBLICADO e visível
 // do documento, carregado SOB DEMANDA (GET /api/aluno/atualizacoes?documentoId=…, paginado no servidor, mais recente primeiro).
-// Abas com sublinhado (border-b-2), cores só por tokens da área nova. Sem cálculo no render: datas vêm formatadas do servidor.
+// Abas com sublinhado (border-b-2), cores só por tokens da área nova. Sem cálculo no render: tag (data/hora) e rótulo vêm prontos do servidor, já com os interruptores do admin.
 
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 
-interface Item { id: string; rotulo: string | null; texto: string; itens: { texto: string; local?: string | null }[]; quando: string }
+interface Item { id: string; rotulo: string | null; texto: string; itens: { texto: string; local?: string | null }[]; tag: string | null }
 
 export function LateralTabs({ documentoId, recente, children }: { documentoId: string; recente: boolean; children: ReactNode }) {
   const [aba, setAba] = useState<'sumario' | 'atualizacoes'>('sumario')
@@ -26,7 +26,7 @@ export function LateralTabs({ documentoId, recente, children }: { documentoId: s
       const j = await r.json()
       pagina.current += 1
       setTotal(Number(j.total) || 0)
-      setRows((cur) => [...cur, ...((j.rows ?? []) as any[]).map((x) => ({ id: x.id, rotulo: x.rotulo ?? null, texto: x.texto ?? '', itens: x.itens ?? [], quando: fmt(x.ocorridaEm) }))])
+      setRows((cur) => [...cur, ...((j.rows ?? []) as any[]).map((x) => ({ id: x.id, rotulo: x.rotuloExibido ?? null, texto: x.texto ?? '', itens: x.itens ?? [], tag: x.tag ?? null }))])
     } catch { setErro(true) } finally { setCarregando(false); setIniciou(true) }
   }, [documentoId])
 
@@ -50,11 +50,8 @@ export function LateralTabs({ documentoId, recente, children }: { documentoId: s
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {rows.map((n) => (
             <div key={n.id} style={{ padding: 12, borderRadius: 12, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <b style={{ fontSize: 13, color: 'var(--ink)' }}>{n.rotulo ?? 'Atualização'}</b>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{n.quando}</span>
-              </div>
-              {n.texto && <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{n.texto}</span>}
+              {n.rotulo && <b style={{ fontSize: 13, color: 'var(--ink)' }}>{n.rotulo}</b>}
+              {(n.tag || n.texto) && <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{n.tag && <b style={{ color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{n.tag}{n.texto ? ': ' : ''}</b>}{n.texto}</span>}
               {n.itens.length > 0 && (
                 <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {n.itens.map((it, k) => <li key={k} style={{ fontSize: 12.5, color: 'var(--muted)' }}>{it.texto}{it.local ? ` — ${it.local}` : ''}</li>)}
@@ -79,9 +76,4 @@ export function LateralTabs({ documentoId, recente, children }: { documentoId: s
       )}
     </>
   )
-}
-
-// Data/hora de Brasília (apresentação apenas; o instante vem pronto do servidor).
-function fmt(iso: string): string {
-  try { return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }

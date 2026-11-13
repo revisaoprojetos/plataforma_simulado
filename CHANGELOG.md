@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.20.0 — 2026-11-13
+
+**Atualizações dos materiais: data, hora e rótulo separados e ocultáveis**
+- Cadastro/edição da atualização: **Data** e **Hora** em campos separados (hora opcional, sempre horário de Brasília) e três interruptores — *Mostrar data*, *Mostrar hora* e *Mostrar rótulo* — para controlar 100% o que o aluno vê. Prévia ao vivo no próprio cadastro.
+- Tag do aluno: ex. **“10/11/2026: atualização disso e daquilo”**; com tudo oculto aparece só o texto e os itens. Mesma regra (helper `montarTagAtualizacao`) na aba de atualizações do curso, na lateral do leitor, no selo “Atualizado em”, no sino e nas Novidades. Data/hora ocultas nem saem no payload do aluno.
+- Lista do admin mostra um ícone discreto nos registros com algo oculto; registros em lote aplicam as mesmas opções a todos os documentos.
+- ⚠️ Migração `20261120010000_atualizacoes_exibicao_flags.sql` (3 colunas boolean, padrão ligado). Sem ela tudo segue como antes e os interruptores ficam desabilitados com aviso.
+
+
 ## [Não lançado] — Registro de acessos do aluno (nota, sem bump de versão)
 
 - Novo **registro de acessos** (IP, aparelho, navegador, SO, método, origem, último visto) e **atividades** (leitura, grifos, quiz, simulados, jogo) por aluno — migração `20261118010000_aluno_registro_acessos.sql` (aplicar manualmente). Só coleta a partir do deploy+migração.
