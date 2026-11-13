@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { RegraFiltros, InicioConfig, FimConfig, StatusRegra } from './tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
  * Leituras do admin de Regras de liberação (/admin/liberacao). server-only; recebe tenantId.
@@ -98,7 +99,7 @@ export async function listarPedidos(tenantId: string, opts: { estado?: string; q
   if (opts.estado && opts.estado !== 'todos') q = q.eq('processing_state', opts.estado)
   const busca = (opts.q ?? '').trim()
   if (busca) {
-    const safe = busca.replace(/[,()%*]/g, ' ').trim()
+    const safe = sanearBusca(busca)
     q = q.or(`comprador_email.ilike.%${safe}%,produto_nome.ilike.%${safe}%,pedido_id.ilike.%${safe}%`)
   }
   const { data, count } = await q.order('criado_em', { ascending: false }).range(de, de + porPagina - 1)

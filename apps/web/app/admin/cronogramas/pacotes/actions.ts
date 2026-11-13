@@ -24,6 +24,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -422,7 +423,7 @@ export async function buscarEstudantes(termo: string): Promise<{ ok: boolean; it
   const g = await guard('cronogramas:view')
   if (!g.ok) return { ok: false, error: g.error }
   // Os caracteres removidos são os que o PostgREST usa como sintaxe de filtro.
-  const t = termo.trim().replace(/[%,()*]/g, ' ').replace(/\s+/g, ' ')
+  const t = sanearBusca(termo)
   if (t.length < 2) return { ok: true, itens: [] }
   const svc = createAdminClient()
 

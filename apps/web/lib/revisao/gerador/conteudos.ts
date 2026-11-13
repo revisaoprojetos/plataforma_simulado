@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Sub-aba "Conteúdos" do Gerador (cronograma padrão): leitura paginada no servidor de
 // (a) conjuntos de aulas do Banco de Conteúdos e (b) links de aula. Só LEITURA — as mutações
@@ -23,7 +24,7 @@ const chaveAula = (a: string | null) => {
   return /^\d+$/.test(t) ? String(Number(t)) : t.toLowerCase()
 }
 /** Texto livre seguro para dentro de `.or(...ilike...)` do PostgREST. */
-const limpaQ = (q: string) => q.replace(/[%,()*\\]/g, ' ').replace(/\s+/g, ' ').trim()
+const limpaQ = (q: string) => sanearBusca(q)
 const cmp = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
 
 export type ConjuntoLinha = {

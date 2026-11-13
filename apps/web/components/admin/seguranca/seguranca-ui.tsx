@@ -7,7 +7,7 @@ import { Gauge, ListChecks, FileText, PackageSearch, Play, Loader2, Check, EyeOf
 import { cn } from '@/lib/utils'
 import { DataTable } from '@/components/admin/data-table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { ROTULO_CATEGORIA, ROTULO_SEVERIDADE, type Categoria, type Severidade } from '@/lib/seguranca/tipos'
+import { CATEGORIAS, SEVERIDADES, ROTULO_CATEGORIA, ROTULO_SEVERIDADE, ROTULO_STATUS_CORRECAO, type Categoria, type Severidade, type Correcao, type CorrecaoVerificada, type StatusCorrecao } from '@/lib/seguranca/tipos'
 import type { AchadoLinha } from '@/lib/seguranca/leitura'
 
 export interface DetalheVarredura {
@@ -16,6 +16,7 @@ export interface DetalheVarredura {
   resolvidos: { fingerprint: string; titulo: string; severidade: string }[]
   persistentes: { fingerprint: string; titulo: string; severidade: string }[]
   erros: string[]
+  fps?: string[]
 }
 
 const ABAS = [
@@ -203,6 +204,119 @@ export function BotaoImprimir() {
     <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground print:hidden">
       <Printer className="h-4 w-4" />Imprimir / salvar PDF
     </button>
+  )
+}
+
+const STATUS_CORR_CLS: Record<StatusCorrecao, string> = {
+  verificada: 'bg-primary/10 text-primary',
+  aguardando: 'bg-muted text-muted-foreground',
+  validar: 'bg-secondary text-secondary-foreground',
+  reapareceu: 'bg-destructive text-destructive-foreground',
+  manual: 'bg-muted text-muted-foreground',
+}
+function StatusCorrecaoBadge({ s }: { s: StatusCorrecao }) {
+  return <span className={cn('inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', STATUS_CORR_CLS[s])}>{ROTULO_STATUS_CORRECAO[s]}</span>
+}
+const dataBr = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—')
+
+function CorrecaoCard({ c }: { c: CorrecaoVerificada }) {
+  return (
+    <li className={cn('rounded-xl border bg-card p-3', c.status === 'reapareceu' && 'border-destructive')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <SevBadge s={c.severidadeOriginal} />
+        <span className="text-sm font-semibold">{c.titulo}</span>
+        <StatusCorrecaoBadge s={c.status} />
+        {c.exemplo && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">exemplo</span>}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {ROTULO_CATEGORIA[c.categoria]} · {dataBr(c.data)}{c.versaoApp ? ` · v${c.versaoApp}` : ''}
+        </span>
+      </div>
+      {c.status === 'reapareceu' && (
+        <p className="mt-2 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
+          A varredura de {dataBr(c.verificadaEm)} ainda encontrou: {c.abertos.map((a) => a.titulo).join('; ') || 'achado aberto'}. Correção incompleta ou regressão.
+        </p>
+      )}
+      {c.status === 'verificada' && <p className="mt-1 text-xs text-muted-foreground">Não detectado na última varredura ({dataBr(c.verificadaEm)}).</p>}
+      <p className="mt-2 text-sm">{c.descricao}</p>
+      <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-muted-foreground lg:grid-cols-2">
+        <div><dt className="inline font-semibold">Arquivos: </dt><dd className="inline font-mono">{c.arquivos.join(', ') || '—'}</dd></div>
+        <div><dt className="inline font-semibold">Como validar: </dt><dd className="inline">{c.comoValidar}</dd></div>
+        {c.riscoDeRegressao && <div><dt className="inline font-semibold">Risco de regressão: </dt><dd className="inline">{c.riscoDeRegressao}</dd></div>}
+        {c.acaoDoUsuario && <div className="text-foreground"><dt className="inline font-semibold">Ação pendente sua: </dt><dd className="inline">{c.acaoDoUsuario}</dd></div>}
+      </dl>
+    </li>
+  )
+}
+
+/** Seção "Correções aplicadas" (aba Relatórios). Os status vêm calculados do servidor; aqui só filtra/busca. */
+export function CorrecoesSecao({ itens, corrigidos, pendentes, ultimaVarredura }: { itens: CorrecaoVerificada[]; corrigidos: number; pendentes: number; ultimaVarredura: string | null }) {
+  const [q, setQ] = React.useState('')
+  const [sev, setSev] = React.useState('')
+  const [cat, setCat] = React.useState('')
+  const [st, setSt] = React.useState('')
+  const termo = q.trim().toLowerCase()
+  const lista = itens.filter((c) =>
+    (!sev || c.severidadeOriginal === sev) && (!cat || c.categoria === cat) && (!st || c.status === st) &&
+    (!termo || `${c.titulo} ${c.descricao} ${c.arquivos.join(' ')}`.toLowerCase().includes(termo)))
+  const sel = 'h-9 rounded-lg border bg-background px-2 text-sm'
+  return (
+    <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Correções aplicadas</h2>
+        <span className="text-xs text-muted-foreground">{corrigidos} corrigidos · {pendentes} pendentes de verificação{ultimaVarredura ? ` · última varredura ${dataBr(ultimaVarredura)}` : ''}</span>
+      </div>
+      {itens.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhuma correção registrada ainda.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar correção…" className={cn(sel, 'min-w-48 flex-1')} />
+            <select value={sev} onChange={(e) => setSev(e.target.value)} className={sel} aria-label="Severidade">
+              <option value="">Severidade: todas</option>{SEVERIDADES.map((s) => <option key={s} value={s}>{ROTULO_SEVERIDADE[s]}</option>)}
+            </select>
+            <select value={cat} onChange={(e) => setCat(e.target.value)} className={sel} aria-label="Categoria">
+              <option value="">Categoria: todas</option>{CATEGORIAS.map((c) => <option key={c} value={c}>{ROTULO_CATEGORIA[c]}</option>)}
+            </select>
+            <select value={st} onChange={(e) => setSt(e.target.value)} className={sel} aria-label="Status">
+              <option value="">Status: todos</option>{(Object.keys(ROTULO_STATUS_CORRECAO) as StatusCorrecao[]).map((s) => <option key={s} value={s}>{ROTULO_STATUS_CORRECAO[s]}</option>)}
+            </select>
+          </div>
+          {lista.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma correção com estes filtros.</p> : (
+            <ul className="space-y-2">{lista.map((c) => <CorrecaoCard key={c.id} c={c} />)}</ul>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+/** Bloco "O que foi feito nesta varredura" (relatório individual). Listas já calculadas no servidor. */
+export function FeitoNaVarredura({ verificadas, reapareceram, feitasAte }: { verificadas: Correcao[]; reapareceram: Correcao[]; feitasAte: Correcao[] }) {
+  const ids = new Set(verificadas.map((c) => c.id))
+  const outras = feitasAte.filter((c) => !ids.has(c.id) && !reapareceram.some((r) => r.id === c.id))
+  const linha = (c: { id: string; titulo: string; severidadeOriginal: string; data?: string }, extra?: string) => (
+    <li key={c.id} className="flex items-center gap-2 text-sm"><SevBadge s={c.severidadeOriginal} /><span className="truncate">{c.titulo}</span>{extra && <span className="shrink-0 text-xs text-muted-foreground">{extra}</span>}</li>
+  )
+  return (
+    <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <h2 className="text-sm font-semibold">O que foi feito nesta varredura</h2>
+      {feitasAte.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma correção registrada até a data desta varredura.</p> : (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Verificadas por esta varredura ({verificadas.length})</h3>
+            <ul className="mt-1 space-y-1">{verificadas.length ? verificadas.map((c) => linha(c, dataBr(c.data))) : <li className="text-sm text-muted-foreground">Nenhuma.</li>}</ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-destructive">Ainda aparecem / incompletas ({reapareceram.length})</h3>
+            <ul className="mt-1 space-y-1">{reapareceram.length ? reapareceram.map((c) => linha(c)) : <li className="text-sm text-muted-foreground">Nenhuma.</li>}</ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aplicadas até esta data, sem verificação automática ({outras.length})</h3>
+            <ul className="mt-1 space-y-1">{outras.length ? outras.map((c) => linha(c, dataBr(c.data))) : <li className="text-sm text-muted-foreground">Nenhuma.</li>}</ul>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

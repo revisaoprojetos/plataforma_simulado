@@ -10,6 +10,7 @@ import { isSuperAdmin, getCurrentAccess } from '@/lib/auth/permissions'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { copiarQuestao } from '@/lib/compartilhamento/copiar'
 import { registrarAudit } from '@/lib/audit'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const NEGADO = 'Área exclusiva do super-administrador global.'
 const PER_PAGE = 15
@@ -46,7 +47,7 @@ export async function buscarQuestoesDePlataforma(
   if (!origem) return { error: 'Plataforma de origem inválida.' }
   const svc = createAdminClient()
   const page = Math.max(1, filtros.page ?? 1)
-  const q = (filtros.busca ?? '').trim()
+  const q = sanearBusca(filtros.busca ?? '')
 
   // Espelha /admin/questoes: tenta com codigo + EXTRAS; cai p/ versões sem essas colunas (bases antigas).
   const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'

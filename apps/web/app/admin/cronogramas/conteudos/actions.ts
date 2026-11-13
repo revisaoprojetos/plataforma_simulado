@@ -18,6 +18,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { garantirPlataformaPdf } from '@/lib/cronograma/plataforma-video'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const AREA = 'cronograma_conteudo'
 
@@ -159,7 +160,7 @@ export async function buscarConjuntosParaCompor(
   const svc = createAdminClient()
   let q = svc.from('simulado_cronograma_conjuntos').select('id, nome, disciplina, disciplina_id').eq('tenant_id', g.tenantId).eq('deletado', false)
   if (filtros.disciplinaId && filtros.disciplinaId !== 'all') q = q.eq('disciplina_id', filtros.disciplinaId)
-  const termo = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  const termo = sanearBusca(filtros.busca ?? '')
   if (termo) q = q.or(`nome.ilike.%${termo}%,disciplina.ilike.%${termo}%`)
   const conjuntos = await fetchAll<any>(() => q.order('nome') as any)
   const ids = conjuntos.map((c) => c.id)

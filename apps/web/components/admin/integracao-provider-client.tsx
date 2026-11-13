@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Loader2, Plug, Check, AlertTriangle, Trash2, RefreshCw, Copy, DownloadCloud, KeyRound, GitBranch, Radio, RotateCw, Eye, Users, UserPlus, Search, Inbox, Braces, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { WebhookSegurancaCard } from '@/components/admin/webhook-seguranca-card'
 import { JsonViewer } from '@/components/admin/json-viewer'
 import { ModalRequisicao } from '@/components/admin/modal-requisicao'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
@@ -818,6 +819,10 @@ function Credenciais({ provider, appUrl, config, meta, campos, area }: { provide
         <Button onClick={salvar} disabled={salvando}>{salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar</Button>
         {mostrarTestarConexao && <Button variant="outline" onClick={testar} disabled={testando}>{testando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plug className="mr-2 h-4 w-4" />} Testar conexão</Button>}
       </div>
+
+      {mostrarWebhook && webhookUrl && provider === 'guru' && (
+        <WebhookSegurancaCard provider="guru" nome={meta.nome} modo="guru" temSegredo={config.camposPreenchidos.includes('webhook_secret')} estrito={config.camposPreenchidos.includes('webhook_estrito')} />
+      )}
 
       {mostrarWebhook && webhookUrl && (
         <div className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { reconciliarPull } from '@/lib/integracoes/orquestrador'
@@ -18,10 +19,7 @@ export const dynamic = 'force-dynamic'
  *    roda em **dry-run por padrão** (só relatório do que mudaria); passe `?aplicar=1` para efetivar.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 export async function POST(req: NextRequest) {

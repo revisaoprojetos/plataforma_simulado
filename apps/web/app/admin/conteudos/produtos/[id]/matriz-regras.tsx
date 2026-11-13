@@ -107,7 +107,9 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
     // 1ª visita sem preferência: base + grupos + segmentos que já têm regra (até 10).
     setCols((cur) => {
       if (cur !== null || somente) return cur
-      const padrao = r.matriz.publicos.filter((p) => p.tipo !== 'segmento' || p.comRegra).slice(0, 10).map((p) => p.chave)
+      // segmentos com regra primeiro (são os que têm datas/cronograma), depois base e grupos
+      const elegiveis = r.matriz.publicos.filter((p) => p.tipo !== 'segmento' || p.comRegra)
+      const padrao = [...elegiveis.filter((p) => p.tipo === 'todos'), ...elegiveis.filter((p) => p.tipo === 'segmento'), ...elegiveis.filter((p) => p.tipo === 'grupo')].slice(0, 10).map((p) => p.chave)
       return padrao.length ? padrao : r.matriz.colunas.map((c) => c.chave)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps

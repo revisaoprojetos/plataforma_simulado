@@ -21,6 +21,7 @@ import { chavesUnicas, normalizarOverride, partirTexto, OVERRIDE_VAZIO, type Cat
 import { CATALOGO_HTML, chaveLeiHTML, chaveDisciplina } from '@/lib/cronograma/adaptativo/catalogo-html'
 import origemCat from '@/lib/cronograma/adaptativo/catalogo-origem.json' // origem (planilha/aba/linha) de cada aula e meta — só servidor
 import { PARAMS_PADRAO, normalizarParams, type ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 async function acesso(acao: 'view' | 'update') {
   const a = await getCurrentAccess()
@@ -206,7 +207,7 @@ export async function salvarPainelMetas(params: Partial<ParamsAdaptativo>): Prom
 
 export async function buscarAlunosLiberacao(q: string): Promise<{ id: string; nome: string; email: string | null }[]> {
   const g = await acesso('view'); if (!g) return []
-  const t = (q ?? '').trim().replace(/[,%()*]/g, ' ').trim()
+  const t = sanearBusca(q ?? '')
   if (t.length < 2) return []
   const { data } = await createAdminClient().from('simulado_estudantes').select('id, nome, email')
     .eq('tenant_id', g.tenantId).eq('deletado', false).or(`nome.ilike.%${t}%,email.ilike.%${t}%`).order('nome').limit(15)

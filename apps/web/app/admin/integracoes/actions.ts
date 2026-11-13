@@ -17,6 +17,7 @@ import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes
 
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { mascararCpf, ehCpfMascarado } from '@/lib/privacidade/cpf'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
 
@@ -83,6 +84,31 @@ export async function testarIntegracao(provider: string): Promise<{ ok: boolean;
   const adapter = getAdapter(provider)
   if (!adapter) return { ok: false, error: `Provedor "${provider}" ainda não implementado.` }
   return adapter.testarCredenciais(cfg)
+}
+
+/**
+ * Segurança do webhook de entrada: define o segredo (HMAC/header) e/ou liga o MODO ESTRITO (`webhook_estrito`).
+ * Atualiza SÓ `credenciais` (não toca base_url/ativo/token). Estrito exige segredo já configurado (senão derrubaria a integração).
+ */
+export async function salvarSegurancaWebhook(provider: string, dados: { segredo?: string; estrito?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: atual } = await svc.from('simulado_integracao_config').select('id, credenciais').eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  if (!atual) return { ok: false, error: 'Salve as credenciais do provedor primeiro.' }
+  const cred = { ...(((atual as any).credenciais ?? {}) as Record<string, string>) }
+  if (dados.segredo && dados.segredo.trim()) cred.webhook_secret = criptografar(dados.segredo.trim()) ?? ''
+  if (typeof dados.estrito === 'boolean') {
+    if (dados.estrito && !cred.webhook_secret) return { ok: false, error: 'Configure o segredo do webhook antes de ativar o modo estrito.' }
+    cred.webhook_estrito = dados.estrito ? '1' : ''
+  }
+  const { error } = await svc.from('simulado_integracao_config').update({ credenciais: cred, atualizado_em: new Date().toISOString() }).eq('id', (atual as any).id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_integracao_config', entidadeId: g.tenantId, tenantId: g.tenantId, depois: { provider, webhook_secret_alterado: !!dados.segredo, webhook_estrito: dados.estrito } })
+  revalidatePath(`/admin/integracoes/${provider}`)
+  revalidatePath('/admin/integracoes')
+  return { ok: true }
 }
 
 /** Gera um novo token de webhook (invalida a URL antiga — recadastrar na Guru). */
@@ -220,7 +246,7 @@ export async function listarEventos(provider: string, f: FiltroEventos = {}): Pr
     if (f.periodo === 'hoje') d.setHours(0, 0, 0, 0); else d.setDate(d.getDate() - (f.periodo === '7d' ? 7 : 30))
     q = q.gte('recebido_em', d.toISOString())
   }
-  const termo = (f.busca ?? '').trim().replace(/[,()%*\\]/g, ' ').trim().slice(0, 80)
+  const termo = sanearBusca(f.busca ?? '', 80)
   if (termo) {
     const p = `%${termo}%`
     q = q.or([`event_id.ilike.${p}`, `payload->contact->>email.ilike.${p}`, `payload->contact->>name.ilike.${p}`, `payload->product->>name.ilike.${p}`, `payload->product->>marketplace_id.ilike.${p}`, `payload->product->>internal_id.ilike.${p}`, `payload->buyer->>email.ilike.${p}`].join(','))
@@ -598,7 +624,7 @@ export async function listarAssinaturasSalvas(provider: string, opts?: { page?: 
   const limite = Math.min(200, Math.max(10, opts?.limite ?? 50))
   const page = Math.max(1, opts?.page ?? 1)
   const offset = (page - 1) * limite
-  const busca = (opts?.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  const busca = sanearBusca(opts?.busca ?? '')
 
   const { data: cfgRow } = await svc.from('simulado_integracao_config').select('base_sync_em').eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
   const sincronizadoEm = (cfgRow as any)?.base_sync_em ?? null

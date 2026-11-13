@@ -1897,7 +1897,37 @@ const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+Str
 const today=()=>dkey(new Date());
 const addDays=n=>{const d=new Date();d.setDate(d.getDate()+n);return dkey(d)};
 const uid=()=>Math.random().toString(36).slice(2,9);
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* SANITIZADOR LEVE (defesa em profundidade; sem dependência). Usa DOMParser = documento INERTE (nada carrega/executa
+   enquanto limpamos). strict=false → HTML do DOCUMENTO (já sanitizado no servidor): só remove o que executa/embute
+   (script, iframe, object, handlers on, javascript:, srcdoc) e PRESERVA classes, id, atributos data, style, details, svg e tabelas (grifos e caixas).
+   strict=true → HTML do ALUNO (folha de anotações): allowlist de tags/atributos. */
+const _sNorm=v=>{let o='';for(const ch of String(v==null?'':v)){const c=ch.charCodeAt(0);if(c<=32||(c>=127&&c<=159)||(c>=8203&&c<=8207)||c===8232||c===8233||c===65279)continue;o+=ch}return o.toLowerCase()};
+const _sUrlOk=(v,img)=>{const u=_sNorm(v);if(!u)return true;if(/^(javascript|vbscript|livescript):/.test(u))return false;if(u.startsWith('data:'))return !!img&&/^data:image\/(png|jpe?g|gif|webp|bmp);base64,/.test(u);return true};
+const _sStyleOk=v=>!/(expression|javascript:|vbscript:|@import|behavior|-moz-binding)/.test(_sNorm(v));
+const _S_URLATTR=new Set(['href','src','xlink:href','action','formaction','background','poster','srcset','data','codebase','ping','manifest']);
+const _S_DROP=new Set(['SCRIPT','IFRAME','FRAME','FRAMESET','OBJECT','EMBED','APPLET','META','BASE','LINK','MATH','NOSCRIPT','FOREIGNOBJECT','TEMPLATE','PORTAL','FORM','INPUT','BUTTON','SELECT','TEXTAREA','VIDEO','AUDIO','SOURCE','TRACK','CANVAS','DIALOG']);
+const _S_OK=new Set(['P','BR','DIV','SPAN','B','I','U','S','STRIKE','DEL','INS','STRONG','EM','FONT','SUB','SUP','MARK','SMALL','H1','H2','H3','H4','H5','H6','UL','OL','LI','BLOCKQUOTE','PRE','CODE','HR','A','IMG','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH','CAPTION','COLGROUP','COL','FIGURE','FIGCAPTION','DL','DT','DD']);
+const _S_ATTR_OK=new Set(['class','style','href','src','alt','title','width','height','colspan','rowspan','contenteditable','color','face','size','align','start','type','dir','lang']);
+function sanHtml(h,strict){
+  let root;try{root=new DOMParser().parseFromString('<!doctype html><html><body>'+String(h==null?'':h)+'</body></html>','text/html').body}catch(_){return ''}
+  for(const el of Array.from(root.querySelectorAll('*'))){
+    const tg=el.tagName.toUpperCase();
+    if(_S_DROP.has(tg)||(strict&&(tg==='STYLE'||tg==='SVG'))){el.remove();continue}
+    if(strict&&!_S_OK.has(tg)){el.replaceWith(...Array.from(el.childNodes));continue}
+    for(const at of Array.from(el.attributes)){
+      const n=at.name.toLowerCase();let ok=true;
+      if(n.startsWith('on')||n==='srcdoc'||n==='formaction')ok=false;
+      else if(strict&&!(_S_ATTR_OK.has(n)||/^data-[a-z0-9_-]+$/.test(n)))ok=false;
+      else if(_S_URLATTR.has(n)){ok=n!=='srcset'&&_sUrlOk(at.value,tg==='IMG');if(ok&&tg==='USE')ok=_sNorm(at.value).startsWith('#')}
+      else if(n==='style')ok=_sStyleOk(at.value);
+      if(!ok)el.removeAttribute(at.name);
+    }
+  }
+  return root.innerHTML;
+}
+/* sanitiza o HTML vindo do host (documento) ANTES de qualquer uso */
+try{if(typeof CFG.html==='string'&&CFG.html)CFG.html=sanHtml(CFG.html,false);if(typeof RAW_INJECTED==='string'&&RAW_INJECTED)RAW_INJECTED=sanHtml(RAW_INJECTED,false)}catch(_){}
 const pad=n=>String(n).padStart(2,'0');
 const hhmm=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
 const isWide=()=>innerWidth>=1500, isSmall=()=>innerWidth<=1100, isNarrow=()=>innerWidth<=900;
@@ -2038,7 +2068,7 @@ const mk=CFG.marca;if(mk&&mk.logo){const im=$('#brandLogo');im.src=mk.logo;im.al
     // PÁGINA INICIAL (Biblioteca): as páginas ANTERIORES (capa em imagem, aviso, índice) nem entram na leitura — não são montadas,
     // então não contam em progresso, tópicos, lista de páginas nem no "X de Y lidas". Os ids seguem ABSOLUTOS (#pN) → grifos/partes ok.
     PG0=Math.max(1,Math.min(CFG.pdf.pages.length,Math.trunc(+CFG.paginaMinima||1)));
-    $('#article').innerHTML=CFG.pdf.pages.map((pg,i)=>i+1<PG0?'':`<section class="sec pdf-sec" id="p${i+1}" data-title="Página ${i+1}" data-cite="${esc(titulo)}"><div class="pdfpage" style="width:${pg.w}px;height:${pg.h}px"><canvas></canvas><div class="pdftl textLayer"></div></div></section>`).join('');
+    $('#article').innerHTML=CFG.pdf.pages.map((pg,i)=>i+1<PG0?'':`<section class="sec pdf-sec" id="p${i+1}" data-title="Página ${i+1}" data-cite="${esc(titulo)}"><div class="pdfpage" style="width:${+pg.w||0}px;height:${+pg.h||0}px"><canvas></canvas><div class="pdftl textLayer"></div></div></section>`).join('');
     try{montarDivisoriasCrono()}catch(e){console.error('[leitor-jus][crono]',e)}
     // Página inicial (meta/parte do Cronograma Adaptativo): como as .sec já têm altura fixa, o destino
     // é posicionável antes mesmo dos canvas renderizarem. Rola direto para a página pedida.
@@ -2555,14 +2585,14 @@ function cadAuto(a){if(!a||!cadAutoOn())return;clearTimeout(_autoT[a.id]);_autoT
 var _folhaSig={};
 function cadPendentes(){const out=[];if(!CAD.on)return out;
   (S.an||[]).forEach(a=>{if(CAD.salvos[a.id])return;out.push(cadMsg(a,String(a.note||'').trim(),null))});
-  try{Object.keys(S.sheets||{}).forEach(k=>{const sc=document.getElementById(k)||{id:k,dataset:{}};const sh=S.sheets[k];if(!sh||!sh.html)return;const tmp=document.createElement('div');tmp.innerHTML=sh.html;const tx=(tmp.innerText||tmp.textContent||'').trim();
-    if(!tx||_folhaSig[sc.id]===sh.html)return;out.push({tipo:'anotacao',comentario:tx.slice(0,5000),html:String(sh.html).slice(0,100000),trecho:String(sc.dataset.title||'').slice(0,300),folha_sec:String(sc.id),ref_tabela:'folha_local'})})}catch(_){}
+  try{Object.keys(S.sheets||{}).forEach(k=>{const sc=document.getElementById(k)||{id:k,dataset:{}};const sh=S.sheets[k];if(!sh||!sh.html)return;const tx=String(new DOMParser().parseFromString(String(sh.html),'text/html').body.textContent||'').trim();
+    if(!tx||_folhaSig[sc.id]===sh.html)return;out.push({tipo:'anotacao',comentario:tx.slice(0,5000),html:sanHtml(sh.html,true).slice(0,100000),trecho:String(sc.dataset.title||'').slice(0,300),folha_sec:String(sc.id),ref_tabela:'folha_local'})})}catch(_){}
   return out.slice(0,300)}
 /* FOLHA de anotações no modo automático: ~2 s depois de parar de digitar, grava (upsert por folha no servidor)
    só se o conteúdo mudou desde o último envio (_folhaSig). Folha vazia não é enviada. */
 var _folhaT={};
-function cadFolhaMsg(sec,auto){const sh=S.sheets&&S.sheets[sec];if(!sh||!sh.html)return null;const tmp=document.createElement('div');tmp.innerHTML=sh.html;const tx=(tmp.innerText||tmp.textContent||'').trim();if(!tx)return null;
-  const so=document.getElementById(sec);return {tipo:'anotacao',comentario:tx.slice(0,5000),html:String(sh.html).slice(0,100000),trecho:String(so&&so.dataset?so.dataset.title||'':'').slice(0,300),folha_sec:String(sec),ref_tabela:'folha_local',auto:!!auto}}
+function cadFolhaMsg(sec,auto){const sh=S.sheets&&S.sheets[sec];if(!sh||!sh.html)return null;const tx=String(new DOMParser().parseFromString(String(sh.html),'text/html').body.textContent||'').trim();if(!tx)return null;
+  const so=document.getElementById(sec);return {tipo:'anotacao',comentario:tx.slice(0,5000),html:sanHtml(sh.html,true).slice(0,100000),trecho:String(so&&so.dataset?so.dataset.title||'':'').slice(0,300),folha_sec:String(sec),ref_tabela:'folha_local',auto:!!auto}}
 function cadAutoFolha(sec){if(!sec||!cadAutoOn())return;clearTimeout(_folhaT[sec]);_folhaT[sec]=setTimeout(()=>{
   if(!cadAutoOn())return;const sh=S.sheets&&S.sheets[sec];if(!sh||_folhaSig[sec]===sh.html)return;const m=cadFolhaMsg(sec,true);if(!m)return;_folhaSig[sec]=sh.html;cadSend({type:'leitor-jus-salvar-caderno',grifo:m})},2000)}
 function cadSalvarAn(a){cadSend({type:'leitor-jus-salvar-caderno',grifo:cadMsg(a,String(a.note||'').trim(),null)})}
@@ -3570,7 +3600,7 @@ function sorted(list){return list.slice().sort((a,b)=>{
   if(a.rects||b.rects){const ya=(a.rects&&a.rects[0])?a.rects[0].y0:0,yb=(b.rects&&b.rects[0])?b.rects[0].y0:0;return ya-yb}
   return ord(a.pid)-ord(b.pid)||(a.s||0)-(b.s||0);
 })}
-function item(a){return `<div class="item" data-aid="${a.id}" data-c="${a.c}"><q>${esc(a.text)}</q>${a.note?`<div class="nt">${esc(a.note)}</div>`:''}
+function item(a){return `<div class="item" data-aid="${esc(a.id)}" data-c="${esc(a.c)}"><q>${esc(a.text)}</q>${a.note?`<div class="nt">${esc(a.note)}</div>`:''}
   <div class="meta"><span>${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}${a.ex?' · exemplo':''}</span><span class="sp"></span><span class="acts">${CAD.on?`<button data-act="cad" class="${CAD.salvos[a.id]?'on':''}" title="${CAD.salvos[a.id]?'Já salvo em caderno · salvar de novo':'Salvar no caderno'}" aria-label="Salvar no caderno"><svg class="i"><use href="#i-bm"/></svg></button>`:''}<button data-act="note" title="Nota"><svg class="i"><use href="#i-note"/></svg></button><button data-act="card" title="Criar cartão"><svg class="i"><use href="#i-cards"/></svg></button><button data-act="sheet" title="Levar para a folha"><svg class="i"><use href="#t-send"/></svg></button><button data-act="del" title="Remover"><svg class="i"><use href="#i-trash"/></svg></button></span></div></div>`}
 function grouped(list){return secs.map((s,i)=>{const hs=sorted(list.filter(a=>a.sec===s.id));return hs.length?`<div class="group-h">Tema ${pad(i+1)}</div>`+hs.map(item).join(''):''}).join('')}
 function renderPanels(){const counts={};S.an.forEach(a=>counts[a.t]=(counts[a.t]||0)+1);
@@ -3602,7 +3632,7 @@ function renderCards(){const d=due().length;$('#rvDue').textContent=d;$('#rvAll'
   const badge=$('#nbBadge');badge.hidden=!d;badge.textContent=d;
   const max=Math.max(1,...[0,1,2,3,4].map(k=>S.cards.filter(c=>c.box===k).length));
   $('#boxes').innerHTML=[0,1,2,3,4].map(k=>{const n=S.cards.filter(c=>c.box===k).length;return `<div><i><b style="height:${n/max*100}%"></b></i><span>${BOX[k]}d · ${n}</span></div>`}).join('');
-  $('#rvList').innerHTML=S.cards.length?'<div class="group-h" style="margin:0 0 4px">Cartões</div>'+S.cards.map(c=>`<div class="crow"><span class="bx">cx ${c.box+1}</span><p>${esc(c.f)}${c.ex?'<span class="ex">exemplo</span>':''}</p><button class="icb" data-delcard="${c.id}" title="Excluir"><svg class="i"><use href="#i-trash"/></svg></button></div>`).join(''):'';
+  $('#rvList').innerHTML=S.cards.length?'<div class="group-h" style="margin:0 0 4px">Cartões</div>'+S.cards.map(c=>`<div class="crow"><span class="bx">cx ${c.box+1}</span><p>${esc(c.f)}${c.ex?'<span class="ex">exemplo</span>':''}</p><button class="icb" data-delcard="${esc(c.id)}" title="Excluir"><svg class="i"><use href="#i-trash"/></svg></button></div>`).join(''):'';
   if($('#p-rv').classList.contains('on'))renderFoot('rv')}
 $('#rvList').onclick=e=>{const d=e.target.closest('[data-delcard]');if(d){S.cards=S.cards.filter(c=>c.id!==d.dataset.delcard);save('cards');renderCards()}};
 let queue=[],qi=0,stats={r:0,t:0};
@@ -3641,7 +3671,7 @@ $('#mvToText').onclick=()=>app.classList.add('mv-text');
 $('#mrSec').onchange=e=>{loadSheet(e.target.value);if(S.set.follow&&e.target.value!==S.cur){S.set.follow=false;saveSet();$('#mrFollow').setAttribute('aria-checked','false');toast('Folha fixada neste tema')}};
 $('#mrFollow').onclick=()=>{S.set.follow=!S.set.follow;saveSet();$('#mrFollow').setAttribute('aria-checked',S.set.follow);if(S.set.follow)loadSheet(S.cur)};
 function onSecChange(){if(app.classList.contains('mirror')&&S.set.follow&&sheetSec!==S.cur)loadSheet(S.cur)}
-function loadSheet(id){flushSheet();sheetSec=id;$('#mrSec').value=id;const sh=sheetOf(id);ed.innerHTML=sh.html||'';drawSketch(sh.sketch);updWords();$('#mrSaved').innerHTML=sh.at?'<i></i>Salvo às '+sh.at:''}
+function loadSheet(id){flushSheet();sheetSec=id;$('#mrSec').value=id;const sh=sheetOf(id);ed.innerHTML=sanHtml(sh.html||'',true);drawSketch(sh.sketch);updWords();$('#mrSaved').innerHTML=sh.at?'<i></i>Salvo às '+sh.at:''}
 let sT2;
 function flushSheet(){if(!sheetSec)return;clearTimeout(sT2);const sh=sheetOf(sheetSec);const html=ed.innerHTML.trim();if(html!==(sh.html||'')){sh.html=html;sh.at=hhmm();save('sheets')}}
 function saveSheetSoon(){cadAutoFolha(sheetSec);$('#mrSaved').textContent='Salvando…';clearTimeout(sT2);sT2=setTimeout(()=>{const sh=sheetOf(sheetSec);sh.html=ed.innerHTML.trim();sh.at=hhmm();save('sheets');$('#mrSaved').innerHTML='<i></i>Salvo às '+sh.at},450);updWords()}
@@ -3690,7 +3720,7 @@ function mdShortcuts(){const s=getSelection();if(!s.rangeCount)return;const n=s.
   const t=n.nodeValue;const rules=[[/^[-*] |^[-*] $/,'insertUnorderedList'],[/^1\. |^1\. $/,'insertOrderedList'],[/^# |^# $/,'h2'],[/^## |^## $/,'h3'],[/^> |^> $/,'blockquote'],[/^\[\] |^\[\] $/,'todo']];
   for(const [re,cmd] of rules){if(re.test(t)&&n===blk.firstChild){n.nodeValue=t.replace(re,'');if(['h2','h3','blockquote'].includes(cmd))document.execCommand('formatBlock',false,cmd);else if(cmd==='todo'){document.execCommand('insertHTML',false,'<ul class="todo"><li><br></li></ul>');blk.textContent.trim()===''&&blk.remove()}else document.execCommand(cmd);break}}}
 /* inserir conteúdo na folha */
-function citeHTML(a){const i=secIdx(a.sec)+1;return `<blockquote class="cite" data-c="${a.c||'y'}">“${esc(a.text)}”<span class="cite-src" contenteditable="false" data-pid="${a.pid}">Tema ${pad(i)} · ir ao texto</span></blockquote>${a.note?`<p>${esc(a.note)}</p>`:''}`}
+function citeHTML(a){const i=secIdx(a.sec)+1;return `<blockquote class="cite" data-c="${esc(a.c||'y')}">“${esc(a.text)}”<span class="cite-src" contenteditable="false" data-pid="${esc(a.pid)}">Tema ${pad(i)} · ir ao texto</span></blockquote>${a.note?`<p>${esc(a.note)}</p>`:''}`}
 function sendToSheet(a){insertIntoSheet(citeHTML(a)+'<p><br></p>',a.sec);toast('Trecho levado para as anotações')}
 function insertIntoSheet(html,secId,atCaret){if(!app.classList.contains('mirror'))setMirror(true);else if(isNarrow())app.classList.remove('mv-text');
   if(secId&&secId!==sheetSec){if(S.set.follow&&secId!==S.cur){S.set.follow=false;saveSet();$('#mrFollow').setAttribute('aria-checked','false')}loadSheet(secId)}
@@ -3941,7 +3971,7 @@ else {
   // EMBED (dentro do arcade): SEMPRE espera o dia REAL do host. NÃO abre o modelo embutido por timeout —
   // senão qualquer dia cairia no DEMO "Dia 01". Handshake robusto: re-anuncia 'ready' até o dia chegar
   // (cobre a corrida de montagem em que a 1ª msg é perdida).
-  window.addEventListener('message',(e)=>{const m=e&&e.data;if(m&&m.type==='leitor-jus-day')__kick(m.html||'', m.cfg||{})});
+  window.addEventListener('message',(e)=>{const m=e&&e.data;if(e.source!==window.parent)return;if(m&&m.type==='leitor-jus-day')__kick(m.html||'', m.cfg||{})});
   const __ping=()=>{try{window.parent.postMessage({type:'leitor-jus-ready'},'*')}catch(_){}};
   __ping();
   let __tries=0; const __iv=setInterval(()=>{ if(__started||++__tries>40){clearInterval(__iv);return;} __ping(); }, 300);

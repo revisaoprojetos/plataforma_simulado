@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!p.success) return NextResponse.json({ message: 'Dados inválidos.' }, { status: 400 })
 
   // Teto de abuso por aluno (o rate-limit de 5s/doc fica no helper, por banco).
-  if (!rateLimit(`bib-prog:${sessao.tenantId}:${sessao.estudanteId}`, 120, 60_000).ok) {
+  if (!(await rateLimit(`bib-prog:${sessao.tenantId}:${sessao.estudanteId}`, 120, 60_000)).ok) {
     return NextResponse.json({ ok: true, ignorado: true })
   }
 

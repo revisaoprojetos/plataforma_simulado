@@ -14,6 +14,7 @@ import { isoParaBrtLocal } from '@/lib/brt'
 import { resumoRegistro } from '@/lib/auditoria/resumo'
 import { cn } from '@/lib/utils'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const ITEMS_PER_PAGE = 12
 
@@ -163,7 +164,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
   // Busca (q): nas visões de estudante, procura por nome/e-mail do aluno (e título do simulado);
   // nas de audit_logs, procura por módulo/ação. Resolvida em ids para filtrar server-side.
-  const like = (params.q ?? '').replace(/[%,()*]/g, ' ').trim()
+  const like = sanearBusca(params.q ?? '')
   const NADA = '00000000-0000-0000-0000-000000000000'
   let estIdsQ: string[] | null = null, simIdsQ: string[] | null = null
   if (like && (view === 'sessoes' || view === 'eventos' || (acessosEstud && sub === 'plataforma'))) {
@@ -196,7 +197,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     } else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
     else if (ehAuto) query = query.or('entidade.eq.simulado_assinaturas,entidade.eq.simulado_curseduca_sync,and(entidade.eq.simulado_estudantes,dados_novos->curseduca_grupos.not.is.null)')
     if (params.acao) query = query.eq('operacao', params.acao)
-    if (params.entidade) query = query.ilike('entidade', `%${params.entidade}%`)
+    if (params.entidade) query = query.ilike('entidade', `%${sanearBusca(params.entidade)}%`)
     if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
     if (params.data_fim) query = query.lte('criado_em', params.data_fim + 'T23:59:59Z')
     if (like) {

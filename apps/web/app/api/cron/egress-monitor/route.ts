@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sqlDisponivel } from '@/lib/data/sql'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
@@ -16,10 +17,7 @@ export const dynamic = 'force-dynamic'
  * roundtrip no Redis). Protegido por CRON_SECRET; chamado pelo worker.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 // Tabelas que geram egress alto quando lidas sem SQL agregado / sem cache. Head count = só o número.

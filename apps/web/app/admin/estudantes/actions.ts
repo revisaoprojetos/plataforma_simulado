@@ -16,6 +16,7 @@ import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { ehCpfMascarado } from '@/lib/privacidade/cpf'
 import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
@@ -90,12 +91,12 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
   if (!t) return []
   const svc = await createServiceClient()
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
-  const like = t.replace(/[%,()*]/g, ' ')
+  const like = sanearBusca(t)
   const ors = [`nome.ilike.%${like}%`, `email.ilike.%${like}%`, `cpf.ilike.%${like}%`, `telefone.ilike.%${like}%`]
   // E-mail SECUNDÁRIO (coluna text[]): casa o endereço exato quando o termo parece um e-mail
   // (operador `cs`/contém — o mesmo usado no login). Assim buscar pelo secundário também acha o aluno.
   if (t.includes('@')) {
-    const alvo = t.toLowerCase().replace(/[{}(),*%]/g, '')
+    const alvo = t.toLowerCase().replace(/[{}(),*%"\\\s]/g, '')
     if (alvo) ors.push(`emails_secundarios.cs.{${alvo}}`)
   }
   const { data } = await svc

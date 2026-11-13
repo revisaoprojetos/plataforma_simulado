@@ -1,3 +1,4 @@
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 // Helpers comuns das sub-abas do Gerador (importação, relatórios, liberação): leitura segura dos searchParams,
 // paginação/ordenação em memória (listas pequenas já carregadas no servidor) e rótulos.
 
@@ -23,7 +24,7 @@ export const porPaginaDe = (v: string | undefined): number => { const n = inteir
 export const dirDe = (v: string | undefined): 'asc' | 'desc' => (v === 'desc' ? 'desc' : 'asc')
 
 /** Remove caracteres que quebram o filtro `.or()`/`.ilike()` do PostgREST. */
-export const limparBusca = (q: string | undefined): string => (q ?? '').trim().replace(/[,%()*\\]/g, ' ').replace(/\s+/g, ' ').trim()
+export const limparBusca = (q: string | undefined): string => sanearBusca(q ?? '')
 
 /** Normaliza para busca sem acento/caixa. */
 export const norm = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

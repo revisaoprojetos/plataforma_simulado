@@ -1,6 +1,7 @@
 'use server'
 import type { NivelAgregado, ResultadoDemo } from './actions-tipos'
 
+import { rateLimit } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { resolverConfigIA } from '@/lib/ia/agentes'
@@ -23,6 +24,8 @@ export async function rodarPipelineDemo(itens: string[]): Promise<ResultadoDemo>
   if (!lista.length) return { ok: false, erro: 'Cole ao menos um item (separe por uma linha com "---").' }
   if (lista.length > 20) return { ok: false, erro: 'Máximo de 20 itens por rodada (demo).' }
 
+  const rl = await rateLimit(`ia-demo:${(await getCurrentTenantId()) ?? 'x'}`, 6, 60_000)
+  if (!rl.ok) return { ok: false, erro: `Muitas execuções seguidas. Aguarde ${rl.retryAfter}s.` }
   const svc = createAdminClient()
   const tenantId = await getCurrentTenantId()
   const cfg = await resolverConfigIA(svc, tenantId)

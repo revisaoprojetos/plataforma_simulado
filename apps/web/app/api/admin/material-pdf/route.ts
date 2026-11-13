@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const st = getStorage()
     let url: string
     try {
-      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: false, cacheControl: '31536000' })
       url = r.url ?? st.getPublicUrl('pdfs', path)
     } catch (e: any) {
       return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const st = getStorage()
     let url: string
     try {
-      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: false, cacheControl: '31536000' })
       url = r.url ?? st.getPublicUrl('pdfs', path)
     } catch (e: any) {
       return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
   const st = getStorage()
   let url: string
   try {
-    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: false, cacheControl: '31536000' })
     url = r.url ?? st.getPublicUrl('pdfs', path)
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })

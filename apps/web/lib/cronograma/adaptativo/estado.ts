@@ -31,7 +31,7 @@ export interface Estado {
   extras?: ExtraSessao[]
 }
 
-export const hojeISO = (): DataISO => dISO(new Date())
+export const hojeISO = (): DataISO => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date()) // dia do ALUNO (Brasília), nunca o fuso do servidor (container em UTC virava 'amanhã' após 21h)
 
 /** Gera plano+fim a partir do cfg (engine puro). */
 export function gerarEstadoPlano(cfg: Cfg, conteudo: _C, fixos?: Record<string, [DataISO, number]>, ancora?: DataISO | null) {

@@ -8,6 +8,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 async function guard() {
   const a = await getCurrentAccess()
@@ -34,7 +35,7 @@ export async function buscarNaoMembros(grupoId: string, busca: string, limite = 
   const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).eq('tenant_id', g.tenantId).order('estudante_id', { ascending: true }))
   const memberSet = new Set(gm.map((m) => m.estudante_id))
   // Remove chars que quebram o parser do .or() do PostgREST (vírgula/parênteses/curinga).
-  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  const safe = sanearBusca(busca)
   let query = svc.from('simulado_estudantes').select('id, nome, email, classificacao').eq('tenant_id', g.tenantId).eq('deletado', false)
   if (safe) query = query.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
   const { data, error } = await query.order('nome', { ascending: true }).limit(Math.min(200, limite * 4))

@@ -21,6 +21,7 @@ import { emissaoEhFixada, promoverProximoFixado } from '@/lib/cronograma/fixar'
 import { montarEmissao } from '@/lib/cronograma/montar-emissao'
 import { regenerarEmissaoDoAluno } from '@/lib/cronograma/regenerar-emissao'
 import { lerProgressoReencaixado } from '@/lib/cronograma/progresso-emissao'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -59,7 +60,7 @@ export async function listarMinhasEmissoes(
   let q = base().eq('arquivada', !!opcoes.arquivadas)
   if (busca) {
     // Procura no rótulo que o aluno deu E no nome do cronograma: ele lembra de um ou do outro.
-    const alvo = `%${busca.replace(/[%_]/g, '')}%`
+    const alvo = `%${sanearBusca(busca).replace(/_/g, ' ')}%`
     q = q.or(`titulo.ilike.${alvo},cronograma_nome.ilike.${alvo}`)
   }
 

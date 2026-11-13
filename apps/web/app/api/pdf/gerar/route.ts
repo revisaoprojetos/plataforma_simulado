@@ -6,6 +6,7 @@ import { enfileirarPdfCaderno } from '@/lib/queue/pdf-queue'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
+import { limitar, ipDeRequest } from '@/lib/rate-limit'
 
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
 export const dynamic = 'force-dynamic'
@@ -34,6 +35,13 @@ export async function POST(request: NextRequest) {
   if (!access.isAdmin && !accessCan(access, 'questoes:view')) {
     return NextResponse.json({ message: 'Sem permissão.' }, { status: 403 })
   }
+
+  // Rate limit por usuário (+ teto por IP+usuário): geração de PDF é cara (worker/Gotenberg).
+  const bloq = await limitar([
+    [`pdf-gerar:u:${access.userId}`, 30, 60_000],
+    [`pdf-gerar:${ipDeRequest(request.headers)}:${access.userId}`, 20, 60_000],
+  ], 'Muitas gerações de PDF seguidas. Aguarde um instante.')
+  if (bloq) return bloq
 
   let body: Body
   try {

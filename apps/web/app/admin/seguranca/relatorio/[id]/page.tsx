@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { BotaoImprimir, DiffVarredura } from '@/components/admin/seguranca/seguranca-ui'
+import { BotaoImprimir, DiffVarredura, FeitoNaVarredura } from '@/components/admin/seguranca/seguranca-ui'
 import { detalheVarredura } from '@/lib/seguranca/leitura'
+import { correcoesDaVarredura } from '@/lib/seguranca/correcoes'
 import { formatBrt } from '@/lib/brt'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,7 @@ export default async function RelatorioImprimivel({ params }: { params: Promise<
   const det = await detalheVarredura(id)
   if (!det) notFound()
   const v = det.varredura
+  const feito = correcoesDaVarredura(v.iniciado_em, det.fps ?? [])
   return (
     <div className="space-y-4">
       {/* Na impressão, esconde a navegação do admin. */}
@@ -28,6 +30,7 @@ export default async function RelatorioImprimivel({ params }: { params: Promise<
         Varredura de {formatBrt(v.iniciado_em) ?? '—'} · origem {v.origem} · {v.total_achados} achado(s): {v.criticos} crítico(s), {v.altos} alto(s), {v.medios} médio(s), {v.baixos} baixo(s)
       </p>
       <DiffVarredura det={det} />
+      <FeitoNaVarredura {...feito} />
     </div>
   )
 }

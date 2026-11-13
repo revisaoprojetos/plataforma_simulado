@@ -15,6 +15,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { LoginCore, Metodo } from './types'
+import { loginGuard, msgBloqueioLogin } from '@/lib/auth/login-guard-client'
 
 // Tempo MÍNIMO que o carregamento branded fica visível após o sucesso, para a animação de intro
 // (logo desenhado + wordmark, ~2,5–3,1s "Pronto" na spec 02 §3.1) não ser cortada pela navegação.
@@ -107,8 +108,11 @@ export function useLoginCore({
     setManutencao(null)
     setCarregando(true)
     try {
+      const g = await loginGuard(email, 'antes')
+      if (g.bloqueado) { setErro(msgBloqueioLogin(g.retryAfter)); return }
       const { error } = await createClient().auth.signInWithPassword({ email, password: senha })
       if (error) {
+        void loginGuard(email, 'falha')
         setErro(
           error.message === 'Invalid login credentials'
             ? 'E-mail ou senha inválidos.'
@@ -116,6 +120,7 @@ export function useLoginCore({
         )
         return
       }
+      void loginGuard(email, 'ok')
       void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
       const rt = destinoRedirect()
       setEntrando(true)

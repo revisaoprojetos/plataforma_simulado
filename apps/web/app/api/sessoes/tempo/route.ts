@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const { data: sess } = await svc
     .from('simulado_sessoes_prova')
-    .select('simulado_id, status, tenant_id')
+    .select('simulado_id, status, tenant_id, estudante_id')
     .eq('id', st)
     .maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })

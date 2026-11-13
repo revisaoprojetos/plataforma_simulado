@@ -177,9 +177,9 @@ export const guruAdapter: ProviderAdapter = {
       if (bate(j?.api_token) || bate(j?.token) || bate(j?.webhook?.token)) return true
     } catch { /* ignora */ }
     // fallback: header (caso a conta use assinatura por header)
-    const cand = headers['x-guru-signature'] || headers['x-webhook-secret'] || headers['authorization'] || ''
-    if (cand && cand.includes(segredo)) return true
-    return false
+    // (comparação EXATA em tempo constante — antes era `includes`, que aceitava substring)
+    const cand = (headers['x-guru-signature'] || headers['x-webhook-secret'] || headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim()
+    return bate(cand)
   },
 
   /**

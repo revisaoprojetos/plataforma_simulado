@@ -16,6 +16,7 @@ import { executarRecorrecao, contarSessoesRecorrecao, type RecorrecaoJob } from 
 import { enfileirarRecorrecao } from '@/lib/queue/recorrecao-queue'
 import type { AnaliseImport, QuestaoImport, AltImport, ResultadoImport } from './import-types'
 import type { HudCores, HudPorPagina } from '@/lib/caderno-designer/types'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) {
@@ -408,7 +409,7 @@ export async function buscarQuestoesForaBanco(bancoId: string | null, filtros: F
     const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).order('questao_id', { ascending: true }))
     for (const r of jaNo) noSet.add(r.questao_id)
   }
-  const safe = (filtros.busca ?? '').replace(/[,()%*]/g, ' ').trim()
+  const safe = sanearBusca(filtros.busca ?? '')
   // `formato` pode não existir no banco (migração 20260708000002 não aplicada) → select tolerante:
   // tenta COM formato; se a coluna faltar, refaz SEM (formato vira null e o tipo cai em "Múltipla").
   const SELECT_BASE = 'id, external_id, enunciado, tipo, nivel_dificuldade, ano, disciplina_id, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'

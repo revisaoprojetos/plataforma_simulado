@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { limitar } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { baixarPdfPorUrl } from '@/lib/storage/pdf-acesso'
 import { carregarConfigIA } from '@/lib/ia/config'
 import { extrairTextoPdf } from '@/lib/ia/pdf-texto'
 import { analisarComTextoIA, type CompParaIA } from '@/lib/ia/correcao-ia'
@@ -17,6 +19,12 @@ export async function POST(req: NextRequest) {
   if (!access.tenantId || !(access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update'))) {
     return NextResponse.json({ ok: false, error: 'Sem permissão para corrigir.' }, { status: 403 })
   }
+  // Rate limit (chamada paga a provedor de IA): por usuário e por tenant.
+  const bloq = await limitar([
+    [`ia-analisar:u:${access.userId}`, 20, 60_000],
+    [`ia-analisar:t:${access.tenantId}`, 100, 60_000],
+  ], 'Muitas requisições de IA seguidas. Aguarde um instante.')
+  if (bloq) return bloq as NextResponse
   let body: any = {}
   try { body = await req.json() } catch { /* corpo inválido */ }
   const respostaId = String(body?.respostaId ?? '')
@@ -63,7 +71,7 @@ export async function POST(req: NextRequest) {
       const bancoId = (sim as any)?.regras?.banco_base_id as string | undefined
       const entrega = bancoId ? await carregarEntregaBanco(svc, tenantId, bancoId) : null
       const pdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
-      if (pdfUrl) { const resp = await fetch(pdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) }
+      if (pdfUrl) { const pdfBuf = await baixarPdfPorUrl(pdfUrl); if (pdfBuf) espelhoTexto = await extrairTextoPdf(pdfBuf) }
     } catch { /* sem espelho */ }
   }
 

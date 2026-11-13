@@ -12,6 +12,7 @@ import {
 } from '@/lib/sistema/manutencao-areas'
 import { normalizarEmailsTestador, normalizarIdsWorkspace } from '@/lib/sistema/testadores-globais'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /** Salva a manutenção da plataforma em tenants.tema.manutencao_sistema (merge, sem apagar o tema). */
 export async function salvarManutencaoSistema(input: ManutencaoSistema) {
@@ -144,7 +145,7 @@ export async function buscarEstudantesLiberacao(busca: string): Promise<PessoaLi
   const tenantId = access.tenantId
   if (!tenantId) return []
   const svc = createAdminClient()
-  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  const safe = sanearBusca(busca)
   let q = svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId).eq('deletado', false)
   if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
   const { data } = await q.order('nome', { ascending: true }).limit(40)

@@ -5,6 +5,7 @@ import { nomesDeRecursos } from '@/lib/produtos/estudio'
 import { normalizarRegra, refsDaRegra, resumoRegra } from '@/lib/segmentos/tipos'
 import { semTabela } from './dados'
 import type { CelulaTrilha, FiltrosGrade, LinhaGrade, SegmentoLeve, Trilha } from './tipos-trilhas'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Leituras das abas "Cronogramas" e "Regras" (só LEEM; filtro/ordem/paginação no banco). Tolerantes: sem as tabelas
 // da migração 20261118020000 devolvem migrado=false em vez de quebrar.
@@ -33,7 +34,7 @@ const COLS_ORDEM: Record<string, string> = { ordem: 'ordem', data: 'data_liberac
 /** Uma página da grade (aulas × trilhas ATIVAS). Paginação no banco: .range() + count. */
 export async function lerGrade(svc: Svc, tenantId: string, produtoId: string, trilhas: Trilha[], f: FiltrosGrade, pagina: number, porPagina: number): Promise<{ total: number; linhas: LinhaGrade[]; migrado: boolean }> {
   let q: any = svc.from('simulado_produto_liberacao_aulas').select('id, ordem, disciplina, numero_aula, titulo, data_liberacao', { count: 'exact' }).eq('tenant_id', tenantId).eq('produto_id', produtoId)
-  const termo = (f.q ?? '').replace(/[%,()*\\]/g, ' ').trim()
+  const termo = sanearBusca(f.q ?? '')
   if (termo) q = q.or(`disciplina.ilike.%${termo}%,titulo.ilike.%${termo}%`)
   if (f.disc) q = q.eq('disciplina', f.disc)
   const col = COLS_ORDEM[f.ord ?? ''] ?? 'ordem'

@@ -180,7 +180,7 @@ export async function pdfRelatorioProcessor(job: Job) {
 
   // 7. Upload no storage (bucket `pdfs`) — via abstração: respeita STORAGE_PROVIDER (supabase|s3)
   const fileName = `relatorios/${sessao_id}_${createHash('sha256').update(sessao_id).digest('hex').slice(0, 8)}.pdf`
-  const up = await uploadPublico({ bucket: 'pdfs', path: fileName, body: pdfBuffer, contentType: 'application/pdf', cacheSeconds: 86400 })
+  const up = await uploadPublico({ bucket: 'pdfs', path: fileName, body: pdfBuffer, contentType: 'application/pdf', cacheSeconds: 86400, privado: true })
   if (!up.ok) {
     console.error('[pdf-relatorio] Upload falhou:', up.erro)
     // Fall through — still return partial result

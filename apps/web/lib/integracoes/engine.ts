@@ -5,6 +5,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement, Mapeamento, ResultadoEntitlement } from '@/lib/integracoes/tipos'
 import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
  * Observabilidade: escritas de domínio (classificação/grupo/pasta/matrícula) eram engolidas
@@ -163,7 +164,7 @@ async function promoverEmailDaCompra(svc: any, tenantId: string, estudanteId: st
     // não promove se OUTRO cadastro já usa esse e-mail (principal ou secundário).
     // Sanitiza o e-mail (vem do payload do webhook, não confiável): chars como , ( ) * % { } quebram
     // o parser do .or() do PostgREST — um e-mail malformado poderia alterar o filtro (injection).
-    const emailSafe = email.replace(/[,()%*{}]/g, ' ').trim()
+    const emailSafe = sanearBusca(email, 254)
     const { data: outros } = await svc.from('simulado_estudantes').select('id')
       .eq('tenant_id', tenantId).eq('deletado', false)
       .or(`email.ilike.${emailSafe},emails_secundarios.cs.{${emailSafe}}`)

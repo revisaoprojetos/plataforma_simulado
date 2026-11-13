@@ -46,10 +46,12 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   // (não esperam a API da Curseduca listar/contar 234 grupos).
   if (prov === 'curseduca') {
     const [estado, regras] = await Promise.all([curseducaEstado(), listarRegrasSync()])
+    const { data: cfgSeg } = await createAdminClient().from('simulado_integracao_config').select('credenciais').eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000').eq('provider', 'curseduca').maybeSingle()
+    const credSeg = ((cfgSeg as any)?.credenciais ?? {}) as Record<string, string>
     return (
       <div className="animate-page space-y-6">
         {header}
-        <IntegracaoCurseducaTabs configurado={estado.configurado} inativo={estado.inativo} regras={(regras as any).regras ?? []} />
+        <IntegracaoCurseducaTabs configurado={estado.configurado} inativo={estado.inativo} regras={(regras as any).regras ?? []} temSegredo={!!credSeg.webhook_secret} estrito={!!credSeg.webhook_estrito} />
       </div>
     )
   }

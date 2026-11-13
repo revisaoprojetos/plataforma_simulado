@@ -13,7 +13,7 @@ services:
     image: collabora/code:latest
     container_name: teste-collabora
     ports:
-      - '9980:9980'
+      - '127.0.0.1:9980:9980'   # só loopback: spike local NÃO deve ficar exposto na rede
     environment:
       # Permite o HOST WOPI do app (o Collabora só aceita hosts listados aqui — regex de URL).
       - aliasgroup1=http://host\.docker\.internal:3000
@@ -21,7 +21,7 @@ services:
       - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:net.frame_ancestors=http://localhost:3000
       - DONT_GEN_SSL_CERT=true
       - username=admin
-      - password=admin
+      - password=${COLLABORA_ADMIN_PASSWORD:-admin}   # console admin só em loopback; defina COLLABORA_ADMIN_PASSWORD p/ trocar
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     cap_add:
@@ -35,10 +35,14 @@ services:
     image: onlyoffice/documentserver:latest
     container_name: teste-onlyoffice
     ports:
-      - '8082:80'
+      - '127.0.0.1:8082:80'   # só loopback
     environment:
-      # Sem JWT no spike (simplifica a integração). Em produção isso seria ligado com segredo.
-      - JWT_ENABLED=false
+      # JWT LIGADO. Exige ONLYOFFICE_JWT_SECRET no ambiente/.env (o MESMO valor do app: o callback valida o JWT do
+      # Document Server com ONLYOFFICE_JWT_SECRET). Ex.:  export ONLYOFFICE_JWT_SECRET=$(openssl rand -hex 32)
+      # ⚠️ Com JWT ligado o editor só abre se a config do DocsAPI for assinada (config.token, HS256, mesmo segredo).
+      - JWT_ENABLED=true
+      - JWT_SECRET=${ONLYOFFICE_JWT_SECRET:?defina ONLYOFFICE_JWT_SECRET (mesmo valor do app) antes de subir o spike}
+      - JWT_HEADER=Authorization
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped

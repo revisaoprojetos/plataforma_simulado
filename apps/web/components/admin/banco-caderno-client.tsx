@@ -22,6 +22,7 @@ import { PdfPreview } from '@/components/admin/pdf-preview'
 import { iconeBanco } from '@/lib/banco-visual'
 import { associarCaderno, removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
 import type { MaterialCaderno } from '@/lib/caderno-designer/material'
+import { pdfProxyUrl } from '@/lib/storage/pdf-proxy'
 
 interface Caderno { id: string; nome: string; descricao?: string | null; cor?: string | null; icone?: string | null; capa?: string | null }
 interface Modalidade { id: string; nome: string; vazio?: boolean }
@@ -316,7 +317,7 @@ export function MaterialPdfCard({ cor, titulo, hint, pdfUrl, pdfNome, busy, onUp
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm" style={{ background: cor }}><BookOpenCheck className="h-3.5 w-3.5" /></span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={titulo}>{titulo}</span>
         {pdfUrl && (
-          <a href={pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF"
+          <a href={pdfProxyUrl(pdfUrl)} target="_blank" rel="noreferrer" title="Abrir PDF"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
         )}
       </div>
@@ -328,7 +329,7 @@ export function MaterialPdfCard({ cor, titulo, hint, pdfUrl, pdfNome, busy, onUp
             {/* Prévia renderizada em canvas (PDF.js) — funciona mesmo se o navegador baixa PDFs. */}
             <PdfPreview url={pdfUrl} titulo={titulo} className="absolute inset-0" />
             <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-              <a href={pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
+              <a href={pdfProxyUrl(pdfUrl)} target="_blank" rel="noreferrer" title="Abrir PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background"><ExternalLink className="h-3.5 w-3.5" /></a>
               <button type="button" onClick={onUpload} disabled={busy} className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60">Trocar</button>
               <button type="button" onClick={onRemover} disabled={busy} title="Remover PDF" className="rounded-md bg-background/90 px-2 py-1 text-xs font-medium text-destructive shadow ring-1 ring-border backdrop-blur transition-colors hover:bg-background disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>

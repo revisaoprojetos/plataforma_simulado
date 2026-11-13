@@ -7,6 +7,7 @@ import { CurseducaConfig } from '@/components/admin/curseduca-config'
 import { CurseducaImport } from '@/components/admin/curseduca-import'
 import { CurseducaSyncCard } from '@/components/admin/curseduca-sync-card'
 import { CurseducaAutoVinculo } from '@/components/admin/curseduca-auto-vinculo'
+import { WebhookSegurancaCard } from '@/components/admin/webhook-seguranca-card'
 import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
 
 /**
@@ -17,7 +18,7 @@ import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
  */
 type Aba = 'importar' | 'sincronizacao' | 'auto-passaporte' | 'credenciais'
 
-export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }: { configurado: boolean; inativo?: boolean; regras: any[] }) {
+export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras, temSegredo = false, estrito = false }: { configurado: boolean; inativo?: boolean; regras: any[]; temSegredo?: boolean; estrito?: boolean }) {
   const [aba, setAba] = useState<Aba>(configurado ? 'importar' : 'credenciais')
   const [grupos, setGrupos] = useState<any[] | null>(null)
   const [sistema, setSistema] = useState<any[]>([])
@@ -88,7 +89,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
         !configurado ? aviso('Integração não configurada', 'Configure as credenciais na aba Credenciais.')
           : <CurseducaAutoVinculo />
       )}
-      {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso /></div>}
+      {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso />{configurado && <div className="mt-4"><WebhookSegurancaCard provider="curseduca" nome="Curseduca/n8n" modo="curseduca" temSegredo={temSegredo} estrito={estrito} /></div>}</div>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { limitar } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { carregarConfigIA } from '@/lib/ia/config'
@@ -14,6 +15,12 @@ export async function POST(req: NextRequest) {
   if (!access.tenantId || !(access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update'))) {
     return NextResponse.json({ ok: false, error: 'Sem permissão para corrigir.' }, { status: 403 })
   }
+  // Rate limit (chamada paga a provedor de IA): por usuário e por tenant.
+  const bloq = await limitar([
+    [`ia-ocr:u:${access.userId}`, 60, 60_000],
+    [`ia-ocr:t:${access.tenantId}`, 300, 60_000],
+  ], 'Muitas requisições de IA seguidas. Aguarde um instante.')
+  if (bloq) return bloq as NextResponse
   let body: any = {}
   try { body = await req.json() } catch { /* corpo inválido */ }
   const respostaId = String(body?.respostaId ?? '')

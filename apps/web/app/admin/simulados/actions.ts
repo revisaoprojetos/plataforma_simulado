@@ -18,6 +18,7 @@ import { reordenarProvaViaApi, estudantesLinkadosViaApi } from '@/lib/data/simul
 import { estudantesLinkadosSql } from '@/lib/data/relatorios.repo'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
 // 0 linhas (fail-closed). Toda query por id/simulado_id filtra .eq('tenant_id', tenantId ?? SEM_TENANT)
@@ -664,7 +665,7 @@ export async function buscarEstudantesSimulado(busca: string, limite = 40): Prom
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const safe = busca.replace(/[,()%*]/g, ' ').trim() // chars que quebram o parser do .or()
+  const safe = sanearBusca(busca) // chars que quebram o parser do .or()
   let q = svc.from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao, avatar, perfil_avatar_cor', { count: 'exact' }).eq('tenant_id', tenantId).eq('deletado', false)
   if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)
   const { data, error, count } = await q.order('nome', { ascending: true }).limit(Math.min(100, limite))
@@ -678,7 +679,7 @@ export async function listarEstudanteIdsSimulado(busca = ''): Promise<{ ok: bool
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const safe = busca.replace(/[,()%*]/g, ' ').trim()
+  const safe = sanearBusca(busca)
   const rows = await fetchAll<{ id: string }>(() => {
     let q = svc.from('simulado_estudantes').select('id').eq('tenant_id', tenantId).eq('deletado', false)
     if (safe) q = q.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`)

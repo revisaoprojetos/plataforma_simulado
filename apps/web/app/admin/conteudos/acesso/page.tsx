@@ -3,6 +3,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
 import { SemAcessoArea } from '@/app/admin/conteudos/_components/sem-acesso-area'
 import { AcessoClient, type AcessoLinha } from './acesso-client'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export default async function ConteudosAcessoPage({ searchParams }: { searchPara
   let query = svc.from('simulado_estudantes').select('id, nome, email, classificacao', { count: 'exact' })
     .eq('tenant_id', tenantId).eq('deletado', false)
     .order('nome', { ascending: true }).range((page - 1) * perPage, page * perPage - 1)
-  if (q) { const safe = q.replace(/[,()%*]/g, ' ').trim(); if (safe) query = query.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`) }
+  if (q) { const safe = sanearBusca(q); if (safe) query = query.or(`nome.ilike.%${safe}%,email.ilike.%${safe}%`) }
   const { data, count } = await query
   const estRows = (data ?? []) as any[]
 

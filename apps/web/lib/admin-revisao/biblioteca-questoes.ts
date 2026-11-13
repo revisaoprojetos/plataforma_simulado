@@ -7,6 +7,7 @@ import { idsDuplicadas, limparCacheDuplicadas } from './biblioteca-questoes-dupl
 import { VIS_SQL } from './biblioteca-questoes-vis'
 import { limparCacheGestao } from './biblioteca-questoes-gestao'
 import { AGRUPAMENTOS_Q, RAIZ_Q, compactarArvore, type AgrupamentoQ, type EstadoQ, type LinhaQuestaoBib, type OpcoesQ, type RespostaQ } from './biblioteca-questoes-tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // BANCO DE QUESTÕES na Biblioteca (aba "Questões"): árvore por taxonomia da questão + lista paginada.
 // Tudo no SERVIDOR: SQL agregado (lib/data/sql) com fallback PostgREST tolerante. A árvore e as opções ficam em cache de 30 s
@@ -370,7 +371,7 @@ async function listarQuestoesRest(svc: SupabaseClient, tenantId: string, e: Esta
     else if (e.vis === 'anulada') q = q.eq('anulada', true)
     if (e.status) q = q.eq('status', e.status); if (e.dif) q = q.eq('nivel_dificuldade', e.dif); if (e.tipo) q = q.eq('tipo', e.tipo)
     if (e.banca && UUID.test(e.banca)) q = q.eq('banca_id', e.banca); if (e.orgao && UUID.test(e.orgao)) q = q.eq('orgao_id', e.orgao); if (e.ano) q = q.eq('ano', Number(e.ano))
-    const busca = e.q.replace(/[,()%*\\]/g, ' ').trim()
+    const busca = sanearBusca(e.q)
     if (busca) q = q.or(`enunciado.ilike.%${busca}%,assunto_detalhe.ilike.%${busca}%`)
     const col: Record<string, string> = { atualizado: 'updated_at', enunciado: 'enunciado', ano: 'ano', tipo: 'tipo', status: 'status', versao: 'versao', cargo: 'cargo', dif: 'nivel_dificuldade' }
     return q.order(col[e.sort] ?? 'updated_at', { ascending: e.dir === 'asc', nullsFirst: false }).order('id', { ascending: true }).range((e.page - 1) * e.pp, e.page * e.pp - 1)

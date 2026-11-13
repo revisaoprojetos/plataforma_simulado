@@ -16,6 +16,7 @@ import type {
   AvisoLinha, AvisoLocal, PublicoItem,
 } from './cs-tipos'
 import { AVISO_LOCAIS, API_PROVEDORES } from './cs-tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 export const NADA = '00000000-0000-0000-0000-000000000000'
 const DIA = 86_400_000
@@ -43,7 +44,7 @@ export function ultimoAcessoTxt(ts: string | null | undefined): string {
   return dias <= 0 ? "hoje" : dias === 1 ? "ontem" : "há " + dias + " dias"
 }
 
-const limpaBusca = (q: string) => q.replace(/[,()%*\\]/g, ' ').trim().slice(0, 80)
+const limpaBusca = (q: string) => sanearBusca(q, 80)
 const colInexistente = (m?: string) => /column|does not exist|schema cache/i.test(m ?? '')
 
 // ═══════════════════════════════ GRUPOS (base compartilhada) ═══════════════════════════════

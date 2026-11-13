@@ -5,11 +5,12 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { CartoesResumo } from '@/components/admin/acessos/blocos'
 import { AcessosFiltros } from '@/components/admin/acessos/acessos-filtros'
 import {
-  SegurancaTabs, BotaoExecutar, AchadosTable, VarreduraTable, AtualizacoesTable, AcoesRelatorio, DiffVarredura,
+  SegurancaTabs, BotaoExecutar, AchadosTable, VarreduraTable, AtualizacoesTable, AcoesRelatorio, DiffVarredura, CorrecoesSecao, FeitoNaVarredura,
 } from '@/components/admin/seguranca/seguranca-ui'
 import {
   resumoGeral, listarAchados, listarVarreduras, detalheVarredura, listarAtualizacoes, contagemAtualizacoes,
 } from '@/lib/seguranca/leitura'
+import { correcoesVerificadas, contagemCorrecoes, correcoesDaVarredura } from '@/lib/seguranca/correcoes'
 import { CATEGORIAS, SEVERIDADES, ROTULO_CATEGORIA, ROTULO_SEVERIDADE } from '@/lib/seguranca/tipos'
 import { formatBrt } from '@/lib/brt'
 
@@ -43,7 +44,8 @@ export default async function SegurancaPage({ searchParams }: { searchParams: Pr
 }
 
 async function Geral() {
-  const r = await resumoGeral()
+  const [r, cv] = await Promise.all([resumoGeral(), correcoesVerificadas()])
+  const cc = contagemCorrecoes(cv.itens)
   const max = Math.max(1, ...r.varreduras.map((v) => v.total_achados as number))
   const serie = [...r.varreduras].reverse()
   return (
@@ -51,6 +53,7 @@ async function Geral() {
       <CartoesResumo itens={[
         { label: 'Críticos abertos', valor: r.criticos }, { label: 'Altos abertos', valor: r.altos },
         { label: 'Médios abertos', valor: r.medios }, { label: 'Baixos abertos', valor: r.baixos },
+        { label: 'Corrigidos', valor: cc.corrigidos, dica: `${cc.pendentes} pendente(s) de verificação${cc.reapareceram ? ` · ${cc.reapareceram} reapareceu` : ''}` },
         { label: 'Alertas não lidos', valor: r.naoLidas }, { label: 'Atualizações pendentes', valor: r.atualizacoesPendentes },
       ]} />
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -90,13 +93,16 @@ async function Achados({ sp, page, pp, dir, q, podeGerenciar }: { sp: SP; page: 
 
 async function Relatorios({ v, page, pp }: { v?: string; page: number; pp: number }) {
   const det = v && /^[0-9a-f-]{36}$/i.test(v) ? await detalheVarredura(v) : null
-  const { rows, total } = await listarVarreduras(page, pp)
+  const [{ rows, total }, cv] = await Promise.all([listarVarreduras(page, pp), correcoesVerificadas()])
+  const cc = contagemCorrecoes(cv.itens)
+  const feito = det ? correcoesDaVarredura(det.varredura.iniciado_em, det.fps ?? []) : null
   const linhas = rows.map((r) => ({
     id: r.id, origem: r.origem, iniciado: formatBrt(r.iniciado_em) ?? '—', total: r.total_achados, criticos: r.criticos, altos: r.altos,
     novos: r.novos, resolvidos: r.resolvidos, erros: r.erros,
   }))
   return (
     <div className="space-y-6">
+      <CorrecoesSecao itens={cv.itens} corrigidos={cc.corrigidos} pendentes={cc.pendentes} ultimaVarredura={cv.ultimaVarredura} />
       {det && (
         <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -104,6 +110,7 @@ async function Relatorios({ v, page, pp }: { v?: string; page: number; pp: numbe
             <AcoesRelatorio id={det.varredura.id} />
           </div>
           <DiffVarredura det={det} />
+          {feito && <FeitoNaVarredura {...feito} />}
         </section>
       )}
       <VarreduraTable rows={linhas} total={total} />

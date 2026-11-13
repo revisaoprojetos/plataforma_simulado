@@ -8,6 +8,7 @@ import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, Shie
 import { cn } from '@/lib/utils'
 import { molduraSelecao } from '@/lib/selecao-moldura'
 import { dominioCookieDeHost } from '@/lib/supabase/cookie-domain'
+import { loginGuard, msgBloqueioLogin } from '@/lib/auth/login-guard-client'
 
 // ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
 // o tema de nenhum tenant). Tema CLARO/branco, neutro e sóbrio. A marca é só o nome/logo do
@@ -166,12 +167,16 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
 
   async function entrarAdmin(e: React.FormEvent) {
     e.preventDefault(); setErro(null); setLoading(true)
+    const g = await loginGuard(email, 'antes')
+    if (g.bloqueado) { const m = msgBloqueioLogin(g.retryAfter); setErro(m); toast.error('Login bloqueado temporariamente', { description: m }); setLoading(false); return }
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
     if (error) {
+      void loginGuard(email, 'falha')
       const msg = error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message
       setErro(msg); toast.error('Login incorreto', { description: msg }); setLoading(false); return
     }
+    void loginGuard(email, 'ok')
     void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
     toast.success('Login realizado com sucesso!')
     setLoading(false); setMinhasPlats(null); setModo('selecionar')

@@ -9,6 +9,7 @@ import { Previa } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { PdfPreview } from '@/components/admin/pdf-preview'
+import { pdfProxyUrl } from '@/lib/storage/pdf-proxy' // bucket `pdfs` é privado: o link cru do storage não abre
 import { useCriar, useGuardStep, type PdfRef } from '../criar-context'
 
 const FOLHA_MODELOS = MODALIDADES.find((m) => m.id === 'folha_respostas')?.modelos ?? []
@@ -181,7 +182,7 @@ function PdfUploader({ icon: Icon, titulo, desc, slot, atual, onChange }: {
           </div>
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 shrink-0 text-primary" />
-            <a href={atual.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-sm hover:underline" title={atual.nome}>{atual.nome}</a>
+            <a href={pdfProxyUrl(atual.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-sm hover:underline" title={atual.nome}>{atual.nome}</a>
             <button type="button" onClick={() => inputRef.current?.click()} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" title="Trocar"><Upload className="h-4 w-4" /></button>
             <button type="button" onClick={() => onChange(null)} className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Remover"><Trash2 className="h-4 w-4" /></button>
           </div>

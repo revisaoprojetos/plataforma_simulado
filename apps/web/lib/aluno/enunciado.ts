@@ -1,4 +1,5 @@
 import type { EntregaSlots } from '@/lib/caderno-teste/entrega-aluno'
+import { assinarUrlPdf } from '@/lib/storage/pdf-acesso'
 
 /**
  * Resolve o "Caderno de questões (sem respostas)" de cada simulado, para o aluno baixar ANTES de
@@ -24,8 +25,9 @@ export async function resolverEnunciadoUrls(
     const en = entregaPorBanco.get((s.regras as any).banco_base_id)?.enunciado
     if (en?.pdfUrl) {
       const arq = (en.pdfNome || 'Caderno de Questões').replace(/\.pdf$/i, '').trim() || 'Caderno de Questões'
-      const sep = en.pdfUrl.includes('?') ? '&' : '?'
-      out.set(s.id, { pdf: `${en.pdfUrl}${sep}download=${encodeURIComponent(arq)}.pdf`, temCaderno: true })
+      const urlAcesso = assinarUrlPdf(en.pdfUrl) // bucket `pdfs` privado → link-token de curta duração
+      const sep = urlAcesso.includes('?') ? '&' : '?'
+      out.set(s.id, { pdf: `${urlAcesso}${sep}download=${encodeURIComponent(arq)}.pdf`, temCaderno: true })
     } else if (en?.cadernoId && en?.itemId) {
       out.set(s.id, { pdf: null, temCaderno: true })
     } else {

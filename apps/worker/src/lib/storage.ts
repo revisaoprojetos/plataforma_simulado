@@ -58,6 +58,8 @@ export function urlPublica(bucket: string, path: string): string {
 /** Faz upload PÚBLICO (upsert) no provider ativo e devolve a URL pública. Nunca lança — retorna {ok,erro}. */
 export async function uploadPublico(opts: {
   bucket: string; path: string; body: Buffer | Uint8Array; contentType: string; cacheSeconds?: number
+  /** true = objeto PRIVADO (sem ACL public-read no S3). A URL devolvida é só um localizador: o acesso é por URL assinada (web). */
+  privado?: boolean
 }): Promise<{ ok: boolean; url: string | null; erro?: string }> {
   const { bucket, path, body, contentType } = opts
   const cacheSeconds = opts.cacheSeconds ?? 31536000
@@ -66,7 +68,7 @@ export async function uploadPublico(opts: {
       const { client, mod } = await s3Client()
       await client.send(new mod.PutObjectCommand({
         Bucket: bucketFisico(bucket), Key: path, Body: body as Uint8Array,
-        ContentType: contentType, CacheControl: `max-age=${cacheSeconds}`, ACL: 'public-read',
+        ContentType: contentType, CacheControl: `max-age=${cacheSeconds}`, ...(opts.privado ? {} : { ACL: 'public-read' }),
       }))
     } else {
       const { error } = await supabase.storage.from(bucket).upload(path, body as any, {

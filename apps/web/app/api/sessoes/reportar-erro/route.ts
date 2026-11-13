@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (!rateLimit(`reportar:${ip}`, 20, 5 * 60 * 1000).ok) {
+  if (!(await rateLimit(`reportar:${ip}`, 20, 5 * 60 * 1000)).ok) {
     return NextResponse.json({ message: 'Muitas solicitações. Tente novamente em instantes.' }, { status: 429 })
   }
 

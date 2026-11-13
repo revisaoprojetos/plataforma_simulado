@@ -33,6 +33,46 @@ export interface AtualizacaoScan {
   severidade: Severidade
 }
 
+/**
+ * Registro de uma CORREÇÃO aplicada (fonte: lib/seguranca/correcoes-data.ts).
+ * Casa com achados do scanner pelo `fingerprints` (ver AchadoScan.fingerprint): valor exato
+ * ('http:csp-ausente') ou prefixo terminado em '*' ('banco:sem-rls:*').
+ */
+export interface Correcao {
+  /** Estável e único (kebab-case), nunca reutilizar. */
+  id: string
+  titulo: string
+  severidadeOriginal: Severidade
+  categoria: Categoria
+  /** Fingerprints/prefixos ('*' no fim) dos achados que esta correção elimina. Vazio = só registro manual (sem verificação automática). */
+  fingerprints: string[]
+  /** ISO. Preferir data+hora (ex.: '2026-11-13T15:30:00-03:00'); só data = fim do dia (BRT). */
+  data: string
+  descricao: string
+  arquivos: string[]
+  comoValidar: string
+  riscoDeRegressao?: string
+  /** Ação pendente do usuário (configurar segredo, aplicar migration, deploy…). */
+  acaoDoUsuario?: string
+  versaoApp?: string
+  /** Apenas para testar a UI; fica oculto quando houver ≥1 correção real. */
+  exemplo?: boolean
+}
+
+export type StatusCorrecao = 'verificada' | 'aguardando' | 'validar' | 'reapareceu' | 'manual'
+export const ROTULO_STATUS_CORRECAO: Record<StatusCorrecao, string> = {
+  verificada: 'Verificada pela varredura', aguardando: 'Aguardando varredura', validar: 'Aplicada — validar e resolver o achado',
+  reapareceu: 'Reapareceu / incompleta', manual: 'Sem verificação automática',
+}
+
+export interface CorrecaoVerificada extends Correcao {
+  status: StatusCorrecao
+  /** ISO da última varredura considerada (verificada/reapareceu). */
+  verificadaEm: string | null
+  /** Achados abertos ainda casando (reapareceu). */
+  abertos: { titulo: string; fingerprint: string }[]
+}
+
 export interface ResultadoChecagem {
   nome: string
   achados: AchadoScan[]

@@ -7,6 +7,7 @@ import { getImpersonationPermission } from '@/lib/impersonation/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { getModoNotificacao, type NotifMode } from '@/lib/impersonation/notification'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /** Busca alunos do tenant para o console de visualização (só quem pode visualizar). */
 export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boolean; alunos?: AlunoBusca[]; error?: string }> {
@@ -15,7 +16,7 @@ export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boo
   const perm = await getImpersonationPermission(access)
   if (!perm) return { ok: false, error: 'Sem permissão para visualizar alunos.' }
   const svc = createAdminClient()
-  const q = (query ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  const q = sanearBusca(query ?? '')
   let sel = svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').eq('tenant_id', access.tenantId).order('nome').limit(40)
   if (q) sel = sel.or(`nome.ilike.%${q}%,email.ilike.%${q}%`)
   const { data } = await sel

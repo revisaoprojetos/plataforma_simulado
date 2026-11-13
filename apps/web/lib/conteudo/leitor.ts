@@ -14,6 +14,7 @@ import { converterTagsEmSelos } from '@/lib/leitura/tags-em-selos'
 import { envolverSecoesPorTitulo } from '@/lib/leitura/titulos-expansivos'
 import { lerCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
+import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
 
 // LEITOR do aluno (Fase 8) — monta a leitura a partir dos TRECHOS da versão atual (cada um com seu
 // uid, a âncora estável do grifo) + as anotações do aluno. A ancoragem é por (uid + offset no trecho):
@@ -373,7 +374,7 @@ export async function carregarLeitura(documentoId: string, alunoId: string, opts
   // lidos à parte, em paralelo, e NUNCA entram no cache compartilhado. Tolerante a Redis ausente (remember
   // cai no cálculo). Forma do retorno idêntica à anterior.
   const [docPart, anotacoes] = await Promise.all([
-    remember<{ trechos: TrechoLeitura[]; html: string }>(`leitura-doc:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => {
+    remember<{ trechos: TrechoLeitura[]; html: string }>(`leitura-doc:s1:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => {
       const [trechos, ver] = await Promise.all([
         fetchAll<any>(() => svc.from(T_TR).select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', tenantId).eq('versao_id', doc.versao_atual_id).order('ordem', { ascending: true })),
         // tolerante à migração pendente: tenta html_rico+arquivo_key; se a coluna não existir, cai p/ arquivo_key.
@@ -389,7 +390,7 @@ export async function carregarLeitura(documentoId: string, alunoId: string, opts
       // regenera a partir do original 1x e grava (cacheia na versão) sem tocar nos trechos/grifos.
       const html = (ver as any)?.html_rico
         || await regenerarHtmlRico(svc, tenantId, doc.versao_atual_id, (ver as any)?.arquivo_key ?? null, (doc as any).tipo_origem, trechosL)
-      return { trechos: trechosL, html }
+      return { trechos: trechosL, html: sanitizarHtmlLeitura(html) } // defesa em profundidade (achado dangerous-html-leitor): sanitiza ANTES de cachear
     }),
     listarAnotacoes(documentoId, alunoId),
   ])
@@ -582,7 +583,7 @@ export async function garantirHtmlLegproc(svc: any, tenantId: string, documentoI
     if (!html.trim()) return false
     const up = await svc.from('simulado_conteudo_versoes').update({ html_rico: MARCA_LP + html }).eq('tenant_id', tenantId).eq('id', versaoId)
     if (up.error) return false
-    await esquecer(`leitura-doc:${tenantId}:${documentoId}:${versaoId}`)
+    await esquecer(`leitura-doc:s1:${tenantId}:${documentoId}:${versaoId}`)
     return true
   } catch (e) { console.error('[legproc] falha ao preparar o texto', documentoId, (e as any)?.message || e); return false /* mantém o html_rico atual */ }
 }
@@ -632,10 +633,10 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     const convertido = await prepararHtmlLegprocComOrcamento(svc, tenantId, documentoId, doc.versao_atual_id, tipoOrigem)
     if (!convertido) return null
     // html convertido (cache com a MARCA na chave → nunca serve a conversão antiga) + anotações do aluno (gate já passou acima)
-    const html = await remember<string | undefined>(`leitura-lp:${MARCA_LP}:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 900, async () => {
+    const html = await remember<string | undefined>(`leitura-lp:s1:${MARCA_LP}:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 900, async () => {
       const r = await svc.from('simulado_conteudo_versoes').select('html_rico').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
       const h = (r.data as any)?.html_rico
-      return typeof h === 'string' && h.startsWith(MARCA_LP) ? h : undefined
+      return typeof h === 'string' && h.startsWith(MARCA_LP) ? sanitizarHtmlLeitura(h) : undefined
     })
     if (!html) return null
     const f = filtrarHtmlPorAreas(html, areasAluno.ocultas, areasAluno.blocos, areasAluno.estiloPadrao)

@@ -2,6 +2,8 @@ import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { allowlistEfetiva } from '@/lib/embed/origem-host'
+import { EmbedOrigensProvider } from '@/components/embed/embed-origens-context'
 
 export default async function EmbedLayout({
   children,
@@ -28,7 +30,10 @@ export default async function EmbedLayout({
   const frameAncestors =
     origens.length > 0
       ? `frame-ancestors 'self' ${origens.join(' ')}`
-      : "frame-ancestors *"
+      : "frame-ancestors 'self'" // meta é ignorada p/ frame-ancestors; a aplicação real é o header do proxy.ts
+
+  // Allowlist (tenant + Curseduca conhecidas) serializada com segurança p/ o <script> inline.
+  const allowJson = JSON.stringify(allowlistEfetiva(origens)).replace(/</g, '\\u003c')
 
   const headersList = await headers()
   // Next.js does not allow mutating response headers in layouts directly — the proxy
@@ -47,26 +52,51 @@ export default async function EmbedLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              window.addEventListener('load', function() {
-                try {
-                  parent.postMessage({ type: 'embed-ready', height: document.body.scrollHeight }, '*');
-                } catch(e) {}
-              });
-              // Auto-resize on body changes
-              if (typeof ResizeObserver !== 'undefined') {
-                var ro = new ResizeObserver(function() {
+              (function() {
+                // Origem do pai derivada (ancestorOrigins/referrer) e validada contra a allowlist; sem validação, só altura (sem dados) com '*'.
+                var ALLOW = ${allowJson};
+                function parentOrigin() {
                   try {
-                    parent.postMessage({ type: 'embed-resize', height: document.body.scrollHeight }, '*');
+                    var a = window.location.ancestorOrigins;
+                    if (a && a.length && a[0] && a[0] !== 'null') return a[0];
                   } catch(e) {}
+                  try { if (document.referrer) return new URL(document.referrer).origin; } catch(e) {}
+                  return null;
+                }
+                function permitido(o) {
+                  if (!o) return false;
+                  var u; try { u = new URL(o); } catch(e) { return false; }
+                  for (var i = 0; i < ALLOW.length; i++) {
+                    var p = ALLOW[i];
+                    if (p === u.origin) return true;
+                    var m = /^(https?:)\\/\\/\\*\\.([^:/]+)$/.exec(p);
+                    if (m && u.protocol === m[1] && u.hostname.slice(-(m[2].length + 1)) === '.' + m[2]) return true;
+                  }
+                  return false;
+                }
+                function enviar(msg) {
+                  try {
+                    var o = parentOrigin();
+                    parent.postMessage(msg, permitido(o) ? new URL(o).origin : '*');
+                  } catch(e) {}
+                }
+                window.addEventListener('load', function() {
+                  enviar({ type: 'embed-ready', height: document.body.scrollHeight });
                 });
-                ro.observe(document.body);
-              }
+                // Auto-resize on body changes
+                if (typeof ResizeObserver !== 'undefined') {
+                  var ro = new ResizeObserver(function() {
+                    enviar({ type: 'embed-resize', height: document.body.scrollHeight });
+                  });
+                  ro.observe(document.body);
+                }
+              })();
             `,
           }}
         />
       </head>
       <body style={{ margin: 0, background: 'white' }} className="antialiased">
-        {children}
+        <EmbedOrigensProvider origens={origens}>{children}</EmbedOrigensProvider>
       </body>
     </html>
   )

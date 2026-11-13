@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { registrarAudit } from '@/lib/audit'
+import { ipDeRequest, lockoutFalha, lockoutLimpar, lockoutRestante } from '@/lib/rate-limit'
+import { emailSeguro } from '@/lib/seguranca/postgrest-safe'
 
 export async function loginAction(formData: FormData) {
   const supabase = await createClient()
@@ -11,14 +14,21 @@ export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
+  // Lockout por IP+e-mail (Redis; 5 falhas/15 min → 15 min, reincidência 1 h/4 h). Fail-open.
+  const chave = `adm:${ipDeRequest(await headers())}:${emailSeguro(email) ?? '-'}`
+  const restante = await lockoutRestante(chave)
+  if (restante > 0) redirect(`/login?error=${encodeURIComponent(`Muitas tentativas. Aguarde ${Math.ceil(restante / 60)} min.`)}`)
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
   if (error) {
+    await lockoutFalha(chave)
     redirect(`/login?error=${encodeURIComponent(error.message)}`)
   }
+  await lockoutLimpar(chave)
 
   await registrarAudit({ operacao: 'LOGIN', entidade: 'auth', atorTipo: 'usuario', atorId: data.user?.id ?? null, depois: { email } })
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolverCfg, executarImport } from '@/lib/curseduca/import-core'
+import { compararSegredo } from '@/lib/integracoes/webhook-seguranca'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!segredo) return NextResponse.json({ ok: false, message: 'Webhook desativado (defina CURSEDUCA_WEBHOOK_SECRET).' }, { status: 503 })
 
   const enviado = req.headers.get('x-webhook-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  if (enviado !== segredo) return NextResponse.json({ ok: false, message: 'Não autorizado.' }, { status: 401 })
+  if (!compararSegredo(enviado, segredo)) return NextResponse.json({ ok: false, message: 'Não autorizado.' }, { status: 401 })
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ ok: false, message: 'JSON inválido.' }, { status: 400 }) }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { processarTransicoesGrants } from '@/lib/integracoes/liberacao/engine'
 import { LIBERACAO_REGRAS_ATIVO } from '@/lib/flags'
@@ -12,10 +13,7 @@ export const dynamic = 'force-dynamic'
  * `?tenant=<id>` limita a um tenant.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 export async function POST(req: NextRequest) {

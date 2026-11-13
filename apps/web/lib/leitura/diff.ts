@@ -1,5 +1,6 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
+import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
 import type { AncoraBloco, BlocoDiff, DiffDoc, Token } from './diff-tipos'
 
 // Diff de versões da Leitura (antes/depois).
@@ -51,7 +52,7 @@ function extrairBlocos(html: string): Bloco[] {
     const disp = el.getAttribute?.('data-disp')
     const art = el.getAttribute?.('data-art')
     const key = disp ? `d:${disp}` : art ? `a:${art}` : `t:${texto.toLowerCase()}`
-    out.push({ key: unica(key), rotulo: rotuloDe(el, texto), texto, html: el.outerHTML ?? String(el) })
+    out.push({ key: unica(key), rotulo: rotuloDe(el, texto), texto, html: sanitizarHtmlLeitura(el.outerHTML ?? String(el)) })
   }
   return out
 }

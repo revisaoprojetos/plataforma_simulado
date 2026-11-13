@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { urlDoJobPdf } from '@/lib/storage/pdf-acesso'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const svc = createAdminClient()
   const { data: job } = await svc
     .from('simulado_pdf_jobs')
-    .select('id, tenant_id, tipo, titulo, status, arquivo_url, erro, created_at, updated_at')
+    .select('id, tenant_id, tipo, titulo, status, arquivo_path, arquivo_url, erro, created_at, updated_at')
     .eq('id', id)
     .maybeSingle()
 
@@ -31,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     tipo: job.tipo,
     titulo: job.titulo,
     status: job.status,
-    url: job.arquivo_url,
+    url: urlDoJobPdf(job),
     erro: job.erro,
   })
 }

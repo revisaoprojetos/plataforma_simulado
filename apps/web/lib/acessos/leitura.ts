@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { calcularAlertas, sessaoAtiva, JANELA_ATIVA_MS, type Alerta, type AcessoMin } from './alertas'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
  * LEITURA do registro de acessos (admin). Tudo calculado no servidor, SEMPRE com service role real
@@ -132,7 +133,7 @@ export async function listarSessoesAluno(tenantId: string, estudanteId: string, 
   let q = svc.from(T_ACESSOS).select(COLS_ACESSO, { count: 'exact' }).eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
     .gte('iniciado_em', desdePeriodo(f.periodo, '180d'))
   if (f.metodo && (METODOS as readonly string[]).includes(f.metodo)) q = q.eq('metodo', f.metodo)
-  if (f.q) q = q.or(`ip.ilike.%${f.q.replace(/[,()%]/g, '')}%,navegador.ilike.%${f.q.replace(/[,()%]/g, '')}%,so.ilike.%${f.q.replace(/[,()%]/g, '')}%`)
+  if (f.q) q = q.or(`ip.ilike.%${sanearBusca(f.q)}%,navegador.ilike.%${sanearBusca(f.q)}%,so.ilike.%${sanearBusca(f.q)}%`)
   const { data, count, error } = await q.order(sort, { ascending: f.dir === 'asc' }).order('id').range((f.page - 1) * f.pp, f.page * f.pp - 1)
   if (tabelaIndisponivel(error)) return { indisponivel: true, rows: [] as AcessoRow[], total: 0 }
   return { indisponivel: false, rows: (data ?? []) as unknown as AcessoRow[], total: count ?? 0 }
@@ -146,7 +147,7 @@ export async function listarAtividadesAluno(tenantId: string, estudanteId: strin
   let q = svc.from(T_ATIV).select('id, estudante_id, acesso_id, tipo, ref_tipo, ref_id, titulo, meta, ip, criado_em', { count: 'exact' })
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).gte('criado_em', desdePeriodo(f.periodo, '30d'))
   if (f.tipo && (TIPOS_ATIVIDADE as readonly string[]).includes(f.tipo)) q = q.eq('tipo', f.tipo)
-  if (f.q) q = q.or(`titulo.ilike.%${f.q.replace(/[,()%]/g, '')}%,ip.ilike.%${f.q.replace(/[,()%]/g, '')}%`)
+  if (f.q) q = q.or(`titulo.ilike.%${sanearBusca(f.q)}%,ip.ilike.%${sanearBusca(f.q)}%`)
   const { data, count, error } = await q.order(sort, { ascending: f.dir === 'asc' }).order('id').range((f.page - 1) * f.pp, f.page * f.pp - 1)
   if (tabelaIndisponivel(error)) return { indisponivel: true, rows: [] as (AtividadeRow & { itemTitulo: string | null })[], total: 0 }
   const rows = (data ?? []) as unknown as AtividadeRow[]
@@ -261,7 +262,7 @@ export async function listarAcessosGlobal(tenantId: string, f: FiltroGlobal) {
   if (f.alerta) q = q.in('estudante_id', f.alertaIds?.length ? f.alertaIds : ['00000000-0000-0000-0000-000000000000'])
 
   // Busca livre: IP (prefixo) ou aluno (nome/e-mail → ids).
-  const termo = f.q.replace(/[,()%]/g, '').trim()
+  const termo = sanearBusca(f.q).trim()
   if (termo) {
     if (/^[0-9a-f:.]+$/i.test(termo) && /[.:]/.test(termo)) q = q.ilike('ip', `${termo}%`)
     else {

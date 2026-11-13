@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { urlDoJobPdf } from '@/lib/storage/pdf-acesso'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 
@@ -22,12 +23,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
   const svc = createAdminClient()
   const { data: job } = await svc
     .from('simulado_pdf_jobs')
-    .select('id, tenant_id, criado_por, tipo, titulo, status, arquivo_url, erro')
+    .select('id, tenant_id, criado_por, tipo, titulo, status, arquivo_path, arquivo_url, erro')
     .eq('id', jobId)
     .maybeSingle()
 
   const j = job as
-    | { tenant_id: string; criado_por: string | null; tipo: string; titulo: string | null; status: string; arquivo_url: string | null; erro: string | null }
+    | { tenant_id: string; criado_por: string | null; tipo: string; titulo: string | null; status: string; arquivo_path: string | null; arquivo_url: string | null; erro: string | null }
     | null
   if (!j || j.tenant_id !== sessao.tenantId || j.criado_por !== sessao.estudanteId) {
     return NextResponse.json({ message: 'Job não encontrado.' }, { status: 404 })
@@ -35,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
 
   return NextResponse.json({
     status: j.status,
-    url: j.arquivo_url,
+    url: urlDoJobPdf(j),
     titulo: j.titulo,
     erro: j.erro,
   })

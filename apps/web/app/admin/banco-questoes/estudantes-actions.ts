@@ -438,7 +438,7 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
   const path = `materiais/${g.tenantId}/${cadernoId}-${hash}.pdf`
   let url: string
   try {
-    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true })
+    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: false })
     url = r.url ?? st.getPublicUrl('pdfs', path)
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }
@@ -493,7 +493,7 @@ export async function buscarEstudantesPlataforma(bancoId: string, query: string)
   if (!g.ok) return g
   const svc = createAdminClient()
   // Sanitiza p/ não quebrar a sintaxe do .or()/ilike do PostgREST (vírgulas, parênteses, curingas).
-  const term = (query ?? '').trim().replace(/[%,()*\\]/g, ' ').replace(/\s+/g, ' ').slice(0, 60)
+  const term = sanearBusca(query ?? '', 60)
   let q = svc.from('simulado_estudantes')
     .select('id, nome, email, telefone, classificacao')
     .eq('tenant_id', g.tenantId)

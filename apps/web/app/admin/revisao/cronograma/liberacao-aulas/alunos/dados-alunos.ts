@@ -6,13 +6,14 @@ import { ContextoAluno, avaliarSegmentos } from '@/lib/segmentos/avaliar'
 import type { AulaConsulta, ExcecaoConsulta, TrilhaAlunoRef } from '@/lib/produtos/liberacao-consulta-aluno'
 import { lerAulasProduto, semTabela } from '../dados'
 import type { AlunoOpcao, ExcecaoLinha, GrupoOpcao, ModuloOpcao } from './tipos-alunos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Leituras da aba Alunos/Exceções/Log. Só LEEM. Filtro/ordem/paginação no banco; sem N+1 (lotes de 80).
 // Tolerante: sem as tabelas da migração devolve migrado=false.
 
 type Svc = ReturnType<typeof createAdminClient>
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-export const termoSeguro = (s: string | undefined) => (s ?? '').replace(/[%,()*\\]/g, ' ').trim().slice(0, 80)
+export const termoSeguro = (s: string | undefined) => sanearBusca(s ?? '', 80)
 
 export interface TrilhaBase { id: string; nome: string; segmentoIds: string[]; ordem: number }
 export interface BaseProduto {

@@ -5,6 +5,7 @@ import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { processarEvento } from '@/lib/integracoes/orquestrador'
 import { dentroDoLimite } from '@/lib/integracoes/ratelimit'
 import { registrarInbox } from '@/lib/integracoes/inbox'
+import { avaliarWebhook, estritoAtivo } from '@/lib/integracoes/webhook-seguranca'
 
 /**
  * Webhook de entrada da Guru (digitalmanager.guru) — §6.2 do PLANO-INTEGRACOES.md.
@@ -74,20 +75,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const cfg = await resolverProviderCfg(tenantId, 'guru', { ignorarAtivo: true })
 
-  // 2) Valida a assinatura SÓ se o Account Token do webhook estiver configurado (webhook_secret).
-  //    ATENÇÃO: o `api_token` que a Guru envia no CORPO é o ACCOUNT TOKEN (token da conta),
-  //    DIFERENTE do User Token da API. Por isso NÃO validamos contra o User Token (daria 401
-  //    sempre). Sem Account Token configurado, a segurança fica no token único da URL.
+  // 2) Autenticidade. O Guru NÃO assina com HMAC: envia o Account Token no CORPO (`api_token`). Aceitamos, em ordem:
+  //    HMAC-SHA256 do corpo cru (se algum proxy/n8n assinar), segredo estático em header e o Account Token do corpo —
+  //    tudo em tempo constante. `api_token` do corpo é o ACCOUNT TOKEN (≠ User Token da API; não validar contra ele).
+  //    Compatível: com segredo configurado → rejeita se não bater; sem segredo → aceita (só token da URL) com AVISO,
+  //    a menos que `webhook_estrito` esteja ligado (aí o segredo é obrigatório).
   const segredo = cfg?.credenciais?.webhook_secret || process.env.GURU_WEBHOOK_SECRET || ''
-  if (segredo && adapter.validarWebhook && !adapter.validarWebhook(raw, headers, segredo)) {
-    return finish(401, { error: 'assinatura inválida (api_token)' }, 'assinatura inválida (Account Token do corpo não confere)')
-  }
+  const v = avaliarWebhook({ raw, headers, segredo, estrito: estritoAtivo(cfg?.credenciais), validarCustom: adapter.validarWebhook })
+  if (!v.ok) return finish(401, { error: 'não autorizado' }, `webhook rejeitado: ${v.motivo}`)
+  const avisoSeg = v.aviso ? ` [${v.aviso}]` : ''
 
   // 3) Normaliza o evento.
   let evento
   try { evento = await adapter.parseWebhook(payload, headers, cfg ?? { provider: 'guru', baseUrl: '', credenciais: {} }) }
   catch (e) { return finish(400, { error: (e as Error).message }, `erro no parse: ${(e as Error).message}`) }
-  if (!evento) return finish(200, { ok: true, ignorado: true }, 'evento sem efeito no acesso (ignorado)')
+  if (!evento) return finish(200, { ok: true, ignorado: true }, `evento sem efeito no acesso (ignorado)${avisoSeg}`)
 
   // 4) Idempotência: grava o evento (event_id UNIQUE). Se já existe → 200 sem reprocessar.
   const base = { tenant_id: tenantId, provider: 'guru', event_id: evento.eventId, tipo: evento.tipo, status: 'recebido', payload }
@@ -107,7 +109,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     await svc.from('simulado_integracao_eventos')
       .update({ status: r.ok ? 'processado' : 'erro', erro: r.error ?? null, processado_em: new Date().toISOString() })
       .eq('tenant_id', tenantId).eq('provider', 'guru').eq('event_id', evento.eventId)
-    return finish(r.ok ? 200 : 500, { ok: r.ok, resultado: r }, r.ok ? `processado: ${evento.tipo}` : `erro ao aplicar: ${r.error ?? ''}`)
+    return finish(r.ok ? 200 : 500, { ok: r.ok, resultado: r }, r.ok ? `processado: ${evento.tipo}${avisoSeg}` : `erro ao aplicar: ${r.error ?? ''}`)
   } catch (e) {
     await svc.from('simulado_integracao_eventos')
       .update({ status: 'erro', erro: (e as Error).message, processado_em: new Date().toISOString() })

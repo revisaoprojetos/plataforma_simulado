@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { chaveBaseAula } from './catalogo-override'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
  * DEFINIÇÃO DAS METAS (visão do admin, por plataforma). Tabela `simulado_cronograma_adaptativo_meta_def`:
@@ -93,7 +94,7 @@ export async function listarMetaDef(svc: SupabaseClient, tenantId: string, f: Fi
   if (f.disciplina) q = q.eq('disciplina', f.disciplina)
   if (f.situacao === 'ativa') q = q.eq('ativa', true)
   if (f.situacao === 'inativa') q = q.eq('ativa', false)
-  const b = (f.busca ?? '').trim().replace(/[%_,()]/g, ' ')
+  const b = sanearBusca(f.busca ?? '').replace(/_/g, ' ')
   if (b) q = q.or(`titulo.ilike.%${b}%,disciplina.ilike.%${b}%,numero.ilike.%${b}%,texto.ilike.%${b}%`)
   const col = COLUNAS_ORDEM.has(f.ordenar ?? '') ? (f.ordenar as string) : 'disciplina'
   q = q.order(col, { ascending: (f.dir ?? 'asc') === 'asc', nullsFirst: false }).order('ordem', { ascending: true, nullsFirst: false }).order('id', { ascending: true })

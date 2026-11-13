@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verificarSilencioWebhook, formatarSilencio } from '@/lib/integracoes/silencio'
 
@@ -11,10 +12,7 @@ export const dynamic = 'force-dynamic'
  * Ao detectar, a recuperação das compras perdidas é `POST /api/cron/guru-reconcile?pull=1` (dry-run; `&aplicar=1` efetiva).
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 export async function POST(req: NextRequest) {

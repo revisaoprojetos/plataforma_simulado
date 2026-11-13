@@ -5,6 +5,7 @@ import {
   CFG_PADRAO, diaSemanaDe,
   type AulaOpcao, type FiltrosLiberacao, type LinhaLiberacao, type LiberacaoCfg, type ProdutoOpcao, type ResumoLiberacao,
 } from './tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Leituras da sub-aba "Liberação de aulas" (só LEEM; backend-first: filtro/ordem/paginação no banco).
 // Tolerante: sem as tabelas da migração 20261117010000 devolve migrado=false em vez de quebrar.
@@ -58,7 +59,7 @@ const COLS_ORDEM: Record<string, string> = { ordem: 'ordem', data: 'data_liberac
 const SELECT = 'id, ordem, modulo_id, aula_id, disciplina, numero_aula, titulo, data_liberacao, cronogramas, semana, observacao, data_original, ativo'
 
 function filtrar(q: any, f: FiltrosLiberacao) {
-  const termo = (f.q ?? '').replace(/[%,()*\\]/g, ' ').trim()
+  const termo = sanearBusca(f.q ?? '')
   if (termo) q = q.or(`disciplina.ilike.%${termo}%,titulo.ilike.%${termo}%`)
   if (f.disc) q = q.eq('disciplina', f.disc)
   if (f.vinc === 'sim') q = q.not('aula_id', 'is', null)

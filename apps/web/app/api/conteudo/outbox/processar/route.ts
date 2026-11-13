@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { timingSafeEqual } from 'node:crypto'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Drenador do OUTBOX (A6/Fase 7). O evento já é gravado na mutação (reconciliacao/documentos); aqui ele
@@ -10,11 +10,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 function autorizado(req: NextRequest): boolean {
-  const esperado = process.env.CRON_SECRET || process.env.CONTEUDO_CRON_SECRET
-  if (!esperado) return false // fail-closed quando não configurado
-  const dado = req.headers.get('x-cron-secret') || '' // só por header (não vaza em log/referrer como ?secret=)
-  const a = Buffer.from(dado), b = Buffer.from(esperado)
-  return a.length === b.length && timingSafeEqual(a, b)
+  // fail-closed quando não configurado; só header (não vaza em log/referrer como ?secret=). Aceita também CONTEUDO_CRON_SECRET (legado).
+  return cronAutorizado(req, ['CONTEUDO_CRON_SECRET'])
 }
 
 async function tratar(tipo: string, payload: any, tenantId: string | null): Promise<void> {

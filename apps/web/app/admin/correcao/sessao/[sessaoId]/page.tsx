@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarQuestoesCorrecao } from '@/lib/correcao/carregar-questoes'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { baixarPdfPorUrl } from '@/lib/storage/pdf-acesso'
+import { pdfProxyUrl } from '@/lib/storage/pdf-proxy'
 import { extrairTextoPdf } from '@/lib/ia/pdf-texto'
 import { iaDisponivel } from '@/lib/ia/config'
 import { CorrecaoSessao } from '@/components/admin/correcao-sessao'
@@ -42,7 +44,7 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
   const espelhoPdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
   // Texto do espelho extraído do PDF (camada de texto) — p/ ler/copiar o gabarito por questão.
   let espelhoTexto = ''
-  if (espelhoPdfUrl) { try { const resp = await fetch(espelhoPdfUrl); if (resp.ok) espelhoTexto = await extrairTextoPdf(Buffer.from(await resp.arrayBuffer())) } catch { /* sem texto */ } }
+  if (espelhoPdfUrl) { try { const pdfBuf = await baixarPdfPorUrl(espelhoPdfUrl); if (pdfBuf) espelhoTexto = await extrairTextoPdf(pdfBuf) } catch { /* sem texto */ } }
 
   // IA disponível? = chave do TENANT (Transcrição IA) OU env global.
   const iaAtiva = await iaDisponivel(svc, tenantId)
@@ -54,7 +56,7 @@ export default async function CorrecaoSessaoPage({ params }: { params: Promise<{
       tentativa={sessao.tentativa_num ?? null}
       simuladoTitulo={sim?.titulo ?? ''}
       questoes={questoes}
-      espelhoPdfUrl={espelhoPdfUrl}
+      espelhoPdfUrl={pdfProxyUrl(espelhoPdfUrl)}
       espelhoTexto={espelhoTexto}
       voltarUrl={voltarUrl}
       iaAtiva={iaAtiva}

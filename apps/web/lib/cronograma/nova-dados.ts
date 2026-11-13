@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { listarMinhasEmissoes, abrirEmissao } from '@/app/aluno/(portal)/cronograma/emissoes-actions'
 import { listarChecks } from '@/app/aluno/(portal)/cronograma/checks-actions'
 import { cronogramasDoAluno } from '@/lib/cronograma/acesso'
+import { hojeBrtISO } from '@/lib/brt'
 import { fmtBr } from '@/lib/cronograma/datas'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import type { Grade, MetaDatada, SemanaGrade } from '@/lib/cronograma/tipos'
@@ -101,7 +102,7 @@ export async function carregarCronogramaData(svc: SupabaseClient, tenantId: stri
       const semanas = (grade.semanas ?? []).map((s) => semanaView(s, alvo))
       const totalGoals = semanas.reduce((a, s) => a + s.metas.length, 0)
       const doneTotal = Object.keys(checks).length
-      const hojeIso = new Date().toISOString().slice(0, 10)
+      const hojeIso = hojeBrtISO()
       const atual = (grade.semanas ?? []).find((s) => s.inicio <= hojeIso && hojeIso <= s.fim)?.numero ?? 1
       const f = (emi.formulario ?? {}) as any
       const baseLabel = `${emi.cronograma_nome ?? ''}${grade.resumo?.subtitulo ? ` · ${grade.resumo.subtitulo}` : ''}`

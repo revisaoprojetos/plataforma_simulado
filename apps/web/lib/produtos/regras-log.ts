@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import type { ItemHistorico } from './mapa-regras-tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
  * LOG UNIFICADO das regras do produto (tabela simulado_regras_log, migração 20261119050000).
@@ -46,7 +47,7 @@ export async function listarHistoricoRegras(tenantId: string, produtoId: string,
   const page = Math.max(1, Math.floor(Number(f.page)) || 1)
   let q = svc.from('simulado_regras_log').select('id, camada, acao, alvo_tipo, alvo_rotulo, antes, depois, ator_id, ator_nome, criado_em', { count: 'exact' }).eq('tenant_id', tenantId).eq('produto_id', produtoId)
   if (f.camada && ROTULO_CAMADA[f.camada]) q = q.eq('camada', f.camada)
-  const termo = (f.q ?? '').replace(/[%,()*\\]/g, ' ').trim().slice(0, 80)
+  const termo = sanearBusca(f.q ?? '', 80)
   if (termo) q = q.or(`alvo_rotulo.ilike.%${termo}%,acao.ilike.%${termo}%`)
   const { data, count, error } = await q.order('criado_em', { ascending: false }).order('id', { ascending: true }).range((page - 1) * pp, page * pp - 1)
   if (error) return { migrado: !/simulado_regras_log|schema cache|does not exist/i.test(error.message), rows: [], total: 0 }

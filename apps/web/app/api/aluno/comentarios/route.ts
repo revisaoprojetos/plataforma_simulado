@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   if (!body.questao_id || !texto) return NextResponse.json({ message: 'Comentário vazio.' }, { status: 400 })
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (!rateLimit(`coment:${sessao.estudanteId}:${ip}`, 10, 5 * 60 * 1000).ok) {
+  if (!(await rateLimit(`coment:${sessao.estudanteId}:${ip}`, 10, 5 * 60 * 1000)).ok) {
     return NextResponse.json({ message: 'Muitos comentários. Aguarde um pouco.' }, { status: 429 })
   }
 

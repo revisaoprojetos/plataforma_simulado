@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, entradaClasse, type LoginConfig } from '@/lib/login-config'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { APP_VERSION } from '@/lib/version'
+import { loginGuard, msgBloqueioLogin } from '@/lib/auth/login-guard-client'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
@@ -149,8 +150,11 @@ export function AlunoEntrarForm({
   async function entrarAdmin() {
     setErro(null); setManutencao(null); setCarregando(true)
     try {
+      const g = await loginGuard(email, 'antes')
+      if (g.bloqueado) { setErro(msgBloqueioLogin(g.retryAfter)); return }
       const { error } = await comTimeout(createClient().auth.signInWithPassword({ email, password: senha }), 20000)
-      if (error) { setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
+      if (error) { void loginGuard(email, 'falha'); setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
+      void loginGuard(email, 'ok')
       void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
       // Com destino (link direto) → vai DIRETO pra ele (o cookie de sessão já foi setado pelo signIn).
       // Sem destino → /login, que roteia: admin comum → /admin; super-admin → seletor de plataformas.

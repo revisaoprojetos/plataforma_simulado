@@ -53,6 +53,11 @@ supabase/.temp/
 auditoria_*.csv
 *.audit.csv
 relatorio-*.csv
+/relatorio-estudantes-incompletos.csv
+/_build.log
+/_*.log
+/_*.csv
+apps/web/scripts/_*.csv
 Verificação/
 Verificacao/
 

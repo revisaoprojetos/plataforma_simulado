@@ -184,7 +184,17 @@ async function montarSnapshot(tenantId: string, produtoId: string): Promise<Snap
   const gruposVinc = new Set(grupos.map((g) => g.id))
   if (!segTodosR.error) for (const s of (segTodosR.data ?? []) as any[]) {
     const gid = grupoUnicoDaRegra(normalizarRegra(s.regra))
-    if (gid && gruposVinc.has(gid)) { const l = segsDoGrupo.get(gid) ?? []; l.push(s.id); segsDoGrupo.set(gid, l); segDeGrupo.add(s.id) }
+    if (gid && gruposVinc.has(gid)) { const l = segsDoGrupo.get(gid) ?? []; l.push(s.id); segsDoGrupo.set(gid, l); segDeGrupo.add(s.id); continue }
+    // Segmento "um dos grupos X, Y, Z" (um bloco OU só com condições "possui grupo"): quem está em QUALQUER um desses grupos
+    // está no segmento, então a coluna de cada grupo herda as regras dele (o segmento continua com coluna própria).
+    const r = normalizarRegra(s.regra)
+    const bloco = r?.grupos?.length === 1 ? r.grupos[0] : null
+    if (!bloco || (bloco.op !== 'ou' && bloco.condicoes.length !== 1)) continue
+    if (!bloco.condicoes.length || !bloco.condicoes.every((c: any) => c.campo === 'grupo' && c.operador === 'possui')) continue
+    for (const c of bloco.condicoes as any[]) for (const g of (c.ref ? [c.ref] : c.refs ?? []) as string[]) {
+      if (!gruposVinc.has(g)) continue
+      const l = segsDoGrupo.get(g) ?? []; if (!l.includes(s.id)) l.push(s.id); segsDoGrupo.set(g, l)
+    }
   }
   const publicos: PublicoCol[] = [
     { chave: 'todos', tipo: 'todos', id: null, nome: 'Todos (regra base)' },

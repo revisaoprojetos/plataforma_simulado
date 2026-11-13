@@ -2,6 +2,8 @@
 // ("Enunciados") ou um PDF pronto IMPORTADO (ex.: "caderno completo" da empresa EBT).
 // Guardado em `simulado_cadernos_designer.config.material` (sem migração).
 
+import { pdfPathDeUrl } from '@/lib/storage/pdf-proxy'
+
 export type FonteMaterial = 'sistema' | 'pdf'
 
 export interface MaterialCaderno {
@@ -20,8 +22,7 @@ export const MATERIAL_PADRAO: MaterialCaderno = { fonte: 'sistema', pdfUrl: '', 
  */
 export function pdfStoragePath(pdfUrl: string | undefined | null): string | null {
   if (!pdfUrl) return null
-  const m = /\/storage\/v1\/object\/public\/pdfs\/(.+?)(?:\?|$)/.exec(pdfUrl)
-  return m ? decodeURIComponent(m[1]) : null
+  return pdfPathDeUrl(pdfUrl)
 }
 
 /** Lê `config.material` de forma tolerante (default = sistema). */

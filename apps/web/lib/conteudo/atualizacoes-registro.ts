@@ -7,6 +7,7 @@ import type { TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
 import {
   normalizarItens, type AtualizacaoAluno, type FiltroAtualizacoes, type LinhaAtualizacao, type StatusAtualizacao,
 } from './atualizacoes-tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // REGISTRO DE ATUALIZAÇÕES / PONTOS DE VERSÃO — leituras (server-only). Tudo paginado no servidor (.range + count).
 // Escopos: documento · produto (une documentos do currículo via simulado_produto_modulo_itens + registros com produto_id) · global.
@@ -18,7 +19,7 @@ export const AVISO_MIGRACAO_PONTOS = 'Aplique a migração 20261119010000 (Regis
 const COLS = 'id, lote_id, documento_id, versao_id, produto_id, tipo, rotulo, texto, itens, ocorrida_em, status, visivel_aluno, avisar_alunos, criado_em'
 const SORT_COL: Record<string, string> = { ocorrida_em: 'ocorrida_em', rotulo: 'rotulo', tipo: 'tipo', status: 'status', criado_em: 'criado_em' }
 
-const sanear = (q: string | undefined | null) => String(q ?? '').replace(/[,()%*\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+const sanear = (q: string | undefined | null) => sanearBusca(q, 80)
 const diaOk = (d?: string) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '')
 
 /** Flag do tenant: o registro de versões é a FONTE de publicação (callback do OnlyOffice não move versao_atual_id). */

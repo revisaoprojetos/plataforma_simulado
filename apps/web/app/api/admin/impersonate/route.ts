@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limit (E10) por admin.
-  const rl = checarRateLimit(access.userId, RATE)
+  const rl = await checarRateLimit(access.userId, RATE)
   if (!rl.ok) return NextResponse.json({ error: 'rate_limited', retry_after: rl.retryAfter }, { status: 429 })
 
   const body = await req.json().catch(() => ({}))

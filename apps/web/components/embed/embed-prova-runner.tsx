@@ -18,6 +18,8 @@ import {
   Send,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { enviarAoPai } from '@/lib/embed/origem-host'
+import { useEmbedOrigens } from '@/components/embed/embed-origens-context'
 import { toast } from 'sonner'
 import { ProvaIntro } from '@/components/prova/prova-intro'
 import { PlatformLoader } from '@/components/brand/platform-loader'
@@ -99,6 +101,7 @@ interface EmbedProvaRunnerProps {
 }
 
 export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, branding }: EmbedProvaRunnerProps) {
+  const origensEmbed = useEmbedOrigens()
   const [status, setStatus] = useState<ProvaStatus>('loading')
   const [iniciado, setIniciado] = useState(false)
   const [sessao, setSessao] = useState<SessaoData | null>(null)
@@ -176,11 +179,10 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
 
   useEffect(() => {
     if (status === 'finalizada' && resultado) {
-      try {
-        parent.postMessage({ type: 'embed-finished', nota: resultado.nota }, '*')
-      } catch {}
+      // Nota só vai com origem do host VALIDADA (targetOrigin exato); sem origem validada sai só o aviso de fim, sem dados.
+      enviarAoPai({ type: 'embed-finished' }, { nota: resultado.nota }, origensEmbed)
     }
-  }, [status, resultado])
+  }, [status, resultado, origensEmbed])
 
   const autoSave = useCallback(async (questaoId: string, alternativaId: string) => {
     setSalvando(questaoId)

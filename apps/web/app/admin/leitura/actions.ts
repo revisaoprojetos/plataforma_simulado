@@ -27,6 +27,7 @@ import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 
 /** Estado de publicação da AULA. 'visualizavel' = aluno vê na trilha, porém BLOQUEADA ("ainda não liberada"). */
@@ -232,7 +233,7 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
     // CRÍTICO: o leitor cacheia o HTML por (doc, versão) com TTL 1h. Como "substituir" reescreve o
     // conteúdo MANTENDO o mesmo número de versão, é preciso invalidar a chave — senão o aluno vê o
     // texto antigo (com o erro) por até 1h. Ver acesso.ts (`leitura:conteudo:...`).
-    await esquecer(`leitura:conteudo:${g.tenantId}:${documentoId}:${pub}`)
+    await esquecer(`leitura:conteudo:s1:${g.tenantId}:${documentoId}:${pub}`)
     await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { substituiu_versao: pub }, atorId: g.atorId, tenantId: g.tenantId })
     revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
     return { ok: true, versao: pub }
@@ -358,7 +359,7 @@ export async function definirEstudantesDocumento(documentoId: string, estudanteI
 export async function buscarEstudantesLeitura(query: string): Promise<{ ok: boolean; itens?: EstudanteRef[]; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const q = (query ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  const q = sanearBusca(query ?? '')
   let sel = svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome').limit(20)
   if (q) sel = sel.or(`nome.ilike.%${q}%,email.ilike.%${q}%,cpf.ilike.%${q}%`)
   const { data, error } = await sel
@@ -1234,7 +1235,7 @@ export async function estudantesDosGrupos(grupoIds: string[]): Promise<{ ok: boo
 export async function listarEstudantesTenantPag(q: string, offset: number, limit: number): Promise<{ ok: boolean; itens?: EstudanteAcessoLinha[]; total?: number; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const query = (q ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  const query = sanearBusca(q ?? '')
   const map = (e: any): EstudanteAcessoLinha => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null })
   const build = (cols: string) => {
     let s = svc.from('simulado_estudantes').select(cols, { count: 'exact' }).eq('tenant_id', g.tenantId).eq('deletado', false)

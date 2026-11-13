@@ -15,6 +15,7 @@ import { registrarRegraLog } from '@/lib/produtos/regras-log'
 import { invalidarMapaRegras } from '@/lib/produtos/mapa-regras-cache'
 import { nomesDeRecursos } from '@/lib/produtos/estudio'
 import { adicionarMembrosAction } from '@/app/admin/produtos/actions'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 async function guard(manage = false) {
   const access = await getCurrentAccess()
@@ -293,7 +294,7 @@ export async function vincularAcessoPublicoAction(produtoId: string, input: { gr
 export async function listarGruposSelecaoAction(produtoId: string, q: string, page: number): Promise<{ ok: true; rows: { id: string; nome: string; noProduto: boolean }[]; total: number } | { error: string }> {
   const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
   const svc = createAdminClient()
-  const termo = String(q ?? '').trim().slice(0, 120).replace(/[%_,()]/g, ' ')
+  const termo = sanearBusca(String(q ?? ''), 120).replace(/_/g, ' ')
   const pg = Math.max(1, Math.floor(Number(page)) || 1), pp = 100, from = (pg - 1) * pp
   let qq = svc.from('simulado_grupos').select('id, nome', { count: 'exact' }).eq('tenant_id', g.tenantId).eq('deletado', false)
   if (termo) qq = qq.ilike('nome', `%${termo}%`)
@@ -306,7 +307,7 @@ export async function listarGruposSelecaoAction(produtoId: string, q: string, pa
 /** Alunos por nome/e-mail (40 por vez) — só quem tem e-mail (é por ele que o aluno entra no público). */
 export async function buscarAlunosSelecaoAction(q: string): Promise<{ ok: true; rows: { id: string; nome: string; email: string }[] } | { error: string }> {
   const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
-  const termo = String(q ?? '').trim().slice(0, 120).replace(/[%_,()]/g, ' ')
+  const termo = sanearBusca(String(q ?? ''), 120).replace(/_/g, ' ')
   if (termo.length < 2) return { ok: true, rows: [] }
   const svc = createAdminClient()
   const { data } = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).eq('deletado', false)

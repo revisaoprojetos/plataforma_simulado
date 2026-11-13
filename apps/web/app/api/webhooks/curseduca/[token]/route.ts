@@ -4,6 +4,8 @@ import { executarImport } from '@/lib/curseduca/import-core'
 import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 import { dentroDoLimite } from '@/lib/integracoes/ratelimit'
 import { registrarInbox } from '@/lib/integracoes/inbox'
+import { avaliarWebhook } from '@/lib/integracoes/webhook-seguranca'
+import { segredoWebhookDoTenant } from '@/lib/integracoes/webhook-config'
 
 /**
  * Webhook de SINCRONIZAÇÃO da Curseduca por TENANT (igual ao padrão da Guru):
@@ -51,6 +53,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!t.ativo) return finish(403, { ok: false, message: 'integração pausada' }, 'integração pausada (ative para sincronizar)')
 
   if (!(await dentroDoLimite('curseduca-sync', token, 120, 60_000))) return finish(429, { ok: false, message: 'rate limit' }, 'rate limit')
+
+  // Autenticidade: HMAC-SHA256 do corpo cru (header x-webhook-signature/x-signature) OU segredo estático (x-webhook-secret / Bearer),
+  // sempre em tempo constante. Compatível: sem segredo configurado aceita (só token da URL) salvo `webhook_estrito`.
+  const seg = await segredoWebhookDoTenant(tid, 'curseduca')
+  const v = avaliarWebhook({ raw, headers, segredo: seg.segredo, estrito: seg.estrito })
+  if (!v.ok) return finish(401, { ok: false, message: 'não autorizado' }, `webhook rejeitado: ${v.motivo}`)
 
   let body: any
   try { body = raw ? JSON.parse(raw) : {} } catch { return finish(400, { ok: false, message: 'JSON inválido' }, 'payload não é JSON válido') }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { enviarAoPai } from '@/lib/embed/origem-host'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -140,9 +141,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
     setAcao(modo)
     setIsLoading(true)
 
-    try {
-      parent.postMessage({ type: 'embed-login-start' }, '*')
-    } catch {}
+    enviarAoPai({ type: 'embed-login-start' }) // evento sem dados; origem validada quando possível, senão '*' (sem payload)
 
     try {
       const res = await fetch('/api/auth/embed/identify', {

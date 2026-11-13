@@ -1,6 +1,7 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { cronAutorizado as cronAutorizadoUnico } from '@/lib/seguranca/cron-auth'
 import { PERM_VIDEO_MANAGE, PERM_VIDEO_VIEW } from './tipos'
 
 export { PERM_VIDEO_MANAGE, PERM_VIDEO_VIEW }
@@ -24,8 +25,5 @@ export async function guardAdminVideo(
 
 /** Segredo de cron/worker (mesmo padrão de /api/cron/*). */
 export function cronAutorizado(req: Request): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizadoUnico(req)
 }

@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
 import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
 import { dominioCookieDeHost } from '@/lib/supabase/cookie-domain'
+import { avaliarOrigem, deveVerificarOrigem, modoCsrf } from '@/lib/seguranca/origem-csrf'
+import { frameAncestorsFallback, registrarOrigensBoas, sanearOrigens } from '@/lib/seguranca/frame-ancestors'
+import { anexarEnforce, cspEnforce, diretivasScript, gerarNonce, ignoraCspScript, valorReportOnly } from '@/lib/seguranca/csp'
 
 // Superfícies do ALUNO cobertas pelo guard de visualização (impersonation). Inclui /lgpd para
 // permitir bloquear consentimento/solicitação LGPD no modo operável (identidade do titular).
@@ -34,16 +37,39 @@ async function guardImpersonation(request: NextRequest): Promise<NextResponse | 
 
 // Next 16: convenção `proxy` (substitui o antigo `middleware`). Mesma lógica.
 export async function proxy(request: NextRequest) {
+  // CSRF do cookie do aluno (SameSite=None p/ iframe): valida Origin/Referer nos POST/PUT/PATCH/DELETE das APIs
+  // do aluno. Regras e decisões em lib/seguranca/origem-csrf.ts. ALUNO_CSRF_ORIGIN=off|report|enforce.
+  if (deveVerificarOrigem(request.method, request.nextUrl.pathname)) {
+    const modo = modoCsrf()
+    if (modo !== 'off') {
+      const h = request.headers
+      const v = avaliarOrigem({ origin: h.get('origin'), referer: h.get('referer'), secFetchSite: h.get('sec-fetch-site'), host: h.get('host'), forwardedHost: h.get('x-forwarded-host') })
+      if (!v.ok) {
+        console.warn(`[csrf-origin] ${modo === 'enforce' ? 'BLOQUEADO' : 'report'} ${request.method} ${request.nextUrl.pathname} — ${v.motivo}`)
+        if (modo === 'enforce') return NextResponse.json({ message: 'Origem da requisição não permitida.' }, { status: 403 })
+      }
+    }
+  }
+
   // Visualização do aluno (impersonation) — barra mutações no modo somente leitura antes de tudo.
   const bloqueio = await guardImpersonation(request)
   if (bloqueio) return bloqueio
 
   // Expõe o caminho atual aos Server Components (headers().get('x-pathname')) para o gate de rota
   // por permissão no layout do /admin. Reconstruído junto com os cookies do Supabase (sem alterar auth).
+  // CSP de scripts (nonce + strict-dynamic). O Next lê o nonce do header de CSP da REQUISIÇÃO e o aplica aos scripts que emite.
+  // Padrão = Report-Only (não bloqueia); CSP_ENFORCE=1 liga o modo bloqueante. Ver lib/seguranca/csp.ts.
+  const comCsp = !ignoraCspScript(request.nextUrl.pathname)
+  const enforceCsp = cspEnforce()
+  const cspNonce = comCsp ? gerarNonce() : ''
   const comPath = () => {
     const h = new Headers(request.headers)
     h.set('x-pathname', request.nextUrl.pathname)                                 // só o caminho (gate de rota do admin)
     h.set('x-full-path', request.nextUrl.pathname + request.nextUrl.search)       // caminho + query (p/ redirectTo pós-login)
+    if (comCsp) {
+      h.set('x-nonce', cspNonce)
+      h.set(enforceCsp ? 'content-security-policy' : 'content-security-policy-report-only', enforceCsp ? diretivasScript(cspNonce) : valorReportOnly(cspNonce))
+    }
     return NextResponse.next({ request: { headers: h } })
   }
   let supabaseResponse = comPath()
@@ -110,6 +136,10 @@ export async function proxy(request: NextRequest) {
     if (nome && authCookieRe.test(nome)) ocorrencias.set(nome, (ocorrencias.get(nome) ?? 0) + 1)
   }
   const finalizar = (res: NextResponse) => {
+    if (comCsp) {
+      if (enforceCsp) res.headers.set('Content-Security-Policy', anexarEnforce(res.headers.get('Content-Security-Policy'), cspNonce))
+      else res.headers.set('Content-Security-Policy-Report-Only', valorReportOnly(cspNonce))
+    }
     if (!cookieDom || (user && !renovou)) return res
     for (const c of request.cookies.getAll()) {
       if (!authCookieRe.test(c.name)) continue
@@ -132,30 +162,37 @@ export async function proxy(request: NextRequest) {
   const isAdminPath = protectedAdminPaths.some(p => pathname.startsWith(p))
 
   // Embed routes: frame-ancestors via HTTP header (meta tag é ignorado por navegadores).
-  // Lê origens_permitidas do tenant via service role; fallback para '*' em caso de falha
-  // (mantém compatibilidade com Curseduca enquanto o config não foi preenchido).
+  // Lê origens_permitidas do tenant via service role. SUCESSO: comportamento inalterado (lista configurada;
+  // lista vazia = legado `*` p/ Curseduca enquanto o config não foi preenchido). FALHA na resolução (erro de
+  // banco/exceção/tenant não achado): FALHA FECHADA com fallback seguro (lib/seguranca/frame-ancestors.ts) — nunca `*`.
   if (pathname.startsWith('/embed/')) {
     supabaseResponse.headers.delete('X-Frame-Options')
+    const host = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '').split(':')[0]
+    let motivoFalha = 'tenant não encontrado'
     try {
-      const host = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '').split(':')[0]
       const admin = createDirectSupabaseClient(
         process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
         { auth: { persistSession: false, autoRefreshToken: false } },
       )
-      const { data: tenantRow } = await admin.from('tenants').select('id').eq('dominio', host).maybeSingle()
+      const { data: tenantRow, error: errT } = await admin.from('tenants').select('id').eq('dominio', host).maybeSingle()
+      if (errT) throw errT
       if (tenantRow?.id) {
-        const { data: ec } = await admin.from('simulado_embed_config')
+        const { data: ec, error: errC } = await admin.from('simulado_embed_config')
           .select('origens_permitidas')
           .eq('tenant_id', tenantRow.id)
           .maybeSingle()
-        const origens = (ec?.origens_permitidas as string[] | null) ?? []
+        if (errC) throw errC
+        const origens = sanearOrigens(ec?.origens_permitidas)
+        // Config preenchida mas 100% inválida → trata como falha (fail-closed), não como "vazio = legado *".
+        if (Array.isArray(ec?.origens_permitidas) && ec.origens_permitidas.length > 0 && origens.length === 0) throw new Error('origens_permitidas inválidas')
+        if (origens.length > 0) registrarOrigensBoas(host, origens)
         const csp = origens.length > 0 ? `frame-ancestors 'self' ${origens.join(' ')}` : "frame-ancestors *"
         supabaseResponse.headers.set('Content-Security-Policy', csp)
         return finalizar(supabaseResponse)
       }
-    } catch { /* fall through to permissive default */ }
-    supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
+    } catch (e) { motivoFalha = `erro: ${(e as Error)?.message ?? 'desconhecido'}` }
+    supabaseResponse.headers.set('Content-Security-Policy', frameAncestorsFallback(host, motivoFalha))
     return finalizar(supabaseResponse)
   }
 

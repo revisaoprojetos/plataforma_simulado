@@ -26,7 +26,7 @@ import {
 import { R } from '@/lib/nova/rotas'
 
 // LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
-const LEITOR_REV = 'lp71'
+const LEITOR_REV = 'lp72'
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6

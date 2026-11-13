@@ -31,7 +31,22 @@ const nextConfig: NextConfig = {
   async headers() {
     // SPIKE Office: o editor OnlyOffice (origem :8082) busca o config.json do nosso plugin
     // (origem :3000) por XHR — precisa de CORS liberado nesses arquivos estáticos.
+    // Headers de segurança GLOBAIS (cobrem /api, estáticos e rotas fora do matcher do proxy.ts).
+    // NÃO tocam em frame-ancestors/X-Frame-Options (controlados pelo proxy.ts; o embed da Curseduca depende disso).
+    //  - X-Content-Type-Options: nosniff
+    //  - Referrer-Policy: strict-origin-when-cross-origin (mantém Origin em chamadas cross-origin; não quebra o
+    //    check de CSRF por Origin/Referer, que usa same-origin).
+    //  - HSTS: SÓ em produção (avaliado no BUILD). Só vale em https (navegador ignora em http). includeSubDomains
+    //    afeta apenas os SUBDOMÍNIOS do host que respondeu (ex.: x.simulado.dominio) — os tenants são hosts
+    //    IRMÃOS (não filhos), então é seguro; sem `preload`. Só ficaria problemático se existisse um filho do host do
+    //    app servido só em http (não é o caso).
+    const seguranca = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      ...(process.env.NODE_ENV === "production" ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
+    ];
     return [
+      { source: "/:path*", headers: seguranca },
       {
         source: "/oo-plugin/:path*",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],

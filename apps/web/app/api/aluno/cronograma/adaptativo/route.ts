@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server'
+import { hojeBrtISO } from '@/lib/brt'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { gerarAdaptativo, patchMetaAdaptativo, somarTempoMeta, pausarAdaptativo, carregarDocs, sincronizarDoc, listarPlanosAdaptativo, fixarPlanoAdaptativo, arquivarPlanoAdaptativo, apagarPlanoAdaptativo, renomearPlanoAdaptativo } from '@/lib/cronograma/adaptativo/dados'
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       const p = (body.patch || {}) as Record<string, unknown>
       const patch: Record<string, unknown> = {}
       if ('estado' in p) patch.estado = p.estado === 'done' || p.estado === 'missed' ? p.estado : null
-      if ('parcial_v' in p) { patch.parcial_v = p.parcial_v ? String(p.parcial_v).slice(0, 80) : null; patch.parcial_em = patch.parcial_v ? (typeof p.parcial_em === 'string' && DATA.test(p.parcial_em) ? p.parcial_em : new Date().toISOString().slice(0, 10)) : null }
+      if ('parcial_v' in p) { patch.parcial_v = p.parcial_v ? String(p.parcial_v).slice(0, 80) : null; patch.parcial_em = patch.parcial_v ? (typeof p.parcial_em === 'string' && DATA.test(p.parcial_em) ? p.parcial_em : hojeBrtISO()) : null }
       if ('grau' in p) patch.grau = p.grau == null ? null : Math.max(0, Math.min(10, Math.round(Number(p.grau))))
       if ('estrelas' in p) patch.estrelas = p.estrelas == null ? null : Math.max(0, Math.min(5, Math.round(Number(p.estrelas))))
       if ('res' in p) patch.res = p.res == null ? null : Math.max(0, Math.round(Number(p.res)))

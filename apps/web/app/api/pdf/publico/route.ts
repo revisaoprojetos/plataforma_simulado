@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { enfileirarPdfCaderno } from '@/lib/queue/pdf-queue'
 
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
     .eq('id', body.sessaoToken)
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   const tenantId = sessao.tenant_id as string
 
   let url: string

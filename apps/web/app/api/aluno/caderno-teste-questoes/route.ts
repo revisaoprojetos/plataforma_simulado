@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
+import { assinarUrlPdf } from '@/lib/storage/pdf-acesso'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
 import puppeteer from 'puppeteer-core'
@@ -65,8 +66,12 @@ export async function GET(request: NextRequest) {
   // PDF importado → baixa o arquivo direto (com nome amigável).
   if (en.pdfUrl) {
     const arq = (en.pdfNome || 'Caderno de Questões').replace(/\.pdf$/i, '').trim() || 'Caderno de Questões'
-    const sep = en.pdfUrl.includes('?') ? '&' : '?'
-    return NextResponse.redirect(`${en.pdfUrl}${sep}download=${encodeURIComponent(arq)}.pdf`)
+    // Bucket `pdfs` privado: link-token (relativo; o navegador resolve na origem atual) + nome amigável.
+    const urlAcesso = assinarUrlPdf(en.pdfUrl)
+    const sep = urlAcesso.includes('?') ? '&' : '?'
+    const destino = `${urlAcesso}${sep}download=${encodeURIComponent(arq)}.pdf`
+    if (destino.startsWith('/')) return new NextResponse(null, { status: 302, headers: { Location: destino, 'Cache-Control': 'private, no-store' } })
+    return NextResponse.redirect(destino)
   }
 
   const exec = acharNavegador()

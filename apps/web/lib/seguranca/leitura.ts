@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { CATEGORIAS, SEVERIDADES, STATUS_ACHADO } from './tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /** Leitura (servidor) para /admin/seguranca. Tudo paginado com .range()+count; a page só LÊ. */
 
@@ -10,7 +11,7 @@ export interface AchadoLinha {
 
 const SORTS = ['severidade_peso', 'titulo', 'categoria', 'status', 'primeira_vez', 'ultima_vez']
 /** Remove caracteres que quebram filtros PostgREST .or() (, ( ) " \ %). */
-export const limparBusca = (q: string) => q.replace(/[,()"\\%*]/g, ' ').trim().slice(0, 80)
+export const limparBusca = (q: string) => sanearBusca(q, 80)
 
 export async function resumoGeral() {
   const svc = createAdminClient()
@@ -72,7 +73,8 @@ export async function detalheVarredura(id: string) {
   }
   const [novos, resolvidos] = await Promise.all([titulos([...(r.novos ?? []), ...(r.reabertos ?? [])]), titulos(r.resolvidos ?? [])])
   const persistentes = (r.atual ?? []).filter((a: any) => (r.persistentes ?? []).includes(a.fp)).map((a: any) => ({ fingerprint: a.fp, titulo: a.titulo, severidade: a.sev }))
-  return { varredura: v, novos, resolvidos, persistentes, erros: (r.erros ?? []) as string[] }
+  const fps = (r.atual ?? []).map((a: any) => a.fp).filter(Boolean) as string[]
+  return { varredura: v, novos, resolvidos, persistentes, erros: (r.erros ?? []) as string[], fps }
 }
 
 export interface AtualizacaoLinha { id: string; pacote: string; versao_atual: string | null; versao_alvo: string | null; tipo: 'patch' | 'minor' | 'major'; cve_ids: string[]; severidade: string; detectado_em: string }

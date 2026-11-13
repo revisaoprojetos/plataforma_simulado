@@ -11,6 +11,7 @@ import { normalizarEspacamento, type EspacamentoDoc } from './espacamento'
 import { resolverTopicos, type TopicosConfig } from './topicos'
 import { ehTestadorModulo } from './testadores'
 import type { DiffDoc } from './diff-tipos'
+import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
 
 /**
  * Detecção de colunas opcionais (lei A1: materia_id; versionamento A2: versao_publicada) memoizada
@@ -285,11 +286,11 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     })(),
     // HTML/artigos — IMUTÁVEL por (doc, versão) → cacheado (não relê a lei inteira a cada abertura; egress).
     remember<{ html: string; artigos: number }>(
-      `leitura:conteudo:${tenantId}:${documentoId}:${versao}`,
+      `leitura:conteudo:s1:${tenantId}:${documentoId}:${versao}`,
       3600,
       async () => {
         const { data } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
-        return { html: (data as any)?.html ?? '', artigos: (data as any)?.artigos ?? 0 }
+        return { html: sanitizarHtmlLeitura((data as any)?.html ?? ''), artigos: (data as any)?.artigos ?? 0 }
       },
     ),
     // Progresso do aluno nesta versão.

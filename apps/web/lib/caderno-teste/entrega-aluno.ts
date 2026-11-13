@@ -1,3 +1,4 @@
+import { assinarUrlPdf } from '@/lib/storage/pdf-acesso'
 /** Cada caderno que o aluno pode baixar (folha, diagnóstico, caderno de questões, gabarito). */
 export interface ModalidadeAluno {
   id: string
@@ -36,7 +37,8 @@ const usavel = (r: EntregaRef | undefined): r is NonNullable<EntregaRef> => !!r 
 function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolean }, r: NonNullable<EntregaRef>, sessaoId?: string): ModalidadeAluno {
   const base: ModalidadeAluno = { id, nome, semGab: flags.semGab, comGab: flags.comGab }
   // PDF importado → baixa direto.
-  if (r.pdfUrl) return { ...base, pdfUrl: comDownload(r.pdfUrl, r.pdfNome || nome) }
+  // Bucket `pdfs` é PRIVADO: o localizador gravado vira link-token (curta duração) emitido no servidor.
+  if (r.pdfUrl) return { ...base, pdfUrl: comDownload(assinarUrlPdf(r.pdfUrl), r.pdfNome || nome) }
   // Diagnóstico do EDITOR BETA (OnlyOffice): vira o tipo `office` (com docId). Se já há sessão, também já
   // monta o pdfUrl pronto (consumidor que abre direto); senão o consumidor monta por realização (dlHref).
   if (ehOffice(r)) {

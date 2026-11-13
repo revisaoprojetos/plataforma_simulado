@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, FileText } from 'lucide-react'
+import { pdfProxyUrl } from '@/lib/storage/pdf-proxy'
 
 /**
  * Prévia de PDF renderizada em <canvas> via PDF.js — funciona mesmo quando o navegador está
@@ -52,7 +53,11 @@ export function PdfPreview({ url, titulo, className, maxPag = 12 }: { url: strin
         setEstado('load')
         const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
         try { pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs` } catch { /* noop */ }
-        const resp = await fetch(`/api/pdf-view?u=${encodeURIComponent(url)}`, { cache: 'force-cache' })
+        // Bucket `pdfs` é privado: localizadores dele passam pelo proxy autenticado (/api/arquivo/pdf, bytes na mesma origem).
+        const viaProxy = pdfProxyUrl(url)
+        const resp = viaProxy !== url
+          ? await fetch(`${viaProxy}${viaProxy.includes('?') ? '&' : '?'}stream=1`, { cache: 'no-store', credentials: 'same-origin' })
+          : await fetch(`/api/pdf-view?u=${encodeURIComponent(url)}`, { cache: 'force-cache' })
         if (!resp.ok) throw new Error('fetch')
         const buf = await resp.arrayBuffer()
         if (cancel) return
@@ -90,7 +95,7 @@ export function PdfPreview({ url, titulo, className, maxPag = 12 }: { url: strin
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-neutral-100 px-6 text-center text-muted-foreground dark:bg-neutral-900">
           <FileText className="h-8 w-8" />
           <span className="text-sm font-medium">PDF do {titulo ?? 'material'} enviado</span>
-          <a href={url} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary underline">Abrir PDF em nova aba</a>
+          <a href={pdfProxyUrl(url)} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary underline">Abrir PDF em nova aba</a>
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@ import { registrarAcesso, ipDeHeaders, type MetodoAcesso } from '@/lib/acessos/r
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { criarSessaoAluno } from '@/lib/aluno-session'
-import { rateLimit } from '@/lib/rate-limit'
+import { limitar } from '@/lib/rate-limit'
 import { registrarAudit } from '@/lib/audit'
 import { emailSeguro, filtroEmailOr } from '@/lib/seguranca/email-seguro'
 import { getManutencaoSistema, emManutencaoAgora } from '@/lib/sistema/manutencao'
@@ -36,9 +36,13 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (!rateLimit(`aluno-login:${ip}`, 8, 5 * 60 * 1000).ok || !rateLimit(`aluno-login:${email}`, 5, 5 * 60 * 1000).ok) {
-    return NextResponse.json({ message: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 })
-  }
+  // IP compartilhado (Curseduca/NAT): teto por IP folgado; a proteção fina é por IP+e-mail e por e-mail.
+  const bloq = await limitar([
+    [`aluno-login:ip:${ip}`, 40, 5 * 60 * 1000],
+    [`aluno-login:${ip}:${email}`, 8, 5 * 60 * 1000],
+    [`aluno-login:${email}`, 5, 5 * 60 * 1000],
+  ], 'Muitas tentativas. Aguarde alguns minutos.')
+  if (bloq) return bloq
 
   // IMPORTANTE: service role REAL (bypassa RLS). NÃO usar createServiceClient aqui —
   // ele herda o cookie de sessão: se houver um admin logado no mesmo navegador

@@ -18,6 +18,7 @@ import {
   normalizarRegra, validarRegra, refsDaRegra,
   type RegraSegmento, type Segmento, type RegraVisibilidade, type AlvoTipo, type Efeito, type SemAcesso, type RefTipo,
 } from '@/lib/segmentos/tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 async function guard(manage = false) {
   const access = await getCurrentAccess()
@@ -354,7 +355,7 @@ export async function buscarRefsSegmentoAction(tipo: RefTipo, q: string): Promis
 /** Busca de alunos para o "Testar com um aluno" (nome ou e-mail, 10 por vez). */
 export async function buscarAlunosSegmentoAction(q: string): Promise<{ ok: true; rows: { id: string; nome: string; email: string | null }[] } | { error: string }> {
   const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
-  const termo = String(q ?? '').trim().slice(0, 120).replace(/[%_,()]/g, ' ')
+  const termo = sanearBusca(String(q ?? ''), 120).replace(/_/g, ' ')
   if (termo.length < 2) return { ok: true, rows: [] }
   const svc = createAdminClient()
   const { data } = await svc.from('simulado_estudantes').select('id, nome, email')

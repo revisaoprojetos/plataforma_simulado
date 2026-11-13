@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { limitar } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { getStorage } from '@/lib/storage'
+import { baixarPdfPorUrl } from '@/lib/storage/pdf-acesso'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
 import { proporCorrecaoIA, type CompParaIA, type ImagemIA } from '@/lib/ia/correcao-ia'
 import { carregarConfigIA } from '@/lib/ia/config'
@@ -20,6 +22,12 @@ export async function POST(req: NextRequest) {
   if (!access.tenantId || !(access.isAdmin || accessCan(access, 'correcao:corrigir') || accessCan(access, 'questoes:update'))) {
     return NextResponse.json({ ok: false, error: 'Sem permissão para corrigir.' }, { status: 403 })
   }
+  // Rate limit (chamada paga a provedor de IA): por usuário e por tenant.
+  const bloq = await limitar([
+    [`ia-corrigir:u:${access.userId}`, 20, 60_000],
+    [`ia-corrigir:t:${access.tenantId}`, 100, 60_000],
+  ], 'Muitas requisições de IA seguidas. Aguarde um instante.')
+  if (bloq) return bloq as NextResponse
   let respostaId = ''
   try { respostaId = String((await req.json())?.respostaId ?? '') } catch { /* corpo inválido */ }
   if (!respostaId) return NextResponse.json({ ok: false, error: 'Resposta ausente.' }, { status: 400 })
@@ -86,8 +94,8 @@ export async function POST(req: NextRequest) {
     const entrega = bancoId ? await carregarEntregaBanco(svc, tenantId, bancoId) : null
     const pdfUrl = (entrega?.gabarito?.pdfUrl as string | undefined) ?? null
     if (pdfUrl) {
-      const resp = await fetch(pdfUrl)
-      if (resp.ok) { const buf = Buffer.from(await resp.arrayBuffer()); gabaritoPdf = buf.toString('base64'); try { gabaritoTexto = await extrairTextoPdf(buf) } catch { /* sem texto */ } }
+      const buf = await baixarPdfPorUrl(pdfUrl) // bucket `pdfs` privado → lê pelo storage
+      if (buf) { gabaritoPdf = buf.toString('base64'); try { gabaritoTexto = await extrairTextoPdf(buf) } catch { /* sem texto */ } }
     }
   } catch { /* sem gabarito */ }
 

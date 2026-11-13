@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { executarImport } from '@/lib/curseduca/import-core'
 import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
@@ -12,10 +13,7 @@ export const dynamic = 'force-dynamic'
  * job que ainda está `pendente` (lock via update condicional).
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 // Jobs travados em `processando` há mais que isto voltam para `pendente` (o processo que os

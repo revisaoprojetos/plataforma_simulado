@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { rankearSimulado } from '@/lib/ranking'
@@ -19,10 +20,7 @@ export const dynamic = 'force-dynamic'
  * Chamado pelo worker (setInterval) ou por um cron externo.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false // desabilitado até configurar o segredo
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 type AnyClient = ReturnType<typeof createAdminClient>

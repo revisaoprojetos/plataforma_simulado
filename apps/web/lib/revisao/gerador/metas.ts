@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { DuracaoDivergente, VarianteAula } from '@/app/admin/cronogramas/metas/actions-tipos'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // Dados das sub-abas Gerador > Metas (Tipos de meta + Auditoria de metas). Tudo resolvido no servidor:
 // busca, filtro, ordenação e página. As leituras reaproveitam as mesmas tabelas/RPCs das telas atuais.
@@ -22,7 +23,7 @@ export function montarQsGerador(sp: Record<string, string | string[] | undefined
 export const porPaginaGerador = (v: string | undefined) => { const n = Math.trunc(Number(v)); return PPS_GERADOR.includes(n) ? n : PP_GERADOR_PADRAO }
 export const paginaGerador = (v: string | undefined) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n >= 1 ? n : 1 }
 /** Remove caracteres que o PostgREST usa como sintaxe de filtro. */
-export const termoSeguro = (v: string | undefined) => (v ?? '').trim().replace(/[%,()*]/g, ' ').replace(/\s+/g, ' ').slice(0, 80)
+export const termoSeguro = (v: string | undefined) => sanearBusca(v ?? '', 80)
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 // ───────────────────────────── Tipos de meta ─────────────────────────────

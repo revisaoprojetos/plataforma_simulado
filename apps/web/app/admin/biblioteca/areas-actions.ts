@@ -13,6 +13,7 @@ import {
   T_AREAS, T_AREA_REGRAS, areasDoDocumento, regrasDoDocumento, resolverAreas, invalidarAreas, estiloExpPadraoDoTenant, salvarEstiloExpPadraoDoTenant, sanearEstiloExp,
   type AreaDoc, type RegraArea, type EstiloExp,
 } from '@/lib/conteudo/areas'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -111,7 +112,7 @@ export async function definirAreaExpansivaAction(documentoId: string, areaKey: s
 
 export async function buscarAlunosAreaAction(q: string): Promise<{ ok: true; rows: { id: string; nome: string; email: string | null }[] } | { ok: false; error: string }> {
   const g = await guard('view'); if (!g.ok) return g
-  const termo = String(q ?? '').trim().replace(/[%,()]/g, ' ').slice(0, 60)
+  const termo = sanearBusca(String(q ?? ''), 60)
   if (termo.length < 2) return { ok: true, rows: [] }
   const svc = createAdminClient()
   const { data, error } = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId)

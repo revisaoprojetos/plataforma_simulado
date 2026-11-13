@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { correcoesVerificadas } from '@/lib/seguranca/correcoes'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +33,13 @@ export async function GET(req: NextRequest) {
   }
   const cab = ['categoria', 'severidade', 'titulo', 'arquivo', 'status', 'recomendacao', 'primeira_vez', 'ultima_vez']
   const corpo = [cab.join(','), ...linhas.map((l) => cab.map((c) => csv(l[c])).join(','))].join('\r\n')
-  return new NextResponse('﻿' + corpo, {
+  // Correções aplicadas (seção adicional do CSV, com status de verificação).
+  const { itens } = await correcoesVerificadas().catch(() => ({ itens: [] as Awaited<ReturnType<typeof correcoesVerificadas>>['itens'] }))
+  const cabC = ['correcao_id', 'titulo', 'severidade_original', 'categoria', 'data', 'status_verificacao', 'descricao', 'arquivos', 'como_validar', 'risco_regressao', 'acao_usuario', 'versao_app']
+  const corrCsv = itens.length
+    ? '\r\n\r\n' + ['CORRECOES APLICADAS', cabC.join(','), ...itens.map((c) => [c.id, c.titulo, c.severidadeOriginal, c.categoria, c.data, c.status, c.descricao, c.arquivos.join(' | '), c.comoValidar, c.riscoDeRegressao, c.acaoDoUsuario, c.versaoApp].map(csv).join(','))].join('\r\n')
+    : ''
+  return new NextResponse('﻿' + corpo + corrCsv, {
     headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="seguranca-${varredura ? varredura.slice(0, 8) : 'abertos'}.csv"` },
   })
 }

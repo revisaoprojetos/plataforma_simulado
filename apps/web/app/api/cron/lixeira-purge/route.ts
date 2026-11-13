@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getStorage } from '@/lib/storage'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
@@ -28,10 +29,7 @@ export const dynamic = 'force-dynamic'
  * Agendamento: `apps/worker/src/main.ts` chama `?aplicar=1` 1x/dia.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 // Tabelas cujos registros têm arquivos no Storage que precisam ser removidos no purge.

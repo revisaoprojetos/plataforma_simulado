@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
 async function baixar(request: NextRequest): Promise<Response> {
   const sessao = await getSessaoAluno()
   if (!sessao) return json(401, 'Faça login novamente para baixar.')
-  const rl = rateLimit(`bib-baixar:${sessao.estudanteId}`, 12, 60_000)
+  const rl = await rateLimit(`bib-baixar:${sessao.estudanteId}`, 12, 60_000)
   if (!rl.ok) return NextResponse.json({ ok: false, message: 'Muitos downloads seguidos. Aguarde um instante e tente de novo.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter), 'Cache-Control': 'private, no-store' } })
   const sp = request.nextUrl.searchParams
   const doc = sp.get('doc') ?? ''

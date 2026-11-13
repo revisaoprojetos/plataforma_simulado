@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   if (!TIPOS.includes(tipo)) return NextResponse.json({ message: 'Tipo inválido.' }, { status: 400 })
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-  if (!rateLimit(`feedback:${ip}`, 20, 5 * 60 * 1000).ok) {
+  if (!(await rateLimit(`feedback:${ip}`, 20, 5 * 60 * 1000)).ok) {
     return NextResponse.json({ message: 'Muitas solicitações. Tente novamente em instantes.' }, { status: 429 })
   }
 

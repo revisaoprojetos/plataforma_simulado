@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || request.headers.get('x-real-ip') || 'unknown'
   const janela = 5 * 60 * 1000
-  const rlIp = rateLimit(`identify:ip:${ip}:${embed_token}`, 8, janela)
-  const rlEmail = rateLimit(`identify:email:${email.toLowerCase().trim()}:${embed_token}`, 5, janela)
+  const rlIp = await rateLimit(`identify:ip:${ip}:${embed_token}`, 8, janela)
+  const rlEmail = await rateLimit(`identify:email:${email.toLowerCase().trim()}:${embed_token}`, 5, janela)
   if (!rlIp.ok || !rlEmail.ok) {
     const retry = Math.max(rlIp.retryAfter, rlEmail.retryAfter)
     return NextResponse.json(

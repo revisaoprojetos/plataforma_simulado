@@ -6,6 +6,7 @@ import { listarBaralhos } from '@/lib/flashcards/baralhos'
 import { PARAMS_PADRAO } from '@/lib/cronograma/adaptativo/params'
 import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
 import type { LinhaMaterial, LinhaBaralho, LinhaSimulado, TipoBib } from './biblioteca-tipos'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // BIBLIOTECA (Plataforma Revisão) — loaders SÓ DE LEITURA. A página nunca calcula: tudo vem pronto daqui.
 //
@@ -91,7 +92,7 @@ async function carregarPastasResolvidasSemCache(svc: SupabaseClient, tenantId: s
 type Builder = any
 type Fonte = (sel: string, head?: boolean) => Builder
 
-const sanear = (q: string) => q.replace(/[,()%*\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
+const sanear = (q: string) => sanearBusca(q, 80)
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 function lotes<T>(a: T[], n = CHUNK): T[][] {

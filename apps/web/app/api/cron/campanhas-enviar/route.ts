@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { processarPendentes } from '@/lib/admin-revisao/campanha-envio'
 
 export const dynamic = 'force-dynamic'
@@ -9,10 +10,7 @@ export const dynamic = 'force-dynamic'
  * (e só envia se CAMPANHA_WEBHOOK_URL estiver configurada). `?tenant=<id>` limita a um tenant.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 export async function POST(req: NextRequest) {

@@ -1,0 +1,596 @@
+{
+ "geradoEm": "2026-11-13T18:00:47.028Z",
+ "rapido": false,
+ "semente": 7,
+ "cenarios": 355,
+ "ops": 977,
+ "nIfr": 79,
+ "nRej": 13,
+ "seg": "580",
+ "desat": null,
+ "aluna": [
+  {
+   "perfil": "4h×5",
+   "metasDiaFalta": 6,
+   "metasHoje": 1,
+   "atrasadasReais": 6,
+   "atrasadasServidorFusoErrado": 7
+  },
+  {
+   "perfil": "6h×5+4",
+   "metasDiaFalta": 4,
+   "metasHoje": 6,
+   "atrasadasReais": 4,
+   "atrasadasServidorFusoErrado": 10
+  },
+  {
+   "perfil": "8h×7",
+   "metasDiaFalta": 6,
+   "metasHoje": 6,
+   "atrasadasReais": 6,
+   "atrasadasServidorFusoErrado": 12
+  },
+  {
+   "perfil": "mix 6/2/6/2/6/0/0",
+   "metasDiaFalta": 6,
+   "metasHoje": 5,
+   "atrasadasReais": 6,
+   "atrasadasServidorFusoErrado": 11
+  }
+ ],
+ "grupos": [
+  {
+   "inv": "I11",
+   "zona": "fuso: visão do servidor com hoje+1",
+   "motor": "3.2.0",
+   "grav": "alta",
+   "ocorrencias": 150,
+   "cenarios": 75,
+   "porComportamento": {
+    "completo": 2,
+    "parcial": 2,
+    "pula1": 2,
+    "some3": 2,
+    "some3org": 2,
+    "some7": 2,
+    "some7org": 2,
+    "some14": 2,
+    "some14org": 2,
+    "foraOrdem": 2,
+    "missed": 2,
+    "reabre": 2,
+    "desempBaixo": 2,
+    "desempAlto": 2,
+    "metade": 2,
+    "organiza": 2,
+    "ajustaHoras": 2,
+    "pausa": 2,
+    "pausaSrv": 2,
+    "migra": 2,
+    "migraIgual": 2,
+    "migraIgualEmDia": 2,
+    "regera": 2,
+    "adianta": 2,
+    "mover": 2,
+    "parcialOrg": 2,
+    "some3+mix": 3,
+    "some7org+mix": 1,
+    "adianta+mix": 1,
+    "ajustaHoras+mix": 1,
+    "desempAlto+mix": 2,
+    "pula1+mix": 1,
+    "pausa+mix": 2,
+    "mover+mix": 1,
+    "some14+mix": 1,
+    "some14org+mix": 1,
+    "completo+mix": 1,
+    "parcial+mix": 2,
+    "organiza+mix": 1,
+    "migraIgualEmDia+mix": 1,
+    "desempBaixo+mix": 1,
+    "regera+mix": 1,
+    "missed+mix": 2
+   },
+   "exemplo": {
+    "id": "c0157",
+    "spec": {
+     "perfil": "10h:2h×5",
+     "discs": "1d",
+     "metas": "todas",
+     "comp": "completo",
+     "tz": "errado",
+     "motor": "3.2.0",
+     "start": "2026-11-02",
+     "horas": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      0,
+      0
+     ],
+     "seed": 500
+    },
+    "dia": "2026-11-02",
+    "msg": "visão atrasadas com hoje+1: 1 (real 0) — inflação de 1 no dia",
+    "diff": []
+   }
+  },
+  {
+   "inv": "I8",
+   "zona": "migrarPlano / fixosPreservados (servidor)",
+   "motor": "3.2.0",
+   "grav": "alta",
+   "ocorrencias": 21,
+   "cenarios": 21,
+   "porComportamento": {
+    "migraIgual": 4,
+    "migraIgualEmDia": 7,
+    "regera+mix": 1,
+    "ajustaHoras+mix": 1,
+    "pausaSrv+mix": 1,
+    "migraIgualEmDia+mix": 3,
+    "parcialOrg+mix": 1,
+    "migraIgual+mix": 1,
+    "parcial+mix": 1,
+    "desempBaixo+mix": 1
+   },
+   "exemplo": {
+    "id": "c0122",
+    "spec": {
+     "perfil": "mix 0h:4-0-6-0-4-0-2",
+     "discs": "4d",
+     "metas": "semLP",
+     "comp": "migraIgual",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-04",
+     "horas": [
+      4,
+      0,
+      6,
+      0,
+      4,
+      0,
+      2
+     ],
+     "seed": 301
+    },
+    "dia": "2026-11-18",
+    "msg": "migração com catálogo de CONTEÚDO IDÊNTICO moveu 242 meta(s) futura(s) (plano \"recalculado\")",
+    "diff": [
+     "pf:6: 2026-11-20 → 2026-11-30",
+     "fl:4: 2026-11-20 → 2026-11-22",
+     "fl:6: 2026-11-25 → 2026-12-07",
+     "fl:7: 2026-11-27 → 2026-11-25",
+     "qu:6: 2026-11-29 → 2026-12-21"
+    ]
+   }
+  },
+  {
+   "inv": "I6",
+   "zona": "motor30 (estado do plano)",
+   "motor": "3.2.0",
+   "grav": "alta",
+   "ocorrencias": 18,
+   "cenarios": 9,
+   "porComportamento": {
+    "organiza": 2,
+    "metade": 1,
+    "some7org+mix": 2,
+    "mover+mix": 1,
+    "some3+mix": 1,
+    "some7+mix": 1,
+    "metade+mix": 1
+   },
+   "exemplo": {
+    "id": "c0091",
+    "spec": {
+     "perfil": "24h30",
+     "discs": "4d",
+     "metas": "semQu",
+     "comp": "organiza",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-02",
+     "horas": [
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5
+     ],
+     "seed": 250
+    },
+    "dia": "2026-11-08",
+    "msg": "fl:0 agendada em 2026-11-13, ANTES do PDFull final da aula (2027-07-19)",
+    "diff": [
+     "fl:0=2026-11-13",
+     "pf:0=2027-07-19"
+    ]
+   }
+  },
+  {
+   "inv": "I11",
+   "zona": "fuso: visão do servidor com hoje+1",
+   "motor": "2.8.1",
+   "grav": "alta",
+   "ocorrencias": 18,
+   "cenarios": 9,
+   "porComportamento": {
+    "completo": 1,
+    "some7": 1,
+    "some14": 1,
+    "migra": 1,
+    "migraIgual": 1,
+    "desempBaixo": 1,
+    "metade": 1,
+    "regera": 1,
+    "parcial": 1
+   },
+   "exemplo": {
+    "id": "c0211",
+    "spec": {
+     "perfil": "34h:6h×5+4sáb",
+     "discs": "2d",
+     "metas": "todas",
+     "comp": "completo",
+     "tz": "errado",
+     "motor": "2.8.1",
+     "start": "2026-11-07",
+     "horas": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      4,
+      0
+     ],
+     "seed": 902
+    },
+    "dia": "2026-11-07",
+    "msg": "visão atrasadas com hoje+1: 1 (real 0) — inflação de 1 no dia",
+    "diff": []
+   }
+  },
+  {
+   "inv": "I1",
+   "zona": "motor30.calcularDomino (organizar)",
+   "motor": "3.2.0",
+   "grav": "alta",
+   "ocorrencias": 9,
+   "cenarios": 7,
+   "porComportamento": {
+    "organiza": 1,
+    "metade": 1,
+    "mover+mix": 1,
+    "some7+mix": 1,
+    "some7org+mix": 1,
+    "metade+mix": 2
+   },
+   "exemplo": {
+    "id": "c0091",
+    "spec": {
+     "perfil": "24h30",
+     "discs": "4d",
+     "metas": "semQu",
+     "comp": "organiza",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-02",
+     "horas": [
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      3.5
+     ],
+     "seed": 250
+    },
+    "dia": "2026-11-15",
+    "msg": "DUPLICA: pp:0:2 (aula 0 já concluída) reapareceu pendente após organizar",
+    "diff": [
+     "pp:0:2"
+    ]
+   }
+  },
+  {
+   "inv": "I4",
+   "zona": "migrarPlano / fixosPreservados (servidor)",
+   "motor": "3.2.0",
+   "grav": "media",
+   "ocorrencias": 23,
+   "cenarios": 22,
+   "porComportamento": {
+    "pausaSrv": 3,
+    "migraIgual": 2,
+    "migraIgualEmDia": 6,
+    "regera+mix": 1,
+    "ajustaHoras+mix": 1,
+    "pausaSrv+mix": 1,
+    "migra+mix": 1,
+    "desempAlto+mix": 1,
+    "pausa+mix": 1,
+    "migraIgualEmDia+mix": 2,
+    "migraIgual+mix": 1,
+    "parcial+mix": 1,
+    "organiza+mix": 1
+   },
+   "exemplo": {
+    "id": "c0110",
+    "spec": {
+     "perfil": "20h:4h×5",
+     "discs": "4d",
+     "metas": "semLP",
+     "comp": "pausaSrv",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-01",
+     "horas": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      0,
+      0
+     ],
+     "seed": 281
+    },
+    "dia": "2026-11-16",
+    "msg": "retomarServidor ADIANTOU 1 aula(s) nova(s) para os próximos 14 dias sem nenhuma conclusão nova",
+    "diff": [
+     "aula 14 (Direito Tributário)"
+    ]
+   }
+  },
+  {
+   "inv": "I9",
+   "zona": "motor30.calcularDomino (organizar)",
+   "motor": "3.2.0",
+   "grav": "media",
+   "ocorrencias": 5,
+   "cenarios": 5,
+   "porComportamento": {
+    "some7org": 1,
+    "metade+mix": 1,
+    "regera+mix": 1,
+    "desempBaixo+mix": 1,
+    "foraOrdem+mix": 1
+   },
+   "exemplo": {
+    "id": "c0038",
+    "spec": {
+     "perfil": "15h:fds",
+     "discs": "2d",
+     "metas": "soPDF",
+     "comp": "some7org",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-07",
+     "horas": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      8,
+      7
+     ],
+     "seed": 161
+    },
+    "dia": "2026-11-24",
+    "msg": "organizar: data fim saltou 19 → 34 semanas",
+    "diff": []
+   }
+  },
+  {
+   "inv": "I9",
+   "zona": "motor30.calcularDomino (retomar)",
+   "motor": "3.2.0",
+   "grav": "media",
+   "ocorrencias": 1,
+   "cenarios": 1,
+   "porComportamento": {
+    "pausa": 1
+   },
+   "exemplo": {
+    "id": "c0103",
+    "spec": {
+     "perfil": "56h:8h×7",
+     "discs": "9d",
+     "metas": "semFlash",
+     "comp": "pausa",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-07",
+     "horas": [
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8
+     ],
+     "seed": 270
+    },
+    "dia": "2026-11-22",
+    "msg": "retomar: data fim saltou 26 → 39 semanas",
+    "diff": []
+   }
+  },
+  {
+   "inv": "I7",
+   "zona": "legado: semana de revisão (RV) servidor×iframe",
+   "motor": "2.8.1",
+   "grav": "media",
+   "ocorrencias": 2,
+   "cenarios": 1,
+   "porComportamento": {
+    "desempBaixo": 1
+   },
+   "exemplo": {
+    "id": "c0226",
+    "spec": {
+     "perfil": "34h:6h×5+4sáb",
+     "discs": "2d",
+     "metas": "todas",
+     "comp": "desempBaixo",
+     "tz": "errado",
+     "motor": "2.8.1",
+     "start": "2026-11-07",
+     "horas": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      4,
+      0
+     ],
+     "seed": 952
+    },
+    "dia": "2026-12-28",
+    "msg": "8 meta(s) de revisão com data diferente entre a visão congelada (iframe) e a recalculada pelo servidor",
+    "diff": [
+     "rf:8:4: frozen=[\"2026-12-24\",1] servidor=[\"2026-12-25\",1]",
+     "rq:8:4: frozen=[\"2026-12-24\",0.5] servidor=[\"2026-12-25\",0.5]",
+     "rf:8:28: frozen=[\"2026-12-25\",1] servidor=[\"2026-12-26\",1]",
+     "rq:8:28: frozen=[\"2026-12-25\",0.5] servidor=[\"2026-12-26\",0.5]"
+    ]
+   }
+  },
+  {
+   "inv": "I9",
+   "zona": "motor30.calcularDomino (parcial)",
+   "motor": "3.2.0",
+   "grav": "media",
+   "ocorrencias": 1,
+   "cenarios": 1,
+   "porComportamento": {
+    "completo+mix": 1
+   },
+   "exemplo": {
+    "id": "c0355",
+    "spec": {
+     "perfil": "34h:6h×5+4sáb",
+     "discs": "9d",
+     "metas": "soPDF",
+     "comp": "completo+mix",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-01",
+     "horas": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      4,
+      0
+     ],
+     "seed": 2119
+    },
+    "dia": "2026-11-02",
+    "msg": "parcial: data fim saltou 30 → 43 semanas",
+    "diff": []
+   }
+  },
+  {
+   "inv": "I6",
+   "zona": "motor30 (estado do plano) [mesmo dia do PDFull = reta final rev.23, intencional?]",
+   "motor": "3.2.0",
+   "grav": "baixa",
+   "ocorrencias": 456,
+   "cenarios": 228,
+   "porComportamento": {
+    "completo": 6,
+    "parcial": 6,
+    "pula1": 5,
+    "some3": 5,
+    "some3org": 8,
+    "some7": 5,
+    "some7org": 6,
+    "some14": 4,
+    "some14org": 7,
+    "foraOrdem": 7,
+    "missed": 4,
+    "reabre": 4,
+    "desempBaixo": 4,
+    "desempAlto": 5,
+    "metade": 6,
+    "organiza": 6,
+    "ajustaHoras": 8,
+    "pausa": 6,
+    "pausaSrv": 5,
+    "migra": 6,
+    "migraIgual": 6,
+    "migraIgualEmDia": 4,
+    "regera": 2,
+    "adianta": 6,
+    "mover": 7,
+    "parcialOrg": 5,
+    "metade+mix": 3,
+    "organiza+mix": 6,
+    "ajustaHoras+mix": 4,
+    "some14+mix": 4,
+    "some3+mix": 6,
+    "some7org+mix": 4,
+    "adianta+mix": 2,
+    "reabre+mix": 3,
+    "regera+mix": 4,
+    "mover+mix": 4,
+    "missed+mix": 3,
+    "pausa+mix": 2,
+    "some14org+mix": 4,
+    "desempAlto+mix": 3,
+    "pula1+mix": 5,
+    "parcial+mix": 3,
+    "desempBaixo+mix": 3,
+    "pausaSrv+mix": 2,
+    "completo+mix": 2,
+    "some3org+mix": 3,
+    "migra+mix": 7,
+    "some7+mix": 2,
+    "parcialOrg+mix": 3,
+    "migraIgualEmDia+mix": 2,
+    "foraOrdem+mix": 1
+   },
+   "exemplo": {
+    "id": "c0001",
+    "spec": {
+     "perfil": "10h:2h×5",
+     "discs": "1d",
+     "metas": "todas",
+     "comp": "completo",
+     "tz": "ok",
+     "motor": "3.2.0",
+     "start": "2026-11-02",
+     "horas": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      0,
+      0
+     ],
+     "seed": 100
+    },
+    "dia": "2026-11-02",
+    "msg": "fl:180 no MESMO dia do PDFull final (2027-01-06); regra do método: PDFlash +1 sem., Questões +2 sem. (motor30.ts:884 permite na reta final)",
+    "diff": [
+     "fl:180=2027-01-06",
+     "pf:180=2027-01-06"
+    ]
+   }
+  }
+ ]
+}

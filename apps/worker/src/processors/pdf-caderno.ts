@@ -32,9 +32,9 @@ export async function pdfCadernoProcessor(job: Job<PdfCadernoData>) {
     const m = process.env.CADERNO_PDF_MARGEM != null ? Number(process.env.CADERNO_PDF_MARGEM) : 0
     const pdf = await urlParaPdf(url, { marginTop: m, marginBottom: m, marginLeft: m, marginRight: m })
 
-    // 2. Upload no storage (bucket público `pdfs`) — via abstração: respeita STORAGE_PROVIDER (supabase|s3)
+    // 2. Upload no storage (bucket PRIVADO pdfs; web serve por link assinado) — via abstração: respeita STORAGE_PROVIDER (supabase|s3)
     const path = `${tenantId}/${jobId}.pdf`
-    const up = await uploadPublico({ bucket: 'pdfs', path, body: pdf, contentType: 'application/pdf', cacheSeconds: 31536000 })
+    const up = await uploadPublico({ bucket: 'pdfs', path, body: pdf, contentType: 'application/pdf', cacheSeconds: 31536000, privado: true })
     if (!up.ok) throw new Error(`Upload falhou: ${up.erro}`)
 
     // 3. URL pública (do provider ativo)

@@ -43,10 +43,10 @@ x-video-logging: &video-logging
 
 x-video-app-env: &video-app-env
   NODE_ENV: production
-  DATABASE_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD:-}@video-postgres:5432/video
+  DATABASE_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD:?defina VIDEO_POSTGRES_PASSWORD no Portainer}@video-postgres:5432/video
   # Reservado para o Prisma `directUrl` (Fase 1.11). Aqui é a mesma conexão (não há PgBouncer).
-  DIRECT_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD}@video-postgres:5432/video
-  REDIS_URL: redis://:${VIDEO_REDIS_PASSWORD:-}@video-redis:6379
+  DIRECT_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD:?defina VIDEO_POSTGRES_PASSWORD no Portainer}@video-postgres:5432/video
+  REDIS_URL: redis://:${VIDEO_REDIS_PASSWORD:?defina VIDEO_REDIS_PASSWORD no Portainer}@video-redis:6379
   S3_ENDPOINT: ${VIDEO_S3_ENDPOINT:-https://hel1.your-objectstorage.com}
   S3_REGION: ${VIDEO_S3_REGION:-hel1}
   S3_BUCKET: ${VIDEO_S3_BUCKET:-revisaopge-videos}
@@ -79,6 +79,7 @@ services:
   web:
     image: ghcr.io/revisaoprojetos/plataforma_simulado:${IMAGE_TAG:-latest}
     environment:
+      - TZ=America/Fortaleza
       - NODE_ENV=production
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
@@ -227,6 +228,7 @@ services:
   worker:
     image: ghcr.io/revisaoprojetos/plataforma_simulado-worker:${IMAGE_TAG:-latest}
     environment:
+      - TZ=America/Fortaleza
       - NODE_ENV=production
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -482,8 +484,8 @@ services:
     image: ghcr.io/${GHCR_OWNER:-revisaoprojetos}/plataforma_simulado-video-api:${VIDEO_TAG:-sem-tag}
     command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
     environment:
-      DATABASE_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD}@video-postgres:5432/video
-      DIRECT_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD}@video-postgres:5432/video
+      DATABASE_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD:?defina VIDEO_POSTGRES_PASSWORD no Portainer}@video-postgres:5432/video
+      DIRECT_URL: postgresql://video:${VIDEO_POSTGRES_PASSWORD:?defina VIDEO_POSTGRES_PASSWORD no Portainer}@video-postgres:5432/video
     # O HEALTHCHECK da imagem é da API (porta 3000) e não se aplica a um job.
     healthcheck:
       disable: true
@@ -512,7 +514,7 @@ services:
     command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=${VIDEO_PG_SHARED_BUFFERS:-256MB}"]
     environment:
       POSTGRES_USER: video
-      POSTGRES_PASSWORD: ${VIDEO_POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD: ${VIDEO_POSTGRES_PASSWORD:?defina VIDEO_POSTGRES_PASSWORD no Portainer}
       POSTGRES_DB: video
     volumes:
       - video_pgdata:/var/lib/postgresql/data
@@ -555,7 +557,7 @@ services:
       - -c
       - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --appendfsync everysec --maxmemory ${VIDEO_REDIS_MAXMEMORY:-1gb} --maxmemory-policy noeviction
     environment:
-      REDIS_PASSWORD: ${VIDEO_REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${VIDEO_REDIS_PASSWORD:?defina VIDEO_REDIS_PASSWORD no Portainer}
     volumes:
       - video_redisdata:/data
     networks:

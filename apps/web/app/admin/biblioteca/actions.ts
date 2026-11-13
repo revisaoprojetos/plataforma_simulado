@@ -23,6 +23,7 @@ import { gerarThumbDocumento, gerarPdfDocumento } from '@/lib/conteudo/thumb'
 import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-pagina'
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { normalizarMetadados, type Metadados } from '@/lib/conteudo/metadados'
+import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
 // Cada uma tem suas próprias pastas via folder_area.
@@ -727,7 +728,7 @@ export async function conteudoPreviewAdmin(documentoId: string): Promise<{ ok: b
   const { data: trechos } = await svc.from('simulado_conteudo_trechos')
     .select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', g.tenantId).eq('versao_id', versaoId)
     .order('ordem', { ascending: true }).limit(400)
-  return { ok: true, trechos: ((trechos as any[]) ?? []).map((t) => ({ uid: t.uid, tipo: t.tipo, rotulo: t.rotulo ?? null, texto: t.texto ?? '' })) }
+  return { ok: true, trechos: ((trechos as any[]) ?? []).map((t) => ({ uid: t.uid, tipo: t.tipo, rotulo: t.rotulo ?? null, texto: sanitizarHtmlLeitura(t.texto ?? '') })) }
 }
 
 // PDF do documento INTEIRO (via OnlyOffice, cacheado) p/ a prévia grande progressiva (iframe nativo).

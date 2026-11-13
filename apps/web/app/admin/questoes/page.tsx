@@ -20,6 +20,7 @@ import { ehTipoTaxonomia } from './taxonomia-tipos'
 import { listarUnificacoesRecentes } from './disciplinas-actions'
 import { EtiquetasClient } from '../etiquetas/etiquetas-client'
 import { listarEtiquetas } from '../etiquetas/actions'
+import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const PER_PAGE_OPTIONS = [10, 12, 15, 20]
 const PER_PAGE_DEFAULT = 12
@@ -43,7 +44,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
   const perPage = PER_PAGE_OPTIONS.includes(Number(params.pp)) ? Number(params.pp) : PER_PAGE_DEFAULT
-  const q = (params.q ?? '').trim()
+  const q = sanearBusca(params.q ?? '')
   // Se o termo for um código de questão (ex.: "Q-6BA4EF94"), busca pelo id (faixa de UUID).
   const faixaCodigo = q ? faixaUuidDoCodigo(q) : null
   const status = params.status ?? ''

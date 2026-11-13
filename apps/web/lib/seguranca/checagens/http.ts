@@ -25,7 +25,11 @@ export function avaliarHeaders(h: Record<string, string>): AchadoScan[] {
   if (!csp) {
     out.push({ categoria: 'headers', severidade: 'medio', titulo: 'Sem Content-Security-Policy', recomendacao: 'Definir CSP com script-src e frame-ancestors.', fingerprint: 'http:csp-ausente' })
   } else {
-    if (!/script-src/i.test(csp)) out.push({ categoria: 'headers', severidade: 'medio', titulo: 'CSP sem diretiva script-src', detalhe: 'Sem script-src a CSP não mitiga XSS.', recomendacao: 'Adicionar script-src (nonce/strict-dynamic).', fingerprint: 'http:csp-sem-script-src' })
+    if (!/script-src/i.test(csp)) {
+      // script-src com nonce/strict-dynamic em modo Report-Only (CSP_ENFORCE ausente) = em observação: não bloqueia ainda → baixo.
+      if (/script-src/i.test(h['content-security-policy-report-only'] ?? '')) out.push({ categoria: 'headers', severidade: 'baixo', titulo: 'CSP script-src apenas em Report-Only (não bloqueante)', detalhe: 'script-src com nonce/strict-dynamic está sendo reportado em /api/csp-report, mas ainda não é aplicado.', recomendacao: 'Revisar os relatórios e ligar CSP_ENFORCE=1.', fingerprint: 'http:csp-script-src-report-only' })
+      else out.push({ categoria: 'headers', severidade: 'medio', titulo: 'CSP sem diretiva script-src', detalhe: 'Sem script-src a CSP não mitiga XSS.', recomendacao: 'Adicionar script-src (nonce/strict-dynamic).', fingerprint: 'http:csp-sem-script-src' })
+    }
     const fa = /frame-ancestors\s+([^;]*)/i.exec(csp)?.[1]?.trim()
     if (!fa) out.push({ categoria: 'headers', severidade: 'baixo', titulo: 'CSP sem frame-ancestors', recomendacao: 'Definir frame-ancestors (origens permitidas do embed).', fingerprint: 'http:csp-sem-frame-ancestors' })
     else if (/(^|\s)\*(\s|$)/.test(fa)) out.push({ categoria: 'headers', severidade: 'medio', titulo: 'frame-ancestors permite qualquer origem (*)', detalhe: 'Clickjacking possível na página inicial.', recomendacao: 'Restringir às origens do embed; falhar fechado.', fingerprint: 'http:frame-ancestors-wildcard' })

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { dentroDoLimite } from '@/lib/integracoes/ratelimit'
 import { registrarInbox } from '@/lib/integracoes/inbox'
+import { avaliarWebhook } from '@/lib/integracoes/webhook-seguranca'
+import { segredoWebhookDoTenant } from '@/lib/integracoes/webhook-config'
+import { getAdapter } from '@/lib/integracoes/registry'
 
 /**
  * Receptor GENÉRICO de webhooks (multi-fonte) — /api/webhooks/in/<token>?fonte=<nome>.
@@ -57,6 +60,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: 'rate limit' }, { status: 429 })
   }
 
-  await registrarInbox({ provider: prov, fonte: prov, metodo: 'POST', token, tenantId, ip, headers, query, raw, status: 200, resultado: 'recebido' })
+  // Autenticidade (compatível): com segredo do provedor configurado → exige HMAC/segredo; sem segredo → aceita com AVISO
+  // (a menos que `webhook_estrito`). Guru: também aceita o Account Token do corpo (formato nativo dele).
+  const provCfg = (provider === 'guru' || provider === 'curseduca') ? provider : null
+  let aviso = ''
+  if (provCfg) {
+    const seg = await segredoWebhookDoTenant(tenantId, provCfg)
+    const v = avaliarWebhook({ raw, headers, segredo: seg.segredo, estrito: seg.estrito, validarCustom: getAdapter(provCfg)?.validarWebhook })
+    if (!v.ok) {
+      await registrarInbox({ provider: prov, fonte: prov, metodo: 'POST', token, tenantId, ip, headers, query, raw, status: 401, resultado: `webhook rejeitado: ${v.motivo}` })
+      return NextResponse.json({ error: 'não autorizado' }, { status: 401 })
+    }
+    if (v.aviso) aviso = ` [${v.aviso}]`
+  }
+
+  await registrarInbox({ provider: prov, fonte: prov, metodo: 'POST', token, tenantId, ip, headers, query, raw, status: 200, resultado: `recebido${aviso}` })
   return NextResponse.json({ ok: true, recebido: true, fonte: prov })
 }

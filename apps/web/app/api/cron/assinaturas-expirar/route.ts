@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cronAutorizado } from '@/lib/seguranca/cron-auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { expirarVencidas } from '@/lib/integracoes/engine'
 
@@ -13,10 +14,7 @@ export const dynamic = 'force-dynamic'
  * para efetivar. `?tenant=<id>` limita a um tenant. NÃO está no agendador automático até aprovação.
  */
 function autorizado(req: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET
-  if (!segredo) return false
-  const h = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return h === segredo
+  return cronAutorizado(req)
 }
 
 export async function POST(req: NextRequest) {

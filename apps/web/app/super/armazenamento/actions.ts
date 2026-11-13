@@ -123,7 +123,7 @@ export async function listarArquivosAction(
   const storage = getStorage()
   const itens: ArquivoItem[] = await Promise.all(
     fatia.map(async (r) => {
-      const publico = !!r.publico && bucket !== 'discursivas'
+      const publico = !!r.publico && bucket !== 'discursivas' && bucket !== 'pdfs' // bucket pdfs é privado: sempre URL assinada
       let url: string | null = null
       try {
         url = publico ? storage.getPublicUrl(bucket, r.path) : await storage.getSignedUrl(bucket, r.path, 3600)

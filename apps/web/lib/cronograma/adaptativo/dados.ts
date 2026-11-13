@@ -295,7 +295,7 @@ export interface CargaAdaptativo {
 }
 
 /** Carga principal (backend-first): devolve o snapshot pronto ou temPlano=false (primeiro acesso). */
-export async function carregarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = dISO(new Date())): Promise<CargaAdaptativo> {
+export async function carregarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = hojeCal()): Promise<CargaAdaptativo> {
   const row0 = await lerPlanoRow(svc, tenantId, estId)
   if (!row0) return { temPlano: false, planoId: null, titulo: null, snapshot: null }
   const row = await migrarPlano(svc, tenantId, row0)
@@ -341,7 +341,7 @@ async function gerarAdaptativoBase(
   const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP, {
     detalhes: detalhesAtuais,
     ordem: conteudo.ordem, feitas: metasAlvo.filter((m) => m.estado === 'done').map((m) => m.meta_id), usados: metasAlvo.map((m) => m.meta_id),
-    params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metasAlvo), prog: progDeMetas(metasAlvo), hoje: opc.ancora || dISO(new Date()), planoAtual: (alvo?.plano || {}) as Plano,
+    params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metasAlvo), prog: progDeMetas(metasAlvo), hoje: opc.ancora || hojeCal(), planoAtual: (alvo?.plano || {}) as Plano,
   })
   const campos = {
     titulo: opc.titulo ?? alvo?.titulo ?? 'Meu cronograma',
@@ -485,7 +485,7 @@ export async function somarTempoMeta(svc: SupabaseClient, tenantId: string, estI
 }
 
 /** Pausar / retomar. Ao retomar, redistribui o não-feito a partir de hoje (ancora). */
-export async function pausarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, pausar: boolean, hoje: DataISO = dISO(new Date())): Promise<{ ok: boolean; error?: string }> {
+export async function pausarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, pausar: boolean, hoje: DataISO = hojeCal()): Promise<{ ok: boolean; error?: string }> {
   const row = await lerPlanoRow(svc, tenantId, estId)
   if (!row) return { ok: false, error: 'sem_plano' }
   if (pausar) {
@@ -662,7 +662,7 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
 }
 
 /** Para o DOCX/relatório: devolve Estado + snapshot cru. */
-export async function estadoParaRender(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = dISO(new Date())) {
+export async function estadoParaRender(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = hojeCal()) {
   const row = await lerPlanoRow(svc, tenantId, estId)
   if (!row) return null
   const metas = await lerMetas(svc, tenantId, row.id)

@@ -1,13 +1,21 @@
 'use client'
 
 import * as React from 'react'
+import { origemHostValidada } from '@/lib/embed/origem-host'
 import { buildEmbedMessage, type EmbedEvent } from '@/lib/video/player-protocolo'
 
-/** Envia um evento ao documento pai (iframe Curseduca). Sem pai → no-op. O payload não carrega dados sensíveis. */
+/**
+ * Envia um evento ao documento pai (iframe Curseduca). Sem pai → no-op.
+ * targetOrigin = origem do pai VALIDADA (ancestorOrigins/referrer × allowlist Curseduca + NEXT_PUBLIC_EMBED_HOST_ORIGINS).
+ * Sem origem validada: só `video:resize` (altura, sem dados) segue com '*'; `started/completed` (levam aulaId) NÃO são enviados.
+ */
 export function postToParent(ev: EmbedEvent): void {
   if (typeof window === 'undefined' || window.parent === window) return
+  const msg = buildEmbedMessage(ev)
+  const alvo = origemHostValidada()
   try {
-    window.parent.postMessage(buildEmbedMessage(ev), '*')
+    if (alvo) window.parent.postMessage(msg, alvo)
+    else if (ev.type === 'video:resize') window.parent.postMessage(msg, '*')
   } catch { /* pai inacessível */ }
 }
 
