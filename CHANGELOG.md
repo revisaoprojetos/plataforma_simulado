@@ -25,6 +25,7 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 - **Matriz de regras do Produto:** a coluna de um **grupo** agora herda as regras do segmento "está em qualquer um destes grupos" (ex.: Passaporte Julho, Extensivo), mostrando "Por aula"/as datas de liberação do cronograma. O segmento continua com coluna própria.
 - **Matriz:** na 1ª visita (sem seleção salva), segmentos com regra aparecem antes dos grupos nas colunas padrão.
 - **Dados (Extensivo da Advocacia Pública):** carga da planilha de liberação com início em 13/07 (268 aulas, 6 cronogramas) e segmentos **Passaporte Julho** e **Extensivo**, com regra Cronograma por módulo (prioridades 20 e 10).
+- **PDFs com bucket privado:** os links "Abrir PDF em nova aba" (prévia do caderno/gabarito) e o nome do PDF na criação do simulado passam pelo proxy autenticado `/api/arquivo/pdf` — o endereço cru do storage dava "Bucket not found"; downloads de cadernos/gabarito do aluno saem com link assinado.
 - Também neste lote: endurecimento de segurança (CSP/frame-ancestors, CSRF por origem, proxy de PDFs, guarda de login, webhooks) e registro de acessos do aluno.
 - ⚠️ Migrações pendentes: rodar `pnpm migracoes status` (inclui `20261119060000_seguranca_storage_pdfs_privado_e_grants`).
 
