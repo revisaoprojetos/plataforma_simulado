@@ -184,13 +184,22 @@ async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any)
     if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
     if (doc.status !== 'publicado') return false
     if ((await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return true
-    // O documento é AULA (ativa e já liberada) do currículo de um extensivo do aluno → libera a leitura,
-    // mesmo fora das pastas liberadas (o configurador do produto pode apontar a qualquer material).
+    return docLiberadoViaProduto(svc, tenantId, alunoId, doc.id)
+  })
+}
+
+/**
+ * O documento é AULA (ativa e já liberada pela regra/data) do currículo de um extensivo a que o aluno tem acesso → libera
+ * leitura/download, mesmo fora das pastas liberadas (o configurador do produto pode apontar a qualquer material; ex.: LegProc
+ * e PDFull em pastas restritas ao grupo "Revisão"). Cache 60s. Sem produto/acesso/liberação → false.
+ */
+async function docLiberadoViaProduto(svc: any, tenantId: string, alunoId: string, documentoId: string): Promise<boolean> {
+  return remember<boolean>(`acesso-via-produto:${tenantId}:${alunoId}:${documentoId}`, 60, async () => {
     try {
       const [{ docLiberadoPorProduto }, { acessoAoProduto }] = await Promise.all([
         import('@/lib/produtos/curriculo-aluno'), import('@/lib/produtos/aluno'),
       ])
-      return await docLiberadoPorProduto(svc, tenantId, alunoId, doc.id,
+      return await docLiberadoPorProduto(svc, tenantId, alunoId, documentoId,
         async (produtoId) => !!(await acessoAoProduto(svc, tenantId, alunoId, produtoId)))
     } catch { return false }
   })
@@ -364,7 +373,7 @@ export async function carregarLeitura(documentoId: string, alunoId: string, opts
   if (!ehTest) {
     if (doc.status !== 'publicado') return null
     // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
-    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido && !(await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) return null // pasta OU aula liberada do produto (D4)
     if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
   }
 
@@ -497,7 +506,8 @@ async function podeBaixarMidia(svc: any, tenantId: string, alunoId: string, doc:
   if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
   if (await bloqueioDeDownload(svc, tenantId, doc.id)) return false
   const res = await avaliarDocAluno(svc, tenantId, alunoId, doc).catch(() => null)
-  return !!res?.permitido && !!res.permissoes.baixar
+  if (res?.permitido) return !!res.permissoes.baixar
+  return docLiberadoViaProduto(svc, tenantId, alunoId, doc.id) // aula liberada do produto (D4); chaves de plataforma/doc já checadas acima
 }
 
 export async function carregarMidiaAluno(documentoId: string, alunoId: string): Promise<MidiaAluno | null> {
@@ -715,7 +725,8 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
     if (blq) { await regDl('bloqueado', blq); return null }
     // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
-    if (!resDl.permitido || !resDl.permissoes.baixar) { await regDl('bloqueado', 'permissao'); return null }
+    // pasta com permissão de baixar OU aula liberada do produto (D4: chaves de plataforma/documento já checadas em `blq`)
+    if (!(resDl.permitido ? resDl.permissoes.baixar : await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'permissao'); return null }
     // Download só do material JÁ LIBERADO no cronograma do aluno (com o bloqueio ativo).
     if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'nao_liberado'); return null } // liberação por data do Cronograma Adaptativo
   }
@@ -759,7 +770,7 @@ export async function prepararDownloadAluno(documentoId: string, alunoId: string
     const blq = await bloqueioDeDownload(svc, tenantId, documentoId)
     if (blq) { await regDl('bloqueado', blq); return { ok: false, erro: blq === 'politica' ? 'politica' : 'documento' } }
     const res = await avaliarDocAluno(svc, tenantId, alunoId, doc)
-    if (!res.permitido || !res.permissoes.baixar) { await regDl('bloqueado', 'permissao'); return { ok: false, erro: 'negado' } }
+    if (!(res.permitido ? res.permissoes.baixar : await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'permissao'); return { ok: false, erro: 'negado' } }
     if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return { ok: false, erro: 'negado' } }
   }
   const tipo = String((doc as any).tipo_origem ?? '')
@@ -901,7 +912,7 @@ export async function lerProgressoLeituraAluno(
 
 /** Motivo pelo qual o leitor NÃO abriu o documento (p/ mostrar uma tela clara em vez de um 404 mudo). Só consultas leves. */
 export type MotivoFalhaLeitura = 'inexistente' | 'em_preparacao' | 'nao_publicado' | 'sem_acesso' | 'ainda_nao_liberado' | 'indisponivel'
-export async function diagnosticarFalhaLeitura(documentoId: string, alunoId: string): Promise<{ motivo: MotivoFalhaLeitura; titulo: string | null }> {
+export async function diagnosticarFalhaLeitura(documentoId: string, alunoId: string): Promise<{ motivo: MotivoFalhaLeitura; titulo: string | null; liberaEm?: string | null }> {
   try {
     const tenantId = await getCurrentTenantId()
     if (!tenantId || !documentoId) return { motivo: 'inexistente', titulo: null }
@@ -911,7 +922,15 @@ export async function diagnosticarFalhaLeitura(documentoId: string, alunoId: str
     const titulo = String(doc.titulo ?? '') || null
     if (!doc.versao_atual_id) return { motivo: 'em_preparacao', titulo }
     if (doc.status !== 'publicado' && !(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }).catch(() => false))) return { motivo: 'nao_publicado', titulo }
-    if (!(await podeLerDoc(svc, tenantId, alunoId, doc).catch(() => false))) return { motivo: 'sem_acesso', titulo }
+    if (!(await podeLerDoc(svc, tenantId, alunoId, doc).catch(() => false))) {
+      // T5: tem acesso ao produto onde o material é aula, mas a data/regra ainda não liberou → "ainda não liberado" (com a data); senão sem acesso.
+      try {
+        const [{ docAindaNaoLiberadoPorProduto }, { acessoAoProduto }] = await Promise.all([import('@/lib/produtos/curriculo-aluno'), import('@/lib/produtos/aluno')])
+        const r = await docAindaNaoLiberadoPorProduto(svc, tenantId, alunoId, doc.id, async (produtoId) => !!(await acessoAoProduto(svc, tenantId, alunoId, produtoId)))
+        if (r.aindaNaoLiberado) return { motivo: 'ainda_nao_liberado', titulo, liberaEm: r.liberaEm }
+      } catch { /* cai em sem_acesso */ }
+      return { motivo: 'sem_acesso', titulo }
+    }
     if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id).catch(() => false)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id).catch(() => false))) return { motivo: 'ainda_nao_liberado', titulo }
     return { motivo: 'indisponivel', titulo }
   } catch { return { motivo: 'indisponivel', titulo: null } }

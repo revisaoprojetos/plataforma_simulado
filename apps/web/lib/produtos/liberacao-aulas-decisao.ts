@@ -103,12 +103,13 @@ export function decidirLiberacao(a: {
   switch (cfg.com_plano) {
     case 'plano':
       return dataPlano ? porData(dataPlano, hoje, 'plano') : porData(planilha, hoje, 'fora-do-plano')
-    case 'mais_cedo': {
+    // 'concluir_meta' NÃO TRAVA mais (decisão D3, 16/11/2026): vale a data da regra/planilha; se o plano do aluno tiver
+    // data MAIS CEDO, antecipa (= 'mais_cedo'). Nunca atrasa além da regra. Concluir a meta continua liberando ('concluida').
+    case 'mais_cedo':
+    default: {
       const cand = [planilha, dataPlano].filter((x): x is string => !!x).sort()[0] ?? null
       return porData(cand, hoje, 'mais-cedo')
     }
-    default:
-      return { liberada: false, motivo: 'concluir-meta', liberaEm: null, interfere: true }
   }
 }
 

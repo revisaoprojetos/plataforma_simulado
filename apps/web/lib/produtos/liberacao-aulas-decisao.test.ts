@@ -20,9 +20,15 @@ describe('decidirLiberacao', () => {
     expect(decidirLiberacao({ cfg: P({ sem_plano: 'liberado' }), linha: linha('2030-01-01'), plano: SEM, hoje }).liberada).toBe(true)
     expect(decidirLiberacao({ cfg: P({ sem_plano: 'atual' }), linha: linha('2030-01-01'), plano: SEM, hoje })).toMatchObject({ liberada: true, interfere: false })
   })
-  it('com plano: concluir_meta bloqueia sem data até concluir', () => {
-    expect(decidirLiberacao({ cfg: P(), linha: linha('2026-01-01'), plano: plano({ dataMeta: '2026-01-02' }), hoje })).toMatchObject({ liberada: false, liberaEm: null, motivo: 'concluir-meta' })
+  it('com plano: concluir_meta NÃO trava (D3): vale a data da regra/planilha; concluída libera', () => {
+    expect(decidirLiberacao({ cfg: P(), linha: linha('2026-01-01'), plano: plano({ dataMeta: '2026-12-02' }), hoje })).toMatchObject({ liberada: true, motivo: 'mais-cedo' })
+    expect(decidirLiberacao({ cfg: P(), linha: linha('2026-12-01'), plano: plano({ dataMeta: '2027-01-02' }), hoje })).toMatchObject({ liberada: false, liberaEm: '2026-12-01' })
     expect(decidirLiberacao({ cfg: P(), linha: linha('2026-01-01'), plano: plano({ concluida: true }), hoje }).liberada).toBe(true)
+  })
+  it('com plano: concluir_meta com data de plano MAIS CEDO antecipa; sem plano = data da regra', () => {
+    expect(decidirLiberacao({ cfg: P(), linha: linha('2027-02-01'), plano: plano({ dataMeta: '2026-11-10' }), hoje }).liberada).toBe(true)
+    expect(decidirLiberacao({ cfg: P(), linha: linha('2027-02-01'), plano: SEM, hoje })).toMatchObject({ liberada: false, liberaEm: '2027-02-01', motivo: 'planilha' })
+    expect(decidirLiberacao({ cfg: P(), linha: linha('2026-11-01'), plano: SEM, hoje }).liberada).toBe(true)
   })
   it('com plano: modo plano usa data da meta - dias_antes', () => {
     const cfg = P({ com_plano: 'plano', dias_antes: 3 })

@@ -43,7 +43,7 @@ function MaterialBloqueado({ lib, voltarHref }: { lib: Liberacao; voltarHref: st
 }
 
 /** Em vez do 404 mudo: diz POR QUE o material não abriu e oferece caminhos (voltar, tentar de novo, falar com o suporte). */
-function MaterialIndisponivel({ motivo, titulo, voltarHref }: { motivo: MotivoFalhaLeitura; titulo: string | null; voltarHref: string }) {
+function MaterialIndisponivel({ motivo, titulo, voltarHref, liberaEm }: { motivo: MotivoFalhaLeitura; titulo: string | null; voltarHref: string; liberaEm?: string | null }) {
   const [h, msg] = ({
     em_preparacao: ['Material em preparação', 'Este material ainda está sendo preparado pela equipe e será publicado em breve. Volte mais tarde.'],
     nao_publicado: ['Material ainda não publicado', 'Este material ainda não foi publicado. Assim que for, ele abre normalmente.'],
@@ -52,12 +52,15 @@ function MaterialIndisponivel({ motivo, titulo, voltarHref }: { motivo: MotivoFa
     inexistente: ['Material não encontrado', 'Este material não existe mais ou o link está incorreto.'],
     indisponivel: ['Não foi possível abrir agora', 'Houve um problema temporário ao carregar o material. Tente novamente em instantes; se continuar, fale com o suporte informando o nome do material.'],
   } as Record<MotivoFalhaLeitura, [string, string]>)[motivo]
+  // Data de liberação (calculada no servidor): troca o texto genérico por "será liberado em dd/mm/aaaa".
+  const dataLib = motivo === 'ainda_nao_liberado' && liberaEm ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(liberaEm)) : null
+  const msgFinal = dataLib ? `Este material será liberado em ${dataLib}. Volte nessa data para abrir.` : msg
   return (
     <div className="flex min-h-[70vh] items-center justify-center p-5">
       <div className="w-full max-w-md rounded-2xl border bg-card p-7 text-center shadow-sm">
         <h1 className="mb-2 text-lg font-bold">{h}</h1>
         {titulo ? <p className="mb-3 text-sm font-medium text-muted-foreground">{titulo}</p> : null}
-        <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{msg}</p>
+        <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{msgFinal}</p>
         <div className="flex flex-col gap-2">
           {motivo === 'indisponivel' && <a href="" className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">Tentar novamente</a>}
           <Link href={voltarHref} className="inline-flex h-11 items-center justify-center rounded-xl border px-4 text-sm font-medium">Voltar</Link>
@@ -128,7 +131,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   if (!doc) {
     // Sem 404 mudo: explica o motivo (em preparação / não publicado / sem acesso / não existe / falha temporária).
     const d = await diagnosticarFalhaLeitura(id, sessao.estudanteId)
-    return <MaterialIndisponivel motivo={d.motivo} titulo={d.titulo} voltarHref={voltarHref} />
+    return <MaterialIndisponivel motivo={d.motivo} titulo={d.titulo} voltarHref={voltarHref} liberaEm={d.liberaEm} />
   }
   const video = doc.kind === 'midia' ? null : video0
 

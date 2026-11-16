@@ -12,6 +12,7 @@
 // Prévia (dryRun) lê e conta, nunca grava. Ao gravar: invalida o mapa (cache 20 s), revalida a rota e audita UM resumo (+ regras-log).
 
 import { revalidatePath } from 'next/cache'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -363,8 +364,8 @@ export async function carregarPublicosProdutoAction(produtoId: string): Promise<
     gruposDoProduto(g.tenantId, produtoId).catch(() => []),
     lerAcessoGratuitoProdutoAction(produtoId).catch(() => null),
     svc.from('simulado_segmentos').select('id, nome, regra').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }).limit(500),
-    svc.from('simulado_produto_visibilidade').select('segmento_id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).limit(5000),
-    svc.from('simulado_produto_disponibilidade_seg').select('segmento_id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).limit(5000),
+    fetchAll<any>(() => svc.from('simulado_produto_visibilidade').select('segmento_id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('id', { ascending: true }) as any).then((data) => ({ data, error: null as any })).catch((error) => ({ data: null as any, error })),
+    fetchAll<any>(() => svc.from('simulado_produto_disponibilidade_seg').select('segmento_id').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('id', { ascending: true }) as any).then((data) => ({ data, error: null as any })).catch((error) => ({ data: null as any, error })),
   ])
   const uso = new Map<string, number>()
   for (const r of [...((visR.data ?? []) as any[]), ...((dispR.data ?? []) as any[])]) uso.set(r.segmento_id, (uso.get(r.segmento_id) ?? 0) + 1)

@@ -1,5 +1,6 @@
 'use server'
 import type { AlvoLote } from './visibilidade-actions-tipos'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import type { RegrasSegmentoAdmin, DispSegAdmin, CapaSegAdmin, PlanilhaLiberacaoInfo } from './segmento-regras-tipos'
 
 // LIBERAÇÃO e CAPA por segmento dentro do produto (tabelas da migração 20261115010000):
@@ -73,8 +74,8 @@ export async function carregarRegrasSegmentoAction(produtoId: string): Promise<{
   const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
   const svc = createAdminClient()
   const [d, c] = await Promise.all([
-    svc.from('simulado_produto_disponibilidade_seg').select('id, segmento_id, alvo_tipo, alvo_id, disponibilidade, prioridade, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('prioridade', { ascending: true }).limit(5000),
-    svc.from('simulado_produto_capas_seg').select('id, segmento_id, alvo_tipo, alvo_id, imagem_url, titulo, descricao, ocultar_titulo, prioridade, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('prioridade', { ascending: true }).limit(2000),
+    fetchAll<any>(() => svc.from('simulado_produto_disponibilidade_seg').select('id, segmento_id, alvo_tipo, alvo_id, disponibilidade, prioridade, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('prioridade', { ascending: true }).order('id', { ascending: true }) as any).then((data) => ({ data, error: null as any })).catch((error) => ({ data: null as any, error })),
+    fetchAll<any>(() => svc.from('simulado_produto_capas_seg').select('id, segmento_id, alvo_tipo, alvo_id, imagem_url, titulo, descricao, ocultar_titulo, prioridade, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('prioridade', { ascending: true }).order('id', { ascending: true }) as any).then((data) => ({ data, error: null as any })).catch((error) => ({ data: null as any, error })),
   ])
   if (d.error || c.error) {
     const msg = d.error?.message ?? c.error?.message

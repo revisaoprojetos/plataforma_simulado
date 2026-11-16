@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.20.1 — 2026-11-16
+
+**Liberação por matriz: correção do corte de 1.000 regras + novas regras de grupo**
+- **Bug crítico:** as regras de liberação por segmento eram lidas com `limit(5000)`, que o PostgREST corta em 1.000 — as turmas de Setembro ficavam sem restrição no aluno e Agosto perdia ~21 regras por grupo; a matriz e as telas de edição do admin mostravam/editavam só parte. Agora todas as leituras paginam.
+- **Grupo fora da matriz = liberação total:** grupo vinculado ao produto sem regra na matriz vê tudo; aluno em grupo com regra **e** em grupo fora da matriz fica com liberação total. Só grupos da matriz têm datas; entre eles vale a menor prioridade e, no empate, a regra mais antiga. “Por que este aluno” explica a liberação total.
+- **Meta não trava mais:** `concluir_meta` deixou de trancar a aula — libera na data da regra/planilha (e antecipa se o plano do aluno for mais cedo).
+- **LegProc/PDFull pelo produto:** abrir e baixar aceitam também o acesso pelo produto (antes só a ACL de pasta — 79 documentos de Civil/Empresarial/Agrário/Consumidor não abriam para quem só tinha o produto).
+- **Data base do item** não prevalece mais sobre a regra de segmento do módulo (causa do bloqueio de Agosto até 14/11).
+- **Mensagem correta:** material com data futura mostra “Ainda não liberado — será liberado em dd/mm/aaaa” em vez de “Você não tem acesso”.
+
+
 ## 4.20.0 — 2026-11-13
 
 **Atualizações dos materiais: data, hora e rótulo separados e ocultáveis**

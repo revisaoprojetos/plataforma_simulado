@@ -140,7 +140,8 @@ export async function explicarAlunoNoProduto(tenantId: string, estudanteId: stri
   dispSegRows.forEach((r) => todosSegIds.add(r.segmento_id))
   for (const c of chunk80([...todosSegIds])) { const { data } = await svc.from('simulado_segmentos').select('id, nome').eq('tenant_id', tenantId).in('id', c); for (const s of (data ?? []) as any[]) segNomes.set(s.id, s.nome) }
   const nomeSeg = (id: string) => segNomes.get(id) ?? '(segmento)'
-  const segDispDe = (alvoId: string) => dispSegRows.filter((r) => r.alvo_id === alvoId && noSegDisp.get(r.segmento_id)).sort((a, b) => a.prioridade - b.prioridade || (a.criado_em < b.criado_em ? -1 : 1))[0] ?? null
+  const totalIds = porSegBase?.liberacaoTotal ?? null // D1/D2: grupo vinculado ao produto FORA da matriz → liberação total
+  const segDispDe = (alvoId: string) => totalIds ? null : dispSegRows.filter((r) => r.alvo_id === alvoId && noSegDisp.get(r.segmento_id)).sort((a, b) => a.prioridade - b.prioridade || (a.criado_em < b.criado_em ? -1 : 1))[0] ?? null
 
   const momentoDe = (id: string): Date | null => {
     const m = porId.get(id); if (!m) return null
@@ -190,6 +191,7 @@ export async function explicarAlunoNoProduto(tenantId: string, estudanteId: stri
     const passosLib: string[] = []
     let origemLib: CamadaExplicada['origem'] = { rotulo: 'Disponibilidade do módulo/aula', href: hrefProduto(produtoId, 'conteudos') }
     const segRow = segDispDe(alvoId)
+    if (totalIds) { passosLib.push(`Liberação total: grupo ${totalIds.map((g) => `"${nomeGrupos.get(g) ?? g.slice(0, 8)}"`).join(', ')} fora da matriz — as regras de liberação por segmento/data/cronograma não se aplicam a este aluno.`); origemLib = { rotulo: 'Grupos de acesso do produto (fora da matriz)', href: hrefProduto(produtoId, 'grupos') } }
     if (verTudo) passosLib.push('Aluno é testador global / impersonation: o motor de cronograma abre tudo para ele.')
     if (det.excecao) { passosLib.push(`Exceção manual vigente: ${det.excecao.acao === 'liberar' ? 'LIBERA' : 'BLOQUEIA'}${det.excecao.motivo ? ` — ${det.excecao.motivo}` : ''}. Vence cronograma, planilha, plano e disponibilidade.`); origemLib = { rotulo: 'Exceções da Liberação de aulas', href: hrefLiberacaoAulas(produtoId, 'excecoes') } }
     if (det.governada) {
@@ -219,14 +221,14 @@ export async function explicarAlunoNoProduto(tenantId: string, estudanteId: stri
     // vencedora: a 1ª camada que barra; se nenhuma barra, a liberação com regra explícita (senão o acesso)
     const camadas = [camProduto, camVis, camLib]
     const barra = camadas.find((c) => c.efeito !== 'liberado')
-    const explicita = !!det.excecao || det.governada || !!segRow
+    const explicita = !!det.excecao || det.governada || !!segRow || !!totalIds
     const venc = barra ?? (explicita ? camLib : camProduto)
     venc.vencedora = true
     const estado: EfeitoRegra = barra ? barra.efeito : 'liberado'
     const liberada = !barra
     out.push({
       alvoId, titulo: m.titulo, tipo, disciplina: raizDe(alvoId), liberada, estado, camadas,
-      resumo: liberada ? `Liberada para o aluno. Camada decisiva: ${venc.titulo}${venc.chave === 'liberacao' && explicita ? ` — ${det.excecao ? 'exceção manual' : det.governada ? 'regra de cronograma' : 'regra de segmento'}` : ''}.`
+      resumo: liberada ? `Liberada para o aluno. Camada decisiva: ${venc.titulo}${venc.chave === 'liberacao' && explicita ? ` — ${det.excecao ? 'exceção manual' : totalIds ? 'liberação total (grupo fora da matriz)' : det.governada ? 'regra de cronograma' : 'regra de segmento'}` : ''}.`
         : `${estado === 'oculto' ? 'Oculta' : 'Bloqueada'} para o aluno pela camada "${venc.titulo}": ${venc.chave === 'liberacao' ? motivoBloq : venc.passos.find((p) => /barra|Não|NÃO|bloque|rascunho|atualização/i.test(p)) ?? venc.rotulo}`,
     })
   }

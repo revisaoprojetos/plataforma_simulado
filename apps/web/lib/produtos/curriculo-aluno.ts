@@ -4,7 +4,7 @@ import { materialDoItem, MATERIAIS, type Disponibilidade, type TipoRef, type Mat
 import { parseReferenciaVideoProprio, referenciaVideoProprio } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 import { regrasSegmentoDoAluno } from '@/lib/segmentos/regras-produto'
-import { liberacaoAulasDoAluno, ehSentinelaMeta, ehSentinelaBloqueio, MSG_AGUARDA_META, MSG_BLOQUEADO_ADMIN } from './liberacao-aulas-aluno'
+import { liberacaoAulasDoAluno, ehDispCronograma, ehSentinelaMeta, ehSentinelaBloqueio, MSG_AGUARDA_META, MSG_BLOQUEADO_ADMIN } from './liberacao-aulas-aluno'
 import { ContextoAluno } from '@/lib/segmentos/avaliar'
 import { resumoCronogramaDoAluno, type ResumoCronograma } from './resumo-cronograma'
 
@@ -292,6 +292,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   for (const i of irows) { const l = aulasPorModulo.get(i.modulo_id) ?? []; l.push(i); aulasPorModulo.set(i.modulo_id, l) }
   const filhos = new Map<string | null, any[]>()
   const ids = new Set(mrows.map((m: any) => m.id))
+  const paiDe = new Map<string, string | null>(mrows.map((m: any) => [m.id as string, (m.pai_id ?? null) as string | null]))
   for (const m of mrows) { const pai = m.pai_id && ids.has(m.pai_id) ? m.pai_id : null; const l = filhos.get(pai) ?? []; l.push(m); filhos.set(pai, l) }
 
   // herdado = liberação do(s) módulo(s) acima: uma aula nunca libera antes do módulo que a contém.
@@ -312,13 +313,16 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     // FAMÍLIA DA AULA: os materiais da mesma aula (PDFull, PDFlash, LegProc…) seguem a MESMA liberação. Item sem data
     // própria (na matrícula) herda a mais tardia das datas dos irmãos; data explícita no próprio item é respeitada.
     const irmaos = aulasPorModulo.get(m.id) ?? []
-    const dispItem = (i: any) => normDisp(porSeg ? porSeg.disp(i.id, i.disponibilidade) : i.disponibilidade)
+    // T4: se o aluno tem REGRA de segmento para o módulo (ou ancestral) e o item não tem regra própria, a data BASE do item
+    // não vale (não pode atrasar além da regra do módulo) — a regra da matriz governa.
+    const regraNaCadeia = !!porSeg?.temRegra && (() => { let c: string | null = m.id; let g = 0; while (c && g++ < 50) { if (porSeg!.temRegra!(c)) return true; c = paiDe.get(c) ?? null } return false })()
+    const dispItem = (i: any) => normDisp(porSeg ? porSeg.disp(i.id, regraNaCadeia && !porSeg.temRegra?.(i.id) && !ehDispCronograma(i.disponibilidade) ? null : i.disponibilidade) : i.disponibilidade)
     const libFamilia = irmaos.reduce<Date | null>((acc, i) => maisTarde(acc, momentoLiberacao(dispItem(i), matricula)), null)
     for (const i of irmaos) {
       const segA = visivel(i.id)
       if (segA === 'oculto') continue
       const exclusivo = exclusivoM || segA === 'cadeado'
-      const di = normDisp(porSeg ? porSeg.disp(i.id, i.disponibilidade) : i.disponibilidade)
+      const di = dispItem(i)
       const libProprio = momentoLiberacao(di, matricula)
       const lib = maisTarde(libM, libProprio ?? libFamilia)
       const noPrazo = !lib || +lib <= agora
@@ -379,11 +383,14 @@ export async function videoLiberadoPorProduto(
 async function itensLiberadosPorProduto(
   svc: any, tenantId: string, estudanteId: string, lista: any[],
   temAcesso: (produtoId: string) => Promise<boolean>,
+  /** Diagnóstico (T5): `temProduto` = o doc está numa aula ativa de produto a que o aluno tem acesso; `liberaEm` = menor data futura. */
+  coletor?: { temProduto: boolean; liberaEm: Date | null },
 ): Promise<boolean> {
   if (!lista.length) return false
   for (const produtoId of [...new Set(lista.map((i) => i.produto_id as string))]) {
     const { data: prod } = await svc.from('simulado_produtos').select('id').eq('tenant_id', tenantId).eq('id', produtoId).eq('ativo', true).maybeSingle()
     if (!prod || !(await temAcesso(produtoId))) continue
+    if (coletor) coletor.temProduto = true
     // Disponibilidade: a aula (e o módulo dela) precisam já estar liberados para este aluno.
     const matricula = await matriculaNoProduto(svc, tenantId, estudanteId, produtoId).catch(() => null)
     // Segmentos: a aula, o módulo e o módulo pai precisam estar visíveis (nem oculto nem cadeado).
@@ -396,10 +403,13 @@ async function itensLiberadosPorProduto(
       if (visivel(it.id) !== 'visivel' || visivel(it.modulo_id) !== 'visivel') continue
       const { data: mod } = await svc.from('simulado_produto_modulos').select('disponibilidade, pai_id, deletado').eq('tenant_id', tenantId).eq('id', it.modulo_id).maybeSingle()
       if (!mod || (mod as any).deletado) continue
-      let lib = momentoLiberacao(normDisp(dEf(it.id, it.disponibilidade)), matricula)
+      // T4: regra de segmento no módulo/pai e item sem regra própria → a data BASE do item não atrasa além da regra.
+      const regraMod = !!porSeg?.temRegra && (porSeg.temRegra(it.modulo_id) || (!!(mod as any).pai_id && porSeg.temRegra((mod as any).pai_id)))
+      const dItem = (id: string, base: unknown) => dEf(id, regraMod && !porSeg?.temRegra?.(id) && !ehDispCronograma(base) ? null : base)
+      let lib = momentoLiberacao(normDisp(dItem(it.id, it.disponibilidade)), matricula)
       if (!lib) { // sem data própria: herda a mais tardia dos materiais irmãos da mesma aula (PDFull/PDFlash/LegProc…)
         const { data: irm } = await svc.from('simulado_produto_modulo_itens').select('id, disponibilidade').eq('tenant_id', tenantId).eq('modulo_id', it.modulo_id).eq('deletado', false).eq('situacao', 'ativo').limit(50)
-        for (const x of (irm ?? []) as any[]) { const lx = momentoLiberacao(normDisp(dEf(x.id, x.disponibilidade)), matricula); if (lx && (!lib || lx > lib)) lib = lx }
+        for (const x of (irm ?? []) as any[]) { const lx = momentoLiberacao(normDisp(dItem(x.id, x.disponibilidade)), matricula); if (lx && (!lib || lx > lib)) lib = lx }
       }
       const lm = momentoLiberacao(normDisp(dEf(it.modulo_id, (mod as any).disponibilidade)), matricula)
       if (lm && (!lib || lm > lib)) lib = lm
@@ -411,7 +421,25 @@ async function itensLiberadosPorProduto(
         if (lp && (!lib || lp > lib)) lib = lp
       }
       if (!lib || +lib <= Date.now()) return true
+      if (coletor && lib.getUTCFullYear() < 9000 && (!coletor.liberaEm || lib < coletor.liberaEm)) coletor.liberaEm = lib // sentinelas (meta/bloqueio) não são data
     }
   }
   return false
+}
+
+/**
+ * Diagnóstico para o leitor (T5): o aluno TEM acesso a algum produto cuja aula ativa aponta para este documento, mas a aula
+ * ainda não liberou (data/regra)? Devolve `liberaEm` (ISO) quando houver data. Mesmo núcleo de `docLiberadoPorProduto`.
+ */
+export async function docAindaNaoLiberadoPorProduto(
+  svc: any, tenantId: string, estudanteId: string, documentoId: string,
+  temAcesso: (produtoId: string) => Promise<boolean>,
+): Promise<{ aindaNaoLiberado: boolean; liberaEm: string | null }> {
+  const { data: itens } = await svc.from('simulado_produto_modulo_itens')
+    .select('id, produto_id, modulo_id, disponibilidade')
+    .eq('tenant_id', tenantId).eq('ref_id', documentoId).eq('tipo_ref', 'documento_biblioteca')
+    .eq('deletado', false).eq('situacao', 'ativo').limit(50)
+  const col = { temProduto: false, liberaEm: null as Date | null }
+  const ok = await itensLiberadosPorProduto(svc, tenantId, estudanteId, (itens ?? []) as any[], temAcesso, col)
+  return { aindaNaoLiberado: !ok && col.temProduto, liberaEm: !ok && col.liberaEm ? col.liberaEm.toISOString() : null }
 }
