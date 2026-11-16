@@ -4,7 +4,7 @@
 // persiste entre card/tabela) e a barra de ações em lote (fixa no rodapé, com contador).
 
 import { useCallback, useRef, useState } from 'react'
-import { Check, Minus, X, MoreHorizontal, FolderInput, Eye, EyeOff, Trash2, Users2, Layers, Settings2, History, Type, CircleDot } from 'lucide-react'
+import { Check, Minus, X, MoreHorizontal, FolderInput, Eye, EyeOff, Trash2, Users2, Layers, Settings2, History, Type, CircleDot, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -67,7 +67,7 @@ export function useSelecaoIds() {
   return { sel, alternar, todos, limpar, manter }
 }
 
-export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'lixeira'
+export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'baixar' | 'lixeira'
 
 /** Barra de ação em lote: fixa no rodapé, sem ocupar largura útil da página. */
 export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModelo, onTodos, onLimpar, onSair, onAcao }: {
@@ -87,6 +87,7 @@ export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModel
         <button type="button" onClick={onTodos} className={btn}>{todosMarcados ? 'Desmarcar todos' : `Selecionar todos (${totalVisivel})`}</button>
         <button type="button" onClick={onLimpar} disabled={off} className={btn}>Limpar</button>
         <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+        <button type="button" onClick={() => onAcao('baixar')} disabled={off} className={btn}><Download className="h-3.5 w-3.5" />Baixar</button>
         <button type="button" onClick={() => onAcao('mover')} disabled={off} className={btn}><FolderInput className="h-3.5 w-3.5" />Mover</button>
         <button type="button" onClick={() => onAcao('status')} disabled={off} className={btn}><CircleDot className="h-3.5 w-3.5" />Status</button>
         {!ehModelo && <button type="button" onClick={() => onAcao('acesso')} disabled={off} className={btn}><Users2 className="h-3.5 w-3.5" />Acesso</button>}

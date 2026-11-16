@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { CapaPaginaDialog } from '@/components/biblioteca/capa-pagina-dialog'
 import { CheckSelecao, BarraLote, useSelecaoIds, type AcaoBarra } from '@/components/biblioteca/selecao-lote'
-import { LoteDialog, type InicialLote } from '@/components/biblioteca/lote-dialogs'
+import { LoteDialog, type InicialLote, type SecaoLote } from '@/components/biblioteca/lote-dialogs'
 import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
 import type { AlvoLote, AcaoLote, ResultadoLote } from './lote-actions-tipos'
 import type { AlvoCP } from './capa-actions-tipos'
@@ -176,7 +176,7 @@ export function BibliotecaClient() {
   const [modoSel, setModoSel] = useState(false)
   const selDocs = useSelecaoIds()
   const selPastas = useSelecaoIds()
-  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: AcaoLote['tipo'][]; config?: boolean; inicial?: InicialLote } | null>(null)
+  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: SecaoLote[]; config?: boolean; inicial?: InicialLote } | null>(null)
   const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
   const limparSelecao = () => { selDocs.limpar(); selPastas.limpar() }
   const sairSelecao = () => { limparSelecao(); setModoSel(false) }
@@ -255,8 +255,9 @@ export function BibliotecaClient() {
   function acaoLote(a: AcaoBarra) {
     const alvo = alvoSelecao()
     if (a === 'atualizacao') { setRegAtualizacao(alvo); return }
-    const abrir = (titulo: string, secoes: AcaoLote['tipo'][], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo, secoes, ...extra })
-    if (a === 'mover') abrir('Mover para a pasta', ['mover'])
+    const abrir = (titulo: string, secoes: SecaoLote[], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo, secoes, ...extra })
+    if (a === 'baixar') abrir('Baixar documentos', ['baixar'])
+    else if (a === 'mover') abrir('Mover para a pasta', ['mover'])
     else if (a === 'status') abrir('Alterar status', ['status'])
     else if (a === 'categoria') abrir('Alterar categoria', ['categoria'])
     else if (a === 'acesso') abrir('Configurar acesso', ['acesso'])
@@ -272,6 +273,9 @@ export function BibliotecaClient() {
       alvo: { docIds: [], pastaIds: [p.id], incluirSubpastas: true, categoria },
       secoes: ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], config: true,
     })
+  }
+  function baixarPasta(p: PastaConteudo) {
+    setLoteDlg({ titulo: `Baixar pasta “${p.nome}”`, alvo: { docIds: [], pastaIds: [p.id], incluirSubpastas: true, categoria }, secoes: ['baixar'] })
   }
   function loteConcluido(r: ResultadoLote) {
     setLoteDlg(null)
@@ -768,6 +772,7 @@ export function BibliotecaClient() {
                         onTipoMaterialCron={(t) => definirTipoMaterialCron(p, t)}
                         onLegendaTabela={(o) => definirLegendaTabela(p, o)}
                         onConfigurar={ehModelo ? undefined : () => configurarPasta(p)}
+                        onBaixar={() => baixarPasta(p)}
                       />
                     }
                   />

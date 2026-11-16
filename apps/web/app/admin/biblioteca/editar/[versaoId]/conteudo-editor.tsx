@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Eye, ClipboardPen } from 'lucide-react'
+import { ArrowLeft, Eye, ClipboardPen, Download, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { OpcoesDownload, capaAplicavel } from '@/components/biblioteca/download-opcoes'
+import { baixarDoServidor } from '@/lib/conteudo/download-admin-cliente'
+import type { FormatoDownload } from '@/lib/conteudo/download-admin-pura'
 import type { PaletaBlocos } from '@/lib/conteudo/blocos-palette'
 import { RegistrarAtualizacaoDialog } from '@/components/biblioteca/gestao/registrar-atualizacao-dialog'
 
@@ -24,6 +28,20 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
   registroAtivo?: boolean
 }) {
   const [registrando, setRegistrando] = useState(false)
+  // Baixar (mesmo serviço do lote): formato + "Incluir capa". Baixa a versão SALVA (alterações não salvas no editor não entram).
+  const [dlAberto, setDlAberto] = useState(false)
+  const [dlFormato, setDlFormato] = useState<FormatoDownload[]>(['pdf'])
+  const [dlCapa, setDlCapa] = useState(false)
+  const [dlBusy, setDlBusy] = useState(false)
+  async function baixar() {
+    if (!documentoId || dlBusy) return
+    setDlBusy(true)
+    const r = await baixarDoServidor({ documentoIds: [documentoId], versaoId, formatos: dlFormato, incluirCapa: dlCapa && capaAplicavel(dlFormato) })
+    setDlBusy(false)
+    if (!r.ok) { toast.error(r.message); return }
+    if (r.aviso) toast.warning(r.aviso); else toast.success('Download concluído.')
+    setDlAberto(false)
+  }
   const montado = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -106,9 +124,24 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
             <span className="text-sm font-semibold">{titulo}</span>
             <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">{registroAtivo ? 'Rascunho · o aluno só vê ao publicar em “Registrar atualização”' : 'Rascunho · salvar re-reconcilia os grifos'}</span>
             {podeRegistrar && documentoId && (
-              <button type="button" onClick={() => setRegistrando(true)} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><ClipboardPen className="h-4 w-4" /> Registrar atualização</button>
+              <button type="button" onClick={() => setRegistrando(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><ClipboardPen className="h-4 w-4" /> Registrar atualização</button>
             )}
-            <a href={`/admin/biblioteca/editar/${versaoId}?preview=1`} target="_blank" rel="noopener noreferrer" className={`${podeRegistrar && documentoId ? '' : 'ml-auto '}inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary`}><Eye className="h-4 w-4" /> Ver com valores</a>
+            {documentoId && (
+              <div className="relative ml-auto">
+                <button type="button" onClick={() => setDlAberto((v) => !v)} aria-expanded={dlAberto} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><Download className="h-4 w-4" /> Baixar</button>
+                {dlAberto && (
+                  <div className="absolute right-0 top-full z-[60] mt-1.5 w-80 space-y-3 rounded-xl border bg-card p-3 shadow-xl">
+                    <OpcoesDownload formatos={dlFormato} onFormatos={setDlFormato} multi={false} incluirCapa={dlCapa} onIncluirCapa={setDlCapa} />
+                    <p className="text-[11px] text-muted-foreground">Baixa a versão salva deste documento, com o título como nome do arquivo.</p>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setDlAberto(false)} disabled={dlBusy} className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60">Fechar</button>
+                      <button type="button" onClick={() => void baixar()} disabled={dlBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">{dlBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}{dlBusy ? 'Gerando…' : 'Baixar'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <a href={`/admin/biblioteca/editar/${versaoId}?preview=1`} target="_blank" rel="noopener noreferrer" className={`${documentoId ? '' : 'ml-auto '}inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary`}><Eye className="h-4 w-4" /> Ver com valores</a>
           </>
         )}
       </header>

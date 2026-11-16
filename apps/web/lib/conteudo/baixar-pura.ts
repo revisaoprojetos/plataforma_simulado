@@ -96,6 +96,8 @@ export async function montarPdfComCapa(
   opts: { descartarAntes?: number; titulo?: string } = {},
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true, updateMetadata: false })
+  // PDF criptografado: o pdf-lib NÃO decifra; salvar com ignoreEncryption geraria páginas ilegíveis (arquivo corrompido). Recusa → o chamador entrega o original.
+  if (doc.isEncrypted) throw new Error('pdf criptografado')
   const total = doc.getPageCount()
   if (total < 1) throw new Error('pdf sem páginas')
   const skip = Math.max(0, Math.min(Math.trunc(opts.descartarAntes ?? 0), total - 1)) // nunca descarta tudo

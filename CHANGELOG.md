@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.22.0 — 2026-11-16
+
+**Download em lote da Biblioteca (ZIP), opção "Incluir capa" e download com capa no editor**
+- **Biblioteca (admin e Revisão):** botão **Baixar** na barra de seleção em lote e **Baixar pasta…** no menu da pasta (com subpastas). Formatos: Original, PDF e, para documentos DOCX, ODT/RTF/TXT (os mesmos "Baixar como" do editor).
+- **Incluir capa:** aplica a capa do documento (ou a da pasta) como 1ª página, respeitando a "página inicial" que oculta páginas. Vale para PDF e Original; DOCX com capa sai em PDF (avisado na tela); nos demais formatos a opção fica desabilitada.
+- **Editor:** botão **Baixar** no cabeçalho com escolha de formato e caixa "Incluir capa" (baixa a versão salva).
+- **ZIP com nomes certos:** título do documento + extensão correta, duplicados "(2)", "(3)", caracteres inválidos e nomes reservados do Windows tratados, acentos/emoji preservados; opção de manter a estrutura de pastas; `_relatorio.txt` lista falhas e avisos sem derrubar o lote. Limites: 200 documentos, 350 MB, 270 s.
+- **Integridade (verificada com PDFs/ZIPs reais em teste):** PDF protegido por senha não sai mais ilegível com capa (entrega sem capa e avisa); arquivo vazio, página de erro do storage ou PDF truncado não entram mais no ZIP (vão para o relatório); o navegador recusa salvar HTML de sessão expirada como se fosse o arquivo. 29 testes novos (páginas, ordem, capa, sha256 dos arquivos no ZIP, nomes, cabeçalhos).
+- Auditoria de cada download (`download_admin`). Sem migração nova.
+
 ## 4.21.0 — 2026-11-16
 
 **Rastreio de acessos (alunos e equipe), API pública v1 e uso da API + correções de segurança**

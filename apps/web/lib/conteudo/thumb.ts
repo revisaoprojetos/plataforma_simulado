@@ -100,8 +100,13 @@ export async function gerarThumbDocumento(tenantId: string, documentoId: string,
 // ── PDF da versão (documento INTEIRO) via OnlyOffice ConvertService — para a prévia grande, carregada
 // progressivamente pelo visualizador de PDF nativo do navegador. Cacheado por versão/hash no storage. ──
 export async function converterDocxParaPdf(url: string, key: string, fileType = 'docx'): Promise<Buffer | null> {
+  return converterDocx(url, key, fileType, 'pdf')
+}
+
+/** Conversão genérica pelo ConvertService (Baixar como do OnlyOffice): pdf, odt, rtf, txt. */
+export async function converterDocx(url: string, key: string, fileType: string, outputtype: string): Promise<Buffer | null> {
   const payload: Record<string, any> = {
-    async: false, filetype: fileType, outputtype: 'pdf',
+    async: false, filetype: fileType, outputtype,
     key: key.replace(/[^a-z0-9_-]/gi, '').slice(0, 60), title: `doc.${fileType}`, url,
   }
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' }
@@ -148,7 +153,7 @@ export async function chaveDocxVariante(tenantId: string, versaoId: string, arqu
 
 
 /** PDF (doc inteiro) da versão atual/mais nova. Se já é PDF, devolve o original. Cacheado. null = falhou. */
-export async function gerarPdfDocumento(tenantId: string, documentoId: string, areas?: ResolucaoAreas): Promise<string | null> {
+export async function gerarPdfDocumento(tenantId: string, documentoId: string, areas?: ResolucaoAreas, versaoIdFixa?: string): Promise<string | null> {
   try {
     const svc = createAdminClient()
     const { data: doc } = await svc.from('simulado_conteudo_documentos')
@@ -156,7 +161,8 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string, a
     if (!doc) return null
     const campos = 'id, arquivo_key, hash_arquivo, paginas'
     let ver: any = null
-    if ((doc as any).versao_atual_id) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('id', (doc as any).versao_atual_id).maybeSingle()).data
+    if (versaoIdFixa) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('id', versaoIdFixa).maybeSingle()).data // versão pedida (ex.: rascunho aberto no editor)
+    if (!ver && (doc as any).versao_atual_id) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('id', (doc as any).versao_atual_id).maybeSingle()).data
     if (!ver) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', documentoId).order('numero', { ascending: false }).limit(1).maybeSingle()).data
     if (!ver?.arquivo_key) return null
     if ((doc as any).tipo_origem === 'pdf') return await urlAssinadaOriginal(ver.arquivo_key, 3600) // já é PDF

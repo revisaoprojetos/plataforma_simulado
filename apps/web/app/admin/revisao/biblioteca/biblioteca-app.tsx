@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { AlertTriangle, ChevronRight, CircleDot, Eye, EyeOff, FolderInput, History, Settings2, Users2, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
-import { LoteDialog, type InicialLote } from '@/components/biblioteca/lote-dialogs'
+import { AlertTriangle, ChevronRight, CircleDot, Download, Eye, EyeOff, FolderInput, History, Settings2, Users2, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
+import { LoteDialog, type InicialLote, type SecaoLote } from '@/components/biblioteca/lote-dialogs'
 import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
 import type { AlvoLote, AcaoLote, ResultadoLote } from '@/app/admin/biblioteca/lote-actions-tipos'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -108,7 +108,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
   const [metaLote, setMetaLote] = useState(false)
   const [emLote, setEmLote] = useState<string | null>(null)
   // Ações em lote unificadas (mesmo LoteDialog/lote-actions da Biblioteca do Drive): status, acesso, configurar, registrar atualização
-  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: AcaoLote['tipo'][]; config?: boolean; inicial?: InicialLote } | null>(null)
+  const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: SecaoLote[]; config?: boolean; inicial?: InicialLote } | null>(null)
   const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
   const ancora = useRef<string | null>(null)
   const [subQ, setSubQ] = useState<SubAbaQ>(subQInicial)
@@ -207,8 +207,9 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
     ancora.current = id
   }
   const alvoSel = (): AlvoLote => ({ docIds: [...sel], pastaIds: [], incluirSubpastas: false, categoria })
-  const abrirLote = (titulo: string, secoes: AcaoLote['tipo'][], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo: alvoSel(), secoes, ...extra })
+  const abrirLote = (titulo: string, secoes: SecaoLote[], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo: alvoSel(), secoes, ...extra })
   const configurarPasta = (id: string, nome: string) => setLoteDlg({ titulo: `Configurar pasta “${nome}”`, alvo: { docIds: [], pastaIds: [id], incluirSubpastas: true, categoria }, secoes: ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], config: true })
+  const baixarPasta = (id: string, nome: string) => setLoteDlg({ titulo: `Baixar pasta “${nome}”`, alvo: { docIds: [], pastaIds: [id], incluirSubpastas: true, categoria }, secoes: ['baixar'] })
   function loteConcluido(r: ResultadoLote) {
     setLoteDlg(null)
     const falhos = r.itens.filter((i) => !i.ok).map((i) => i.id)
@@ -380,6 +381,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <b className="mr-1 text-sm">{sel.size} {sel.size === 1 ? 'selecionado' : 'selecionados'}</b>
           <Button size="sm" variant="outline" disabled={!!emLote || !resumo.temOculto} onClick={() => void lote('Mostrando ao aluno', ids, (id) => definirVisibilidadeConteudo(id, true), 'Visíveis ao aluno')}><Eye />Mostrar ao aluno</Button>
           <Button size="sm" variant="outline" disabled={!!emLote || !resumo.temOculto} onClick={() => void lote('Escondendo do aluno', ids, (id) => definirVisibilidadeConteudo(id, false), 'Escondidos do aluno')}><EyeOff />Ocultar do aluno</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Baixar documentos', ['baixar'])}><Download />Baixar</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setMoverLote(true)}><FolderInput />Mover para…</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setMetaLote(true)}><Tags />Editar metadados</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void lote('Publicando', ids, (id) => publicarDocumento(id), 'Publicados')}><SquarePen />Publicar</Button>
@@ -415,7 +417,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <PastasPainel arvore={arv?.arvore ?? null} pasta={st.pasta} onPasta={abrirPasta} onPrefetch={(id) => prefetch({ ...st, pasta: id, page: 1 })} podeEditar={podeEditar}
             ocultarVazias={ocultarVazias} onOcultarVazias={setOcultarVazias} onMudou={() => void recarregar()}
             onAcessoPasta={(id, nome) => setAcessoPasta({ id, nome })} onCapaPasta={(id) => setCapa({ tipo: 'pasta', id })} carregando={carregando}
-            onConfigurarPasta={podeEditar ? configurarPasta : undefined}
+            onConfigurarPasta={podeEditar ? configurarPasta : undefined} onBaixarPasta={baixarPasta}
             cabecalho={podeEditar ? (
               <div className="px-2 pb-1.5">
                 <Button type="button" variant="outline" size="sm" className="w-full justify-start" onClick={() => setUnificar(true)} title="Juntar disciplinas (pastas) repetidas ou parecidas"><Merge />Unificar disciplinas</Button>

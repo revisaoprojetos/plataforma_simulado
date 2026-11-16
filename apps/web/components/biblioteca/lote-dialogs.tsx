@@ -8,16 +8,21 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, X, FolderInput, CircleCheck, CircleAlert, ImageIcon, History } from 'lucide-react'
+import { Loader2, X, FolderInput, CircleCheck, CircleAlert, ImageIcon, History, Download } from 'lucide-react'
 import { Overlay, MoverConteudoDialog } from '@/components/biblioteca/menus-drive'
 import { CheckSelecao } from '@/components/biblioteca/selecao-lote'
+import { OpcoesDownload, capaAplicavel } from '@/components/biblioteca/download-opcoes'
+import { baixarDoServidor } from '@/lib/conteudo/download-admin-cliente'
+import { DL_MAX_DOCS, type FormatoDownload } from '@/lib/conteudo/download-admin-pura'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { listarPastasConteudo, listarGruposBiblioteca } from '@/app/admin/biblioteca/actions'
 import { previaLote, executarLote } from '@/app/admin/biblioteca/lote-actions'
 import type { Categoria } from '@/app/admin/biblioteca/actions-tipos'
 import type { AlvoLote, AcaoLote, PreviaLote, ResultadoLote, StatusLote, ModoAcessoLote } from '@/app/admin/biblioteca/lote-actions-tipos'
 
-type Secao = AcaoLote['tipo']
+type Secao = AcaoLote['tipo'] | 'baixar'
+/** Seções aceitas pelo LoteDialog ('baixar' = download em lote, sem escrita). */
+export type SecaoLote = Secao
 
 export type InicialLote = Partial<{ status: StatusLote; acesso: ModoAcessoLote; oculto: boolean; categoria: Categoria }>
 
@@ -25,7 +30,7 @@ const SEL = 'h-9 w-full rounded-lg border bg-background px-2.5 text-sm outline-n
 const ROTULO_CATEGORIA: Record<Categoria, string> = { conteudo: 'Conteúdos', modelo_caderno: 'Modelos de caderno', jurisclub: 'JurisClub' }
 const ROTULO_SECAO: Record<Secao, string> = {
   mover: 'Mover para a pasta', categoria: 'Categoria (coleção)', status: 'Status', acesso: 'Acesso dos alunos',
-  visibilidade: 'Visibilidade', legenda: 'Legenda de grifos', lixeira: 'Enviar para a lixeira',
+  visibilidade: 'Visibilidade', legenda: 'Legenda de grifos', lixeira: 'Enviar para a lixeira', baixar: 'Baixar',
 }
 
 export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo, pausado, onFechar, onConcluido, onCapa, onAtualizacao }: {
@@ -64,6 +69,11 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
   const [previa, setPrevia] = useState<PreviaLote | null>(null)
   const [fase, setFase] = useState<'form' | 'rodando' | 'resultado'>('form')
   const [resultado, setResultado] = useState<ResultadoLote | null>(null)
+  // Download em lote (secoes = ['baixar']): formatos, capa e estrutura de pastas. Nada é gravado no banco.
+  const modoBaixar = !config && secoes.includes('baixar')
+  const [formatosDl, setFormatosDl] = useState<FormatoDownload[]>(['original'])
+  const [capaDl, setCapaDl] = useState(false)
+  const [estruturaDl, setEstruturaDl] = useState(true)
 
   const forcaSub = ativos.has('categoria')
   const subEfetivo = incluirSub || forcaSub
@@ -109,9 +119,26 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
 
   const faltaDestino = ativos.has('mover') && destino === undefined
   const faltaLegenda = ativos.has('legenda') && !acoes.some((a) => a.tipo === 'legenda')
-  const podeAplicar = !!previa?.ok && !previa.excedeu && previa.totalDocs > 0 && acoes.length > 0 && !faltaDestino && !faltaLegenda && ativos.size === acoes.length
+  const excedeDl = modoBaixar && !!previa?.ok && previa.totalDocs > DL_MAX_DOCS
+  const podeBaixar = modoBaixar && !!previa?.ok && !previa.excedeu && previa.totalDocs > 0 && !excedeDl && formatosDl.length > 0
+  const podeAplicar = modoBaixar ? podeBaixar : !!previa?.ok && !previa.excedeu && previa.totalDocs > 0 && acoes.length > 0 && !faltaDestino && !faltaLegenda && ativos.size === acoes.length
+
+  async function baixar() {
+    if (!podeBaixar || !previa) return
+    setFase('rodando')
+    const r = await baixarDoServidor({
+      documentoIds: alvo.docIds, pastaIds: alvo.pastaIds, incluirSubpastas: alvo.incluirSubpastas,
+      formatos: formatosDl, incluirCapa: capaDl && capaAplicavel(formatosDl), manterEstrutura: estruturaDl && temPastas,
+    })
+    if (!r.ok) { toast.error(r.message); setFase('form'); return }
+    if (r.falhas > 0) toast.warning(`${r.geradas} de ${r.total} arquivo(s) baixado(s); ${r.falhas} falharam — veja o _relatorio.txt dentro do ZIP.`)
+    else if (r.avisos > 0) toast.success(`Download concluído (${r.avisos} aviso(s)${r.zip ? ' — veja o _relatorio.txt' : `: ${r.aviso ?? ''}`}).`)
+    else toast.success(r.zip ? `ZIP com ${r.geradas} arquivo(s) baixado.` : 'Download concluído.')
+    onFechar()
+  }
 
   async function aplicar() {
+    if (modoBaixar) { await baixar(); return }
     if (!podeAplicar || !previa) return
     if (ativos.has('lixeira')) {
       const ok = await confirmar({
@@ -129,7 +156,7 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
     } catch (e: any) { toast.error(e?.message || 'Falha ao executar o lote.'); setFase('form') }
   }
 
-  const mostrar = (s: Secao) => secoes.includes(s) && !(ehModelo && (s === 'acesso' || s === 'visibilidade' || s === 'legenda'))
+  const mostrar = (s: Secao) => !modoBaixar && secoes.includes(s) && !(ehModelo && (s === 'acesso' || s === 'visibilidade' || s === 'legenda'))
   const nomeAlvo = [
     alvoBase.pastaIds.length ? `${alvoBase.pastaIds.length} ${alvoBase.pastaIds.length === 1 ? 'pasta' : 'pastas'}` : '',
     alvoBase.docIds.length ? `${alvoBase.docIds.length} ${alvoBase.docIds.length === 1 ? 'documento' : 'documentos'}` : '',
@@ -161,8 +188,9 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
               <div className="flex items-center gap-2" aria-live="polite">
                 {!previa ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="text-muted-foreground">Calculando…</span></>
                   : !previa.ok ? <><CircleAlert className="h-4 w-4 text-destructive" /><span className="text-destructive">{previa.error}</span></>
+                  : excedeDl ? <><CircleAlert className="h-4 w-4 text-destructive" /><span className="text-destructive">A seleção tem {previa.totalDocs} documentos — o download aceita até {DL_MAX_DOCS} por vez. Baixe por pasta ou divida a seleção.</span></>
                   : previa.excedeu ? <><CircleAlert className="h-4 w-4 text-destructive" /><span className="text-destructive">A seleção tem mais de 1000 documentos — aplique por subpasta.</span></>
-                  : <span>Serão afetados <strong>{previa.totalDocs}</strong> {previa.totalDocs === 1 ? 'documento' : 'documentos'}{previa.totalPastas > 0 && <> em {previa.totalPastas} {previa.totalPastas === 1 ? 'pasta' : 'pastas'}</>}.</span>}
+                  : <span>{modoBaixar ? 'Serão baixados' : 'Serão afetados'} <strong>{previa.totalDocs}</strong> {previa.totalDocs === 1 ? 'documento' : 'documentos'}{previa.totalPastas > 0 && <> em {previa.totalPastas} {previa.totalPastas === 1 ? 'pasta' : 'pastas'}</>}.</span>}
               </div>
               {previa?.ok && previa.amostra.length > 0 && (
                 <ul className="text-xs text-muted-foreground">
@@ -173,6 +201,12 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
             </div>
 
             <div className="space-y-2.5">
+              {modoBaixar && (
+                <div className="rounded-xl border p-3">
+                  <OpcoesDownload formatos={formatosDl} onFormatos={setFormatosDl} multi incluirCapa={capaDl} onIncluirCapa={setCapaDl} manterEstrutura={temPastas ? estruturaDl : undefined} onManterEstrutura={temPastas ? setEstruturaDl : undefined} />
+                  <p className="mt-2 text-[11px] text-muted-foreground">{previa?.ok && previa.totalDocs === 1 && formatosDl.length === 1 ? 'Um documento em um formato baixa o arquivo direto.' : 'Vários arquivos saem em um ZIP (nomes = título do documento; repetidos ganham “ (2)”), com um _relatorio.txt dos itens que falharem.'}</p>
+                </div>
+              )}
               {mostrar('mover') && (
                 <SecaoBox {...sp('mover')}>
                   <div className="flex items-center gap-2">
@@ -284,7 +318,7 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
                 className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-50 ${ativos.has('lixeira') ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}
               >
                 {fase === 'rodando' && <Loader2 className="h-4 w-4 animate-spin" />}
-                {fase === 'rodando' ? 'Aplicando…' : previa?.ok ? `Aplicar em ${previa.totalDocs} ${previa.totalDocs === 1 ? 'documento' : 'documentos'}` : 'Aplicar'}
+                {modoBaixar ? (fase === 'rodando' ? 'Gerando arquivos…' : <><Download className="h-4 w-4" />{previa?.ok ? `Baixar ${previa.totalDocs} ${previa.totalDocs === 1 ? 'documento' : 'documentos'}` : 'Baixar'}</>) : fase === 'rodando' ? 'Aplicando…' : previa?.ok ? `Aplicar em ${previa.totalDocs} ${previa.totalDocs === 1 ? 'documento' : 'documentos'}` : 'Aplicar'}
               </button>
             </div>
           </>

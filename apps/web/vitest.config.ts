@@ -3,6 +3,7 @@
 // fase seguinte (precisa do app + banco de teste no ar).
 // Config como objeto simples (sem importar 'vitest/config') p/ rodar também via `npx vitest`.
 export default {
+  resolve: { alias: { '@': new URL('./', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').replace(/\/$/, '') } },
   test: {
     environment: 'node',
     include: ['lib/**/*.test.ts', 'app/**/*.test.ts'],
