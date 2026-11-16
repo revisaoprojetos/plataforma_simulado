@@ -101,6 +101,10 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/lixeira-purge?aplicar=1', 'cron lixeira-purge', (j) => !!j.totalPurgados) }, 86_400_000)
   // Retenção LGPD do registro de acessos do aluno (IP/UA): purga > ACESSOS_RETENCAO_DIAS (180). 24h, idempotente.
   setInterval(() => { void chamarCron('/api/cron/acessos-purge', 'cron acessos-purge', (j) => !!(j.atividades || j.acessos)) }, 86_400_000)
+  // Retenção do rastreio de uso da API (IP/UA): purga > API_USO_RETENCAO_DIAS (180). 24h, idempotente.
+  setInterval(() => { void chamarCron('/api/cron/api-uso-purge', 'cron api-uso-purge', (j) => !!j.apagadas) }, 86_400_000)
+  // Retenção do rastreio de acessos da EQUIPE (IP/UA): purga > ADMIN_RASTREIO_RETENCAO_DIAS (180). 24h, idempotente.
+  setInterval(() => { void chamarCron('/api/cron/admin-rastreio-purge', 'cron admin-rastreio-purge', (j) => !!(j.atividades || j.sessoes)) }, 86_400_000)
   // O4 — monitor de egress: alerta se o SQL agregado cair (causa do incidente) ou o Redis sumir. A cada 6h;
   // o worker só destaca no log quando NÃO está saudável (o web loga sempre).
   setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false) }, 21_600_000)

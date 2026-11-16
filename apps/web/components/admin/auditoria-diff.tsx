@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { GitCompare, ArrowRight, User, Clock, Globe, Monitor, Info } from 'lucide-react'
+import Link from 'next/link'
+import { GitCompare, ArrowRight, User, Clock, Globe, Monitor, Info, Copy, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { camposMudados } from '@/lib/auditoria/resumo'
 
@@ -18,6 +19,9 @@ interface Props {
   quando?: string
   ip?: string | null
   userAgent?: string | null
+  /** Contexto da requisição gravado pelo registrarAudit (rota, rota_api, request_id, sessao_id, status). */
+  ctx?: Record<string, unknown> | null
+  atorId?: string | null
 }
 
 const opCor: Record<string, string> = {
@@ -35,8 +39,14 @@ const opCor: Record<string, string> = {
 const jsonReplacer = (_k: string, v: unknown) =>
   typeof v === 'string' && (v.startsWith('data:') || v.length > 200) ? `${v.slice(0, 40)}…(${v.length} caracteres)` : v
 
-export function AuditoriaDiff({ antes, depois, raw, resumo, operacao, entidade, ator, quando, ip, userAgent }: Props) {
+export function AuditoriaDiff({ antes, depois, raw, resumo, operacao, entidade, ator, quando, ip, userAgent, ctx, atorId }: Props) {
   const [open, setOpen] = useState(false)
+  const [copiado, setCopiado] = useState(false)
+  const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
+  const rota = str(ctx?.rota), rotaApi = str(ctx?.rota_api), requestId = str(ctx?.request_id), sessaoId = str(ctx?.sessao_id)
+  const statusRaw = str(ctx?.status)
+  const sucesso = statusRaw !== 'erro'
+  const copiar = () => { if (requestId) { void navigator.clipboard?.writeText(requestId).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500) }).catch(() => {}) } }
   const mud = camposMudados(antes, depois)
   const isInsert = !antes && !!depois
   const isDelete = operacao === 'DELETE'
@@ -58,12 +68,35 @@ export function AuditoriaDiff({ antes, depois, raw, resumo, operacao, entidade, 
         <div className="space-y-4 text-sm">
           {resumo && <p className="rounded-lg border bg-muted/40 p-3 font-medium leading-snug">{resumo}</p>}
 
-          <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-            {ator && <Meta icon={User} label="Quem">{ator}</Meta>}
-            {quando && <Meta icon={Clock} label="Quando">{quando}</Meta>}
-            {entidade && <Meta icon={Info} label="Módulo"><span className="font-mono text-xs">{entidade}</span></Meta>}
-            {ip && <Meta icon={Globe} label="IP">{ip}</Meta>}
-            {userAgent && <Meta icon={Monitor} label="Dispositivo">{resumoUA(userAgent)}</Meta>}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Cartao titulo="Quando" icon={Clock}>
+              {quando ? <Linha rotulo="Data/hora">{quando}</Linha> : <Linha rotulo="Data/hora">—</Linha>}
+              {ator && <Linha rotulo="Quem">{ator}</Linha>}
+            </Cartao>
+            <Cartao titulo="Onde" icon={Globe}>
+              <Linha rotulo="IP">{ip ?? '—'}</Linha>
+              <Linha rotulo="Dispositivo">{userAgent ? resumoUA(userAgent) : '—'}</Linha>
+              <Linha rotulo="Página">{rota ? <span className="font-mono text-xs">{rota}</span> : '—'}</Linha>
+              <Linha rotulo="Rota da API">{rotaApi ? <span className="font-mono text-xs">{rotaApi}</span> : '—'}</Linha>
+            </Cartao>
+            <Cartao titulo="O quê" icon={Info}>
+              <Linha rotulo="Ação">{operacao ?? '—'}</Linha>
+              <Linha rotulo="Módulo / entidade">{entidade ? <span className="font-mono text-xs">{entidade}</span> : '—'}</Linha>
+              <Linha rotulo="Status">
+                <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-semibold', sucesso ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400')}>{sucesso ? 'Sucesso' : 'Erro'}</span>
+              </Linha>
+            </Cartao>
+            <Cartao titulo="Sessão" icon={Monitor}>
+              <Linha rotulo="Sessão">{sessaoId ? <span className="font-mono text-xs" title={sessaoId}>{sessaoId.slice(0, 8)}</span> : '—'}</Linha>
+              <Linha rotulo="ID da requisição">
+                {requestId ? (
+                  <button type="button" onClick={copiar} className="inline-flex max-w-full items-center gap-1 font-mono text-xs hover:underline" title="Copiar ID da requisição">
+                    <span className="truncate">{requestId}</span>{copiado ? <Check className="h-3 w-3 shrink-0" /> : <Copy className="h-3 w-3 shrink-0" />}
+                  </button>
+                ) : '—'}
+              </Linha>
+              {atorId && <Linha rotulo="Usuário"><Link href={`/admin/auditoria?ator=${atorId}`} className="text-xs underline-offset-2 hover:underline">Ver auditoria deste usuário</Link></Linha>}
+            </Cartao>
           </div>
 
           {mud.length > 0 && (
@@ -102,6 +135,24 @@ export function AuditoriaDiff({ antes, depois, raw, resumo, operacao, entidade, 
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function Cartao({ titulo, icon: Icon, children }: { titulo: string; icon: any; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Icon className="h-3.5 w-3.5" />{titulo}</p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  )
+}
+
+function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <span className="block text-[11px] text-muted-foreground">{rotulo}</span>
+      <span className="block truncate text-sm">{children}</span>
+    </div>
   )
 }
 

@@ -9,6 +9,7 @@ import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
 import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions-tipos'
+import { useRastreioPagina, RASTREIO_TH, RastreioUltimo, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
 import { carregarPublicoGam, salvarModoPublico, definirGruposGam, definirEstudantesGam, estudantesDosGruposGam } from '../actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; is_mestre?: boolean; pai_id?: string | null; membros?: number; origem?: 'guru' | 'curseduca' | null }
@@ -75,6 +76,7 @@ export function PublicoGamificacaoForm({ podeGerenciar }: { podeGerenciar: boole
   }, [linhas, busca])
   const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA))
   const paginaItens = useMemo(() => filtradas.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [filtradas, pagina])
+  const { mapa: rast } = useRastreioPagina(paginaItens.map((a) => a.id))
   useEffect(() => { setPagina(0) }, [busca])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
@@ -174,15 +176,17 @@ export function PublicoGamificacaoForm({ podeGerenciar }: { podeGerenciar: boole
                 <th className="w-10 px-3 py-2" />
                 <th className="px-3 py-2 font-medium">Nome</th>
                 <th className="hidden px-3 py-2 font-medium sm:table-cell">E-mail</th>
-                <th className="hidden px-3 py-2 font-medium md:table-cell">Documento</th>
+                {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.ultimo}</th>}
+                {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.aparelho}</th>}
+                {rast && <th className="hidden px-3 py-2 text-center font-medium xl:table-cell">{RASTREIO_TH.sessoes}</th>}
                 <th className="px-3 py-2 font-medium">Origem</th>
               </tr>
             </thead>
             <tbody>
               {linhas.length === 0 ? (
-                <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Ninguém ainda. Use “Adicionar estudantes” ou “Adicionar grupo”.</td></tr>
+                <tr><td colSpan={rast ? 7 : 4} className="py-10 text-center text-muted-foreground">Ninguém ainda. Use “Adicionar estudantes” ou “Adicionar grupo”.</td></tr>
               ) : filtradas.length === 0 ? (
-                <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
+                <tr><td colSpan={rast ? 7 : 4} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
               ) : paginaItens.map((a) => {
                 const avulso = a.origem === 'avulso'
                 const on = sel.has(a.id)
@@ -202,7 +206,9 @@ export function PublicoGamificacaoForm({ podeGerenciar }: { podeGerenciar: boole
                       </div>
                     </td>
                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
-                    <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                    {rast && <td className="hidden whitespace-nowrap px-3 py-2 xl:table-cell"><RastreioUltimo r={rast[a.id]} /></td>}
+                    {rast && <td className="hidden px-3 py-2 xl:table-cell"><RastreioAparelho r={rast[a.id]} /></td>}
+                    {rast && <td className="hidden px-3 py-2 text-center xl:table-cell"><RastreioSessoes r={rast[a.id]} /></td>}
                     <td className="px-3 py-2">
                       {avulso ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Avulso</span>

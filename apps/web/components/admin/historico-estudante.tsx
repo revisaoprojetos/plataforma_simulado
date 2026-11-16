@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import { useColResize, ColResizeHandle, ColResizeReset } from '@/components/admin/use-col-resize'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SessaoAcoesMenu } from './sessao-acoes-menu'
@@ -39,6 +40,7 @@ const pctTone = (p: number) =>
 const GRUPO_CORES = ['#4f7fff', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16']
 
 export function HistoricoEstudante({ rows, estudanteId, estudanteNome }: { rows: SessaoRow[]; estudanteId: string; estudanteNome?: string }) {
+  const rs = useColResize('estudante-historico')
   const [busca, setBusca] = useState('')
   const [aberto, setAberto] = useState<string | null>(null)
   const q = busca.trim().toLowerCase()
@@ -59,18 +61,19 @@ export function HistoricoEstudante({ rows, estudanteId, estudanteNome }: { rows:
         </div>
 
         {/* Tabela rolável */}
+        {rs.custom && <div className="flex justify-end"><ColResizeReset rs={rs} /></div>}
         <div className="scroll-claro max-h-[480px] overflow-auto rounded-lg border">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={rs.tableStyle()}>
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
               <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5 font-medium">Simulado</th>
-                <th className="px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5 font-medium">Iniciado</th>
-                <th className="px-3 py-2.5 font-medium">Finalizado</th>
-                <th className="px-3 py-2.5 font-medium">Acertos</th>
-                <th className="px-3 py-2.5 text-center font-medium">Pontuação</th>
-                <th className="px-3 py-2.5 text-center font-medium">Ações</th>
-                <th className="px-3 py-2.5 text-center font-medium">Expandir</th>
+                <th data-col="simulado" style={rs.style('simulado')} className="relative px-3 py-2.5 font-medium">Simulado<ColResizeHandle rs={rs} k="simulado" /></th>
+                <th data-col="status" style={rs.style('status')} className="relative px-3 py-2.5 font-medium">Status<ColResizeHandle rs={rs} k="status" /></th>
+                <th data-col="iniciado" style={rs.style('iniciado')} className="relative px-3 py-2.5 font-medium">Iniciado<ColResizeHandle rs={rs} k="iniciado" /></th>
+                <th data-col="finalizado" style={rs.style('finalizado')} className="relative px-3 py-2.5 font-medium">Finalizado<ColResizeHandle rs={rs} k="finalizado" /></th>
+                <th data-col="acertos" style={rs.style('acertos')} className="relative px-3 py-2.5 font-medium">Acertos<ColResizeHandle rs={rs} k="acertos" /></th>
+                <th data-col="pontuacao" style={rs.style('pontuacao')} className="relative px-3 py-2.5 text-center font-medium">Pontuação<ColResizeHandle rs={rs} k="pontuacao" /></th>
+                <th data-col="acoes" style={rs.style('acoes')} className="relative px-3 py-2.5 text-center font-medium">Ações<ColResizeHandle rs={rs} k="acoes" /></th>
+                <th data-col="expandir" style={rs.style('expandir')} className="relative px-3 py-2.5 text-center font-medium">Expandir<ColResizeHandle rs={rs} k="expandir" /></th>
               </tr>
             </thead>
             <tbody className="divide-y">

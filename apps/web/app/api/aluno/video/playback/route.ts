@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { playbackReqSchema } from '@/lib/video/tipos'
 import { basePublica, iniciarPlayback, tokenDoAluno, esquecerTokenDoAluno, VideoApiError } from '@/lib/video/client'
 import { mapearPlayback } from '@/lib/video/puro'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { contextoAluno, garantirMatricula, origemDoRequest, podeAssistir, respostaDeErro } from '@/lib/video/aluno'
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
         r = await iniciarPlayback(token, lessonId, origin)
       } else throw e
     }
+    void registrarAtividade(sessao, { tipo: 'video_play', refTipo: 'video_aula', refId: lessonId, meta: { curso: courseId } })
     // "Próxima aula": client.ts ainda não expõe listagem das aulas do módulo -> null (botão não aparece).
     return NextResponse.json(mapearPlayback(r, await basePublica(origin), null, lessonId), { headers: { 'Cache-Control': 'no-store' } })
   } catch (e) {

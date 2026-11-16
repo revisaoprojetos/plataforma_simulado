@@ -556,7 +556,7 @@ export function gradeValida(g: unknown): boolean {
 }
 
 /** Grava um doc do modelo. parte ∈ 'estado'|'progresso'|'notas'. */
-export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>): Promise<{ ok: boolean; error?: string; recusadas?: Record<string, { motivo: string; liberaEm: string | null }> }> {
   if (parte === 'estado') {
     let cfg = doc.cfg as CfgPlano
     if (!cfg || !cfg.start) return { ok: false, error: 'cfg_invalido' }
@@ -611,6 +611,25 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
   if (!row) return { ok: false, error: 'sem_plano' }
   if (parte === 'progresso') {
     const prog = (doc.prog || {}) as Record<string, ProgMeta & { concluidoEm?: string }>
+    // FONTE ÚNICA (matriz): conclusão NOVA de meta cujo material está bloqueado (data/regra) ou sem acesso é RECUSADA — não grava 'done'
+    // (nem conta p/ progresso/XP/sequência). Conclusões já gravadas não são revertidas. Falha de consulta = não recusa.
+    let recusadas: Record<string, { motivo: string; liberaEm: string | null }> = {}
+    const pedidas = Object.entries(prog).filter(([, p]) => p?.s === 'done').map(([id]) => id)
+    if (pedidas.length) {
+      try {
+        const ja = new Set<string>()
+        for (let k = 0; k < pedidas.length; k += 150) {
+          const { data } = await svc.from(T_META).select('meta_id').eq('tenant_id', tenantId).eq('plano_id', row.id).eq('estado', 'done').in('meta_id', pedidas.slice(k, k + 150))
+          for (const r of (data ?? []) as Array<{ meta_id: string }>) ja.add(r.meta_id)
+        }
+        const novas = pedidas.filter((id) => !ja.has(id))
+        if (novas.length) {
+          const { metasAdaptativoBloqueadas } = await import('@/lib/cronograma/gate-meta')
+          recusadas = await metasAdaptativoBloqueadas(svc, tenantId, estId, novas)
+          for (const id of Object.keys(recusadas)) prog[id] = { ...prog[id], s: undefined, em: undefined, concluidoEm: undefined } as typeof prog[string]
+        }
+      } catch { recusadas = {} }
+    }
     const entradas = Object.entries(prog)
     const temProg = (p: ProgMeta) => !!(p && (p.s || p.t || p.parou || p.modo))
     const hoje = hojeCal()
@@ -642,7 +661,7 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
       if (erro) return { ok: false, error: erro.message }
     }
     if (Array.isArray(doc.extras)) await svc.from(T_PLANO).update({ extras: doc.extras }).eq('id', row.id)
-    return { ok: true }
+    return Object.keys(recusadas).length ? { ok: true, recusadas } : { ok: true }
   }
   if (parte === 'notas') {
     const notas = (doc.notas || {}) as Record<string, { grau?: number; res?: number; err?: number; diff?: number; cert?: number }>

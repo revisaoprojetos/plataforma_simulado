@@ -44,6 +44,8 @@ export async function notificarPontoDeVersao(
   o: { documentoId: string; pastaId: string | null; titulo: string; tipo: TipoAtualizacao; rotulo: string | null; resumo: string; primeiroItem: string | null; avisarAlunos: boolean; mostrarInicio: boolean; ocorridaEm?: string | null; exibirData?: boolean; exibirHora?: boolean; exibirRotulo?: boolean },
 ): Promise<number> {
   let avisados = 0
+  // "Sem atualizações": nada mudou → nunca notifica nem entra nas novidades do Início.
+  if (o.tipo === 'sem_atualizacao') return 0
   const detalhe = (o.resumo || o.primeiroItem || '').slice(0, 200)
   const nomeTipo = NOME_TIPO_ATUALIZACAO[o.tipo]
   // Mesma regra de exibição do aluno (helper compartilhado): "10/11/2026: texto"; sem tag -> "Tipo: texto" (ou só o texto se o rótulo está oculto).

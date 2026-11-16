@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { TabelaRedimensionavel } from '@/components/admin/use-col-resize'
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
@@ -85,19 +86,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
       <section className="space-y-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold"><BookOpen className="h-4 w-4 text-primary" /> Aulas feitas</h2>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5">Aula</th>
-                <th className="px-4 py-2.5 text-center">Quiz</th>
-                <th className="px-4 py-2.5 text-center">Acertos</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Tempo de leitura</th>
-                <th className="px-4 py-2.5">Lida em</th>
-                <th className="px-4 py-2.5">Última resposta</th>
-              </tr>
-            </thead>
-            <tbody>
+          <TabelaRedimensionavel id="estudante-desafio-aulas" thClassName="px-4 py-2.5" theadClassName="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground" colunas={[{ key: 'aula', label: 'Aula' },{ key: 'quiz', label: 'Quiz', className: 'text-center' },{ key: 'acertos', label: 'Acertos', className: 'text-center' },{ key: 'status', label: 'Status' },{ key: 'tempo', label: 'Tempo de leitura' },{ key: 'lida', label: 'Lida em' },{ key: 'resp', label: 'Última resposta' }]}>
               {aulas.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Nenhuma aula com atividade.</td></tr>
               ) : aulas.map((a) => (
@@ -117,8 +106,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">{a.ultimaResposta ? formatBrt(a.ultimaResposta) : '—'}</td>
                 </tr>
               ))}
-            </tbody>
-          </table>
+            </TabelaRedimensionavel>
         </div>
       </section>
 
@@ -131,11 +119,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> {resumo.diasAtivos} dia(s) ativos</span>
         </div>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-4 py-2.5">Dia</th><th className="px-4 py-2.5">Conta na sequência?</th></tr>
-            </thead>
-            <tbody>
+          <TabelaRedimensionavel id="estudante-desafio-dias" thClassName="px-4 py-2.5" theadClassName="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground" colunas={[{ key: 'dia', label: 'Dia' },{ key: 'conta', label: 'Conta na sequência?' }]}>
               {dias.length === 0 ? (
                 <tr><td colSpan={2} className="px-4 py-8 text-center text-muted-foreground">Nenhum dia com atividade.</td></tr>
               ) : dias.map((d) => (
@@ -150,8 +134,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
+            </TabelaRedimensionavel>
         </div>
       </section>
 
@@ -159,11 +142,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
       <section className="space-y-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold"><Clock className="h-4 w-4 text-primary" /> Registros de horário</h2>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-4 py-2.5">Data e hora</th><th className="px-4 py-2.5">Tipo</th><th className="px-4 py-2.5">Aula</th><th className="px-4 py-2.5">Dia creditado</th><th className="px-4 py-2.5 text-right">XP</th></tr>
-            </thead>
-            <tbody>
+          <TabelaRedimensionavel id="estudante-desafio-registros" thClassName="px-4 py-2.5" theadClassName="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground" colunas={[{ key: 'quando', label: 'Data e hora' },{ key: 'tipo', label: 'Tipo' },{ key: 'aula', label: 'Aula' },{ key: 'dia', label: 'Dia creditado' },{ key: 'xp', label: 'XP', className: 'text-right' }]}>
               {registros.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Nenhum registro.</td></tr>
               ) : registros.map((r, i) => (
@@ -180,8 +159,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">{r.xp != null ? `+${r.xp}` : '—'}</td>
                 </tr>
               ))}
-            </tbody>
-          </table>
+            </TabelaRedimensionavel>
           {registros.length >= 200 && <div className="border-t px-4 py-2 text-[11px] text-muted-foreground">Mostrando os 200 registros mais recentes.</div>}
         </div>
       </section>

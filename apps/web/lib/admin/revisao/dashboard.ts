@@ -199,7 +199,7 @@ async function duvidas(svc: Svc, t: string): Promise<DashboardRevisao['duvidas']
 // Fonte REAL = Central de Atualizações (simulado_conteudo_atualizacoes). "Em massa" = o MESMO texto registrado no
 // mesmo dia (Brasília) em 2+ materiais. Alunos avisados = alunos distintos que receberam a notificação
 // 'material_atualizado' (simulado_notificacoes) de algum desses materiais naquele dia.
-const TIPO_MASSA: Record<string, string> = { legislacao: 'Legislação', jurisprudencia: 'Jurisprudência', correcao: 'Correção', conteudo_novo: 'Correção' }
+const TIPO_MASSA: Record<string, string> = { legislacao: 'Legislação', jurisprudencia: 'Jurisprudência', correcao: 'Correção', conteudo_novo: 'Correção', sem_atualizacao: 'Sem atualizações' }
 async function massa(_svc: Svc, t: string): Promise<DashboardRevisao['massa']> {
   const r = await seguro(() => sqlQuery<{ d: string; texto: string; tipo: string; n: string; docs: string | null; avisados: string }>(
     `WITH g AS (

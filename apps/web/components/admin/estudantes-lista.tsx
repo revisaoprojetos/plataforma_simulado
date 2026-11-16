@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Search, Users, Crown, ClipboardCheck, UserCheck, X, ArrowUpRight, GraduationCap, ArrowUp, ArrowDown, ChevronsUpDown, Loader2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
@@ -11,6 +12,7 @@ import type { ColunaExport } from '@/lib/exportar'
 import type { EstudanteBase, SortEstudante, FiltroEstudante } from '@/app/admin/estudantes/actions-tipos'
 import {carregarLoteEstudantes, buscarEstudantes, exportarTodosEstudantes} from '@/app/admin/estudantes/actions'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
+import { useColResize, ColResizeHandle, ColResizeReset, type ColResize } from '@/components/admin/use-col-resize'
 
 export type EstudanteRow = EstudanteBase
 
@@ -26,6 +28,14 @@ function fmtData(iso: string | null) {
   if (!iso) return '—'
   const d = new Date(iso)
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+function fmtRel(iso: string | null) {
+  if (!iso) return '—'
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (m < 1) return 'agora'
+  if (m < 60) return `há ${m} min`
+  if (m < 1440) return `há ${Math.floor(m / 60)} h`
+  return `há ${Math.floor(m / 1440)} d`
 }
 function notaTom(n: number | null) {
   if (n == null) return 'text-muted-foreground'
@@ -62,11 +72,13 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
   kpis: { total: number; passaporte: number; feitos: number; ativos: number }
   adminEmails?: string[]
 }) {
+  const rs = useColResize('estudantes-lista')
   const adminSet = useMemo(() => new Set(adminEmails.map((e) => e.toLowerCase())), [adminEmails])
   const ehAdmin = (e: EstudanteRow) => !!e.email && adminSet.has(e.email.toLowerCase())
 
   // Página SERVIDOR (10 por vez) — não baixa mais os milhares de uma vez.
   const [rows, setRows] = useState<EstudanteRow[]>(inicial)
+  const temRastreio = rows.some((r) => r.rastreio !== undefined)
   const [totalFiltro, setTotalFiltro] = useState(total)
   const [pagina, setPagina] = useState(1)
   const [carregandoPag, setCarregandoPag] = useState(false)
@@ -187,7 +199,8 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
-          <span>
+          <span className="inline-flex flex-wrap items-center gap-3">
+            <ColResizeReset rs={rs} />
             {buscandoAtivo
               ? (buscando ? 'Buscando…' : <>{totalMostrado} resultado(s) para "<b className="text-foreground">{q.trim()}</b>"</>)
               : totalMostrado > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{primeiroIdx}–{ultimoIdx}</b> de <b className="tabular-nums text-foreground">{totalMostrado}</b></> : 'Nenhum estudante'}
@@ -197,22 +210,25 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
 
         {/* tabela (só a página atual — 10 linhas) */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={rs.tableStyle(120)}>
             <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr className="border-b">
-                <Th label="Estudante" k="nome" sort={sort} onSort={ordenarPor} />
-                <th className="hidden px-4 py-2.5 font-medium lg:table-cell">CPF / Telefone</th>
-                <Th label="Plano" k="classificacao" sort={sort} onSort={ordenarPor} />
-                <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Acesso</th>
-                <Th label="Simulados" k="feitos" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
-                <Th label="Média" k="media" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
-                <Th label="Cadastrado" k="created_at" sort={sort} onSort={ordenarPor} className="hidden whitespace-nowrap sm:table-cell" />
+                <Th label="Estudante" k="nome" sort={sort} onSort={ordenarPor} rs={rs} />
+                <ThFixo rs={rs} k="telefone" className="hidden lg:table-cell">Telefone</ThFixo>
+                <Th label="Plano" k="classificacao" sort={sort} onSort={ordenarPor} rs={rs} />
+                <ThFixo rs={rs} k="acesso" className="hidden lg:table-cell">Acesso</ThFixo>
+                <Th label="Simulados" k="feitos" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" rs={rs} />
+                <Th label="Média" k="media" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" rs={rs} />
+                <Th label="Cadastrado" k="created_at" sort={sort} onSort={ordenarPor} className="hidden whitespace-nowrap sm:table-cell" rs={rs} />
+                {temRastreio && <ThFixo rs={rs} k="ultimo" className="hidden xl:table-cell">Último acesso</ThFixo>}
+                {temRastreio && <ThFixo rs={rs} k="aparelho" className="hidden xl:table-cell">Aparelho · IP</ThFixo>}
+                {temRastreio && <ThFixo rs={rs} k="sessoes" className="hidden text-center xl:table-cell">Sessões · tempo (30d)</ThFixo>}
                 <th className="px-4 py-2.5 text-right font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
               {visiveis.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">{(buscando || carregandoPag) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
+                <tr><td colSpan={temRastreio ? 11 : 8} className="py-12 text-center text-muted-foreground">{(buscando || carregandoPag) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
               ) : visiveis.map((e) => (
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">
@@ -224,7 +240,7 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
                       </span>
                     </Link>
                   </td>
-                  <td className="hidden px-4 py-2.5 text-xs tabular-nums text-muted-foreground lg:table-cell">{[e.cpf, e.telefone].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className="hidden px-4 py-2.5 text-xs tabular-nums text-muted-foreground lg:table-cell">{e.telefone || '—'}</td>
                   <td className="px-4 py-2.5">
                     {ehAdmin(e)
                       ? <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Admin</span>
@@ -238,6 +254,26 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
                   <td className="px-4 py-2.5 text-center tabular-nums">{e.feitos > 0 ? <span className="font-semibold">{e.feitos}</span> : <span className="text-muted-foreground">—</span>}</td>
                   <td className={cn('px-4 py-2.5 text-center font-semibold tabular-nums', notaTom(e.media))}>{e.media != null ? e.media.toFixed(1) : '—'}</td>
                   <td className="hidden whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground sm:table-cell">{fmtData(e.created_at)}</td>
+                  {temRastreio && (
+                    <td className="hidden whitespace-nowrap px-4 py-2.5 text-xs xl:table-cell">
+                      {e.rastreio ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={cn('h-2 w-2 rounded-full', e.rastreio.online ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+                          <span className={e.rastreio.online ? 'font-medium text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>{e.rastreio.online ? 'Online' : fmtRel(e.rastreio.ultimo)}</span>
+                        </span>
+                      ) : <span className="text-muted-foreground">sem registro</span>}
+                    </td>
+                  )}
+                  {temRastreio && (
+                    <td className="hidden px-4 py-2.5 text-xs text-muted-foreground xl:table-cell">
+                      {e.rastreio ? <><span className="block truncate">{e.rastreio.aparelho}</span><span className="block tabular-nums">{e.rastreio.ip ?? '—'}</span></> : '—'}
+                    </td>
+                  )}
+                  {temRastreio && (
+                    <td className="hidden px-4 py-2.5 text-center text-xs tabular-nums xl:table-cell">
+                      {e.rastreio ? <><b>{e.rastreio.sessoes30d}</b> <span className="text-muted-foreground">· {e.rastreio.tempo30d}</span></> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  )}
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-1">
                       <Link href={`/admin/estudantes/${e.id}`} title="Abrir dashboard do estudante"
@@ -280,18 +316,27 @@ function PagBtn({ children, onClick, disabled, title }: { children: React.ReactN
 }
 
 /** Cabeçalho de coluna ordenável — mostra ↑ (asc), ↓ (desc) ou ⇅ (inativo) ao lado do texto. */
-function Th({ label, k, sort, onSort, align = 'left', className }: {
-  label: string; k: SortKey; sort: Sort; onSort: (k: SortKey) => void; align?: 'left' | 'center'; className?: string
+function ThFixo({ rs, k, className, children }: { rs: ColResize; k: string; className?: string; children: React.ReactNode }) {
+  return (
+    <th data-col={k} style={rs.style(k)} className={cn('relative px-4 py-2.5 font-medium', className)}>
+      {children}<ColResizeHandle rs={rs} k={k} />
+    </th>
+  )
+}
+
+function Th({ label, k, sort, onSort, align = 'left', className, rs }: {
+  label: string; k: SortKey; sort: Sort; onSort: (k: SortKey) => void; align?: 'left' | 'center'; className?: string; rs: ColResize
 }) {
   const ativo = sort?.key === k
   const Icon = ativo ? (sort!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown
   return (
-    <th className={cn('px-4 py-2.5 font-medium', align === 'center' && 'text-center', className)}>
+    <th data-col={k} style={rs.style(k)} className={cn('relative px-4 py-2.5 font-medium', align === 'center' && 'text-center', className)}>
       <button type="button" onClick={() => onSort(k)}
         className={cn('inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-foreground', align === 'center' && 'mx-auto', ativo && 'text-foreground')}>
         {label}
         <Icon className={cn('h-3.5 w-3.5', ativo ? 'opacity-100' : 'opacity-40')} />
       </button>
+      <ColResizeHandle rs={rs} k={k} />
     </th>
   )
 }

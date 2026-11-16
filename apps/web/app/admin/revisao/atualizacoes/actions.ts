@@ -8,6 +8,7 @@ import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 import { destinatariosDoMaterial } from '@/lib/conteudo/atualizacoes-notificar'
 import { NOME_TIPO_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import { TIPOS_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
+import { TEXTO_SEM_ATUALIZACAO } from '@/lib/conteudo/atualizacoes-tipos'
 
 // Central de Atualizações (Plataforma Revisão). Só async exportadas ('use server').
 // Permissão reusa configuracoes:update (mesma da Biblioteca). Service role + tenant explícito + auditoria.
@@ -29,7 +30,8 @@ export async function registrarAtualizacaoAction(input: {
   const g = await guard(); if (!g.ok) return g
   if (!UUID.test(input.documentoId)) return { ok: false, error: 'Escolha o material.' }
   if (!TIPOS_ATUALIZACAO.some((t) => t.id === input.tipo)) return { ok: false, error: 'Tipo de atualização inválido.' }
-  const texto = String(input.texto ?? '').trim()
+  const semAtu = input.tipo === 'sem_atualizacao'
+  const texto = String(input.texto ?? '').trim() || (semAtu ? TEXTO_SEM_ATUALIZACAO : '')
   if (!texto) return { ok: false, error: 'Escreva o que mudou.' }
   if (texto.length > 2000) return { ok: false, error: 'O texto passou de 2.000 caracteres.' }
   const origem = input.origem && UUID.test(input.origem.id) && (input.origem.tipo === 'reporte' || input.origem.tipo === 'pedido') ? input.origem : null
@@ -40,10 +42,10 @@ export async function registrarAtualizacaoAction(input: {
 
   const { data, error } = await svc.from('simulado_conteudo_atualizacoes').insert({
     tenant_id: g.tenantId, documento_id: input.documentoId, versao_id: (doc as any).versao_atual_id ?? null, tipo: input.tipo, texto,
-    avisar_alunos: !!input.avisarAlunos, mostrar_inicio: !!input.mostrarInicio,
+    avisar_alunos: !semAtu && !!input.avisarAlunos, mostrar_inicio: !semAtu && !!input.mostrarInicio,
     origem_tipo: origem?.tipo ?? null, origem_id: origem?.id ?? null, criado_por: g.atorId,
   }).select('id').single()
-  if (error || !data) return { ok: false, error: error && TABELA_AUSENTE.test(error.message) ? AVISO : error?.message || 'Falha ao registrar.' }
+  if (error || !data) return { ok: false, error: error && /atualizacoes_tipo_check/i.test(error.message) ? 'O tipo "Sem atualizações" exige aplicar a migração 20261121000000.' : error && TABELA_AUSENTE.test(error.message) ? AVISO : error?.message || 'Falha ao registrar.' }
   const id = (data as any).id as string
 
   // Fecha a origem na fila: reporte vira "resolvido" (mesmo fluxo da Central de Demandas); pedido vira "atendido".
@@ -55,7 +57,7 @@ export async function registrarAtualizacaoAction(input: {
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_conteudo_atualizacoes', entidadeId: id, atorId: g.atorId, tenantId: g.tenantId, depois: { documento_id: input.documentoId, tipo: input.tipo, avisar_alunos: !!input.avisarAlunos, origem } }).catch(() => {})
   // Aviso in-app (sino do aluno): best-effort, mesma fila de notificações do resto da plataforma.
   let avisados = 0
-  if (input.avisarAlunos) {
+  if (input.avisarAlunos && !semAtu) {
     const dest = await destinatariosDoMaterial(svc, g.tenantId, input.documentoId, (doc as any).pasta_id ?? null)
     avisados = await criarNotificacoesEmMassa(svc, g.tenantId, dest, {
       tipo: 'material_atualizado', titulo: `Material atualizado: ${(doc as any).titulo ?? 'material'}`,
@@ -63,7 +65,7 @@ export async function registrarAtualizacaoAction(input: {
     })
   }
   // "Novidades do Início": uma novidade na categoria Materiais (lista do Início do aluno). Best-effort.
-  if (input.mostrarInicio) {
+  if (input.mostrarInicio && !semAtu) {
     await svc.from('simulado_novidades').insert({
       tenant_id: g.tenantId, categoria: 'materiais', titulo: `Material atualizado: ${(doc as any).titulo ?? 'material'}`,
       descricao: `${NOME_TIPO_ATUALIZACAO[input.tipo]}: ${texto.slice(0, 400)}`, destaque: false, ativo: true,

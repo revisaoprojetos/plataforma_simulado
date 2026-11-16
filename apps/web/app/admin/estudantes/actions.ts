@@ -17,6 +17,7 @@ import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { ehCpfMascarado } from '@/lib/privacidade/cpf'
 import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { rastreioLote } from '@/lib/acessos/leitura'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
@@ -74,11 +75,13 @@ export async function carregarLoteEstudantes(offset: number, limit: number, comC
   // agregados próprios e não devem pagar essa query por lote.
   const comAgg = opts?.comAgregados !== false
   const ids = base.map((r: any) => r.id)
-  const [agg, acesso] = await Promise.all([
+  const verRastreio = comAgg && (await checkPermission('acessos:view').catch(() => false))
+  const [agg, acesso, rast] = await Promise.all([
     comAgg ? agregarSessoes(svc, tenantId, ids) : Promise.resolve({} as Record<string, { feitos: number; media: number | null }>),
     comAgg ? resumoAcessoLote(tenantId, ids) : Promise.resolve({} as Record<string, number>),
+    verRastreio ? rastreioLote(tenantId, ids) : Promise.resolve(null),
   ])
-  const rows: EstudanteBase[] = base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0 }))
+  const rows: EstudanteBase[] = base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0, ...(rast ? { rastreio: rast[r.id] ?? null } : {}) }))
   return { rows, total: count ?? rows.length }
 }
 
@@ -115,8 +118,9 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
   const ids = base.map((r: any) => r.id)
-  const [agg, acesso] = await Promise.all([agregarSessoes(svc, tenantId, ids), resumoAcessoLote(tenantId, ids)])
-  return base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0 }))
+  const verRastreio = await checkPermission('acessos:view').catch(() => false)
+  const [agg, acesso, rast] = await Promise.all([agregarSessoes(svc, tenantId, ids), resumoAcessoLote(tenantId, ids), verRastreio ? rastreioLote(tenantId, ids) : Promise.resolve(null)])
+  return base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0, ...(rast ? { rastreio: rast[r.id] ?? null } : {}) }))
 }
 
 /** KPIs + e-mails de admin, CACHEADOS (remember, 5 min) — a parte cara (varrer sessões p/ "ativos"

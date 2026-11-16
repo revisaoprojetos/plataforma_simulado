@@ -2886,7 +2886,7 @@ function renderUpd(rows,anexar){
   rows.forEach(r=>{
     const itens=(r.itens||[]).map(i=>'<li>'+esc(i.texto||'')+(i.local?' <em>— '+esc(i.local)+'</em>':'')+'</li>').join('');
     const d=document.createElement('div');d.className='upd-it';
-    d.innerHTML='<div class="upd-hd"><span class="upd-rot">'+esc(r.rotulo||'Atualização')+'</span><span class="upd-dt">'+esc(updFmt(r.ocorridaEm))+'</span></div>'+(r.texto?'<p class="upd-tx">'+esc(r.texto)+'</p>':'')+(itens?'<ul class="upd-ul">'+itens+'</ul>':'');
+    d.innerHTML=(r.rotuloExibido||r.tag?'<div class="upd-hd">'+(r.rotuloExibido?'<span class="upd-rot">'+esc(r.rotuloExibido)+'</span>':'')+(r.tag?'<span class="upd-dt">'+esc(r.tag)+'</span>':'')+'</div>':'')+(r.texto?'<p class="upd-tx">'+esc(r.texto)+'</p>':'')+(itens?'<ul class="upd-ul">'+itens+'</ul>':'');
     p.appendChild(d)});
   if(!p.querySelector('.upd-it')){const m=document.createElement('div');m.className='upd-msg';m.textContent=UPD.erro?'Não foi possível carregar as atualizações agora. Tente de novo em instantes.':'Este material ainda não teve atualizações publicadas. Quando houver, elas aparecem aqui.';p.appendChild(m);if(UPD.erro){const b=document.createElement('button');b.type='button';b.className='upd-more';b.textContent='Tentar de novo';b.onclick=()=>carregarUpd();p.appendChild(b)}}
   const n=p.querySelectorAll('.upd-it').length;

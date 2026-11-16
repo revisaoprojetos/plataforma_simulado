@@ -8,6 +8,7 @@ import { montarConfig } from '@/lib/cronograma/visao-emissao'
 import { montarPayloadRevisaoIframe } from '@/lib/cronograma/revisao-iframe'
 import { formatBrt, hojeBrtISO } from '@/lib/brt'
 import type { MetaParaConteudo } from '@/lib/cronograma/conteudo-meta'
+import { docsBloqueadosDoAluno } from '@/lib/produtos/docs-liberacao-aluno'
 import { lerProgressoMetas, resolverConteudoDasMetas, type DocDaMeta } from '@/lib/cronograma/meta-extras-server'
 
 // GET /api/aluno/cronograma/revisao-iframe?emissaoId=<uuid>
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
   const metasGrade: MetaParaConteudo[] = d.grade.semanas.flatMap((s) =>
     s.kind === 'conteudo' ? s.metas.map((m) => ({ id: m.id, tipo: m.tipo, disciplinas: [m.disciplina], aula: m.aula, conteudo: m.conteudo, textos: [m.titulo, m.complemento] })) : [])
   const tPar = Date.now()
-  const [checks, notas, progresso, conteudos, progressoMetas] = await Promise.all([
+  const [checks, notas, progresso, conteudos0, progressoMetas, bloqueados] = await Promise.all([
     // O dono da emissão já foi validado em montarEmissao: lê direto (sem repetir sessão + emissão).
     cron('checks', lerProgressoReencaixado<{ marcada_em: string }>(svc, sessao.tenantId, cronogramaId, emissaoId, 'simulado_cronograma_meta_checks', 'marcada_em').catch(() => [])),
     cron('notas', lerProgressoReencaixado<{ texto: string }>(svc, sessao.tenantId, cronogramaId, emissaoId, 'simulado_cronograma_meta_notas', 'texto').catch(() => [])),
@@ -54,7 +55,10 @@ export async function GET(req: NextRequest) {
     // Conteúdo (vínculo explícito do admin > automático) e Parcial/Não realizada: best-effort, nunca derrubam o plano.
     d.indisponivel ? Promise.resolve(new Map<string, DocDaMeta>()) : cron('conteudo', resolverConteudoDasMetas(svc, sessao.tenantId, cronogramaId, metasGrade, d.versaoGrade).catch(() => new Map<string, DocDaMeta>())),
     d.indisponivel ? Promise.resolve([]) : cron('parcial', lerProgressoMetas(svc, sessao.tenantId, cronogramaId, emissaoId).catch(() => [])),
+    // FONTE ÚNICA: materiais que a MATRIZ ainda bloqueia para este aluno (mesma árvore do currículo; cache 60s) → meta rotulada "libera em".
+    d.indisponivel ? Promise.resolve({} as Record<string, string>) : cron('bloqueios', docsBloqueadosDoAluno(sessao.tenantId, sessao.estudanteId)),
   ])
+  const conteudos = new Map([...conteudos0.entries()].map(([k, v]) => [k, bloqueados[v.docId] !== undefined ? { ...v, bloqueado: true, liberaEm: bloqueados[v.docId] || null } : v]))
   medir('paralelo-total', Date.now() - tPar)
 
   const checksMap: Record<string, string> = {}

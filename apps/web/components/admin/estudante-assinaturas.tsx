@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useColResize, ColResizeHandle, ColResizeReset, type ColResize } from '@/components/admin/use-col-resize'
 import { Repeat, CircleSlash, Search, CreditCard, TrendingUp, Receipt, CheckCircle2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { formatBrt } from '@/lib/brt'
 import { cn } from '@/lib/utils'
@@ -67,11 +68,12 @@ function toggle(prev: SortState, col: string, padrao: 'asc' | 'desc' = 'asc'): S
 }
 type Align = 'left' | 'center' | 'right'
 const thAlignCls = (a: Align) => (a === 'center' ? 'text-center' : a === 'right' ? 'text-right' : 'text-left')
-function SortTh({ label, col, sort, onSort, align = 'left' }: { label: string; col: string; sort: SortState; onSort: (c: string) => void; align?: Align }) {
+function SortTh({ label, col, sort, onSort, align = 'left', rs }: { label: string; col: string; sort: SortState; onSort: (c: string) => void; align?: Align; rs: ColResize }) {
   const active = sort.col === col
   const Icon = active ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
-    <th className={cn('px-4 py-2.5', thAlignCls(align))}>
+    <th data-col={col} style={rs.style(col)} className={cn('relative px-4 py-2.5', thAlignCls(align))}>
+      <ColResizeHandle rs={rs} k={col} />
       <button type="button" onClick={() => onSort(col)}
         className={cn('flex w-fit items-center gap-1 hover:text-foreground', align === 'center' && 'mx-auto', align === 'right' && 'ml-auto', active && 'text-foreground')}>
         {label} <Icon className={cn('h-3 w-3', !active && 'opacity-40')} />
@@ -129,6 +131,7 @@ export function EstudanteAssinaturas({ assinaturas, pagamentos, sqlOff }: { assi
 }
 
 function Historico({ pagamentos }: { pagamentos: PagamentoItem[] }) {
+  const rs = useColResize('estudante-pagamentos')
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('todos')
   const [sort, setSort] = useState<SortState>({ col: 'data', dir: 'desc' })
@@ -172,18 +175,18 @@ function Historico({ pagamentos }: { pagamentos: PagamentoItem[] }) {
         <BuscaInput value={q} onChange={setQ} placeholder="Buscar produto…" />
       </div>
 
-      <div className="text-xs text-muted-foreground">{lista.length} pagamento(s) no filtro</div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground"><span>{lista.length} pagamento(s) no filtro</span><ColResizeReset rs={rs} /></div>
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+        <table className="w-full text-sm" style={rs.tableStyle()}>
           <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <SortTh label="Data do pagamento" col="data" sort={sort} onSort={onSort} />
-              <SortTh label="Produto" col="produto" sort={sort} onSort={onSort} />
-              <SortTh label="Valor" col="valor" sort={sort} onSort={onSort} align="center" />
-              <SortTh label="Tipo" col="tipo" sort={sort} onSort={onSort} align="center" />
-              <SortTh label="Método" col="metodo" sort={sort} onSort={onSort} align="center" />
-              <SortTh label="Status" col="status" sort={sort} onSort={onSort} align="center" />
+              <SortTh label="Data do pagamento" col="data" sort={sort} onSort={onSort} rs={rs} />
+              <SortTh label="Produto" col="produto" sort={sort} onSort={onSort} rs={rs} />
+              <SortTh label="Valor" col="valor" sort={sort} onSort={onSort} rs={rs} align="center" />
+              <SortTh label="Tipo" col="tipo" sort={sort} onSort={onSort} rs={rs} align="center" />
+              <SortTh label="Método" col="metodo" sort={sort} onSort={onSort} rs={rs} align="center" />
+              <SortTh label="Status" col="status" sort={sort} onSort={onSort} rs={rs} align="center" />
             </tr>
           </thead>
           <tbody>
@@ -218,6 +221,7 @@ function Historico({ pagamentos }: { pagamentos: PagamentoItem[] }) {
 }
 
 function Assinaturas({ assinaturas }: { assinaturas: AssinaturaItem[] }) {
+  const rs = useColResize('estudante-assinaturas')
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('todos')
   const [sort, setSort] = useState<SortState>({ col: 'status', dir: 'asc' })
@@ -253,17 +257,17 @@ function Assinaturas({ assinaturas }: { assinaturas: AssinaturaItem[] }) {
         <BuscaInput value={q} onChange={setQ} placeholder="Buscar assinatura…" />
       </div>
 
-      <div className="text-xs text-muted-foreground">{lista.length} assinatura(s) no filtro</div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground"><span>{lista.length} assinatura(s) no filtro</span><ColResizeReset rs={rs} /></div>
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+        <table className="w-full text-sm" style={rs.tableStyle()}>
           <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <SortTh label="Produto" col="produto" sort={sort} onSort={onSort} />
-              <SortTh label="Status" col="status" sort={sort} onSort={onSort} align="center" />
-              <th className="px-4 py-2.5 text-center">Origem</th>
-              <SortTh label="Pagamento (início)" col="inicio" sort={sort} onSort={onSort} align="center" />
-              <SortTh label="Próxima renovação" col="expira" sort={sort} onSort={onSort} align="center" />
+              <SortTh label="Produto" col="produto" sort={sort} onSort={onSort} rs={rs} />
+              <SortTh label="Status" col="status" sort={sort} onSort={onSort} rs={rs} align="center" />
+              <th data-col="origem" style={rs.style('origem')} className="relative px-4 py-2.5 text-center">Origem<ColResizeHandle rs={rs} k="origem" /></th>
+              <SortTh label="Pagamento (início)" col="inicio" sort={sort} onSort={onSort} rs={rs} align="center" />
+              <SortTh label="Próxima renovação" col="expira" sort={sort} onSort={onSort} rs={rs} align="center" />
             </tr>
           </thead>
           <tbody>

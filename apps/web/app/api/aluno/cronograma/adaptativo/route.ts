@@ -1,3 +1,4 @@
+import { docsBloqueadosDoAluno } from '@/lib/produtos/docs-liberacao-aluno'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { hojeBrtISO } from '@/lib/brt'
 import { getSessaoAluno } from '@/lib/aluno-session'
@@ -30,7 +31,7 @@ export async function GET() {
   if (!sessao) return NextResponse.json({ ok: false, message: 'Não autenticado.' }, { status: 401 })
   const svc = createAdminClient()
   const t0 = Date.now()
-  const [docs, conteudo, params, catalogoId, filtrosQf] = await Promise.all([
+  const [docs, conteudo, params, catalogoId, filtrosQf, docsBloqueados] = await Promise.all([
     carregarDocs(svc, sessao.tenantId, sessao.estudanteId),
     // O conteúdo (aulas/leis/disciplinas) é do TENANT, não do aluno, e custa ~4 s para montar: cache curto no Redis
     // (degrada p/ cálculo direto sem Redis). Edições do admin aparecem em até 2 min.
@@ -38,6 +39,13 @@ export async function GET() {
     lerParamsMotor(svc, sessao.tenantId), // v3: parâmetros do tenant → o iframe gera o plano com os MESMOS valores do servidor
     catalogoIdDoTenant(svc, sessao.tenantId),
     lerFiltros(svc, sessao.tenantId), // filtros de "questões da plataforma" por aula (tabela própria; cache 30s)
+    // FONTE ÚNICA (matriz): materiais ainda bloqueados p/ este aluno (docId → data). EM PARALELO e com teto de 2 s: era a parte mais
+    // lenta (monta o currículo de cada produto) e rodava DEPOIS das demais, segurando a carga do cronograma (>10 s a frio). Estourou o teto
+    // → {} (o gate do leitor continua bloqueando no servidor; só o rótulo de cadeado some até a próxima carga, já com o cache quente).
+    Promise.race([
+      docsBloqueadosDoAluno(sessao.tenantId, sessao.estudanteId).catch(() => ({} as Record<string, string>)),
+      new Promise<Record<string, string>>((r) => setTimeout(() => r({}), 2000)),
+    ]),
   ])
   if (Date.now() - t0 > 4000) console.warn(`[cronograma GET] lento: ${Date.now() - t0}ms (tenant ${sessao.tenantId})`)
   // O iframe só precisa saber QUAIS aulas oferecem questões da plataforma e a CHAVE estável de cada uma (vai na
@@ -49,7 +57,7 @@ export async function GET() {
   // ordem = distribuição das aulas do modelo; agu = grupos de disciplinas específicas (pares, ex.: Internacional).
   const nomes = new Set(conteudo.disciplinas.map((d) => d.nome))
   const agu = GRUPOS_HTML.agu.map((g) => g.filter((n) => nomes.has(n))).filter((g) => g.length)
-  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, qfAulas } })
+  return NextResponse.json({ ok: true, ...docs, docsBloqueados, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, qfAulas } })
 }
 
 export async function POST(req: NextRequest) {
@@ -151,7 +159,7 @@ export async function POST(req: NextRequest) {
       // O iframe cria/edita o plano via sync (não via 'gerar'). Write-behind do Painel DEPOIS da resposta
       // (after): o auto-save do iframe não espera o recálculo pesado; o painel sai atualizado no próximo load.
       if (r.ok) after(async () => { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
-      return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'sem_plano' || r.error === 'cfg_invalido' ? 400 : 500 })
+      return r.ok ? NextResponse.json({ ok: true, ...(r.recusadas ? { recusadas: r.recusadas } : {}) }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'sem_plano' || r.error === 'cfg_invalido' ? 400 : 500 })
     }
     return NextResponse.json({ ok: false, message: 'Ação desconhecida.' }, { status: 400 })
   } catch (e) {

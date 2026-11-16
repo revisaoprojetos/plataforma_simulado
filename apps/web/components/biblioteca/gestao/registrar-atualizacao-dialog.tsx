@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from '@/lib/utils'
 import { hojeBrtISO } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
-import type { ItemAlteracao, TipoAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
+import { TEXTO_SEM_ATUALIZACAO, type ItemAlteracao, type TipoAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
 import { CamposQuando, type ExibicaoState } from './atualizacao-exibicao'
 import { contextoRegistroAction, registrarPontoVersaoAction } from '@/app/admin/conteudos/atualizacoes-actions'
 
@@ -72,12 +72,19 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
   const podePublicarVersao = !!ctx?.registroAtivo && !!ctx.versao && !ctx.versao.atual && documentoIds.length === 1
   const itensValidos = useMemo(() => itens.filter((i) => i.texto.trim()), [itens])
 
+  const semAtu = tipo === 'sem_atualizacao'
+  function escolherTipo(t: TipoAtualizacao) {
+    setTipo(t)
+    if (t === 'sem_atualizacao') { setResumo((x) => (!x.trim() ? TEXTO_SEM_ATUALIZACAO : x)); setAvisar(false); setInicio(false) }
+    else if (tipo === 'sem_atualizacao') { setResumo((x) => (x === TEXTO_SEM_ATUALIZACAO ? '' : x)); setAvisar(true); setInicio(true) }
+  }
+
   function setItem(i: number, patch: Partial<Item>) { setItens((l) => l.map((x, k) => (k === i ? { ...x, ...patch } : x))) }
 
   async function salvar() {
-    const gerais: ItemAlteracao[] = itensValidos.map((i) => ({ texto: i.texto.trim(), local: i.local.trim() || null }))
+    const gerais: ItemAlteracao[] = semAtu ? [] : itensValidos.map((i) => ({ texto: i.texto.trim(), local: i.local.trim() || null }))
     const override: Record<string, { resumo?: string; itens?: ItemAlteracao[] }> = {}
-    if (personalizar) {
+    if (personalizar && !semAtu) {
       for (const [id, v] of Object.entries(porDoc)) {
         const linhas = v.itens.split('\n').map((s) => s.trim()).filter(Boolean).map((texto) => ({ texto }))
         if (v.resumo.trim() || linhas.length) override[id] = { resumo: v.resumo.trim() || resumo.trim(), itens: linhas.length ? linhas : gerais }
@@ -129,19 +136,19 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
               <span className="font-medium">Tipo</span>
               <div className="flex flex-wrap gap-1.5">
                 {TIPOS_ATUALIZACAO.map((t) => (
-                  <button key={t.id} type="button" onClick={() => setTipo(t.id)}
+                  <button key={t.id} type="button" onClick={() => escolherTipo(t.id)}
                     className={cn('h-8 rounded-full border px-3 text-xs font-medium transition-colors', tipo === t.id ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground hover:bg-muted')}>{t.nome}</button>
                 ))}
               </div>
             </div>
 
             <label className="block space-y-1.5 text-sm">
-              <span className="font-medium">Resumo <span className="font-normal text-muted-foreground">(opcional se houver itens)</span></span>
+              <span className="font-medium">Resumo <span className="font-normal text-muted-foreground">{semAtu ? '(texto padrão — editável)' : '(opcional se houver itens)'}</span></span>
               <Textarea value={resumo} onChange={(e) => setResumo(e.target.value)} maxLength={2000} rows={2} placeholder="Em uma frase: o que mudou nesta versão." />
             </label>
 
             {/* Itens */}
-            <div className="space-y-2 text-sm">
+            {!semAtu && <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium">O que mudou <span className="font-normal text-muted-foreground">({itensValidos.length})</span></span>
                 <Button type="button" variant="outline" size="sm" onClick={() => setItens((l) => [...l, { texto: '', local: '' }])} disabled={itens.length >= 50}><Plus className="h-3.5 w-3.5" />Adicionar item</Button>
@@ -153,10 +160,10 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
                   <Button type="button" variant="ghost" size="icon-sm" aria-label="Remover item" onClick={() => setItens((l) => (l.length > 1 ? l.filter((_, k) => k !== i) : [{ texto: '', local: '' }]))}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}
-            </div>
+            </div>}
 
             {/* Personalizar por material (lote) */}
-            {lote && (
+            {lote && !semAtu && (
               <div className="rounded-lg border">
                 <button type="button" onClick={() => setPersonalizar((v) => !v)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium">
                   Personalizar resumo e itens por material (opcional)
@@ -198,7 +205,7 @@ export function RegistrarAtualizacaoDialog({ documentoIds, produtoId = null, ver
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={salvando}>Cancelar</Button>
-          <Button onClick={salvar} disabled={salvando || ctx === null || (!resumo.trim() && itensValidos.length === 0 && !(personalizar && Object.values(porDoc).some((v) => v.resumo.trim() || v.itens.trim())))}>
+          <Button onClick={salvar} disabled={salvando || ctx === null || (!semAtu && !resumo.trim() && itensValidos.length === 0 && !(personalizar && Object.values(porDoc).some((v) => v.resumo.trim() || v.itens.trim())))}>
             {salvando && <Loader2 className="h-4 w-4 animate-spin" />}
             {publicar ? (podePublicarVersao && publicarVersao ? 'Publicar versão e registrar' : 'Registrar atualização') : 'Salvar rascunho'}
           </Button>

@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.21.0 — 2026-11-16
+
+**Rastreio de acessos (alunos e equipe), API pública v1 e uso da API + correções de segurança**
+- **API pública `/api/v1` (leitura):** alunos, acessos, atividades, simulados/resultados, progresso de leitura e métricas, por escopo de API key; log de uso (chave, recurso, IP, navegador, status, latência, barrados) e aba **Uso** em `/admin/api-keys` (p50/p95, por recurso/chave, sugestões). Rate limit por IP antes da validação da chave.
+- **Rastreio do aluno:** páginas vistas e tempo por página (beacon), ações no servidor (download, vídeo, cronograma, biblioteca, ranking), painel de métricas em `/admin/acessos` e exportação CSV. Visível só para admin com `acessos:view`.
+- **Perfil do aluno:** aba "Acessos e atividade" agora **dentro do perfil** (mantém cabeçalho e abas), agrupada **por dia** com relatório do dia (sessões, IPs, aparelhos, páginas e tempo); IP normalizado (`::ffff:`/loopback) e tempo real da sessão.
+- **Rastreio da equipe:** "Equipe online", ficha de atividade por admin, auditoria enriquecida (IP, dispositivo, página, rota da API, sessão, request id) com cartões Quando/Onde/O quê; encerrar sessão revoga logins do Supabase Auth.
+- **Tabelas de alunos:** CPF oculto das linhas (só no perfil), colunas de rastreio (último acesso/online, aparelho·IP, sessões·tempo) e **colunas redimensionáveis** (lista de estudantes, perfil e matriz de regras do produto).
+- **Segurança:** Biblioteca (vazamento de acesso do aluno), bucket `pdfs` privado, PII fora do git, webhooks (comportamento original; modo estrito opcional), limites de duração/rotas no beacon do aluno, retenção LGPD agendada (api-uso/admin-rastreio).
+- **Migrations a aplicar:** `20261114030000`, `20261116010000`, `20261117010000`, `20261120000000`, `20261120010000_rastreio_aluno_total`, `20261121000000`, `20261121100000`, `20261121110000`, `20261121120000`, `20261121130000`. Env: `CRON_SECRET`.
+
 ## 4.20.1 — 2026-11-16
 
 **Liberação por matriz: correção do corte de 1.000 regras + novas regras de grupo**

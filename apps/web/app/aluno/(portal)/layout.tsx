@@ -30,6 +30,7 @@ import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { remember } from '@/lib/cache/relatorio-cache'
 import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
 import { SuporteWhatsApp } from '@/components/aluno/suporte-whatsapp'
+import { RastreioAluno } from '@/components/aluno/rastreio-aluno'
 import { paletaHref } from '@/lib/brand/paleta-nova-server'
 import { PaletaWsCookie } from '@/components/brand/paleta-ws-cookie'
 import { lerPaletaNova } from '@/lib/brand/paleta-nova'
@@ -314,6 +315,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
         <FontScaleInit scope={`aluno:${sessao.email || 'aluno'}`} />
         <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
         <GuiaTourRunner gamAtivo={gamAtivo} />
+        <RastreioAluno />
         {/* Botão flutuante de suporte (WhatsApp, rodízio entre os números). */}
         <SuporteWhatsApp />
         <ShellRevisaoNova
@@ -346,6 +348,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       {/* Tour guiado da Capi (acionado pelo "Iniciar passo a passo" na Ajuda) — global p/ sobreviver à navegação. */}
       <GuiaTourRunner gamAtivo={gamAtivo} />
+      <RastreioAluno />
       {/* Botão flutuante de suporte (WhatsApp, rodízio entre os números). */}
       <SuporteWhatsApp />
       {/* Manutenção por área do aluno: VND/MEQ (e Revisão legada) bloqueiam o CONTEÚDO da rota aqui —

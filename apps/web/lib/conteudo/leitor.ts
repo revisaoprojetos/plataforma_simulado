@@ -183,9 +183,48 @@ async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any)
   return remember<boolean>(`acesso-leitura:${tenantId}:${alunoId}:${doc.id}`, 60, async () => {
     if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
     if (doc.status !== 'publicado') return false
-    if ((await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return true
+    if ((await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return !(await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id)) // ACL não fura a data do produto
     return docLiberadoViaProduto(svc, tenantId, alunoId, doc.id)
   })
+}
+
+/**
+ * VAZAMENTO POR ACL: mesmo com pasta/doc permitidos, nega quando o aluno TEM acesso a produto(s) que contêm o doc como aula e a
+ * regra efetiva dele (matriz/data do módulo-item; liberação total = base) AINDA NÃO liberou em NENHUM deles. Doc em vários
+ * produtos: libera se algum libera. Sem produto com acesso / doc fora de produto / testador / impersonation / erro → false (ACL decide).
+ * Cache 60s. O caminho 'cronograma' (docBloqueadoPorLiberacaoAulas) segue à parte; aqui só a data/regra de disponibilidade.
+ */
+async function liberacaoDataDoProduto(svc: any, tenantId: string, alunoId: string, documentoId: string): Promise<{ bloqueado: boolean; liberaEm: string | null }> {
+  try {
+    return await remember<{ bloqueado: boolean; liberaEm: string | null }>(`bloq-data-produto2:${tenantId}:${alunoId}:${documentoId}`, 60, async () => {
+      if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId }).catch(() => false)) return { bloqueado: false, liberaEm: null }
+      try { const { lerSessaoImpersonation } = await import('@/lib/impersonation/session'); const sess = await lerSessaoImpersonation(); if (sess && sess.estudanteId === alunoId) return { bloqueado: false, liberaEm: null } } catch { /* sem sessão */ }
+      // FONTE ÚNICA: a MESMA árvore do currículo do aluno (1 cálculo por aluno/60s, compartilhado por todos os docs e pelo cronograma).
+      const { docsBloqueadosDoAluno } = await import('@/lib/produtos/docs-liberacao-aluno')
+      const b = await docsBloqueadosDoAluno(tenantId, alunoId)
+      return documentoId in b ? { bloqueado: true, liberaEm: b[documentoId] ? `${b[documentoId]}T03:00:00.000Z` : null } : { bloqueado: false, liberaEm: null }
+    })
+  } catch { return { bloqueado: false, liberaEm: null } }
+}
+async function docBloqueadoPorDataDoProduto(svc: any, tenantId: string, alunoId: string, documentoId: string): Promise<boolean> {
+  return (await liberacaoDataDoProduto(svc, tenantId, alunoId, documentoId)).bloqueado
+}
+
+/**
+ * FONTE ÚNICA da liberação de UM documento para o aluno (usada por /meta-conteudo, pela marcação de meta e pelo cronograma):
+ * matriz/produto (data) + liberação de aulas (cronograma) + bloqueio por data do Adaptativo. Falha de consulta = não bloqueia.
+ */
+export async function statusLiberacaoDocAluno(tenantId: string, alunoId: string, documentoId: string): Promise<{ bloqueado: boolean; liberaEm: string | null }> {
+  try {
+    const svc = createAdminClient()
+    const d = await liberacaoDataDoProduto(svc, tenantId, alunoId, documentoId)
+    if (d.bloqueado) return d
+    const [c, a] = await Promise.all([
+      docBloqueadoNoCronograma(svc, tenantId, alunoId, documentoId).catch(() => false),
+      docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, documentoId).catch(() => false),
+    ])
+    return { bloqueado: c || a, liberaEm: null }
+  } catch { return { bloqueado: false, liberaEm: null } }
 }
 
 /**
@@ -215,7 +254,10 @@ export async function alunoPodeAbrirDocumento(tenantId: string, alunoId: string,
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
   if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return false
-  return podeLerDoc(svc, tenantId, alunoId, doc)
+  if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return false
+  if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId }).catch(() => false)) return true
+  // mesma decisão da abertura: cronograma/liberação de aulas também negam (antes só o leitor revalidava)
+  return !((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id).catch(() => false)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id).catch(() => false)))
 }
 
 export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number; capaUrl?: string | null }
@@ -373,7 +415,8 @@ export async function carregarLeitura(documentoId: string, alunoId: string, opts
   if (!ehTest) {
     if (doc.status !== 'publicado') return null
     // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
-    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido && !(await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) return null // pasta OU aula liberada do produto (D4)
+    const aclOk = (await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido
+    if (aclOk ? await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id) : !(await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) return null // pasta (sem furar a data do produto) OU aula liberada do produto
     if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) return null // liberação por data do Cronograma Adaptativo
   }
 
@@ -506,7 +549,7 @@ async function podeBaixarMidia(svc: any, tenantId: string, alunoId: string, doc:
   if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
   if (await bloqueioDeDownload(svc, tenantId, doc.id)) return false
   const res = await avaliarDocAluno(svc, tenantId, alunoId, doc).catch(() => null)
-  if (res?.permitido) return !!res.permissoes.baixar
+  if (res?.permitido) return !!res.permissoes.baixar && !(await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id))
   return docLiberadoViaProduto(svc, tenantId, alunoId, doc.id) // aula liberada do produto (D4); chaves de plataforma/doc já checadas acima
 }
 
@@ -727,6 +770,7 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     // pasta com permissão de baixar OU aula liberada do produto (D4: chaves de plataforma/documento já checadas em `blq`)
     if (!(resDl.permitido ? resDl.permissoes.baixar : await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'permissao'); return null }
+    if (resDl.permitido && await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return null }
     // Download só do material JÁ LIBERADO no cronograma do aluno (com o bloqueio ativo).
     if ((await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) || (await docBloqueadoPorLiberacaoAulas(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'nao_liberado'); return null } // liberação por data do Cronograma Adaptativo
   }
@@ -771,6 +815,7 @@ export async function prepararDownloadAluno(documentoId: string, alunoId: string
     if (blq) { await regDl('bloqueado', blq); return { ok: false, erro: blq === 'politica' ? 'politica' : 'documento' } }
     const res = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     if (!(res.permitido ? res.permissoes.baixar : await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'permissao'); return { ok: false, erro: 'negado' } }
+    if (res.permitido && await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return { ok: false, erro: 'negado' } }
     if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return { ok: false, erro: 'negado' } }
   }
   const tipo = String((doc as any).tipo_origem ?? '')

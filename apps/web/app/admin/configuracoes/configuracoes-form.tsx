@@ -893,7 +893,7 @@ function TelaGrupos({ c, fgBtn }: PrevScreen) {
 /** Lista de estudantes: 5 KPIs + busca/filtros + tabela (colunas reais). */
 function TelaEstudantes({ c, fgBtn }: PrevScreen) {
   const kpis: [any, string, string][] = [[Users, '0', 'Estudantes'], [Trophy, '0', 'Passaporte'], [GraduationCap, '0', 'Padrão'], [ClipboardList, '0', 'Simulados feitos'], [Activity, '0', 'Alunos ativos']]
-  const cols = ['Estudante', 'CPF / Telefone', 'Plano', 'Simulados', 'Média', 'Cadastrado', 'Ações']
+  const cols = ['Estudante', 'Telefone', 'Plano', 'Simulados', 'Média', 'Cadastrado', 'Ações']
   return (
     <div className="space-y-3">
       <HeaderTela c={c} fgBtn={fgBtn} titulo="Estudantes" sub="Gerencie os alunos e acesse o dashboard pessoal de cada um." acaoSec="Importar" acaoPrim="Novo Estudante" />

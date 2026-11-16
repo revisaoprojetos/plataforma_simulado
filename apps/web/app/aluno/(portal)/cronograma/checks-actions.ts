@@ -16,6 +16,7 @@ import type { ChecksDaEmissao } from './checks-actions-tipos'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { metaDoCronograma, UUID_META_RE } from '@/lib/cronograma/meta-valida'
+import { metaBloqueadaPelaMatriz } from '@/lib/cronograma/gate-meta'
 import { registrarAudit } from '@/lib/audit'
 import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
 import { emissaoEhFixada } from '@/lib/cronograma/fixar'
@@ -88,6 +89,12 @@ export async function alternarCheckMeta(
   // metaId vem do cliente: UUID (senão 500) e, ao marcar, meta DESTE cronograma (desmarcar aceita meta órfã de reimportação).
   if (!UUID_META_RE.test(metaId)) return { ok: false, error: 'Meta inválida.' }
   if (marcar && !(await metaDoCronograma(g.svc, g.sessao.tenantId, g.cronogramaId, metaId))) return { ok: false, error: 'Meta não pertence a este cronograma.' }
+
+  // FONTE ÚNICA: meta cujo material a MATRIZ ainda bloqueia para o aluno não pode ser concluída (nem "cumprida").
+  if (marcar) {
+    const bl = await metaBloqueadaPelaMatriz(g.svc, g.sessao.tenantId, g.sessao.estudanteId, g.cronogramaId, metaId).catch(() => null)
+    if (bl) return { ok: false, error: bl.liberaEm ? `Este material ainda não foi liberado (libera em ${bl.liberaEm.slice(8, 10)}/${bl.liberaEm.slice(5, 7)}/${bl.liberaEm.slice(0, 4)}). Não é possível concluir a meta antes.` : 'Este material ainda não foi liberado. Não é possível concluir a meta antes.' }
+  }
 
   if (!marcar) {
     const { error } = await g.svc

@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { listarGruposParaSimulado, contarGruposSimulado, listarMembrosGrupos } from '../acoes'
+import { useRastreioPagina, RASTREIO_TH, RastreioUltimo, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
 import { useCriar, useGuardStep } from '../criar-context'
 
 type Grupo = { id: string; nome: string; cor: string | null; membros: number }
@@ -77,6 +78,8 @@ export default function EstudantesPage() {
   const filtrados = q ? merged.filter((e) => e.nome.toLowerCase().includes(q) || (e.email ?? '').toLowerCase().includes(q)) : merged
   const totalPag = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaItens = filtrados.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA)
+  const { mapa: rast } = useRastreioPagina(paginaItens.map((a) => a.id))
+  const nCols = rast ? 8 : 5
   useEffect(() => { setPagina(0) }, [busca])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
@@ -192,16 +195,18 @@ export default function EstudantesPage() {
                 </th>
                 <th className="py-2 pr-3 font-medium">Nome</th>
                 <th className="py-2 pr-3 font-medium">E-mail</th>
-                <th className="py-2 pr-3 font-medium">Documento</th>
                 <th className="py-2 pr-3 font-medium">Telefone</th>
+                {rast && <th className="py-2 pr-3 font-medium">{RASTREIO_TH.ultimo}</th>}
+                {rast && <th className="py-2 pr-3 font-medium">{RASTREIO_TH.aparelho}</th>}
+                {rast && <th className="py-2 pr-3 text-center font-medium">{RASTREIO_TH.sessoes}</th>}
                 <th className="w-12 py-2 pr-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {merged.length === 0 && !carregando ? (
-                <tr><td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Nenhum estudante. Clique em “Adicionar estudantes” ou “Adicionar grupo”.</td></tr>
+                <tr><td colSpan={nCols} className="py-12 text-center text-sm text-muted-foreground">Nenhum estudante. Clique em “Adicionar estudantes” ou “Adicionar grupo”.</td></tr>
               ) : filtrados.length === 0 && !carregando ? (
-                <tr><td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</td></tr>
+                <tr><td colSpan={nCols} className="py-12 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</td></tr>
               ) : paginaItens.map((e) => {
                 const isInd = e.origem === 'individual'
                 const on = sel.has(e.id)
@@ -230,8 +235,10 @@ export default function EstudantesPage() {
                       </div>
                     </td>
                     <td className="py-2.5 pr-3 text-muted-foreground">{e.email ?? '—'}</td>
-                    <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground">{e.cpf ?? '—'}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground">{e.telefone ?? '—'}</td>
+                    {rast && <td className="whitespace-nowrap py-2.5 pr-3"><RastreioUltimo r={rast[e.id]} /></td>}
+                    {rast && <td className="py-2.5 pr-3"><RastreioAparelho r={rast[e.id]} /></td>}
+                    {rast && <td className="py-2.5 pr-3 text-center"><RastreioSessoes r={rast[e.id]} /></td>}
                     <td className="py-2.5 pr-2 text-center">
                       {isInd && (
                         <button type="button" onClick={() => removerEstudante(e.id)} className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" title="Remover"><Trash2 className="h-4 w-4" /></button>
@@ -241,7 +248,7 @@ export default function EstudantesPage() {
                 )
               })}
               {carregando && (
-                <tr><td colSpan={6} className="py-6 text-center text-sm text-muted-foreground"><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Carregando estudantes dos grupos…</span></td></tr>
+                <tr><td colSpan={nCols} className="py-6 text-center text-sm text-muted-foreground"><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Carregando estudantes dos grupos…</span></td></tr>
               )}
             </tbody>
           </table>

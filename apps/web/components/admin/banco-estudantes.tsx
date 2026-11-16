@@ -3,7 +3,6 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoEstudantesClient } from '@/components/admin/banco-estudantes-client'
 import { AlertTriangle } from 'lucide-react'
-import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 function SqlPendente() {
   return (
@@ -28,7 +27,8 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     // Dedup por id (defensivo): se houver linhas repetidas em pasta_estudantes/estudantes, o JOIN
     // pode trazer o mesmo aluno mais de uma vez; o fallback deduplicava via Set — aqui garantimos igual.
     const visto = new Set<string>()
-    vinculados = rpc.filter((r: any) => r?.id && !visto.has(r.id) && visto.add(r.id))
+    // CPF fora do payload (a linha não o exibe mais; só o perfil interno do aluno).
+    vinculados = rpc.filter((r: any) => r?.id && !visto.has(r.id) && visto.add(r.id)).map(({ cpf: _cpf, ...r }: any) => r)
   } catch {
     vinculados = null // função ausente (SQL não aplicado) → fallback abaixo
   }
@@ -46,10 +46,9 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
     }
     const vincRecs: any[] = vincIds.length
       ? await fetchAllByIn<any>(vincIds, (ids) => svc
-          .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao, avatar, perfil_avatar_cor').in('id', ids), { chunk: 300 })
+          .from('simulado_estudantes').select('id, nome, email, telefone, classificacao, avatar, perfil_avatar_cor').in('id', ids), { chunk: 300 })
       : []
-    const exibCpf = await exibidorCpf() // CPF completo só p/ super-admin
-    for (const r of vincRecs) r.cpf = exibCpf.cpf(r.cpf)
+    // CPF fora da linha/payload: só no perfil interno do aluno.
     vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
   }
 

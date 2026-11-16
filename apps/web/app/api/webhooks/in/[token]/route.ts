@@ -66,7 +66,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   let aviso = ''
   if (provCfg) {
     const seg = await segredoWebhookDoTenant(tenantId, provCfg)
-    const v = avaliarWebhook({ raw, headers, segredo: seg.segredo, estrito: seg.estrito, validarCustom: getAdapter(provCfg)?.validarWebhook })
+    const v = avaliarWebhook({ raw, headers, segredo: seg.segredo, estrito: seg.estrito, validarCustom: seg.estrito ? getAdapter(provCfg)?.validarWebhook : undefined })
     if (!v.ok) {
       await registrarInbox({ provider: prov, fonte: prov, metodo: 'POST', token, tenantId, ip, headers, query, raw, status: 401, resultado: `webhook rejeitado: ${v.motivo}` })
       return NextResponse.json({ error: 'não autorizado' }, { status: 401 })

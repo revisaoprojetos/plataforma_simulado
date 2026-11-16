@@ -4,6 +4,8 @@ export type EstudanteBase = {
   feitos: number; media: number | null
   /** nº de produtos com acesso ATIVO (regras de venda + catálogo). Preenchido só com agregados. */
   acessoAtivos?: number
+  /** Rastreio de acesso (IP/aparelho): só vem preenchido para quem tem acessos:view. */
+  rastreio?: { ultimo: string | null; online: boolean; ip: string | null; aparelho: string; sessoes30d: number; tempo30d: string } | null
 }
 
 export type SortEstudante = { key: 'nome' | 'classificacao' | 'created_at'; dir: 'asc' | 'desc' }

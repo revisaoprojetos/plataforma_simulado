@@ -4,7 +4,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
  * Segurança dos webhooks de entrada (Guru / Curseduca / receptor genérico).
  *
  * Modelo de adoção COMPATÍVEL (não derruba produção):
- *  - Tenant COM segredo configurado → a requisição só passa se token/assinatura conferir (sempre rejeita se não bater).
+ *  - Modo padrão (estrito desligado) = COMPORTAMENTO ORIGINAL: só o token da URL; Guru mantém a checagem do Account Token (se configurado).
  *  - Tenant SEM segredo e `webhook_estrito` DESLIGADO → continua aceitando (só o token único da URL protege),
  *    mas o resultado fica marcado no inbox com AVISO e o admin vê o alerta em Integrações.
  *  - `webhook_estrito` LIGADO (flag por tenant+provedor, em credenciais.webhook_estrito='1') → segredo OBRIGATÓRIO:
@@ -67,10 +67,15 @@ export function avaliarWebhook(args: {
   validarCustom?: (raw: string, headers: Record<string, string>, segredo: string) => boolean
 }): VeredictoWebhook {
   const { raw, headers, segredo, estrito, validarCustom } = args
-  if (!segredo) {
-    if (estrito) return { ok: false, motivo: 'modo estrito: segredo do webhook não configurado' }
-    return { ok: true, aviso: 'AVISO: webhook sem segredo configurado (protegido só pelo token da URL) — configure o segredo e ative o modo estrito' }
+  // MODO PADRÃO = COMPORTAMENTO ORIGINAL (nada novo bloqueia): só o token da URL protege; a única checagem que já existia
+  // é a do Guru (Account Token do corpo, quando `webhook_secret` está configurado). Curseduca/n8n nunca foram checados.
+  if (!estrito) {
+    if (segredo && validarCustom && !validarCustom(raw, headers, segredo)) return { ok: false, motivo: 'Account Token do corpo não confere' }
+    if (!segredo) return { ok: true, aviso: 'AVISO: webhook sem segredo configurado (protegido só pelo token da URL)' }
+    return { ok: true }
   }
+  // MODO ESTRITO (opt-in por tenant/provedor): segredo OBRIGATÓRIO e credencial válida.
+  if (!segredo) return { ok: false, motivo: 'modo estrito: segredo do webhook não configurado' }
   const sig = assinaturaDosHeaders(headers)
   if (sig && verificarHmac(raw, sig, segredo)) return { ok: true }
   const estatico = segredoDosHeaders(headers)

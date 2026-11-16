@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { CopyLink } from '@/components/admin/copy-link'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
+import { useRastreioPagina, RASTREIO_TH, RastreioUltimo, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
 import type { EstudanteAcessoLinha, ControleAcessoLinha } from '@/app/admin/leitura/actions-tipos'
@@ -104,6 +105,7 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
   }, [controle, busca, filtroGrupo])
   const totalPag = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaItens = useMemo(() => filtrados.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [filtrados, pagina])
+  const { mapa: rast } = useRastreioPagina(paginaItens.map((a) => a.id))
   useEffect(() => { setPagina(0) }, [busca, filtroGrupo])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
@@ -252,15 +254,17 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
                   </th>
                   <th className="px-3 py-2 font-medium">Nome</th>
                   <th className="hidden px-3 py-2 font-medium sm:table-cell">E-mail</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Documento</th>
+                  {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.ultimo}</th>}
+                  {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.aparelho}</th>}
+                  {rast && <th className="hidden px-3 py-2 text-center font-medium xl:table-cell">{RASTREIO_TH.sessoes}</th>}
                   <th className="px-3 py-2 font-medium">Grupo</th>
                 </tr>
               </thead>
               <tbody>
                 {controle.length === 0 ? (
-                  <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Nenhum aluno com acesso. Vincule um grupo acima ou use “Adicionar estudantes”.</td></tr>
+                  <tr><td colSpan={rast ? 7 : 4} className="py-10 text-center text-muted-foreground">Nenhum aluno com acesso. Vincule um grupo acima ou use “Adicionar estudantes”.</td></tr>
                 ) : filtrados.length === 0 ? (
-                  <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
+                  <tr><td colSpan={rast ? 7 : 4} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
                 ) : paginaItens.map((a) => {
                   const on = sel.has(a.id)
                   const aParte = ehAParte(a)
@@ -281,7 +285,9 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
                         </div>
                       </td>
                       <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
-                      <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                      {rast && <td className="hidden whitespace-nowrap px-3 py-2 xl:table-cell"><RastreioUltimo r={rast[a.id]} /></td>}
+                      {rast && <td className="hidden px-3 py-2 xl:table-cell"><RastreioAparelho r={rast[a.id]} /></td>}
+                      {rast && <td className="hidden px-3 py-2 text-center xl:table-cell"><RastreioSessoes r={rast[a.id]} /></td>}
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap items-center gap-1">
                           {a.grupos.map((g) => (
@@ -426,6 +432,7 @@ function TestadoresExclusivosCard({ testEst, setTestEst, salvar }: {
     for (const nv of novos) if (!map.has(nv.id)) map.set(nv.id, { id: nv.id, nome: nv.nome, email: nv.email, cpf: nv.cpf, classificacao: nv.classificacao, avatar: nv.avatar, perfil_avatar_cor: nv.perfil_avatar_cor })
     const arr = [...map.values()]; setTestEst(arr); salvar(arr)
   }
+  const { mapa: rast } = useRastreioPagina(testEst.map((e) => e.id))
   function remover(id: string) { const arr = testEst.filter((x) => x.id !== id); setTestEst(arr); salvar(arr) }
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -444,13 +451,15 @@ function TestadoresExclusivosCard({ testEst, setTestEst, salvar }: {
             <tr className="border-b text-left text-muted-foreground">
               <th className="px-3 py-2 font-medium">Nome</th>
               <th className="hidden px-3 py-2 font-medium sm:table-cell">E-mail</th>
-              <th className="hidden px-3 py-2 font-medium md:table-cell">Documento</th>
+              {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.ultimo}</th>}
+              {rast && <th className="hidden px-3 py-2 font-medium xl:table-cell">{RASTREIO_TH.aparelho}</th>}
+              {rast && <th className="hidden px-3 py-2 text-center font-medium xl:table-cell">{RASTREIO_TH.sessoes}</th>}
               <th className="w-12 px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {testEst.length === 0 ? (
-              <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">Nenhuma conta de teste. Use “Adicionar estudantes” (e-mail do admin) para habilitar o modo teste deste desafio.</td></tr>
+              <tr><td colSpan={rast ? 6 : 3} className="py-10 text-center text-muted-foreground">Nenhuma conta de teste. Use “Adicionar estudantes” (e-mail do admin) para habilitar o modo teste deste desafio.</td></tr>
             ) : testEst.map((a) => (
               <tr key={a.id} className="border-b transition-colors hover:bg-muted/40">
                 <td className="px-3 py-2">
@@ -463,7 +472,9 @@ function TestadoresExclusivosCard({ testEst, setTestEst, salvar }: {
                   </div>
                 </td>
                 <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
-                <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                {rast && <td className="hidden whitespace-nowrap px-3 py-2 xl:table-cell"><RastreioUltimo r={rast[a.id]} /></td>}
+                {rast && <td className="hidden px-3 py-2 xl:table-cell"><RastreioAparelho r={rast[a.id]} /></td>}
+                {rast && <td className="hidden px-3 py-2 text-center xl:table-cell"><RastreioSessoes r={rast[a.id]} /></td>}
                 <td className="px-3 py-2 text-right">
                   <button type="button" onClick={() => remover(a.id)} title="Remover do modo teste" aria-label="Remover do modo teste" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </td>

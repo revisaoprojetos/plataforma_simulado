@@ -31,16 +31,16 @@ export async function GET(req: NextRequest) {
   if (indisponivel) return NextResponse.json({ message: MSG_NAO_ATIVADO }, { status: 409 })
 
   const agora = Date.now()
-  const linhas: string[] = ['registro;inicio_brt_utc;ultimo_visto_ou_fim;duracao_min;ip;navegador;so;dispositivo;metodo_ou_tipo;origem_ou_item;status']
+  const linhas: string[] = ['registro;inicio_brt_utc;ultimo_visto_ou_fim;duracao_min;ip;navegador;so;dispositivo;metodo_ou_tipo;origem_ou_item;status;rota;duracao_seg']
   for (const a of acessos) {
     linhas.push([
       'sessao', a.iniciado_em, a.ultimo_visto_em, duracaoMin(a), a.ip, a.navegador, a.so, a.dispositivo,
       ROTULO_METODO[a.metodo] ?? a.metodo, ROTULO_ORIGEM[a.origem] ?? a.origem,
-      a.impersonado_por ? 'visualizacao_admin' : statusSessao(a, agora) + (a.motivo_encerramento ? `:${a.motivo_encerramento}` : ''),
+      a.impersonado_por ? 'visualizacao_admin' : statusSessao(a, agora) + (a.motivo_encerramento ? `:${a.motivo_encerramento}` : ''), '', '',
     ].map(cel).join(';'))
   }
   for (const t of atividades) {
-    linhas.push(['atividade', t.criado_em, '', '', t.ip, '', '', '', ROTULO_ATIVIDADE[t.tipo] ?? t.tipo, t.titulo ?? t.ref_id ?? '', JSON.stringify(t.meta ?? {})].map(cel).join(';'))
+    linhas.push(['atividade', t.criado_em, '', '', t.ip, '', '', '', ROTULO_ATIVIDADE[t.tipo] ?? t.tipo, t.titulo ?? t.ref_id ?? '', JSON.stringify(t.meta ?? {}), String(t.meta?.rota ?? ''), String(t.meta?.duracao_seg ?? '')].map(cel).join(';'))
   }
   await registrarAudit({
     operacao: 'UPDATE', entidade: 'aluno_acessos_exportacao', entidadeId: estudanteId, tenantId: access.tenantId, atorId: access.userId, atorTipo: 'admin',

@@ -31,6 +31,7 @@ import type { GrupoBanco } from '@/app/admin/banco-questoes/actions-tipos'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { checkPermission } from '@/lib/auth/permissions'
+import { AcessosAlunoConteudo, type AcessosSP } from './acessos-conteudo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
@@ -61,9 +62,10 @@ const statusCfg: Record<string, { label: string; variant: 'default' | 'secondary
   aguardando: { label: 'Aguardando', variant: 'outline' },
 }
 
-export default async function EstudantePerfilPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; voltar?: string }> }) {
+export default async function EstudantePerfilPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; voltar?: string } & AcessosSP> }) {
   const { id } = await params
-  const { tab, voltar } = await searchParams
+  const spAll = await searchParams
+  const { tab, voltar } = spAll
   // volta para onde o admin veio (só rotas internas de Membros; qualquer outra coisa cai na lista de estudantes)
   const voltarHref = voltar && voltar.startsWith('/admin/revisao/membros') && !voltar.startsWith('//') ? voltar : '/admin/estudantes'
   const tenantId = await getCurrentTenantId()
@@ -486,8 +488,9 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
             key: 'acessos',
             label: 'Acessos e atividade',
             icon: <ShieldCheck className="h-4 w-4" />,
-            href: `/admin/estudantes/${id}/acessos`,
-            panel: null,
+            ...(tab === 'acessos'
+              ? { panel: <AcessosAlunoConteudo id={id} sp={spAll} /> }
+              : { href: `/admin/estudantes/${id}?tab=acessos${voltar ? `&voltar=${encodeURIComponent(voltar)}` : ''}`, panel: null }),
           }] : []),
         ]}
       />

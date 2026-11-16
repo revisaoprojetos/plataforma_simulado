@@ -13,6 +13,7 @@ import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
+import { TEXTO_SEM_ATUALIZACAO } from '@/lib/conteudo/atualizacoes-tipos'
 import type { ItemFila, OpcaoMaterial } from '@/lib/admin-revisao/atualizacoes'
 import { criarPedidoAtualizacaoAction, descartarPedidoAction, registrarAtualizacaoAction } from './actions'
 
@@ -70,6 +71,12 @@ export function FormRegistrar({ opcoes, docInicial, origem }: { opcoes: OpcaoMat
   const [troca, setTroca] = useState(false)
   const rotulo = opcoes.find((o) => o.id === doc)?.rotulo ?? 'Material'
 
+  function escolherTipo(t: TipoAtualizacao) {
+    setTipo(t)
+    if (t === 'sem_atualizacao') { setTexto((x) => (!x.trim() ? TEXTO_SEM_ATUALIZACAO : x)); setAvisar(false); setInicio(false) }
+    else if (tipo === 'sem_atualizacao') { setTexto((x) => (x === TEXTO_SEM_ATUALIZACAO ? '' : x)); setAvisar(true); setInicio(true) }
+  }
+
   function publicar() {
     if (!doc) { toast.error('Escolha o material.'); return }
     if (!texto.trim()) { toast.error('Escreva o que mudou.'); return }
@@ -95,7 +102,7 @@ export function FormRegistrar({ opcoes, docInicial, origem }: { opcoes: OpcaoMat
           <span className="font-medium">Tipo de atualização</span>
           <div className="flex flex-wrap gap-1.5">
             {TIPOS_ATUALIZACAO.map((t) => (
-              <button key={t.id} type="button" onClick={() => setTipo(t.id)}
+              <button key={t.id} type="button" onClick={() => escolherTipo(t.id)}
                 className={cn('inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium', tipo === t.id ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>
                 {tipo === t.id && <Check className="h-3 w-3" />}{t.nome}
               </button>

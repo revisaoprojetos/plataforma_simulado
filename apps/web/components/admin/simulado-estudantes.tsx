@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import type { EstudanteLinkado } from '@/app/admin/simulados/actions-tipos'
 import {listarEstudantesSimulado, removerPassaportesIndevidos, definirAcessoGratuitoSimulado} from '@/app/admin/simulados/actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
+import { useRastreioPagina, RASTREIO_TH, RastreioUltimo, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
 import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
@@ -114,6 +115,9 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, 
     else { setCampo(c); setDir('asc') }
   }
 
+  const { mapa: rast } = useRastreioPagina(visiveis.map((e) => e.id))
+  const temRast = rast !== null
+
   const nPassaporte = dados.filter((e) => e.classificacao === 'passaporte').length
 
   if (carregando) {
@@ -196,35 +200,36 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, 
       <div className="overflow-hidden rounded-lg border">
         <Table className="w-full table-fixed">
           <colgroup>
-            <col className="w-[22%]" />
-            <col className="w-[24%]" />
-            <col className="w-[13%]" />
-            <col className="w-[13%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            <col className="w-[6%]" />
+            <col className={temRast ? 'w-[16%]' : 'w-[24%]'} />
+            <col className={temRast ? 'w-[18%]' : 'w-[27%]'} />
+            <col className={temRast ? 'w-[10%]' : 'w-[15%]'} />
+            <col className={temRast ? 'w-[9%]' : 'w-[13%]'} />
+            <col className={temRast ? 'w-[9%]' : 'w-[13%]'} />
+            <col className={temRast ? 'w-[5%]' : 'w-[8%]'} />
+            {temRast && <><col className="w-[11%]" /><col className="w-[14%]" /><col className="w-[8%]" /></>}
           </colgroup>
           <TableHeader>
             <TableRow>
               <Th c="nome">Nome</Th>
               <Th c="email">E-mail</Th>
-              <TableHead>CPF</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>Classificação</TableHead>
               <Th c="situacao">Situação</Th>
               <Th c="nota" className="text-right">Nota</Th>
+              {temRast && <TableHead>{RASTREIO_TH.ultimo}</TableHead>}
+              {temRast && <TableHead>{RASTREIO_TH.aparelho}</TableHead>}
+              {temRast && <TableHead className="text-center">{RASTREIO_TH.sessoes}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {visiveis.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={temRast ? 9 : 6}className="py-10 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</TableCell></TableRow>
             ) : visiveis.map((e) => {
               const sit = situacaoCfg[e.situacao] ?? situacaoCfg.nao_iniciou
               return (
                 <TableRow key={e.id}>
                   <TableCell className="truncate font-medium" title={e.nome}>{e.nome}</TableCell>
                   <TableCell className="truncate text-muted-foreground" title={e.email ?? undefined}>{e.email ?? '—'}</TableCell>
-                  <TableCell className="truncate text-muted-foreground" title={e.cpf ?? undefined}>{e.cpf ?? '—'}</TableCell>
                   <TableCell className="truncate text-muted-foreground" title={e.telefone ?? undefined}>{e.telefone ?? '—'}</TableCell>
                   <TableCell className="truncate">
                     <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', e.classificacao === 'vitalicio' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : e.classificacao === 'passaporte' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-muted text-muted-foreground')}>
@@ -233,6 +238,9 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, 
                   </TableCell>
                   <TableCell className="truncate"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.cls)}>{sit.label}</span></TableCell>
                   <TableCell className="text-right tabular-nums">{e.nota != null ? e.nota.toFixed(1) : '—'}</TableCell>
+                  {temRast && <TableCell><RastreioUltimo r={rast?.[e.id]} /></TableCell>}
+                  {temRast && <TableCell className="truncate"><RastreioAparelho r={rast?.[e.id]} /></TableCell>}
+                  {temRast && <TableCell className="text-center"><RastreioSessoes r={rast?.[e.id]} /></TableCell>}
                 </TableRow>
               )
             })}

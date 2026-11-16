@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { parseUserAgent } from './user-agent'
 import { detectarRajada } from './alertas'
+import { normalizarIp } from './ip'
 
 /**
  * REGISTRO DE ACESSOS DO ALUNO (backend-first, fire-and-forget).
@@ -21,10 +22,12 @@ export type OrigemAcesso = 'portal' | 'embed' | 'curseduca-iframe'
 export type TipoAtividade =
   | 'leitura_aberta' | 'leitura_concluida' | 'grifo_criado' | 'grifo_removido' | 'nota_editada'
   | 'quiz_tentativa' | 'simulado_iniciado' | 'simulado_finalizado' | 'jogo_progresso' | 'pagina_vista' | 'outro'
+  | 'material_aberto' | 'material_download' | 'video_play' | 'video_concluido' | 'cronograma_meta_concluida' | 'cronograma_aberto'
+  | 'biblioteca_navegou' | 'ranking_visto' | 'desafio_iniciado' | 'desafio_concluido' | 'busca_realizada' | 'tempo_pagina'
 
 const T_ACESSOS = 'simulado_aluno_acessos'
 const T_ATIV = 'simulado_aluno_atividades'
-const HEARTBEAT_MS = 5 * 60_000
+const HEARTBEAT_MS = 60_000
 const JANELA_AGRUPAR_MS = 60_000
 
 // ───────────────────────── contexto da requisição ─────────────────────────
@@ -32,7 +35,7 @@ const JANELA_AGRUPAR_MS = 60_000
 /** IP "de exibição": 1º do x-forwarded-for (Traefik/nginx) ou x-real-ip. Spoofável — NUNCA usar p/ decisão de acesso. */
 export function ipDeHeaders(h: { get(n: string): string | null }): string | null {
   const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip')?.trim() || null
-  return ip ? ip.slice(0, 64) : null
+  return normalizarIp(ip)
 }
 
 export interface CtxReq { ip: string | null; ua: string | null }
@@ -105,12 +108,12 @@ export function registrarAcesso(a: NovoAcesso): void {
 
 const ultimoToque = new Map<string, number>()
 
-/** Heartbeat THROTTLED (≤ 1 escrita / sessão / 5 min por processo): atualiza `ultimo_visto_em` e `ultimo_acesso_em`. */
-export function tocarAcesso(acessoId: string, tenantId: string, estudanteId: string): void {
+/** Heartbeat THROTTLED (≤ 1 escrita / sessão / 60 s por processo; `intervaloMs` menor p/ o beacon de rastreio): atualiza `ultimo_visto_em` e `ultimo_acesso_em`. */
+export function tocarAcesso(acessoId: string, tenantId: string, estudanteId: string, intervaloMs: number = HEARTBEAT_MS): void {
   if (!ativo()) return
   const agora = Date.now()
   const ult = ultimoToque.get(acessoId) ?? 0
-  if (agora - ult < HEARTBEAT_MS) return
+  if (agora - ult < intervaloMs) return
   if (ultimoToque.size > 5000) ultimoToque.clear()
   ultimoToque.set(acessoId, agora)
   depois(async () => {
@@ -171,7 +174,14 @@ export interface EventoAtividade {
   refId?: string
   titulo?: string
   meta?: Record<string, unknown>
+  /** Rota normalizada (sem query, ids → :id). Vai p/ a coluna `rota` (pós-migração 20261120010000) e p/ meta.rota. */
+  rota?: string
+  /** Tempo de permanência em segundos (coluna `duracao_seg` pós-migração) e meta.duracao_seg. */
+  duracaoSeg?: number
 }
+
+let colunasNovasAteMs = 0
+const semColunasNovas = () => Date.now() < colunasNovasAteMs
 
 const throttleMap = new Map<string, number>()
 function passouThrottle(chave: string, ms: number): boolean {
@@ -193,7 +203,17 @@ async function inserirAtividade(ator: AtorAluno, ev: EventoAtividade, ip: string
     tipo: ev.tipo, ref_tipo: ev.refTipo ?? null, ref_id: ev.refId ?? null, titulo: ev.titulo?.slice(0, 200) ?? null,
     meta: ator.impersonation ? { ...meta, impersonado_por: ator.impersonation.por } : meta, ip,
   }
-  let { error } = await svc.from(T_ATIV).insert(row)
+  // Colunas novas (rota/duracao_seg) só quando a migração 20261120010000 foi aplicada; senão grava só em meta.
+  const extras = !semColunasNovas() && (ev.rota || ev.duracaoSeg != null)
+    ? { ...(ev.rota ? { rota: ev.rota.slice(0, 200) } : {}), ...(ev.duracaoSeg != null ? { duracao_seg: Math.max(0, Math.min(14_400, Math.round(ev.duracaoSeg))) } : {}) }
+    : {}
+  if (ev.rota) row.meta = { ...row.meta, rota: ev.rota.slice(0, 200) }
+  if (ev.duracaoSeg != null) row.meta = { ...row.meta, duracao_seg: Math.round(ev.duracaoSeg) }
+  let { error } = await svc.from(T_ATIV).insert({ ...row, ...extras })
+  if (error && Object.keys(extras).length && /rota|duracao_seg/.test(String(error.message ?? ''))) {
+    colunasNovasAteMs = Date.now() + 10 * 60_000
+    ;({ error } = await svc.from(T_ATIV).insert(row))
+  }
   if (error?.code === '23503' && row.acesso_id) ({ error } = await svc.from(T_ATIV).insert({ ...row, acesso_id: null })) // acesso ainda não gravado
   tabelaAusente(error)
 }
@@ -221,6 +241,9 @@ export async function registrarAtividade(ator: AtorAluno, ev: EventoAtividade): 
     const chaveItem = `${ator.estudanteId}:${ev.tipo}:${ev.refId ?? ''}`
     if (ev.tipo === 'leitura_aberta' || ev.tipo === 'jogo_progresso') { if (!passouThrottle(chaveItem, 5 * 60_000)) return }
     else if (ev.tipo === 'nota_editada') { if (!passouThrottle(chaveItem, 60_000)) return }
+    else if (ev.tipo === 'pagina_vista' || ev.tipo === 'tempo_pagina') { if (!passouThrottle(`${chaveItem}:${ev.rota ?? ''}`, ev.tipo === 'pagina_vista' ? 25_000 : 5_000)) return }
+    else if (ev.tipo === 'material_aberto' || ev.tipo === 'video_play' || ev.tipo === 'cronograma_aberto' || ev.tipo === 'biblioteca_navegou' || ev.tipo === 'ranking_visto' || ev.tipo === 'busca_realizada') { if (!passouThrottle(chaveItem, 60_000)) return }
+    else if (ev.tipo === 'material_download') { if (!passouThrottle(chaveItem, 10_000)) return }
 
     const ctx = await contextoReq()
     if (ev.tipo === 'grifo_criado' || ev.tipo === 'grifo_removido') {

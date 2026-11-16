@@ -71,11 +71,12 @@ export interface LinhaSimulado { id: string; titulo: string; status: string; mod
 
 export interface VersaoDoc { numero: number; origem: string; criadaEm: string; paginas: number | null; atual: boolean }
 
-export type TipoAtualizacao = 'legislacao' | 'jurisprudencia' | 'correcao' | 'conteudo_novo'
+export type TipoAtualizacao = 'legislacao' | 'jurisprudencia' | 'correcao' | 'conteudo_novo' | 'sem_atualizacao'
 export const TIPOS_ATUALIZACAO: { id: TipoAtualizacao; nome: string }[] = [
   { id: 'legislacao', nome: 'Legislação' },
   { id: 'jurisprudencia', nome: 'Jurisprudência' },
   { id: 'correcao', nome: 'Correção' },
   { id: 'conteudo_novo', nome: 'Conteúdo novo' },
+  { id: 'sem_atualizacao', nome: 'Sem atualizações' },
 ]
 export const NOME_TIPO_ATUALIZACAO: Record<TipoAtualizacao, string> = Object.fromEntries(TIPOS_ATUALIZACAO.map((t) => [t.id, t.nome])) as Record<TipoAtualizacao, string>

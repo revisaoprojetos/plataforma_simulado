@@ -14,7 +14,7 @@ import { registrarAudit } from '@/lib/audit'
 import { hojeBrtISO } from '@/lib/brt'
 import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
 import {
-  LIMITES_ATUALIZACAO, combinarDataHoraBrt, normalizarItens,
+  LIMITES_ATUALIZACAO, TEXTO_SEM_ATUALIZACAO, combinarDataHoraBrt, normalizarItens,
   type FiltroAtualizacoes, type ItemAlteracao, type LinhaAtualizacao, type StatusAtualizacao, type TipoAtualizacao,
 } from '@/lib/conteudo/atualizacoes-tipos'
 import {
@@ -40,7 +40,9 @@ async function guard(acao: 'view' | 'edit'): Promise<Falha | { ok: true; tenantI
 }
 
 const tipoOk = (t: unknown): t is TipoAtualizacao => TIPOS_ATUALIZACAO.some((x) => x.id === t)
-const msgErro = (m: string | undefined) => (m && SCHEMA_AUSENTE.test(m) ? AVISO_MIGRACAO_PONTOS : m || 'Falha ao salvar.')
+const CHECK_TIPO = /atualizacoes_tipo_check|violates check constraint.*tipo/i
+const AVISO_MIGRACAO_TIPO = 'O tipo "Sem atualizações" exige aplicar a migração 20261121000000 (atualizacoes_tipo_sem_atualizacao).'
+const msgErro = (m: string | undefined) => (m && CHECK_TIPO.test(m) ? AVISO_MIGRACAO_TIPO : m && SCHEMA_AUSENTE.test(m) ? AVISO_MIGRACAO_PONTOS : m || 'Falha ao salvar.')
 
 /** Data (YYYY-MM-DD) + hora opcional (HH:mm), ambas em Brasília. Data vazia = hoje (BRT); hora vazia = 00:00. Rejeita futuro distante. */
 function resolverOcorrida(data: string | null | undefined, hora: string | null | undefined): { iso: string } | { erro: string } {
@@ -167,14 +169,15 @@ export async function registrarPontoVersaoAction(input: RegistrarPontoInput): Pr
   const linhas: any[] = []
   for (const d of docs) {
     const ov = input.porDocumento?.[d.id]
-    const texto = String(ov?.resumo ?? resumoGeral).trim()
+    const semAtu = input.tipo === 'sem_atualizacao'
+    const texto = semAtu ? (String(ov?.resumo ?? resumoGeral).trim() || TEXTO_SEM_ATUALIZACAO) : String(ov?.resumo ?? resumoGeral).trim()
     if (texto.length > LIMITES_ATUALIZACAO.resumo) return { ok: false, error: `O resumo passou de ${LIMITES_ATUALIZACAO.resumo} caracteres.` }
-    const itens = ov?.itens ? normalizarItens(ov.itens) : itensGerais
+    const itens = semAtu ? [] : ov?.itens ? normalizarItens(ov.itens) : itensGerais
     if (!texto && !itens.length) return { ok: false, error: `Descreva o que mudou em "${d.titulo ?? 'material'}" (resumo ou ao menos um item).` }
     linhas.push({
       tenant_id: g.tenantId, documento_id: d.id, versao_id: versaoPublicar ?? d.versao_atual_id ?? null, produto_id: produtoId, lote_id: loteId,
       tipo: input.tipo, rotulo, texto, itens, ocorrida_em: ocorrida.iso, status, visivel_aluno: input.visivelAluno !== false,
-      avisar_alunos: !!input.avisarAlunos, mostrar_inicio: input.mostrarInicio !== false, ...(flagsOk ? flags : {}),
+      avisar_alunos: !semAtu && !!input.avisarAlunos, mostrar_inicio: !semAtu && input.mostrarInicio !== false, ...(flagsOk ? flags : {}),
       publicado_em: status === 'publicado' ? agora : null, criado_por: g.atorId,
     })
   }
@@ -226,9 +229,10 @@ export async function editarPontoVersaoAction(input: {
   const g = await guard('edit'); if (!g.ok) return g
   if (!UUID.test(input.id)) return { ok: false, error: 'Registro inválido.' }
   if (!tipoOk(input.tipo)) return { ok: false, error: 'Tipo de atualização inválido.' }
-  const texto = String(input.resumo ?? '').trim()
+  const semAtu = input.tipo === 'sem_atualizacao'
+  const texto = String(input.resumo ?? '').trim() || (semAtu ? TEXTO_SEM_ATUALIZACAO : '')
   if (texto.length > LIMITES_ATUALIZACAO.resumo) return { ok: false, error: `O resumo passou de ${LIMITES_ATUALIZACAO.resumo} caracteres.` }
-  const itens = normalizarItens(input.itens)
+  const itens = semAtu ? [] : normalizarItens(input.itens)
   if (!texto && !itens.length) return { ok: false, error: 'Descreva o que mudou (resumo ou ao menos um item).' }
   const ocorrida = resolverOcorrida(input.data, input.hora); if ('erro' in ocorrida) return { ok: false, error: ocorrida.erro }
   const svc = createAdminClient()

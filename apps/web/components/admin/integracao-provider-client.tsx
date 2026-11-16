@@ -233,7 +233,7 @@ function Assinaturas({ provider }: { provider: Provider }) {
                     <td className="px-3 py-2"><input type="checkbox" checked={on} onChange={() => toggle(a)} onClick={(e) => e.stopPropagation()} /></td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{a.nome}</div>
-                      <div className="text-[11px] text-muted-foreground">{a.email ?? '—'}{a.cpf ? ` · ${a.cpf}` : ''}</div>
+                      <div className="text-[11px] text-muted-foreground">{a.email ?? '—'}</div>
                     </td>
                     <td className="px-3 py-2">{a.produtoNome ?? a.produtoRef}</td>
                     <td className="px-3 py-2">{badge(a)}</td>

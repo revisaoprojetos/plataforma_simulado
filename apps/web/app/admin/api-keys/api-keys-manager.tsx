@@ -36,6 +36,13 @@ const SCOPES: { id: string; label: string; descricao: string }[] = [
   { id: 'import:run', label: 'Executar importação', descricao: 'Disparar a ingestão em lote de questões/dados (webhook de importação).' },
   { id: 'simulados:view', label: 'Ler simulados', descricao: 'Consultar os simulados e sua configuração pela API.' },
   { id: 'relatorios:view', label: 'Ler relatórios', descricao: 'Acessar estatísticas e resultados (relatórios) pela API.' },
+  { id: 'alunos:read', label: 'API v1: alunos', descricao: 'Listar alunos (nome, e-mail, status) — sem CPF/telefone.' },
+  { id: 'acessos:read', label: 'API v1: acessos', descricao: 'Registro de acessos dos alunos (sem IP).' },
+  { id: 'acessos:pii', label: 'API v1: acessos com IP', descricao: 'Inclui IP e user-agent nos acessos (dado pessoal). Use só se necessário.' },
+  { id: 'atividades:read', label: 'API v1: atividades', descricao: 'Atividades dos alunos (leitura, quiz, simulado).' },
+  { id: 'simulados:read', label: 'API v1: simulados', descricao: 'Simulados e resultados por aluno.' },
+  { id: 'leitura:read', label: 'API v1: leitura', descricao: 'Progresso de leitura por aluno/documento.' },
+  { id: 'metricas:read', label: 'API v1: métricas', descricao: 'Métricas agregadas do período.' },
 ]
 const SCOPE_META: Record<string, { label: string; descricao: string }> =
   Object.fromEntries(SCOPES.map(s => [s.id, { label: s.label, descricao: s.descricao }]))
@@ -142,7 +149,6 @@ export function ApiKeysManager({ initialKeys }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>
           <p className="text-muted-foreground">Chaves para sistemas externos acessarem a API da plataforma (via <code className="font-mono text-xs">Authorization: Bearer</code>). {keys.length} registrada(s).</p>
         </div>
 

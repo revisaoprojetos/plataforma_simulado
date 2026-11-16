@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { UUID_META_RE } from '@/lib/cronograma/meta-valida'
-import { alunoPodeAbrirDocumento } from '@/lib/conteudo/leitor'
+import { alunoPodeAbrirDocumento, statusLiberacaoDocAluno } from '@/lib/conteudo/leitor'
 
 // GET /api/aluno/cronograma/meta-conteudo?emissaoId=<uuid>&docId=<uuid>
 // Antes de o iframe do cronograma Revisão navegar para o leitor, confirma que o ALUNO pode abrir o documento
@@ -19,5 +20,8 @@ export async function GET(req: NextRequest) {
     .eq('id', emissaoId).eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).maybeSingle()
   if (!em) return NextResponse.json({ ok: false, message: 'Cronograma não encontrado.' }, { status: 404 })
   const pode = await alunoPodeAbrirDocumento(sessao.tenantId, sessao.estudanteId, docId).catch(() => false)
-  return NextResponse.json({ ok: true, pode }, { headers: { 'Cache-Control': 'no-store' } })
+  if (pode) void registrarAtividade(sessao, { tipo: 'material_aberto', refTipo: 'conteudo_doc', refId: docId, meta: { origem: 'cronograma' } })
+  // FONTE ÚNICA: negado por data/regra da matriz → motivo + data (o iframe mostra "libera em dd/mm"; não é falta de acesso)
+  const lib = pode ? null : await statusLiberacaoDocAluno(sessao.tenantId, sessao.estudanteId, docId)
+  return NextResponse.json({ ok: true, pode, ...(lib?.bloqueado ? { motivo: 'ainda_nao_liberado', liberaEm: lib.liberaEm } : {}) }, { headers: { 'Cache-Control': 'no-store' } })
 }

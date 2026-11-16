@@ -10,6 +10,7 @@ import {
   montarPdfComCapa, sanitizarNomeArquivo,
 } from '@/lib/conteudo/baixar-pura'
 import { rateLimit } from '@/lib/rate-limit'
+import { registrarAtividade } from '@/lib/acessos/registro'
 
 // GET /api/aluno/biblioteca/baixar?doc=<uuid>[&meta=<id>][&produto=<uuid>]
 // Baixa o DOCUMENTO da meta do cronograma com o NOME do documento. Se o documento (ou a pasta em modo lote) tem CAPA
@@ -118,6 +119,7 @@ async function baixar(request: NextRequest): Promise<Response> {
     return json(403, 'Você não tem permissão para baixar este material.')
   }
 
+  void registrarAtividade(sessao, { tipo: 'material_download', refTipo: 'conteudo_doc', refId: doc, titulo: prep.titulo, meta: { origem: 'cronograma' } })
   const { capaUrl, paginaInicial } = await capaEPaginaDoDocumento(svc, sessao.tenantId, doc)
   const dec = decidirDownload(prep.tipoOrigem, capaUrl, paginaInicial)
 

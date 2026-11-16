@@ -22,6 +22,7 @@ import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
 import { NavProgress } from '@/components/brand/nav-progress'
 import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
+import { RastreioAdmin } from '@/components/admin/rastreio-admin'
 import { FontScaleInit } from '@/components/font-scale-init'
 import { Lock } from 'lucide-react'
 import { Suspense } from 'react'
@@ -54,6 +55,7 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/gamificacao', perm: 'gamificacao:view' },
   { prefix: '/admin/auditoria', perm: 'auditoria:view' },
   { prefix: '/admin/acessos', perm: 'acessos:view' },
+  { prefix: '/admin/acessos-equipe', perm: 'acessos:view' },
   { prefix: '/admin/administradores', perm: 'rbac:view' },
   { prefix: '/admin/api-keys', perm: 'api_keys:manage' },
   { prefix: '/admin/configuracoes', perm: 'configuracoes:view' },
@@ -216,6 +218,7 @@ export default async function AdminLayout({
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="icon" />
               <NavProgress edge="top" />
+              <RastreioAdmin />
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
                 {semAcesso ? (

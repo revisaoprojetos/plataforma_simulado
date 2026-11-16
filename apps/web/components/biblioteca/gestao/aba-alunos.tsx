@@ -132,7 +132,7 @@ function LinhaAluno({ a, base, aberta, onToggle, tipo }: { a: AlunoAcesso; base:
         <td className="px-4 py-2.5">
           <div className="flex items-center gap-2.5">
             <AvatarAluno nome={a.nome} avatar={a.avatar} cor={a.cor} />
-            <div className="min-w-0"><div className="truncate font-medium text-foreground" title={a.nome}>{a.nome}</div><div className="truncate text-[11px] text-muted-foreground">{a.email ?? '—'} · {a.cpfMasc}</div></div>
+            <div className="min-w-0"><div className="truncate font-medium text-foreground" title={a.nome}>{a.nome}</div><div className="truncate text-[11px] text-muted-foreground">{a.email ?? '—'}</div></div>
           </div>
         </td>
         <td className="px-4 py-2.5"><div className="flex flex-col gap-0.5"><OrigemBadge origem={a.recebidoPor.origem} /><span className="text-[11px] text-muted-foreground">{a.recebidoPor.detalhe}</span></div></td>

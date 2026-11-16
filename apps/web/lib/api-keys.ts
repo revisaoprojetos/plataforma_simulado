@@ -9,7 +9,14 @@ import { createAdminClient } from '@/lib/supabase/server'
  * Best-effort: carimba `ultimo_uso`. Retorna o tenant + escopos, ou um erro tipado.
  */
 export type ApiKeyOk = { ok: true; tenantId: string; escopos: string[]; keyId: string; nome: string | null }
-export type ApiKeyErro = { ok: false; status: 401 | 403; error: string }
+/** `keyId`/`tenantId` só vêm quando a chave EXISTE (revogada/expirada/sem escopo) — usados no rastreio de uso. */
+export type ApiKeyErro = { ok: false; status: 401 | 403; error: string; keyId?: string; tenantId?: string }
+
+/** Prefixo (8 chars) da chave apresentada — p/ rastreio; NUNCA a chave inteira. */
+export function prefixoChave(req: Request): string | null {
+  const c = extrairChave(req)
+  return c ? c.slice(0, 8) : null
+}
 
 function extrairChave(req: Request): string | null {
   const auth = req.headers.get('authorization') || ''
@@ -32,13 +39,14 @@ export async function validarApiKey(req: Request, escopo?: string): Promise<ApiK
     .maybeSingle()
 
   if (error || !data) return { ok: false, status: 401, error: 'API key inválida.' }
-  if ((data as any).revogada) return { ok: false, status: 401, error: 'API key revogada.' }
+  const ref = { keyId: (data as any).id as string, tenantId: (data as any).tenant_id as string }
+  if ((data as any).revogada) return { ok: false, status: 401, error: 'API key revogada.', ...ref }
   const expira = (data as any).expira_em ? new Date((data as any).expira_em) : null
-  if (expira && expira < new Date()) return { ok: false, status: 401, error: 'API key expirada.' }
+  if (expira && expira < new Date()) return { ok: false, status: 401, error: 'API key expirada.', ...ref }
 
   const escopos: string[] = Array.isArray((data as any).escopos) ? (data as any).escopos : []
   if (escopo && !escopos.includes(escopo)) {
-    return { ok: false, status: 403, error: `API key sem o escopo necessário: ${escopo}.` }
+    return { ok: false, status: 403, error: `API key sem o escopo necessário: ${escopo}.`, ...ref }
   }
 
   // Carimba último uso (não bloqueia se a coluna/atualização falhar).

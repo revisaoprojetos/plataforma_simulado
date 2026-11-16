@@ -7,6 +7,7 @@ import { AvatarMembro, KpisCs, NotaCs, PillStatusMembro } from '@/components/adm
 import type { GrupoOpcao, MembroLinha, MembrosContagens, MembrosFiltro } from '@/lib/admin-revisao/cs-tipos'
 import { MembrosTopo } from './membros-topo'
 import { FichaPainel, prefetchFicha } from './ficha-painel'
+import { useRastreioPagina } from '@/components/admin/rastreio-celulas'
 
 type Dados = { rows: MembroLinha[]; total: number; migrado: boolean; contagens: MembrosContagens }
 type Estado = { f: MembrosFiltro; q: string; page: number; pp: number; sort: string; dir: 'asc' | 'desc' }
@@ -95,6 +96,9 @@ export function MembrosApp({ inicial, estadoInicial, selInicial, grupos, podeCri
   const totalPag = Math.max(1, Math.ceil(dados.total / st.pp))
   const ini = dados.total === 0 ? 0 : (st.page - 1) * st.pp + 1, fim = Math.min(st.page * st.pp, dados.total)
   const seta = (k: string) => st.sort === k ? (st.dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : null
+  // Rastreio (só com acessos:view): online/aparelho·IP/sessões·tempo (30d) dos membros da página.
+  const { mapa: rast } = useRastreioPagina(dados.rows.map((r) => r.id))
+  const gridCols = rast ? 'grid-cols-[minmax(0,1fr)_9rem_12rem] max-md:grid-cols-[minmax(0,1fr)_12rem]' : 'grid-cols-[minmax(0,1fr)_9rem_7rem] max-md:grid-cols-[minmax(0,1fr)_7rem]'
   const recarregarTudo = useCallback(() => { PAG_CACHE.clear(); return carregar(st) }, [carregar, st])
 
   return (
@@ -125,7 +129,7 @@ export function MembrosApp({ inicial, estadoInicial, selInicial, grupos, podeCri
 
       <div className="grid items-start gap-4 xl:items-stretch xl:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
         <section className="flex min-w-0 flex-col rounded-2xl border bg-card shadow-sm" aria-busy={carregando}>
-          <div className="grid grid-cols-[minmax(0,1fr)_9rem_7rem] gap-2 border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground max-md:grid-cols-[minmax(0,1fr)_7rem]">
+          <div className={cn('grid gap-2 border-b bg-muted/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground', gridCols)}>
             <button type="button" className="flex items-center gap-1 text-left" onClick={() => ordenar('nome')}>Membro {seta('nome')}</button>
             <span className="max-md:hidden">Situação</span>
             <button type="button" className="flex items-center gap-1 text-left" onClick={() => ordenar('ultimo_acesso')}>Último acesso {seta('ultimo_acesso')}</button>
@@ -135,7 +139,7 @@ export function MembrosApp({ inicial, estadoInicial, selInicial, grupos, podeCri
             {!erro && dados.rows.length === 0 && <p className="p-8 text-center text-sm text-muted-foreground">Nenhum membro encontrado{st.q ? ` para “${st.q}”` : ''}.</p>}
             {dados.rows.map((r) => (
               <button key={r.id} type="button" onClick={() => escolher(r)} onPointerEnter={() => prefetchFicha(r.id)} aria-current={sel === r.id}
-                className={cn('grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_9rem_7rem] items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/60 max-md:grid-cols-[minmax(0,1fr)_7rem]', sel === r.id && 'bg-primary/10 shadow-[inset_3px_0_0_0_var(--primary)]')}>
+                className={cn('grid w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/60', gridCols, sel === r.id && 'bg-primary/10 shadow-[inset_3px_0_0_0_var(--primary)]')}>
                 <span className="flex min-w-0 items-center gap-2.5">
                   <AvatarMembro nome={r.nome} avatar={r.avatar} cor={r.avatarCor} />
                   <span className="min-w-0">
@@ -144,7 +148,16 @@ export function MembrosApp({ inicial, estadoInicial, selInicial, grupos, podeCri
                   </span>
                 </span>
                 <span className="max-md:hidden"><PillStatusMembro bloqueado={r.bloqueado} risco={r.risco} /></span>
-                <span className="text-xs text-muted-foreground">{r.ultimoTxt}</span>
+                <span className="min-w-0 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    {rast?.[r.id]?.online && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Online agora" />}
+                    <span className={cn(rast?.[r.id]?.online && 'font-medium text-emerald-600 dark:text-emerald-400')}>{rast?.[r.id]?.online ? 'Online' : r.ultimoTxt}</span>
+                  </span>
+                  {rast && (rast[r.id]
+                    ? <><span className="block truncate text-[11px]" title={`${rast[r.id].aparelho} · ${rast[r.id].ip ?? '—'}`}>{rast[r.id].aparelho} · <span className="tabular-nums">{rast[r.id].ip ?? '—'}</span></span>
+                        <span className="block truncate text-[11px] tabular-nums"><b className="font-semibold text-foreground">{rast[r.id].sessoes30d}</b> sessões · {rast[r.id].tempo30d} (30d)</span></>
+                    : <span className="block text-[11px]">sem registro</span>)}
+                </span>
               </button>
             ))}
           </div>

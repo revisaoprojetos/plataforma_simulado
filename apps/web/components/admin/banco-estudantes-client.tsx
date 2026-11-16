@@ -15,13 +15,15 @@ import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudant
 import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 
-interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null; cpf?: string | null; classificacao?: string | null; ultimo_acesso?: string | null; avatar?: string | null; perfil_avatar_cor?: string | null }
+import { useRastreioPagina, RASTREIO_TH, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
+
+interface Aluno { id: string; nome: string; email?: string | null; telefone?: string | null;classificacao?: string | null; ultimo_acesso?: string | null; avatar?: string | null; perfil_avatar_cor?: string | null }
 
 function iniciais(n: string) {
   return n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
 }
 
-type OrdCampo = 'nome' | 'email' | 'cpf' | 'ultimo_acesso'
+type OrdCampo = 'nome' | 'email' | 'ultimo_acesso'
 function SortHead({ label, campo, ordCampo, ordDir, onSort }: { label: string; campo: OrdCampo; ordCampo: OrdCampo; ordDir: 'asc' | 'desc'; onSort: (c: OrdCampo) => void }) {
   const ativo = ordCampo === campo
   return (
@@ -54,7 +56,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
-  const [ordCampo, setOrdCampo] = useState<'nome' | 'email' | 'cpf' | 'ultimo_acesso'>('nome')
+  const [ordCampo, setOrdCampo] = useState<OrdCampo>('nome')
   const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(0)
   const [detUltimo, setDetUltimo] = useState<Record<string, string>>({})
@@ -63,7 +65,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
   const [carregadosSet, setCarregadosSet] = useState<Set<string>>(new Set())
   const router = useRouter()
 
-  function ordenar(campo: 'nome' | 'email' | 'cpf' | 'ultimo_acesso') {
+  function ordenar(campo: OrdCampo) {
     if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setOrdCampo(campo); setOrdDir('asc') }
   }
@@ -85,6 +87,7 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
 
   const totalPag = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaItens = useMemo(() => filtrados.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [filtrados, pagina])
+  const { mapa: rast } = useRastreioPagina(paginaItens.map((a) => a.id))
   // Volta à 1ª página quando muda busca/ordenação; e não deixa a página passar do total.
   useEffect(() => { setPagina(0) }, [busca, ordCampo, ordDir])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
@@ -166,15 +169,16 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
                 </TableHead>
                 <SortHead label="Nome" campo="nome" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <SortHead label="E-mail" campo="email" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
-                <SortHead label="Documento" campo="cpf" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
                 <TableHead>Grupo</TableHead>
                 <SortHead label="Último acesso" campo="ultimo_acesso" ordCampo={ordCampo} ordDir={ordDir} onSort={ordenar} />
+                {rast && <TableHead>{RASTREIO_TH.aparelho}</TableHead>}
+                {rast && <TableHead className="text-center">{RASTREIO_TH.sessoes}</TableHead>}
                 <TableHead className="w-16 text-center">Perfil</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtrados.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Nenhum aluno vinculado. Clique em “Adicionar estudantes”.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={rast ? 8 : 6} className="py-10 text-center text-muted-foreground">Nenhum aluno vinculado. Clique em “Adicionar estudantes”.</TableCell></TableRow>
               ) : (
                 paginaItens.map((a) => {
                   const on = sel.has(a.id)
@@ -203,7 +207,6 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{a.email ?? '—'}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{a.cpf ?? '—'}</TableCell>
                       <TableCell>
                         {!detCarregado ? (
                           <span className="text-xs text-muted-foreground/60">…</span>
@@ -221,7 +224,12 @@ export function BancoEstudantesClient({ bancoId, vinculados, cor = '#6d28d9' }: 
                           <span className="text-xs text-muted-foreground" title="Adicionado diretamente ao banco (sem grupo)">Direto</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{detCarregado ? fmtAcesso(detUltimo[a.id]) : <span className="text-muted-foreground/60">…</span>}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {detCarregado ? fmtAcesso(detUltimo[a.id]) : <span className="text-muted-foreground/60">…</span>}
+                        {rast?.[a.id]?.online && <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400"><span className="h-2 w-2 rounded-full bg-emerald-500" />Online</span>}
+                      </TableCell>
+                      {rast && <TableCell><RastreioAparelho r={rast[a.id]} /></TableCell>}
+                      {rast && <TableCell className="text-center"><RastreioSessoes r={rast[a.id]} /></TableCell>}
                       <TableCell className="text-center">
                         <Link href={`/admin/estudantes/${a.id}`} className="inline-flex text-muted-foreground hover:text-primary" title="Ver perfil">
                           <Eye className="h-4 w-4" />

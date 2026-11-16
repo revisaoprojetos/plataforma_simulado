@@ -25,6 +25,7 @@ import {
   chaveCelula, nomesCurtos, resolverPares, resumirPares, retangulo, selecaoTotal, selecaoVazia, type SelecaoMatriz,
 } from '@/lib/produtos/matriz-util'
 import { carregarMatrizAction } from './regras-actions'
+import { useColResize, ColResizeHandle, ColResizeReset } from '@/components/admin/use-col-resize'
 import { PainelEdicaoRegras, copiarRegraDaCelula, type AbaPainel, type PedidoPainel, type RegraCopiada } from './painel-edicao-regras'
 
 const selectCls = 'h-9 rounded-lg border bg-card px-2.5 text-[13px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -67,6 +68,8 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
   onMudou: () => void
   onIrPublicos: () => void
 }) {
+  // Larguras ajustáveis por arrasto (compartilhado por produto).
+  const rs = useColResize(`matriz:${produtoId}`)
   // ── preferências (localStorage, com try/catch) ──
   const [cols, setCols] = useState<string[] | null>(null)
   const [fixas, setFixas] = useState<string[]>([])
@@ -232,10 +235,12 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
   const [qCols, setQCols] = useState('')
 
   // posição das colunas fixas
-  const LARGURA_ARVORE = 304
+  const LARGURA_ARVORE = rs.w('arvore') ?? 304
   const larguraCol = densidade === 'compacta' ? 104 : 132
+  // Largura por coluna: ajustada pelo usuário (arrasto) ou o padrão da densidade.
+  const wCol = (chave: string) => rs.w(chave) ?? larguraCol
   const fx = new Set(fixas)
-  const left = (i: number) => LARGURA_ARVORE + i * larguraCol
+  const left = (i: number) => LARGURA_ARVORE + colunas.slice(0, i).reduce((s, c) => s + wCol(c.chave), 0)
   const nFixas = colunas.filter((c) => fx.has(c.chave)).length
   const alt = densidade === 'compacta' ? 'h-8' : 'h-11'
 
@@ -273,6 +278,7 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
           <Button variant="outline" size="sm" onClick={() => setExpandidos(new Set())} title="Recolher todos"><FoldVertical className="h-4 w-4" />Recolher</Button>
           {podeEditar && <Button variant="outline" size="sm" onClick={selecionarTodosFiltrados} disabled={!dados}><CheckCheck className="h-4 w-4" />{filtrando ? 'Selecionar filtrados' : 'Selecionar tudo'}</Button>}
           {!somente && <Button variant="outline" size="sm" onClick={() => setDlgCols(true)}><Columns3 className="h-4 w-4" />Colunas ({colunas.length})</Button>}
+          <ColResizeReset rs={rs} />
           <Button variant="outline" size="sm" onClick={() => { const n = densidade === 'compacta' ? 'confortavel' : 'compacta'; setDensidade(n); gravarLS(LS('densidade'), n) }} title="Densidade das linhas">
             <Rows3 className="h-4 w-4" />{densidade === 'compacta' ? 'Compacta' : 'Confortável'}
           </Button>
@@ -298,7 +304,8 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
           <table className="w-max min-w-full border-separate border-spacing-0 text-[13px]">
             <thead>
               <tr>
-                <th rowSpan={2} className="sticky left-0 top-0 z-30 border-b bg-card px-3 text-left align-bottom" style={{ minWidth: LARGURA_ARVORE, width: LARGURA_ARVORE }}>
+                <th rowSpan={2} className="sticky left-0 top-0 z-30 border-b bg-card px-3 text-left align-bottom" data-col="arvore" style={{ minWidth: LARGURA_ARVORE, width: LARGURA_ARVORE }}>
+                  <ColResizeHandle rs={rs} k="arvore" />
                   <div className="py-2 text-xs font-semibold text-muted-foreground">
                     Módulo / Aula
                     <span className="ml-2 font-normal">{dados.raizes.length} módulo(s){loading && <Loader2 className="ml-1 inline h-3 w-3 animate-spin" />}</span>
@@ -316,7 +323,8 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
                   return (
                     <th key={p.chave} title={`${TIPO_ROT[p.tipo]}: ${p.nome}${p.membros != null ? ` · ${p.membros} membro(s)` : ''}`}
                       className={cn('group sticky top-6 border-b border-l bg-card px-1.5 py-1 text-left align-bottom', fixa ? 'z-30' : 'z-20')}
-                      style={{ minWidth: larguraCol, width: larguraCol, ...(fixa ? { left: left(i) } : {}) }}>
+                      data-col={p.chave} style={{ minWidth: wCol(p.chave), width: wCol(p.chave), ...(fixa ? { left: left(i) } : {}) }}>
+                      <ColResizeHandle rs={rs} k={p.chave} />
                       <div className="flex items-start gap-1">
                         {podeEditar && <button type="button" onClick={() => alternarColuna(p)} aria-label={`Selecionar a coluna ${p.nome}`} aria-pressed={marcada}
                           className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border', marcada ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-transparent hover:text-muted-foreground')}><Check className="h-3 w-3" /></button>}
@@ -374,7 +382,7 @@ export function MatrizRegras({ produtoId, ativa, podeEditar, aplicarEm, onMudou,
                       const fixa = fx.has(p.chave)
                       const fixaIdx = fixa ? colunas.filter((x) => fx.has(x.chave)).findIndex((x) => x.chave === p.chave) : -1
                       return (
-                        <td key={p.chave} className={cn('border-b border-l p-0', fixa && 'sticky z-10 bg-card', alt)} style={{ minWidth: larguraCol, width: larguraCol, ...(fixa ? { left: left(fixaIdx) } : {}) }}>
+                        <td key={p.chave} className={cn('border-b border-l p-0', fixa && 'sticky z-10 bg-card', alt)} style={{ minWidth: wCol(p.chave), width: wCol(p.chave), ...(fixa ? { left: left(fixaIdx) } : {}) }}>
                           {!c ? <span className="px-2 text-muted-foreground">—</span> : (
                             <div role="button" tabIndex={0} data-celula={k} title={`${c.origem}: ${c.porque}`} aria-label={`${linha.titulo} · ${p.nome}: ${c.rotulo}`}
                               onMouseDown={(e) => aoMouseDown(e, li, ci, linha, p)} onMouseEnter={() => aoEntrar(li, ci)} onClick={(e) => aoClicar(e, linha, p, c)}

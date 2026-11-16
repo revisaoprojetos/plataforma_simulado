@@ -1,6 +1,7 @@
 'use client'
 
 import { KeyRound } from 'lucide-react'
+import { useColResize, ColResizeHandle, ColResizeReset } from '@/components/admin/use-col-resize'
 import { formatBrt } from '@/lib/brt'
 import type { AcessoProdutoAluno, StatusAcesso, OrigemAcesso } from '@/lib/acesso/aluno-efetivo'
 
@@ -20,6 +21,7 @@ function validade(it: AcessoProdutoAluno): string {
 }
 
 export function EstudanteAcesso({ itens }: { itens: AcessoProdutoAluno[] }) {
+  const rs = useColResize('estudante-acesso')
   if (!itens.length) {
     return (
       <div className="rounded-2xl border bg-card p-10 text-center">
@@ -34,13 +36,13 @@ export function EstudanteAcesso({ itens }: { itens: AcessoProdutoAluno[] }) {
       <p className="text-sm text-muted-foreground">{ativos} produto(s) com acesso ativo · {itens.length} no total (une regras de venda e catálogo).</p>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={rs.tableStyle()}>
             <thead className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5 font-medium">Produto</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Validade</th>
-                <th className="px-4 py-2.5 font-medium">Origem</th>
+                <th data-col="produto" style={rs.style('produto')} className="relative px-4 py-2.5 font-medium">Produto<ColResizeHandle rs={rs} k="produto" /></th>
+                <th data-col="status" style={rs.style('status')} className="relative px-4 py-2.5 font-medium">Status<ColResizeHandle rs={rs} k="status" /></th>
+                <th data-col="validade" style={rs.style('validade')} className="relative px-4 py-2.5 font-medium">Validade<ColResizeHandle rs={rs} k="validade" /></th>
+                <th data-col="origem" style={rs.style('origem')} className="relative px-4 py-2.5 font-medium">Origem<ColResizeHandle rs={rs} k="origem" /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -62,6 +64,7 @@ export function EstudanteAcesso({ itens }: { itens: AcessoProdutoAluno[] }) {
             </tbody>
           </table>
         </div>
+        {rs.custom && <div className="flex justify-end border-t px-3 py-1.5"><ColResizeReset rs={rs} /></div>}
       </div>
     </div>
   )

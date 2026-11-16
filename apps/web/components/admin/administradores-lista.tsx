@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save, Building2, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Activity, Trash2, Save, Building2, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useCan } from '@/components/auth/can-provider'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions-tipos'
@@ -18,6 +20,7 @@ function iniciais(nome: string | null, email: string | null) {
 
 export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper = false }: { membros: AdminMembro[]; cargos: CargoOpcao[]; tenantId?: string; super?: boolean }) {
   const router = useRouter()
+  const can = useCan()
   const [pending, start] = useTransition()
   const [q, setQ] = useState('')
   const [alvo, setAlvo] = useState<string | null>(null)
@@ -238,6 +241,12 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
                   <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {m.email ?? 'sem e-mail'}</p>
                 </div>
                 <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline">{rotuloCargo(m.cargo)}</span>
+                {can('acessos:view') && (
+                  <Link href={`/admin/acessos-equipe/${m.userId}`} title="Ver atividade e acessos deste administrador"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                    <Activity className="h-4 w-4" />
+                  </Link>
+                )}
                 {/* Engrenagem: configuração INDIVIDUAL deste acesso */}
                 <button type="button" onClick={() => abrirConfig(m)} title="Configurar este acesso"
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground">

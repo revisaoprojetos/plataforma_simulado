@@ -216,6 +216,7 @@ const navGroups: NavGroup[] = [
       { label: 'Automações', href: '/admin/auditoria?tipo=automacoes', icon: Zap, perm: 'auditoria:view' },
       { label: 'Visualizações', href: '/admin/auditoria?tipo=visualizacoes', icon: Eye, perm: 'auditoria:view' },
       { label: 'Acessos de alunos', href: '/admin/acessos', icon: ShieldCheck, perm: 'acessos:view' },
+      { label: 'Equipe online', href: '/admin/acessos-equipe', icon: Users, perm: 'acessos:view', matchPrefix: '/admin/acessos-equipe' },
       { label: 'Segurança', href: '/admin/seguranca', icon: ShieldAlert, perm: 'seguranca:view', matchPrefix: '/admin/seguranca' },
     ],
   },

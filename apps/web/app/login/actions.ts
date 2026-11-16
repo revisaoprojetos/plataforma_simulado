@@ -7,6 +7,8 @@ import { headers } from 'next/headers'
 import { registrarAudit } from '@/lib/audit'
 import { ipDeRequest, lockoutFalha, lockoutLimpar, lockoutRestante } from '@/lib/rate-limit'
 import { emailSeguro } from '@/lib/seguranca/postgrest-safe'
+import { iniciarSessaoAdmin, encerrarSessaoAtualAdmin } from '@/lib/admin-rastreio/registro'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 export async function loginAction(formData: FormData) {
   const supabase = await createClient()
@@ -31,6 +33,7 @@ export async function loginAction(formData: FormData) {
   await lockoutLimpar(chave)
 
   await registrarAudit({ operacao: 'LOGIN', entidade: 'auth', atorTipo: 'usuario', atorId: data.user?.id ?? null, depois: { email } })
+  await iniciarSessaoAdmin(data.user?.id ?? null, await getCurrentTenantId().catch(() => null))
 
   revalidatePath('/', 'layout')
   redirect('/admin')
@@ -39,6 +42,10 @@ export async function loginAction(formData: FormData) {
 /** Registra auditoria de LOGIN. Chamada pelo form client-side após o signIn. */
 export async function registrarLoginAudit() {
   await registrarAudit({ operacao: 'LOGIN', entidade: 'auth', atorTipo: 'usuario', depois: {} })
+  try {
+    const { data } = await (await createClient()).auth.getUser()
+    await iniciarSessaoAdmin(data.user?.id ?? null, await getCurrentTenantId().catch(() => null))
+  } catch { /* rastreio é best-effort */ }
 }
 
 export async function logoutAction() {
@@ -50,6 +57,7 @@ export async function logoutAction() {
     const supabase = await createClient()
     const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } } as any))
     void registrarAudit({ operacao: 'LOGOUT', entidade: 'auth', atorTipo: 'usuario', atorId: data?.session?.user?.id ?? null }).catch(() => {})
+    await encerrarSessaoAtualAdmin(data?.session?.user?.id ?? null, await getCurrentTenantId().catch(() => null))
     await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
   } catch { /* nunca bloquear o logout */ }
   revalidatePath('/', 'layout')

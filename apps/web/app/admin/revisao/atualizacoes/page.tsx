@@ -25,6 +25,7 @@ const PILL: Record<TipoAtualizacao, string> = {
   jurisprudencia: 'bg-primary/10 text-primary',
   correcao: 'bg-muted text-muted-foreground',
   conteudo_novo: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  sem_atualizacao: 'bg-muted text-muted-foreground',
 }
 
 // CENTRAL DE ATUALIZAÇÕES (Plataforma Revisão · Pedagógico). Abas por ?aba= (fila | nova | hist). A página só LÊ.

@@ -35,10 +35,10 @@ describe('explicarLiberacaoAluno (consulta admin)', () => {
     const r = explicarLiberacaoAluno({ hoje, agora, gateAtivo: false, aulas: [aula()], trilhasAluno: [], excecoes: [], nucleo: { paramsDe: () => P, governada: () => true, plano: () => SEM_PLANO } })[0]
     expect(r.liberada).toBe(false); expect(r.origem).toBe('planilha'); expect(r.dataEfetiva).toBe('2026-12-01')
   })
-  it('plano fixado com com_plano=plano usa a data da meta', () => {
+  it('plano fixado com com_plano=plano NÃO antecipa a matriz (vale a data da planilha)', () => {
     const p = paramsEfetivos({ com_plano: 'plano' })
     const r = explicarLiberacaoAluno({ hoje, agora, gateAtivo: true, aulas: [aula()], trilhasAluno: [], excecoes: [], nucleo: { paramsDe: () => p, governada: () => true, plano: () => ({ tem: true, noPlano: true, dataMeta: '2026-11-05', concluida: false }) } })[0]
-    expect(r.liberada).toBe(true); expect(r.origem).toBe('plano')
+    expect(r.liberada).toBe(false); expect(r.dataEfetiva).toBe('2026-12-01')
   })
   it('bloquear vence liberar (mesma regra do motor)', () => {
     const exc = (acao: 'liberar' | 'bloquear', alvoTipo: 'aula' | 'modulo', alvoId: string) => ({ id: acao + alvoId, alvoTipo, alvoId, acao, escopo: 'aluno' as const, expiraEm: null, ativo: true })

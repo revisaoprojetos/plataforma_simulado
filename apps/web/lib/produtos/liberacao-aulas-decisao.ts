@@ -98,19 +98,15 @@ export function decidirLiberacao(a: {
     if (!planilha) return { liberada: true, motivo: 'desligado', liberaEm: null, interfere: false }
     return porData(planilha, hoje, 'fora-do-plano')
   }
+  // FONTE ÚNICA (16/11/2026): a MATRIZ (data da regra/planilha da aula, já com trilha/segmento) é a autoridade. O plano do aluno
+  // NUNCA antecipa a liberação e concluir a meta NÃO libera nada (meta bloqueada nem pode ser concluída). 'concluir_meta' não trava.
+  if (planilha) return porData(planilha, hoje, 'planilha')
+  // Aula SEM data na matriz (sem linha na planilha): não há data a violar. 'plano'/'mais_cedo' usam a data do plano (config explícita);
+  // 'concluir_meta' (padrão) não trava.
   if (plano.concluida) return { liberada: true, motivo: 'concluida', liberaEm: null, interfere: true }
   const dataPlano = plano.dataMeta ? somarDias(plano.dataMeta, -cfg.dias_antes) : null
-  switch (cfg.com_plano) {
-    case 'plano':
-      return dataPlano ? porData(dataPlano, hoje, 'plano') : porData(planilha, hoje, 'fora-do-plano')
-    // 'concluir_meta' NÃO TRAVA mais (decisão D3, 16/11/2026): vale a data da regra/planilha; se o plano do aluno tiver
-    // data MAIS CEDO, antecipa (= 'mais_cedo'). Nunca atrasa além da regra. Concluir a meta continua liberando ('concluida').
-    case 'mais_cedo':
-    default: {
-      const cand = [planilha, dataPlano].filter((x): x is string => !!x).sort()[0] ?? null
-      return porData(cand, hoje, 'mais-cedo')
-    }
-  }
+  if (cfg.com_plano === 'concluir_meta') return { liberada: true, motivo: 'plano', liberaEm: null, interfere: true }
+  return porData(dataPlano, hoje, cfg.com_plano === 'plano' ? 'plano' : 'mais-cedo')
 }
 
 /** Exceção já resolvida para a aula (resultado de resolverExcecao); null = nenhuma vigente. */

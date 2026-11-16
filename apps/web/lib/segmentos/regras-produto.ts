@@ -80,6 +80,9 @@ export async function regrasSegmentoDoAluno(svc: any, tenantId: string, estudant
   const ctxA = ctx ?? new ContextoAluno(svc, tenantId, estudanteId)
   const noSeg = await avaliarSegmentos(ctxA, [...disp.map((r) => r.segmento_id), ...capas.map((r) => r.segmento_id)])
   // D1/D2: grupo do aluno vinculado ao produto e FORA da matriz → liberação total (regras de liberação não se aplicam).
+  // Só entram na conta grupos VINCULADOS ao produto: grupo geral não vinculado (ex.: Passaporte) é NEUTRO; se ganhar regra de segmento
+  // na matriz, ela vale para quem casa (prioridade / mais antiga) sem ser 'engolida' pela liberação total. Regra de disponibilidade
+  // só altera datas; acesso ao produto vem de assinatura/grupo vinculado/gratuito/segmento da aba Visibilidade (não desta tabela).
   let foraDaMatriz: string[] | null = null
   if (disp.length) {
     try {

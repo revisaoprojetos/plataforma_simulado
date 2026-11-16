@@ -71,6 +71,7 @@ import {
 import { cn } from '@/lib/utils'
 import { navProgressStart } from '@/lib/nav-progress'
 import { SortButton, type Sort } from '@/components/admin/th-ordenavel'
+import { useColResize, ColResizeHandle, ColResizeReset } from '@/components/admin/use-col-resize'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator,
@@ -162,6 +163,8 @@ export type DataTableProps<T> = {
   nomeSingular?: string
   nomePlural?: string
   className?: string
+  /** Alças de arrasto nas colunas (larguras salvas em localStorage por tabela) + rolagem horizontal. Padrão: false. */
+  redimensionavel?: boolean
 }
 
 // ───────────────────────────── Constantes ─────────────────────────────
@@ -194,13 +197,15 @@ export function DataTable<T>({
   onRowClick, activeRowId = null, rowHeight,
   loading = false, error = null, empty,
   nomeSingular = 'registro', nomePlural,
-  className,
+  className, redimensionavel = false,
 }: DataTableProps<T>) {
   const ROW_CLASS = rowHeight ?? ROW_H
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const plural = nomePlural ?? `${nomeSingular}s`
+  // Larguras ajustáveis: id = rota + assinatura das colunas (duas tabelas na mesma página não se misturam).
+  const rs = useColResize(`dt:${pathname}:${columns.map((c) => c.key).join('.')}`)
 
   // ── Estado derivado dos searchParams (server-driven) ──
   const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1)
@@ -351,10 +356,10 @@ export function DataTable<T>({
 
       {/* Tabela */}
       <div className="relative w-full overflow-x-auto rounded-2xl border bg-card">
-        <table className="w-full table-fixed border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm" style={redimensionavel ? rs.tableStyle((selectable ? 44 : 0) + (colAcoes ? 48 : 0)) : undefined}>
           <colgroup>
             {selectable && <col style={{ width: '2.75rem' }} />}
-            {columns.map((c, i) => <col key={i} style={c.width ? { width: c.width } : undefined} />)}
+            {columns.map((c, i) => <col key={i} style={(redimensionavel ? rs.style(c.key) : undefined) ?? (c.width ? { width: c.width } : undefined)} />)}
             {colAcoes && <col style={{ width: '3rem' }} />}
           </colgroup>
 
@@ -372,7 +377,7 @@ export function DataTable<T>({
                 </th>
               )}
               {columns.map((c) => (
-                <th key={c.key} className={cn('px-3 py-2.5 font-medium', alinhar(c.align))}>
+                <th key={c.key} data-col={c.key} className={cn('px-3 py-2.5 font-medium', redimensionavel && 'relative', alinhar(c.align))}>
                   {c.sortable ? (
                     <SortButton
                       label={typeof c.header === 'string' ? c.header : ''}
@@ -384,6 +389,7 @@ export function DataTable<T>({
                   ) : (
                     c.header
                   )}
+                  {redimensionavel && <ColResizeHandle rs={rs} k={c.key} />}
                 </th>
               ))}
               {colAcoes && <th className="px-3 py-2.5"><span className="sr-only">Ações</span></th>}
@@ -473,6 +479,7 @@ export function DataTable<T>({
       {/* Rodapé: "a–b de N · X páginas" + por página + navegação */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center gap-3">
+          {redimensionavel && <ColResizeReset rs={rs} />}
           <span>
             Mostrando <span className="tabular-nums text-foreground">{inicio.toLocaleString('pt-BR')}</span>–
             <span className="tabular-nums text-foreground">{fim.toLocaleString('pt-BR')}</span> de{' '}

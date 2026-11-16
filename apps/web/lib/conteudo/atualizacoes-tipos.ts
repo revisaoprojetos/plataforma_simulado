@@ -1,9 +1,12 @@
 // Tipos/constantes PUROS (sem server-only) do REGISTRO DE ATUALIZAÇÕES / PONTOS DE VERSÃO de materiais.
 // Compartilhado por: server actions, loaders (lib/conteudo/atualizacoes-registro.ts), dialog admin e telas do aluno.
-import type { TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
+import { TIPOS_ATUALIZACAO, type TipoAtualizacao } from '../admin-revisao/biblioteca-tipos'
 import { brtLocalParaIso, isoParaBrtLocal } from '../brt'
 
 export type { TipoAtualizacao }
+/** Resumo padrão do tipo "Sem atualizações" (preenchido no dialog e garantido no servidor). */
+export const TEXTO_SEM_ATUALIZACAO = 'Nesta versão da aula, não foram feitos acréscimos em relação à versão anterior.'
+
 export type StatusAtualizacao = 'rascunho' | 'publicado'
 export const STATUS_ATUALIZACAO: { id: StatusAtualizacao; nome: string }[] = [
   { id: 'publicado', nome: 'Publicado' },
@@ -111,7 +114,7 @@ export function prefixarTag(tag: string | null | undefined, texto: string): stri
 /** Normaliza/valida a lista de itens vinda do cliente (nunca confiar no payload). */
 export function normalizarItens(brutos: unknown): ItemAlteracao[] {
   if (!Array.isArray(brutos)) return []
-  const tipos = ['legislacao', 'jurisprudencia', 'correcao', 'conteudo_novo']
+  const tipos = TIPOS_ATUALIZACAO.map((t) => t.id as string)
   const out: ItemAlteracao[] = []
   for (const b of brutos.slice(0, LIMITES_ATUALIZACAO.itens)) {
     const texto = String((b as any)?.texto ?? '').trim().slice(0, LIMITES_ATUALIZACAO.itemTexto)

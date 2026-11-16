@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { DataTable } from '@/components/admin/data-table'
 import { Badge } from '@/components/ui/badge'
+import { normalizarIp, ipLoopback, rotuloIp } from '@/lib/acessos/ip'
 
 // Linhas JÁ formatadas pelo servidor (datas em BRT, duração, rótulos) — o cliente só exibe.
 export interface SessaoLinha {
@@ -24,9 +25,12 @@ function StatusBadge({ s, motivo, imp }: { s: SessaoLinha['status']; motivo: str
   return <Badge variant="outline">Encerrada{motivo === 'revogado_admin' ? ' (admin)' : motivo === 'logout' ? ' (saiu)' : ''}</Badge>
 }
 
-const IpLink = ({ ip }: { ip: string | null }) => ip
-  ? <Link href={`/admin/acessos?ip=${encodeURIComponent(ip)}`} className="tabular-nums hover:underline" title="Ver todas as contas que usaram este IP">{ip}</Link>
-  : <span className="text-muted-foreground">—</span>
+const IpLink = ({ ip }: { ip: string | null }) => {
+  const n = normalizarIp(ip)
+  if (!n) return <span className="text-muted-foreground">—</span>
+  if (ipLoopback(n)) return <span className="text-muted-foreground" title={n}>{rotuloIp(n)}</span>
+  return <Link href={`/admin/acessos?ip=${encodeURIComponent(n)}`} className="tabular-nums hover:underline" title="Ver todas as contas que usaram este IP">{n}</Link>
+}
 
 /** Sessões de UM aluno (ficha). */
 export function SessoesAlunoTable({ rows, total, filtros }: { rows: SessaoLinha[]; total: number; filtros: React.ReactNode }) {
@@ -34,7 +38,7 @@ export function SessoesAlunoTable({ rows, total, filtros }: { rows: SessaoLinha[
     <DataTable<SessaoLinha>
       rows={rows} total={total} getRowId={(r) => r.id} selectable={false} searchable searchPlaceholder="Buscar por IP, navegador ou sistema…"
       perPageOptions={PP} defaultPerPage={10} defaultSort={{ key: 'iniciado_em', dir: 'desc' }} filters={filtros}
-      nomeSingular="sessão" nomePlural="sessões" empty="Nenhuma sessão registrada neste período."
+      redimensionavel nomeSingular="sessão" nomePlural="sessões" empty="Nenhuma sessão registrada neste período."
       columns={[
         { key: 'iniciado_em', header: 'Início', sortable: true, width: '10rem', render: (r) => r.inicio },
         { key: 'ultimo_visto_em', header: 'Último visto', sortable: true, width: '10rem', render: (r) => r.visto },
@@ -55,7 +59,7 @@ export function AtividadesAlunoTable({ rows, total, filtros }: { rows: Atividade
     <DataTable<AtividadeLinha>
       rows={rows} total={total} getRowId={(r) => r.id} selectable={false} searchable searchPlaceholder="Buscar por item ou IP…"
       perPageOptions={PP} defaultPerPage={25} defaultSort={{ key: 'criado_em', dir: 'desc' }} filters={filtros}
-      nomeSingular="atividade" nomePlural="atividades" empty="Nenhuma atividade registrada neste período."
+      redimensionavel nomeSingular="atividade" nomePlural="atividades" empty="Nenhuma atividade registrada neste período."
       columns={[
         { key: 'criado_em', header: 'Quando', sortable: true, width: '10rem', render: (r) => r.quando },
         { key: 'tipo', header: 'Tipo', sortable: true, width: '12rem', render: (r) => (
@@ -79,7 +83,7 @@ export function AcessosGlobalTable({ rows, total, filtros }: { rows: SessaoLinha
     <DataTable<SessaoLinha>
       rows={rows} total={total} getRowId={(r) => r.id} selectable={false} searchable searchPlaceholder="Buscar por aluno, e-mail ou IP…"
       perPageOptions={[10, 25, 50]} defaultPerPage={25} defaultSort={{ key: 'iniciado_em', dir: 'desc' }} filters={filtros}
-      nomeSingular="acesso" nomePlural="acessos" empty="Nenhum acesso registrado com estes filtros."
+      redimensionavel nomeSingular="acesso" nomePlural="acessos" empty="Nenhum acesso registrado com estes filtros."
       columns={[
         { key: 'aluno', header: 'Aluno', render: (r) => (
           <Link href={`/admin/estudantes/${r.estudanteId}/acessos`} className="inline-flex items-center gap-1.5 font-medium hover:underline">

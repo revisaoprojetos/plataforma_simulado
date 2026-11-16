@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Loader2, Save, Search, Users, UserCheck, Info, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions-tipos'
+import { useRastreioPagina, RASTREIO_TH, RastreioUltimo, RastreioAparelho, RastreioSessoes } from '@/components/admin/rastreio-celulas'
 import { carregarAtribuicao, definirGruposDocumento, carregarEstudantesDocumento, definirEstudantesDocumento, listarEstudantesTenantPag } from '@/app/admin/leitura/actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; atribuido: boolean }
@@ -52,7 +53,8 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
   useEffect(() => { setPagina(0) }, [busca])
 
   const totalPag = Math.max(1, Math.ceil(total / POR_PAGINA))
-  const paginaTodosMarcados = alunos.length > 0 && alunos.every((a) => acesso.has(a.id))
+  const { mapa: rast } = useRastreioPagina(alunos.map((a) => a.id))
+  const paginaTodosMarcados =alunos.length > 0 && alunos.every((a) => acesso.has(a.id))
   function toggleAcesso(id: string) { setAcesso((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function togglePagina() {
     setAcesso((p) => { const n = new Set(p); if (paginaTodosMarcados) alunos.forEach((a) => n.delete(a.id)); else alunos.forEach((a) => n.add(a.id)); return n })
@@ -123,7 +125,9 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
                 </th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Nome</th>
                 <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">E-mail</th>
-                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground md:table-cell">CPF</th>
+                {rast && <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground xl:table-cell">{RASTREIO_TH.ultimo}</th>}
+                {rast && <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground xl:table-cell">{RASTREIO_TH.aparelho}</th>}
+                {rast && <th className="hidden px-3 py-2 text-center font-medium text-muted-foreground xl:table-cell">{RASTREIO_TH.sessoes}</th>}
               </tr>
             </thead>
             <tbody>
@@ -140,7 +144,9 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
                     </td>
                     <td className="px-3 py-2"><span className="block truncate font-medium">{a.nome}</span></td>
                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
-                    <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                    {rast && <td className="hidden whitespace-nowrap px-3 py-2 xl:table-cell"><RastreioUltimo r={rast[a.id]} /></td>}
+                    {rast && <td className="hidden px-3 py-2 xl:table-cell"><RastreioAparelho r={rast[a.id]} /></td>}
+                    {rast && <td className="hidden px-3 py-2 text-center xl:table-cell"><RastreioSessoes r={rast[a.id]} /></td>}
                   </tr>
                 )
               })}

@@ -1157,7 +1157,13 @@ function rodar(id) {
   manterTelaAcesa(true);
 }
 function parar() { if (!RUN) return; registrarTempo(); RUN = null; clearInterval(tick); salvar('progresso'); manterTelaAcesa(false); }
+/* MATRIZ = AUTORIDADE: material bloqueado (docId → 'AAAA-MM-DD' | '') vindo do servidor; meta bloqueada não abre, não inicia e não conclui. */
+let DOCS_BLOQ = {};
+function bloqMeta(id) { try { const i = info(id), d = i && i.doc; return d && Object.prototype.hasOwnProperty.call(DOCS_BLOQ, d) ? DOCS_BLOQ[d] : null; } catch (e) { return null; } }
+function dataBloq(v) { return v ? v.slice(8, 10) + '/' + v.slice(5, 7) + '/' + v.slice(0, 4) : ''; }
+function avisoBloq(id) { const v = bloqMeta(id); if (v === null) return false; toast(v ? 'Este material será liberado em ' + dataBloq(v) + '.' : 'Este material ainda não foi liberado.'); return true; }
 function iniciarMeta(id) {
+  if (avisoBloq(id) && !feito(id)) return;
   if (FOCO && FOCO.id !== id) parar();
   FOCO = { id, min: false, etapa: 'relogio' };
   if (!RUN) rodar(id);
@@ -1166,6 +1172,7 @@ function iniciarMeta(id) {
 function pausarMeta() { parar(); desenharFoco(); }
 function continuarMeta() { rodar(FOCO.id); desenharFoco(); }
 function concluirMeta() {
+  if (FOCO && avisoBloq(FOCO.id)) return;
   const id = FOCO.id; parar();
   const p = S.prog[id] ||= {}; p.s = 'done'; p.em = hojeISO(); delete p.parou;
   salvar('progresso'); FOCO = null; desenharFoco(); renderTudo();
@@ -1199,6 +1206,7 @@ function textoParou(id) {
 }
 /** Botão que entra no lugar do antigo cronômetro dos cartões. */
 function botaoIniciar(id) {
+  { const v = feito(id) ? null : bloqMeta(id); if (v !== null) return `<button type="button" class="btn sm" disabled aria-disabled="true" title="Este material ainda não foi liberado para você"><svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> ${v ? 'Libera em ' + dataBloq(v) : 'Ainda não liberado'}</button>`; }
   const play = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>`;
   // Meta CONCLUÍDA: ainda deixa ABRIR o material para revisar (quando a meta tem material na Biblioteca),
   // sem reiniciar o cronômetro/sessão de estudo. Pedido do aluno: poder abrir a meta mesmo já concluída.
@@ -2812,9 +2820,9 @@ if (CRIAR) {
   const loc = carregarLocal(); if (loc && loc.perfil) S.perfil = { ...loc.perfil };
 } else S = (TESTE || REVFIXO ? null : carregarLocal()) || novoEstado();
 if (REVFIXO) S.exemplo = false; /* sem onboarding: o plano chega pronto do servidor */
-/* Sem cache local: o estado inicial é o de "primeiro acesso". Não mostrar essa tela antes de o servidor responder
+/* Segura a tela até o servidor responder: (1) sem cache o estado inicial é o de "primeiro acesso" — não mostrar essa tela antes de o servidor responder
    (o aluno com plano fixado via o onboarding piscar); o loader sai em carregarDoServidor (sucesso ou falha). */
-if (!CRIAR && !TESTE && !REVFIXO && S.exemplo && !S.perfil) document.body.classList.add('rv-carregando');
+if (!CRIAR && !TESTE && !REVFIXO) document.body.classList.add('rv-carregando'); /* também COM cache local: sem o conteúdo do servidor as metas LegProc/aulas saem com NaN e os botões não abrem o material */
 S.extras ||= []; S.detalhes ||= {};
 S.atualizado ||= { estado: 0, progresso: 0, notas: 0 };
 indexar();
@@ -3154,7 +3162,9 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
   function acoesHtml(id, s, m) {
     const feita = s === 'done';
     /* MESMO markup/classes do botaoIniciar do adaptativo: `btn sm iniciar` (ícone play + rótulo) enquanto pendente; `btn sm` "Abrir material" na concluída. */
-    const abrir = m && m.doc
+    const dLib = m && m.doc && m.doc.bloqueado && !feita ? (m.doc.liberaEm ? 'Libera em ' + m.doc.liberaEm.slice(8, 10) + '/' + m.doc.liberaEm.slice(5, 7) + '/' + m.doc.liberaEm.slice(0, 4) : 'Ainda não liberado') : null; /* matriz = autoridade: meta bloqueada não abre */
+    const abrir = dLib ? `<button type="button" class="btn sm" disabled aria-disabled="true" title="Este material ainda não foi liberado para você">${esc(dLib)}</button>`
+      : m && m.doc
       ? (feita
         ? `<button type="button" class="btn sm" data-acao="rv-material" data-id="${id}" title="Abrir o material desta meta para revisar">${PLAY}Abrir material</button>`
         : `<button type="button" class="btn sm iniciar" data-acao="rv-material" data-id="${id}" title="${esc(m.doc.titulo)}">${PLAY}${s === 'missed' || parcialAtivo(id) ? 'Continuar meta' : 'Abrir material'}</button>`)
@@ -3355,10 +3365,11 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
   /* ---- Abrir material / Parcial / Não realizada (rotas próprias; capturados ANTES dos handlers globais do adaptativo) ---- */
   async function abrirMaterial(id) {
     const m = metaDe(id); if (!m || !m.doc) return;
+    if (m.doc.bloqueado) { toast(m.doc.liberaEm ? 'Este material será liberado em ' + m.doc.liberaEm.slice(8, 10) + '/' + m.doc.liberaEm.slice(5, 7) + '/' + m.doc.liberaEm.slice(0, 4) + '.' : 'Este material ainda não foi liberado.'); return; }
     try { /* acesso da Biblioteca (pasta + documento): avisa antes de navegar; o leitor revalida ao abrir */
       const r = await fetch('/api/aluno/cronograma/meta-conteudo?emissaoId=' + encodeURIComponent(REV_EMISSAO) + '&docId=' + encodeURIComponent(m.doc.id), { credentials: 'same-origin', cache: 'no-store' });
       const j = await r.json().catch(() => null);
-      if (j && j.ok && j.pode === false) { toast('Você não tem acesso a este material. Fale com o suporte.'); return; }
+      if (j && j.ok && j.pode === false) { toast(j.motivo === 'ainda_nao_liberado' ? (j.liberaEm ? 'Este material será liberado em ' + String(j.liberaEm).slice(8, 10) + '/' + String(j.liberaEm).slice(5, 7) + '/' + String(j.liberaEm).slice(0, 4) + '.' : 'Este material ainda não foi liberado.') : 'Você não tem acesso a este material. Fale com o suporte.'); return; }
     } catch (er) { /* sem checagem prévia: o leitor decide */ }
     pai({ type: 'rej-crono-abrir', url: urlMaterial(id, m) });
   }
@@ -3614,6 +3625,14 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       try {
         var r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ acao: 'sync', parte: p, doc: docDe(p) }) });
         if (!r.ok) throw new Error('http ' + r.status);
+        if (p === 'progresso') { /* o servidor RECUSA concluir meta de material bloqueado/sem acesso: reverte local e avisa */
+          var jr = await r.json().catch(function () { return null; }), rec = jr && jr.recusadas ? Object.keys(jr.recusadas) : [];
+          if (rec.length) {
+            rec.forEach(function (mid) { var q = S.prog[mid]; if (q) { delete q.s; delete q.em; } });
+            var r0 = jr.recusadas[rec[0]]; toast(r0.motivo === 'sem_acesso' ? 'Você não tem acesso a este material; a meta não foi concluída.' : (r0.liberaEm ? 'Este material será liberado em ' + dataBloq(r0.liberaEm) + '. A meta não foi concluída.' : 'Este material ainda não foi liberado. A meta não foi concluída.'));
+            renderTudo();
+          }
+        }
       } catch (e) { falhou = true; sujo.add(p); }
     }
     if (falhou) { clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 5000); marcarSync(false, 'Salvo neste navegador'); }
@@ -3681,6 +3700,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       if (!j || j.ok === false) throw new Error((j && j.message) || 'resposta inválida');
       limparErroCarga();
       if (j && j.conteudo) aplicarConteudo(j.conteudo);
+      DOCS_BLOQ = (j && j.docsBloqueados && typeof j.docsBloqueados === 'object') ? j.docsBloqueados : {};
       if (!(j && j.ok && j.estado) || CRIAR) document.body.classList.remove('rv-carregando'); /* sem plano: onboarding legítimo */
       if (CRIAR) {
         // Modo criar: só o CONTEÚDO do servidor; o plano existente é ignorado (não hidrata S, não grava cache).

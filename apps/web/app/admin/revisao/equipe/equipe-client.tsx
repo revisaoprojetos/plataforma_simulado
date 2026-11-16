@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Check, ChevronDown, ChevronUp, Copy, Loader2, Lock, Plus, Search, Send } from 'lucide-react'
@@ -206,7 +207,7 @@ export function EquipeClient({ dados, podeGerenciar }: { dados: EquipeDados; pod
                       {dados.papeis.map((p) => <option key={p.id} value={p.nome}>{p.rotulo}</option>)}
                     </select>
                   </td>
-                  <td className="px-3 py-3">{m.ultimoAcesso}</td>
+                  <td className="px-3 py-3">{m.ultimoAcesso}<Link href={`/admin/acessos-equipe/${m.userId}`} className="block text-xs text-muted-foreground hover:underline">Ver atividade e acessos</Link></td>
                   <td className="px-3 py-3 text-right">
                     {podeGerenciar && !m.ehVoce && (confirmar === m.userId
                       ? <span className="inline-flex items-center gap-1.5 text-xs">Tirar o acesso?

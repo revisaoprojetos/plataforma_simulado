@@ -192,6 +192,7 @@ export async function explicarAlunoNoProduto(tenantId: string, estudanteId: stri
     let origemLib: CamadaExplicada['origem'] = { rotulo: 'Disponibilidade do módulo/aula', href: hrefProduto(produtoId, 'conteudos') }
     const segRow = segDispDe(alvoId)
     if (totalIds) { passosLib.push(`Liberação total: grupo ${totalIds.map((g) => `"${nomeGrupos.get(g) ?? g.slice(0, 8)}"`).join(', ')} fora da matriz — as regras de liberação por segmento/data/cronograma não se aplicam a este aluno.`); origemLib = { rotulo: 'Grupos de acesso do produto (fora da matriz)', href: hrefProduto(produtoId, 'grupos') } }
+    else passosLib.push('Grupos gerais NÃO vinculados ao produto e sem regra na matriz (ex.: Passaporte, Passaporte Vitalício) são neutros: não interferem nas datas nem dão liberação total. Só contam grupos vinculados ao produto e regras ativas da matriz.')
     if (verTudo) passosLib.push('Aluno é testador global / impersonation: o motor de cronograma abre tudo para ele.')
     if (det.excecao) { passosLib.push(`Exceção manual vigente: ${det.excecao.acao === 'liberar' ? 'LIBERA' : 'BLOQUEIA'}${det.excecao.motivo ? ` — ${det.excecao.motivo}` : ''}. Vence cronograma, planilha, plano e disponibilidade.`); origemLib = { rotulo: 'Exceções da Liberação de aulas', href: hrefLiberacaoAulas(produtoId, 'excecoes') } }
     if (det.governada) {

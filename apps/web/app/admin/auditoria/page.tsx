@@ -21,7 +21,7 @@ const ITEMS_PER_PAGE = 12
 interface PageProps {
   searchParams: Promise<{
     page?: string; tipo?: string; area?: string; sub?: string; ord?: string; dir?: string
-    q?: string; evt?: string; acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
+    q?: string; ator?: string; evt?: string; acao?: string; entidade?: string; data_inicio?: string; data_fim?: string
   }>
 }
 
@@ -196,6 +196,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       else query = query.eq('ator_tipo', 'estudante')
     } else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
     else if (ehAuto) query = query.or('entidade.eq.simulado_assinaturas,entidade.eq.simulado_curseduca_sync,and(entidade.eq.simulado_estudantes,dados_novos->curseduca_grupos.not.is.null)')
+    if (isUuid(params.ator)) query = query.or(`actor_user_id.eq.${params.ator},ator_id.eq.${params.ator}`)
     if (params.acao) query = query.eq('operacao', params.acao)
     if (params.entidade) query = query.ilike('entidade', `%${sanearBusca(params.entidade)}%`)
     if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
@@ -510,6 +511,8 @@ function DetalhesCell({ log, resumo, ator }: { log: any; resumo?: string; ator?:
       quando={fmtBR(log.criado_em)}
       ip={log.ip ? String(log.ip) : null}
       userAgent={log.user_agent ? String(log.user_agent) : null}
+      ctx={((log.detalhes as Record<string, unknown> | null)?.ctx as Record<string, unknown> | undefined) ?? null}
+      atorId={(log.actor_user_id ?? log.ator_id ?? null) as string | null}
     />
   )
 }

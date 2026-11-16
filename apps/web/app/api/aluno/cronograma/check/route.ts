@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { registrarAtividade } from '@/lib/acessos/registro'
 import { alternarCheckMeta } from '@/app/aluno/(portal)/cronograma/checks-actions'
 
 // POST /api/aluno/cronograma/check — marca/desmarca uma meta concluída (novo cronograma, design novo).
@@ -15,5 +16,6 @@ export async function POST(req: NextRequest) {
   if (!emissaoId || !metaId) return NextResponse.json({ ok: false, message: 'Dados obrigatórios ausentes.' }, { status: 400 })
   const r = await alternarCheckMeta(emissaoId, metaId, !!body.marcar, { data: body.data, titulo: body.titulo })
   if (!r.ok) return NextResponse.json({ ok: false, message: r.error ?? 'Falha ao marcar.' }, { status: /inválida|pertence|não encontrado/i.test(r.error ?? '') ? 400 : 500 })
+  if (body.marcar) void registrarAtividade(sessao, { tipo: 'cronograma_meta_concluida', refTipo: 'cronograma_meta', refId: String(metaId).slice(0, 120), titulo: typeof body.titulo === 'string' ? body.titulo.slice(0, 120) : undefined })
   return NextResponse.json({ ok: true, marcadaEm: r.marcadaEm ?? null, progresso: r.progresso ?? null })
 }
