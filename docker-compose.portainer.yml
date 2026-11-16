@@ -136,6 +136,24 @@ services:
       - ONLYOFFICE_INTERNAL_URL=${ONLYOFFICE_INTERNAL_URL:-http://onlyoffice}
       # Segredo HMAC dos access_token das rotas /api/teste/* (OnlyOffice/WOPI/plugin). Opcional: sem ele deriva de APP_ENCRYPTION_KEY.
       - ONLYOFFICE_ACCESS_SECRET=${ONLYOFFICE_ACCESS_SECRET:-}
+      # --- Segurança (varredura de 13/11/2026). Todas opcionais; o padrão NÃO derruba nada em produção. ---
+      # CSRF por Origin nos POST do aluno (cookie SameSite=None p/ iframe da Curseduca): report = só loga
+      # [csrf-origin] (observar 1 dia nos logs) · enforce = bloqueia origem não permitida · off = desliga.
+      - ALUNO_CSRF_ORIGIN=${ALUNO_CSRF_ORIGIN:-report}
+      # Origens extras aceitas nesses POST (lista separada por vírgula/espaço), além do próprio host,
+      # do mesmo domínio e de *.curseduca.pro. Ex.: https://membros.cliente.com.br
+      - ALUNO_ORIGENS_PERMITIDAS=${ALUNO_ORIGENS_PERMITIDAS:-}
+      # Se a resolução das origens do embed falhar, o frame-ancestors usa 'self' + Curseduca + ESTA lista
+      # (domínios dos clientes que embedam). Nunca cai em "*".
+      - FRAME_ANCESTORS_FALLBACK=${FRAME_ANCESTORS_FALLBACK:-}
+      # CSP script-src por nonce: vazio = só Report-Only (não bloqueia). 1 = bloqueia (ligar só depois de
+      # olhar os relatórios /api/csp-report nos logs).
+      - CSP_ENFORCE=${CSP_ENFORCE:-}
+      # Buckets extras permitidos na prévia /api/pdf-view (além de pdfs e STORAGE_CONTENT_BUCKET), separados por vírgula.
+      - PDF_VIEW_BUCKETS=${PDF_VIEW_BUCKETS:-}
+      # Fallback global do segredo dos webhooks (o normal é por tenant, em Integrações > Segurança do webhook).
+      - GURU_WEBHOOK_SECRET=${GURU_WEBHOOK_SECRET:-}
+      - CURSEDUCA_WEBHOOK_SECRET=${CURSEDUCA_WEBHOOK_SECRET:-}
     networks:
       - default
       - traefik

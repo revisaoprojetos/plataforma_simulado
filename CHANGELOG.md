@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.22.1 — 2026-11-16
+
+**Compose do Portainer: variáveis de segurança chegam ao serviço web (CSRF em modo observação)**
+- As variáveis `ALUNO_CSRF_ORIGIN`, `ALUNO_ORIGENS_PERMITIDAS`, `FRAME_ANCESTORS_FALLBACK`, `CSP_ENFORCE`, `PDF_VIEW_BUCKETS`, `GURU_WEBHOOK_SECRET` e `CURSEDUCA_WEBHOOK_SECRET` não estavam na lista de `environment` do serviço `web`, então definir no stack não tinha efeito e o CSRF por Origin rodava em `enforce`. Agora estão declaradas, todas opcionais, com `ALUNO_CSRF_ORIGIN=report` por padrão (só registra `[csrf-origin]` nos logs; mudar para `enforce` depois de observar).
+- Sem alteração de código do app.
+
 ## 4.22.0 — 2026-11-16
 
 **Download em lote da Biblioteca (ZIP), opção "Incluir capa" e download com capa no editor**
