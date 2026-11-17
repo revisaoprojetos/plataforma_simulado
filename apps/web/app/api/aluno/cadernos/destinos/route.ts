@@ -5,7 +5,7 @@ import { MSG_MIGRACAO, tabelaAusente, uuid } from '@/lib/aluno/caderno-itens-ser
 
 // Destino PADRÃO de salvamento por contexto ('leitura' = grifos/anotações do leitor, 'questoes' = questões).
 //   caderno_id null  → "perguntar sempre";  salvar_sem_perguntar → grava direto no caderno escolhido.
-// O Caderno de Erros é CALCULADO (automático) e não é destino configurável.
+// O Caderno de Revisão é CALCULADO (automático) e não é destino configurável.
 // GET → { destinos: { leitura, questoes } }  (tabela ausente → defaults + indisponivel:true, nunca quebra o leitor)
 // PUT → { contexto, caderno_id|null, salvar_sem_perguntar }
 export const dynamic = 'force-dynamic'

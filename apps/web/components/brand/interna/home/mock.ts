@@ -58,7 +58,7 @@ function base(brand: Brand): HomeData {
     agenda: AGENDA,
     destaques: [
       { eyebrow: 'DESTAQUE DA SEMANA', titulo: 'Simulado Mensal 10/2026', subtitulo: 'Participe e dispute o ranking nacional', chips: ['100 questões', 'Padrão PGE/PGM'], cta: { rotulo: 'Começar agora', url: '#' } },
-      { eyebrow: 'NOVO', titulo: 'Caderno de erros', subtitulo: 'Treine o que você mais erra', chips: ['Personalizado'], cta: { rotulo: 'Ver reforço', url: '#' } },
+      { eyebrow: 'NOVO', titulo: 'Caderno de revisão', subtitulo: 'Treine o que você mais erra', chips: ['Personalizado'], cta: { rotulo: 'Ver reforço', url: '#' } },
       { eyebrow: 'CRONOGRAMA', titulo: 'Seu plano de hoje', subtitulo: '3 atividades programadas', chips: ['2h'], cta: { rotulo: 'Abrir cronograma', url: '#' } },
       { eyebrow: 'LIGAS', titulo: 'Você está em 7º na Liga Ouro', subtitulo: 'Faltam 420 XP para subir', chips: ['Ouro'], cta: { rotulo: 'Ver liga', url: '#' } },
       { eyebrow: 'JURISPRUDÊNCIA', titulo: 'Desafio de Jurisprudência', subtitulo: 'Informativos e súmulas do dia', chips: ['Diário'], cta: { rotulo: 'Jogar', url: '#' } },

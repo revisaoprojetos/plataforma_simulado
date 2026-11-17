@@ -2,7 +2,7 @@
 // REAL: título do curso (pasta da Biblioteca) no cabeçalho/breadcrumb.
 // EXEMPLO/TODO(dados): este é um CONFIGURADOR de conciliação edital↔cronograma. NÃO existe modelo de
 // vínculo edital→conteúdo, nem "data da prova" por curso, nem prévia por disciplina/incidência — tudo
-// isso (passos 1 e 2, "45 dias", caderno de erros) fica como exemplo até haver backend.
+// isso (passos 1 e 2, "45 dias", caderno de revisão) fica como exemplo até haver backend.
 import { Card, Col, Row, H2, Muted, P, Eyebrow, Tag, Btn, Bar, Media, Cover, GR, Crumbs, IconBox } from '@/components/nova/ui'
 import { Icon, type IconName } from '@/components/nova/icons'
 import { R } from '@/lib/nova/rotas'
@@ -143,9 +143,9 @@ export default async function EditalPage({ params }: { params: Promise<Params> }
               ))}
             </Col>
 
-            {/* Temas do caderno de erros */}
+            {/* Temas do caderno de revisão */}
             <Col gap={10} style={{ padding: 16, borderRadius: 14, background: 'var(--surface2)' }}>
-              <Muted size={12.5}>Temas específicos deste edital que têm origem no seu caderno de erros.</Muted>
+              <Muted size={12.5}>Temas específicos deste edital que têm origem no seu caderno de revisão.</Muted>
               {ERROS.map((e) => (
                 <Row key={e.tema} gap={10} style={{ justifyContent: 'space-between', flexWrap: 'nowrap', padding: '10px 12px', borderRadius: 12, background: 'var(--surface)', borderLeft: '3px solid var(--brand)' }}>
                   <Col gap={2} style={{ minWidth: 0 }}>

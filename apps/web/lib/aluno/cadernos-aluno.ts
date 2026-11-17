@@ -20,7 +20,7 @@ async function ultimasRespostas(svc: any, tenantId: string, estudanteId: string)
 
 export interface ResumoErros { ids: string[]; atualizadoEm: string | null }
 
-/** Caderno de erros: ids das questões com a ÚLTIMA resposta errada, da mais recente para a mais antiga. */
+/** Caderno de revisão: ids das questões com a ÚLTIMA resposta errada, da mais recente para a mais antiga. */
 export async function cadernoDeErros(svc: any, tenantId: string, estudanteId: string): Promise<ResumoErros> {
   const ult = await ultimasRespostas(svc, tenantId, estudanteId)
   const erradas = [...ult.entries()].filter(([, v]) => !v.correta).sort((a, b) => (a[1].em < b[1].em ? 1 : a[1].em > b[1].em ? -1 : 0))

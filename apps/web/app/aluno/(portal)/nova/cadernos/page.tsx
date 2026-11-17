@@ -123,7 +123,7 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
                   <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{erros.ids.length}</span>
                 </div>
                 <Col gap={12} style={{ padding: 18 }}>
-                  <H3>Caderno de erros</H3>
+                  <H3>Caderno de revisão</H3>
                   <Row gap={6}><Tag kind="green">Questões</Tag></Row>
                   <Row style={{ justifyContent: 'space-between', gap: 8 }}>
                     <Muted size={12}>{erros.ids.length ? (erros.ids.length === 1 ? '1 questão para refazer' : `${erros.ids.length} questões para refazer`) : 'Nenhum erro pendente'}</Muted>

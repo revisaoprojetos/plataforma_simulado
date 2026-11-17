@@ -1,4 +1,4 @@
-// Caderno de ERROS (automático) — questões do Banco/Recomendados/cadernos cuja ÚLTIMA resposta do aluno
+// Caderno de REVISÃO (automático; antes "de erros") — questões do Banco/Recomendados/cadernos cuja ÚLTIMA resposta do aluno
 // foi errada. Refazer aqui e acertar tira a questão do caderno (na próxima visita).
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -27,7 +27,7 @@ export default async function CadernoErrosPage({ searchParams }: { searchParams:
     <>
       <Link href={R.cadernos} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--muted)' }}>← Meus Cadernos</Link>
       <PageHeader
-        title="Caderno de erros"
+        title="Caderno de revisão"
         sub={ids.length
           ? `${ids.length} ${ids.length === 1 ? 'questão' : 'questões'} que você errou na última tentativa. Acerte para tirá-las daqui.`
           : 'Montado automaticamente com as questões que você errar no Banco de Questões.'}
