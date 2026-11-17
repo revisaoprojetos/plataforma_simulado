@@ -3,7 +3,7 @@ import type { FormatoDownload } from './download-admin-pura'
 
 export interface PedidoDownloadCliente {
   documentoIds: string[]; pastaIds?: string[]; incluirSubpastas?: boolean
-  formatos: FormatoDownload[]; incluirCapa: boolean; manterEstrutura?: boolean; versaoId?: string | null
+  formatos: FormatoDownload[]; incluirCapa: boolean; incluirAtualizacao?: boolean; manterEstrutura?: boolean; versaoId?: string | null
 }
 export type RespostaDownloadCliente =
   | { ok: true; nome: string; zip: boolean; geradas: number; total: number; falhas: number; avisos: number; aviso?: string }

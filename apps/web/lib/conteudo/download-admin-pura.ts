@@ -68,11 +68,11 @@ export function nomeDoZip(pastaUnica: string | null, hoje = new Date()): string 
 export interface LinhaRelatorio { titulo: string; formato: string; mensagem: string }
 
 /** Conteúdo do _relatorio.txt (UTF-8 com BOM, quebras CRLF para o Bloco de Notas). */
-export function montarRelatorio(r: { geradoEm: Date; total: number; ok: number; falhas: LinhaRelatorio[]; avisos: LinhaRelatorio[]; incluirCapa: boolean; formatos: string[] }): string {
+export function montarRelatorio(r: { geradoEm: Date; total: number; ok: number; falhas: LinhaRelatorio[]; avisos: LinhaRelatorio[]; incluirCapa: boolean; incluirAtualizacao?: boolean; formatos: string[] }): string {
   const L: string[] = []
   L.push('RELATÓRIO DO DOWNLOAD EM LOTE — Biblioteca')
   L.push(`Gerado em: ${r.geradoEm.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)
-  L.push(`Formatos: ${r.formatos.join(', ')} · Incluir capa: ${r.incluirCapa ? 'sim' : 'não'}`)
+  L.push(`Formatos: ${r.formatos.join(', ')} · Incluir capa: ${r.incluirCapa ? 'sim' : 'não'} · Folha de atualização: ${r.incluirAtualizacao ? 'sim' : 'não'}`)
   L.push(`Arquivos pedidos: ${r.total} · gerados: ${r.ok} · com falha: ${r.falhas.length} · avisos: ${r.avisos.length}`)
   if (r.falhas.length) { L.push('', 'FALHAS (itens que NÃO entraram no ZIP):'); for (const f of r.falhas) L.push(`  - ${f.titulo} [${f.formato}]: ${f.mensagem}`) }
   if (r.avisos.length) { L.push('', 'AVISOS (entraram no ZIP, com observação):'); for (const f of r.avisos) L.push(`  - ${f.titulo} [${f.formato}]: ${f.mensagem}`) }

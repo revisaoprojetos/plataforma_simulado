@@ -9,11 +9,13 @@ export function capaAplicavel(formatos: FormatoDownload[]): boolean {
   return formatos.some((f) => FORMATOS_DOWNLOAD.find((x) => x.id === f)?.aceitaCapa)
 }
 
-export function OpcoesDownload({ formatos, onFormatos, multi, incluirCapa, onIncluirCapa, manterEstrutura, onManterEstrutura }: {
+export function OpcoesDownload({ formatos, onFormatos, multi, incluirCapa, onIncluirCapa, incluirAtualizacao, onIncluirAtualizacao, manterEstrutura, onManterEstrutura }: {
   formatos: FormatoDownload[]; onFormatos: (f: FormatoDownload[]) => void
   /** true = vários formatos (checkbox, lote); false = um só (editor). */
   multi: boolean
   incluirCapa: boolean; onIncluirCapa: (v: boolean) => void
+  /** Folha com a ÚLTIMA atualização do documento (depois da capa, antes da 1ª folha). Ausente = opção não aparece. */
+  incluirAtualizacao?: boolean; onIncluirAtualizacao?: (v: boolean) => void
   /** Ausente = opção não aparece (download unitário). */
   manterEstrutura?: boolean; onManterEstrutura?: (v: boolean) => void
 }) {
@@ -46,6 +48,19 @@ export function OpcoesDownload({ formatos, onFormatos, multi, incluirCapa, onInc
           </p>
         </div>
       </div>
+      {onIncluirAtualizacao && (
+        <div className={`flex items-start gap-2.5 rounded-md border px-2 py-1.5 ${podeCapa ? '' : 'opacity-60'}`}>
+          <CheckSelecao marcado={podeCapa && !!incluirAtualizacao} onToggle={() => { if (podeCapa) onIncluirAtualizacao(!incluirAtualizacao) }} rotulo="Incluir folha de atualização" className="mt-0.5" />
+          <div className="min-w-0 text-sm">
+            <div className="font-medium">Incluir folha de atualização</div>
+            <p className="text-[11px] leading-tight text-muted-foreground">
+              {podeCapa
+                ? 'Adiciona uma folha formatada com a ÚLTIMA atualização publicada do documento, depois da capa (se marcada) e antes da 1ª folha. Documentos sem atualização publicada saem sem ela.'
+                : 'Indisponível nos formatos ODT/RTF/TXT (a folha só pode ser mesclada em PDF). Marque PDF ou Original para usar.'}
+            </p>
+          </div>
+        </div>
+      )}
       {onManterEstrutura && (
         <div className="flex items-start gap-2.5 rounded-md border px-2 py-1.5">
           <CheckSelecao marcado={!!manterEstrutura} onToggle={() => onManterEstrutura(!manterEstrutura)} rotulo="Manter estrutura de pastas" className="mt-0.5" />

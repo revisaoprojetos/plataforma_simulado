@@ -8,7 +8,7 @@ import { formatoValido, type FormatoDownload } from '@/lib/conteudo/download-adm
 import { prepararDownloadAdmin } from '@/lib/conteudo/download-admin'
 
 // POST /api/admin/biblioteca/download-lote
-// body: { documentoIds[], pastaIds?[], incluirSubpastas?, formatos[] | formato, incluirCapa?, manterEstrutura?, versaoId? }
+// body: { documentoIds[], pastaIds?[], incluirSubpastas?, formatos[] | formato, incluirCapa?, incluirAtualizacao?, manterEstrutura?, versaoId? }
 // 1 documento + 1 formato = arquivo direto (nome = título + extensão). Caso contrário = ZIP (nomes = título sanitizado,
 // duplicados " (2)", estrutura de pastas opcional, _relatorio.txt com falhas/avisos). Falha de item não derruba o lote.
 // Gate: configuracoes:view (mesmo do "baixar original" do admin) + tenant explícito. Rota de API (não server action).
@@ -34,10 +34,10 @@ export async function POST(req: NextRequest) {
     if (formatos.length === 0) return json(400, 'Escolha ao menos um formato válido.')
     const documentoIds = uuids(b.documentoIds), pastaIds = uuids(b.pastaIds)
     const versaoId = typeof b.versaoId === 'string' && UUID.test(b.versaoId) ? b.versaoId : null
-    const incluirCapa = b.incluirCapa === true, manterEstrutura = b.manterEstrutura === true
+    const incluirCapa = b.incluirCapa === true, incluirAtualizacao = b.incluirAtualizacao === true, manterEstrutura = b.manterEstrutura === true
 
     const r = await prepararDownloadAdmin(createAdminClient(), access.tenantId, req.nextUrl.origin, {
-      documentoIds, pastaIds, incluirSubpastas: b.incluirSubpastas !== false, formatos, incluirCapa, manterEstrutura,
+      documentoIds, pastaIds, incluirSubpastas: b.incluirSubpastas !== false, formatos, incluirCapa, incluirAtualizacao, manterEstrutura,
       versaoId: documentoIds.length === 1 && pastaIds.length === 0 ? versaoId : null,
     })
     if (!r.ok) return json(r.status, r.erro)
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     void registrarAudit({
       operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: r.docIds.length === 1 ? r.docIds[0] : null,
       tenantId: access.tenantId, atorId: access.userId ?? null, metodo: 'POST',
-      depois: { acao: 'download_admin', formatos, incluirCapa, manterEstrutura, pastaIds, total: r.resumo.total, geradas: r.resumo.geradas, falhas: r.resumo.falhas, zip: r.resumo.zip, docIds: r.docIds.slice(0, 200) },
+      depois: { acao: 'download_admin', formatos, incluirCapa, incluirAtualizacao, manterEstrutura, pastaIds, total: r.resumo.total, geradas: r.resumo.geradas, falhas: r.resumo.falhas, zip: r.resumo.zip, docIds: r.docIds.slice(0, 200) },
     })
 
     const headers: Record<string, string> = {

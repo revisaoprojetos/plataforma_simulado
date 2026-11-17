@@ -90,10 +90,12 @@ const A4: [number, number] = [595.28, 841.89]
  * Devolve o PDF com a CAPA como primeira folha (+ o documento). Imagem → página do mesmo tamanho da 1ª página do documento,
  * imagem inteira (sem cortar) centralizada; capa em PDF → suas páginas (até 5) entram na frente.
  * O documento mantém marcadores/links (a capa é inserida NO próprio PDF, não copiando as páginas).
+ * `capa` pode ser null (só a folha de atualização). `opts.folha` = PDF (ou gerador `(W,H)`) da FOLHA DE ATUALIZAÇÃO: entra
+ * logo DEPOIS da capa e ANTES da 1ª folha do documento.
  */
 export async function montarPdfComCapa(
-  pdf: Uint8Array, capa: { tipo: TipoCapa; bytes: Uint8Array },
-  opts: { descartarAntes?: number; titulo?: string } = {},
+  pdf: Uint8Array, capa: { tipo: TipoCapa; bytes: Uint8Array } | null,
+  opts: { descartarAntes?: number; titulo?: string; folha?: Uint8Array | ((w: number, h: number) => Promise<Uint8Array>) } = {},
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true, updateMetadata: false })
   // PDF criptografado: o pdf-lib NÃO decifra; salvar com ignoreEncryption geraria páginas ilegíveis (arquivo corrompido). Recusa → o chamador entrega o original.
@@ -105,18 +107,30 @@ export async function montarPdfComCapa(
   const W = ref.width > 50 ? ref.width : A4[0], H = ref.height > 50 ? ref.height : A4[1]
   for (let i = 0; i < skip; i++) doc.removePage(0)
 
-  if (capa.tipo === 'pdf') {
+  let pos = 0 // onde entra a folha de atualização (depois da capa)
+  if (capa && capa.tipo === 'pdf') {
     const cdoc = await PDFDocument.load(capa.bytes, { ignoreEncryption: true, updateMetadata: false })
     const n = Math.min(cdoc.getPageCount(), 5)
     if (n < 1) throw new Error('capa pdf sem páginas')
     const pgs = await doc.copyPages(cdoc, Array.from({ length: n }, (_, i) => i))
     pgs.forEach((p, i) => doc.insertPage(i, p))
-  } else {
+    pos = n
+  } else if (capa) {
     const img = capa.tipo === 'png' ? await doc.embedPng(capa.bytes) : await doc.embedJpg(capa.bytes)
     const k = Math.min(W / img.width, H / img.height)
     const w = img.width * k, h = img.height * k
     const pg = doc.insertPage(0, [W, H])
     pg.drawImage(img, { x: (W - w) / 2, y: (H - h) / 2, width: w, height: h })
+    pos = 1
+  }
+  if (opts.folha) {
+    const bytes = typeof opts.folha === 'function' ? await opts.folha(W, H) : opts.folha
+    const fdoc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })
+    const n = fdoc.getPageCount()
+    if (n > 0) {
+      const pgs = await doc.copyPages(fdoc, Array.from({ length: n }, (_, i) => i))
+      pgs.forEach((p, i) => doc.insertPage(pos + i, p))
+    }
   }
   if (opts.titulo) doc.setTitle(opts.titulo.slice(0, 200))
   return doc.save()

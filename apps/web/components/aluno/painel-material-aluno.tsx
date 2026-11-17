@@ -51,6 +51,7 @@ export function PainelMaterialAluno({
   const [relatarAberto, setRelatarAberto] = useState(false)
   const [relatoTexto, setRelatoTexto] = useState('')
   const [relatoEnviado, setRelatoEnviado] = useState(false)
+  const [comAtz, setComAtz] = useState(false)
   const copiaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   if (!doc) return null
@@ -164,14 +165,25 @@ export function PainelMaterialAluno({
           {/* 3 · Download e link */}
           <TabsContent value="download" className="space-y-3 pt-1">
             {baixarLiberado ? (
-              <a
-                href={`/api/conteudo/baixar?doc=${encodeURIComponent(doc.id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
-              >
-                <Download className="h-4 w-4" />Baixar material
-              </a>
+              <>
+                {(doc.tipo_origem === 'pdf' || doc.tipo_origem === 'docx') && (
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2 text-sm hover:bg-muted/50">
+                    <input type="checkbox" checked={comAtz} onChange={(e) => setComAtz(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+                    <span className="min-w-0">
+                      <span className="font-medium">Incluir folha de atualização</span>
+                      <span className="block text-[11px] leading-tight text-muted-foreground">Junta ao PDF uma folha com a última atualização deste material, antes da 1ª página. Se não houver atualização, baixa só o material.</span>
+                    </span>
+                  </label>
+                )}
+                <a
+                  href={comAtz ? `/api/aluno/biblioteca/baixar?doc=${encodeURIComponent(doc.id)}&atualizacao=1` : `/api/conteudo/baixar?doc=${encodeURIComponent(doc.id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
+                >
+                  <Download className="h-4 w-4" />Baixar material
+                </a>
+              </>
             ) : (
               <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground">
                 O download deste material está desativado. Leia direto na plataforma.

@@ -10,10 +10,13 @@ import {
   montarPdfComCapa, sanitizarNomeArquivo,
 } from '@/lib/conteudo/baixar-pura'
 import { buscar, carregarCapa } from '@/lib/conteudo/capa-bytes'
+import { montarFolhaAtualizacaoPdf } from '@/lib/conteudo/folha-atualizacao'
+import { dadosFolhaDoDocumento } from '@/lib/conteudo/folha-atualizacao-dados'
 import { rateLimit } from '@/lib/rate-limit'
 import { registrarAtividade } from '@/lib/acessos/registro'
 
-// GET /api/aluno/biblioteca/baixar?doc=<uuid>[&meta=<id>][&produto=<uuid>]
+// GET /api/aluno/biblioteca/baixar?doc=<uuid>[&meta=<id>][&produto=<uuid>][&atualizacao=1]
+// `atualizacao=1`: junta ao PDF a FOLHA DE ATUALIZAÇÃO (última atualização publicada e visível ao aluno), depois da capa e antes da 1ª folha.
 // Baixa o DOCUMENTO da meta do cronograma com o NOME do documento. Se o documento (ou a pasta em modo lote) tem CAPA
 // cadastrada na Biblioteca, entrega um PDF com a capa como 1ª folha (páginas antes da "página inicial" saem, sem duplicar);
 // sem capa, entrega o original sem alteração. Gate = o mesmo do download da Biblioteca (publicado, pasta+doc com herança,
@@ -76,6 +79,9 @@ async function baixar(request: NextRequest): Promise<Response> {
   const { capaUrl, paginaInicial } = await capaEPaginaDoDocumento(svc, sessao.tenantId, doc)
   const dec = decidirDownload(prep.tipoOrigem, capaUrl, paginaInicial)
 
+  const querAtz = sp.get('atualizacao') === '1'
+  const folha = querAtz ? await dadosFolhaDoDocumento(svc, sessao.tenantId, doc, prep.titulo, { soVisivelAluno: true }) : null
+  const semFolha = querAtz && !folha // pediu a folha mas o material não tem atualização publicada
   const entregar = (bytes: Uint8Array, ext: 'pdf' | 'docx') => {
     const nome = sanitizarNomeArquivo(prep.titulo, ext)
     return new Response(bytes as unknown as BodyInit, {
@@ -86,13 +92,14 @@ async function baixar(request: NextRequest): Promise<Response> {
         'Content-Length': String(bytes.byteLength),
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
+        ...(semFolha ? { 'X-Folha-Atualizacao': 'sem-registro' } : {}),
       },
     })
   }
 
   // Sem capa: o original, sem alteração.
   const original = async () => buscar(prep.urlOriginal, MAX_DOC, 40000)
-  if (!dec.comCapa) {
+  if (!dec.comCapa && !folha) {
     const b = await original()
     return b ? entregar(b, prep.tipoOrigem) : json(503, 'Não foi possível obter o arquivo agora. Tente novamente em instantes.')
   }
@@ -101,9 +108,12 @@ async function baixar(request: NextRequest): Promise<Response> {
   try {
     const urlPdf = await prep.urlPdf()
     const base = urlPdf ? await buscar(urlPdf, MAX_DOC, 40000) : null
-    const capa = base ? await carregarCapa(capaUrl as string, request.nextUrl.origin) : null
-    if (base && capa) {
-      const pdf = await montarPdfComCapa(base, capa, { descartarAntes: dec.descartarAntes, titulo: prep.titulo })
+    const capa = base && dec.comCapa ? await carregarCapa(capaUrl as string, request.nextUrl.origin) : null
+    if (base && (capa || folha)) {
+      const pdf = await montarPdfComCapa(base, capa, {
+        descartarAntes: capa ? dec.descartarAntes : 0, titulo: prep.titulo,
+        folha: folha ? (w, h) => montarFolhaAtualizacaoPdf(folha, [w, h]) : undefined,
+      })
       return entregar(pdf, 'pdf')
     }
     console.warn(`[baixar] capa não aplicada doc=${doc.slice(0, 8)}… base=${base ? 'ok' : 'falhou'} capa=${capa ? 'ok' : 'falhou'} → entrega o original`)

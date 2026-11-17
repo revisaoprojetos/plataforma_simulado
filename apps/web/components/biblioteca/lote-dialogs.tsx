@@ -73,6 +73,7 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
   const modoBaixar = !config && secoes.includes('baixar')
   const [formatosDl, setFormatosDl] = useState<FormatoDownload[]>(['original'])
   const [capaDl, setCapaDl] = useState(false)
+  const [atzDl, setAtzDl] = useState(false)
   const [estruturaDl, setEstruturaDl] = useState(true)
 
   const forcaSub = ativos.has('categoria')
@@ -128,7 +129,7 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
     setFase('rodando')
     const r = await baixarDoServidor({
       documentoIds: alvo.docIds, pastaIds: alvo.pastaIds, incluirSubpastas: alvo.incluirSubpastas,
-      formatos: formatosDl, incluirCapa: capaDl && capaAplicavel(formatosDl), manterEstrutura: estruturaDl && temPastas,
+      formatos: formatosDl, incluirCapa: capaDl && capaAplicavel(formatosDl), incluirAtualizacao: atzDl && capaAplicavel(formatosDl), manterEstrutura: estruturaDl && temPastas,
     })
     if (!r.ok) { toast.error(r.message); setFase('form'); return }
     if (r.falhas > 0) toast.warning(`${r.geradas} de ${r.total} arquivo(s) baixado(s); ${r.falhas} falharam — veja o _relatorio.txt dentro do ZIP.`)
@@ -203,7 +204,7 @@ export function LoteDialog({ titulo, alvoBase, secoes, config, inicial, ehModelo
             <div className="space-y-2.5">
               {modoBaixar && (
                 <div className="rounded-xl border p-3">
-                  <OpcoesDownload formatos={formatosDl} onFormatos={setFormatosDl} multi incluirCapa={capaDl} onIncluirCapa={setCapaDl} manterEstrutura={temPastas ? estruturaDl : undefined} onManterEstrutura={temPastas ? setEstruturaDl : undefined} />
+                  <OpcoesDownload formatos={formatosDl} onFormatos={setFormatosDl} multi incluirCapa={capaDl} onIncluirCapa={setCapaDl} incluirAtualizacao={atzDl} onIncluirAtualizacao={setAtzDl} manterEstrutura={temPastas ? estruturaDl : undefined} onManterEstrutura={temPastas ? setEstruturaDl : undefined} />
                   <p className="mt-2 text-[11px] text-muted-foreground">{previa?.ok && previa.totalDocs === 1 && formatosDl.length === 1 ? 'Um documento em um formato baixa o arquivo direto.' : 'Vários arquivos saem em um ZIP (nomes = título do documento; repetidos ganham “ (2)”), com um _relatorio.txt dos itens que falharem.'}</p>
                 </div>
               )}

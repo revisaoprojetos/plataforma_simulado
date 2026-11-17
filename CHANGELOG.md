@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.23.0 — 2026-11-17
+
+**Folha de atualização no download (admin e aluno)**
+- Nova caixa **Incluir folha de atualização** (junto de "Incluir capa"): junta ao PDF uma folha com a **última atualização publicada** do documento, **depois da capa e antes da 1ª folha** do documento (respeitando a "página inicial"). Vale para PDF e Original (PDF/DOCX; .docx com folha sai em PDF). Sem atualização publicada o download sai normal, com aviso.
+- **Admin:** no diálogo de download do card (Baixar), no download em lote (ZIP, uma folha por documento) e no Baixar do editor.
+- **Aluno:** caixa "com atualização" ao lado do Baixar do Cronograma Adaptativo (escolha lembrada no navegador) e na aba Download do painel do material da Biblioteca. O aluno só recebe atualizações publicadas e visíveis a ele, com as regras de exibição de data/hora/rótulo.
+- **Visual = índice dos documentos:** título central em maiúsculas (índigo), entradas com pontilhado até o valor à direita (data, tipo/rótulo, local de cada alteração), sem cabeçalho nem rodapé; fonte **Carlito** (equivalente aberta da Calibri usada nos documentos). Máx. 3 páginas.
+- Dependência nova: `@pdf-lib/fontkit` (embutir a fonte). 8 testes novos. Sem migração.
+
 ## 4.22.3 — 2026-11-17
 
 **Biblioteca (admin): "Baixar" do documento abre o diálogo de opções, com nome certo**

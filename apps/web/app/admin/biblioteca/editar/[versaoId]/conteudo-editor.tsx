@@ -32,11 +32,12 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
   const [dlAberto, setDlAberto] = useState(false)
   const [dlFormato, setDlFormato] = useState<FormatoDownload[]>(['pdf'])
   const [dlCapa, setDlCapa] = useState(false)
+  const [dlAtz, setDlAtz] = useState(false)
   const [dlBusy, setDlBusy] = useState(false)
   async function baixar() {
     if (!documentoId || dlBusy) return
     setDlBusy(true)
-    const r = await baixarDoServidor({ documentoIds: [documentoId], versaoId, formatos: dlFormato, incluirCapa: dlCapa && capaAplicavel(dlFormato) })
+    const r = await baixarDoServidor({ documentoIds: [documentoId], versaoId, formatos: dlFormato, incluirCapa: dlCapa && capaAplicavel(dlFormato), incluirAtualizacao: dlAtz && capaAplicavel(dlFormato) })
     setDlBusy(false)
     if (!r.ok) { toast.error(r.message); return }
     if (r.aviso) toast.warning(r.aviso); else toast.success('Download concluído.')
@@ -131,7 +132,7 @@ export function ConteudoEditor({ versaoId, documentoId, titulo, documentUrl, onl
                 <button type="button" onClick={() => setDlAberto((v) => !v)} aria-expanded={dlAberto} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><Download className="h-4 w-4" /> Baixar</button>
                 {dlAberto && (
                   <div className="absolute right-0 top-full z-[60] mt-1.5 w-80 space-y-3 rounded-xl border bg-card p-3 shadow-xl">
-                    <OpcoesDownload formatos={dlFormato} onFormatos={setDlFormato} multi={false} incluirCapa={dlCapa} onIncluirCapa={setDlCapa} />
+                    <OpcoesDownload formatos={dlFormato} onFormatos={setDlFormato} multi={false} incluirCapa={dlCapa} onIncluirCapa={setDlCapa} incluirAtualizacao={dlAtz} onIncluirAtualizacao={setDlAtz} />
                     <p className="text-[11px] text-muted-foreground">Baixa a versão salva deste documento, com o título como nome do arquivo.</p>
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => setDlAberto(false)} disabled={dlBusy} className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60">Fechar</button>

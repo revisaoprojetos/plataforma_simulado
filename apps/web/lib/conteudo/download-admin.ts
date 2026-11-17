@@ -6,6 +6,8 @@ import { decidirDownload, montarPdfComCapa, sanitizarNomeArquivo } from './baixa
 import { mapaPastas, resolverCapaDoc, resolverPaginaInicialDoc, type PastaCP } from './capa-pagina'
 import { buscar, carregarCapa } from './capa-bytes'
 import { urlAssinadaOriginal } from './ingestao'
+import { montarFolhaAtualizacaoPdf } from './folha-atualizacao'
+import { dadosFolhaDoDocumento } from './folha-atualizacao-dados'
 import { urlFonteOnlyOffice } from './fonte-onlyoffice'
 import { converterDocx, gerarPdfDocumento } from './thumb'
 import {
@@ -34,6 +36,8 @@ export interface PedidoDownload {
   incluirSubpastas: boolean
   formatos: FormatoDownload[]
   incluirCapa: boolean
+  /** Folha com a ÚLTIMA atualização publicada do documento: entra depois da capa e antes da 1ª folha (só PDF/Original). */
+  incluirAtualizacao?: boolean
   manterEstrutura: boolean
   /** Só com 1 documento: baixa ESTA versão (ex.: a do editor) em vez da atual. */
   versaoId?: string | null
@@ -111,7 +115,7 @@ async function resolverDocs(svc: SupabaseClient, tenantId: string, p: PedidoDown
 }
 
 interface Ctx {
-  tenantId: string; origem: string; incluirCapa: boolean
+  svc: SupabaseClient; tenantId: string; origem: string; incluirCapa: boolean; incluirAtualizacao: boolean
   versoes: Map<string, VerRow>; pastasCP: Map<string, PastaCP>
   capaCache: Map<string, Promise<Awaited<ReturnType<typeof carregarCapa>>>>
   versaoIdFixa?: string | null
@@ -146,8 +150,20 @@ async function gerarArquivoBruto(ctx: Ctx, d: DocRow, fmt: FormatoDownload): Pro
   else if (ctx.incluirCapa && !baixavel) aviso = 'Capa só se aplica a documentos PDF/DOCX; este tipo saiu sem capa.'
   const comCapa = !!(ctx.incluirCapa && fmtAceitaCapa && capaUrl && baixavel)
 
+  // Folha de atualização (última atualização publicada): só PDF/Original de PDF/DOCX; sem registro, sai sem ela.
+  let folha: Awaited<ReturnType<typeof dadosFolhaDoDocumento>> = null
+  if (ctx.incluirAtualizacao) {
+    if (!fmtAceitaCapa) aviso = [aviso, 'A folha de atualização só se aplica ao PDF; este formato saiu sem ela.'].filter(Boolean).join(' ')
+    else if (!baixavel) aviso = [aviso, 'A folha de atualização só se aplica a documentos PDF/DOCX.'].filter(Boolean).join(' ')
+    else {
+      folha = await dadosFolhaDoDocumento(ctx.svc, ctx.tenantId, d.id, d.titulo, { soVisivelAluno: false })
+      if (!folha) aviso = [aviso, 'Sem atualização publicada neste documento; saiu sem a folha de atualização.'].filter(Boolean).join(' ')
+    }
+  }
+  const comAtz = !!folha
+
   // ORIGINAL sem capa → bytes do storage (qualquer tipo)
-  if (fmt === 'original' && !comCapa) {
+  if (fmt === 'original' && !comCapa && !comAtz) {
     const u = await urlOrig(); if (!u) return { ok: false, erro: 'Não foi possível gerar o link do arquivo no storage.' }
     const b = await buscar(u, MAX_DOC_BYTES, 60000)
     return b ? { ok: true, bytes: b, ext: extDoOriginal(d, arquivoKey), aviso } : { ok: false, erro: 'Falha ao ler o arquivo no storage (ausente ou maior que 120 MB).' }
@@ -174,17 +190,26 @@ async function gerarArquivoBruto(ctx: Ctx, d: DocRow, fmt: FormatoDownload): Pro
     if (!base) return { ok: false, erro: 'Não foi possível converter para PDF (OnlyOffice indisponível ou conversão falhou).' }
   }
   if (!base) return { ok: false, erro: 'Falha ao ler o arquivo no storage.' }
-  if (!comCapa) return { ok: true, bytes: base, ext: 'pdf', aviso }
+  if (!comCapa && !comAtz) return { ok: true, bytes: base, ext: 'pdf', aviso }
 
-  const dec = decidirDownload(tipo as 'pdf' | 'docx', capaUrl, paginaInicial)
+  const dec = decidirDownload(tipo as 'pdf' | 'docx', comCapa ? capaUrl : null, paginaInicial)
   try {
-    let p = ctx.capaCache.get(capaUrl as string)
-    if (!p) { p = carregarCapa(capaUrl as string, ctx.origem); ctx.capaCache.set(capaUrl as string, p) }
-    const capa = await p
-    if (!capa) return { ok: true, bytes: base, ext: 'pdf', aviso: 'A capa não pôde ser carregada; o PDF saiu SEM capa.' }
-    const pdf = await montarPdfComCapa(base, capa, { descartarAntes: dec.descartarAntes, titulo: d.titulo })
-    return { ok: true, bytes: pdf, ext: 'pdf', aviso: fmt === 'original' && tipo === 'docx' ? 'Original .docx com capa: saiu em PDF (a capa não é aplicável ao .docx).' : undefined }
-  } catch { return { ok: true, bytes: base, ext: 'pdf', aviso: 'Falha ao montar a capa; o PDF saiu SEM capa.' } }
+    let capa: Awaited<ReturnType<typeof carregarCapa>> = null
+    let avisoCapa: string | undefined
+    if (comCapa) {
+      let p = ctx.capaCache.get(capaUrl as string)
+      if (!p) { p = carregarCapa(capaUrl as string, ctx.origem); ctx.capaCache.set(capaUrl as string, p) }
+      capa = await p
+      if (!capa) avisoCapa = 'A capa não pôde ser carregada; o PDF saiu SEM capa.'
+    }
+    if (!capa && !comAtz) return { ok: true, bytes: base, ext: 'pdf', aviso: avisoCapa ?? aviso }
+    const pdf = await montarPdfComCapa(base, capa, {
+      descartarAntes: capa ? dec.descartarAntes : 0, titulo: d.titulo,
+      folha: folha ? (w, h) => montarFolhaAtualizacaoPdf(folha as NonNullable<typeof folha>, [w, h]) : undefined,
+    })
+    const avisoOrig = fmt === 'original' && tipo === 'docx' ? 'Original .docx com capa/folha de atualização: saiu em PDF (não é aplicável ao .docx).' : undefined
+    return { ok: true, bytes: pdf, ext: 'pdf', aviso: [avisoCapa, avisoOrig, aviso].filter(Boolean).join(' ') || undefined }
+  } catch { return { ok: true, bytes: base, ext: 'pdf', aviso: 'Falha ao montar a capa/folha de atualização; o PDF saiu SEM elas.' } }
 }
 
 /** Gera + valida (não-vazio e assinatura): arquivo truncado/HTML de erro/0 bytes vira FALHA relatada, nunca um item corrompido no ZIP. */
@@ -221,7 +246,7 @@ export async function prepararDownloadAdmin(svc: SupabaseClient, tenantId: strin
     if (data) versoes.set(d.id, data as VerRow)
   }
 
-  const ctx: Ctx = { tenantId, origem, incluirCapa: p.incluirCapa, versoes, pastasCP: mapaPastas(r.pastas), capaCache: new Map(), versaoIdFixa: p.versaoId ?? null }
+  const ctx: Ctx = { svc, tenantId, origem, incluirCapa: p.incluirCapa, incluirAtualizacao: !!p.incluirAtualizacao, versoes, pastasCP: mapaPastas(r.pastas), capaCache: new Map(), versaoIdFixa: p.versaoId ?? null }
   const unico = docs.length === 1 && p.formatos.length === 1
   const falhas: LinhaRelatorio[] = [], avisos: LinhaRelatorio[] = []
   const tarefas = docs.flatMap((d) => p.formatos.map((f) => ({ d, f })))
@@ -258,7 +283,7 @@ export async function prepararDownloadAdmin(svc: SupabaseClient, tenantId: strin
 
   // ZIP determinístico: ordem por título/formato; nomes únicos
   saidas.sort((a, b) => a.d.titulo.localeCompare(b.d.titulo, 'pt-BR') || a.f.localeCompare(b.f))
-  const rel = montarRelatorio({ geradoEm: new Date(), total: tarefas.length, ok: saidas.length, falhas, avisos, incluirCapa: p.incluirCapa, formatos: p.formatos.map((f) => FORMATOS_DOWNLOAD.find((x) => x.id === f)?.rotulo ?? f) })
+  const rel = montarRelatorio({ geradoEm: new Date(), total: tarefas.length, ok: saidas.length, falhas, avisos, incluirCapa: p.incluirCapa, incluirAtualizacao: !!p.incluirAtualizacao, formatos: p.formatos.map((f) => FORMATOS_DOWNLOAD.find((x) => x.id === f)?.rotulo ?? f) })
   const { bytes: out } = montarZip(saidas.map((s) => ({ dir: r.caminho(s.d), titulo: s.d.titulo, ext: s.g.ext, bytes: s.g.bytes })), rel)
   return {
     ok: true, bytes: out, nome: nomeDoZip(r.pastaUnica), mime: MIME_POR_EXT.zip, docIds,
