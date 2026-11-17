@@ -519,10 +519,9 @@ export function BibliotecaClient() {
       toast.error('Falha ao abrir o editor: ' + (e?.message || 'erro desconhecido'))
     }
   }
-  async function baixarDoc(d: Doc) {
-    const r = await urlDownloadDocumento(d.id)
-    if (!r.ok || !r.url) return toast.error(r.error || 'Falha ao gerar o link.')
-    window.open(r.url, '_blank')
+  // Mesmo diálogo do lote/editor (formato + "Incluir capa"); 1 documento sai como arquivo único com o título dele no nome.
+  function baixarDoc(d: Doc) {
+    setLoteDlg({ titulo: `Baixar “${d.titulo}”`, alvo: { docIds: [d.id], pastaIds: [], incluirSubpastas: false, categoria }, secoes: ['baixar'] })
   }
   async function renomearDoc(d: Doc) {
     const titulo = await pedirTexto({ titulo: 'Renomear documento', valorInicial: d.titulo, confirmar: 'Salvar' })

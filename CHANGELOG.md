@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.22.3 — 2026-11-17
+
+**Biblioteca (admin): "Baixar" do documento abre o diálogo de opções, com nome certo**
+- O **Baixar** do menu de 3 pontos do card (e do painel lateral) abre o mesmo diálogo do lote/editor: escolha de formato e caixa **Incluir capa** (capa do documento ou da pasta, respeitando a página inicial). Antes abria um link direto do storage, sem opções e com nome aleatório.
+- Um documento sai como arquivo único com o **título dele** no nome e a extensão correta; vários selecionados continuam saindo em ZIP.
+- Só front (`biblioteca-client.tsx`); sem migração.
+
 ## 4.22.2 — 2026-11-17
 
 **Grifos: o que é do admin não aparece como do aluno, e o grifo do aluno acompanha só o texto que mudou**
