@@ -482,6 +482,29 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
     snapshot()
   }
 
+  // Texto digitado no FIM de um grifo herdava o grifo (comportamento do contentEditable) e "grudava" a marca
+  // no que vinha depois. Se o cursor está no fim de um [data-grifo], move o cursor para fora antes de inserir.
+  function sairDoGrifoAoDigitar(e: React.FormEvent<HTMLDivElement>) {
+    const t = (e.nativeEvent as InputEvent).inputType
+    if (!t || !t.startsWith('insert')) return
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return
+    const box = boxRef.current; if (!box) return
+    const { anchorNode, anchorOffset } = sel
+    if (!anchorNode) return
+    let el: Node | null = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentNode
+    while (el && el !== box && !(el.nodeType === 1 && (el as Element).hasAttribute('data-grifo'))) el = el.parentNode
+    if (!el || el === box) return
+    const fim = anchorNode.nodeType === 3 ? anchorOffset >= (anchorNode.textContent?.length ?? 0) : anchorOffset >= anchorNode.childNodes.length
+    if (!fim) return
+    // só quando é de fato o último conteúdo do grifo
+    const ultimo = (n: Node): Node => (n.lastChild ? ultimo(n.lastChild) : n)
+    if (ultimo(el) !== anchorNode && el !== anchorNode) return
+    const r = document.createRange()
+    r.setStartAfter(el); r.collapse(true)
+    sel.removeAllRanges(); sel.addRange(r)
+  }
+
   // Remove grifos inline que tocam a seleção (ou o grifo sob o cursor).
   function removerGrifo() {
     const box = boxRef.current; if (!box) return
@@ -783,6 +806,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
         {editando ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
             <div ref={boxRef} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => { setDirty(true); snapshotDebounced() }}
+              onBeforeInput={sairDoGrifoAoDigitar}
               className={cn(CONTENT_CLASS, 'focus:ring-1 focus:ring-inset focus:ring-ring')} />
           </div>
         ) : html ? (

@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.22.2 — 2026-11-17
+
+**Grifos: o que é do admin não aparece como do aluno, e o grifo do aluno acompanha só o texto que mudou**
+- **Grifos/notas "base" do admin não chegam mais ao aluno como se fossem dele:** o sistema copiava as anotações base para o conjunto de cada aluno (origem `base`). A cópia foi removida e as já existentes ficam ocultas na leitura (nada foi apagado no banco). Grifos editoriais do Revisão (toggle próprio) não mudam. Grifos próprios do aluno nunca são tocados.
+- **Excluir/editar um grifo base no admin** passa a valer também para as cópias já geradas.
+- **Reancoragem parcial:** ao salvar o texto no editor, publicar nova versão ou usar "Substituir a versão atual", o grifo do aluno acompanha só o que sobrou — apagou início/fim → encurta; apagou o miolo → fica contíguo; entrou texto no meio → divide em dois (o texto novo não fica grifado); trecho todo apagado → "revisão necessária" (não se perde). Antes era tudo ou nada e o "Substituir" não ajustava nada. 7 testes novos.
+- **Editor do admin:** texto digitado no fim de um grifo não herda mais a marca (a marca "grudava" no texto seguinte).
+
 ## 4.22.1 — 2026-11-16
 
 **Compose do Portainer: variáveis de segurança chegam ao serviço web (CSRF em modo observação)**

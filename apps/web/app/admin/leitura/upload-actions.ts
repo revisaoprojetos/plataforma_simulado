@@ -10,6 +10,9 @@ import { esquecer } from '@/lib/cache/relatorio-cache'
 import { sanitizarDocumento } from '@/lib/leitura/sanitize'
 import { carregarTagsBiblioteca } from '@/lib/leitura/biblioteca-tags'
 import { validateFile, PRESETS } from '@/lib/storage/validate'
+import { espinhaDeHtml } from '@/lib/leitura/reanchor'
+import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
+import { ajustarAnotacoesAoTexto } from '@/lib/leitura/reanchor-db'
 
 async function guard() {
   if (!(await checkPermission('leitura:update'))) return { ok: false as const, error: 'Sem permissão.' }
@@ -70,6 +73,10 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
     ;({ error } = await svc.from('simulado_documento_conteudos').upsert({ tenant_id: tenantId, documento_id: documentoId, versao: versaoAlvo, html, texto_hash, artigos }, { onConflict: 'documento_id,versao' }))
   }
   if (error) return { ok: false as const, error: error.message }
+
+  // Grifos/anotações que já existem NESTA versão (rascunho reaproveitado ou doc sem versionamento) acompanham o
+  // texto novo: só some/encurta/divide o que o admin de fato apagou ou inseriu. Best-effort: não bloqueia o salvar.
+  try { await ajustarAnotacoesAoTexto(svc, tenantId, documentoId, versaoAlvo, espinhaDeHtml(limparCabecalhoHtml(html))) } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
 
   // Dispositivos estruturados (A3) — regrava para a versão alvo. Tolerante à migração ausente.
   try {

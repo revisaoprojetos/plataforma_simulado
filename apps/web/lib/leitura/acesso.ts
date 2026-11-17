@@ -208,29 +208,6 @@ export interface GrifoLei { id: string; inicio: number; fim: number; exact: stri
 /** Sinaliza que a lei foi atualizada (há versão publicada anterior) — alimenta o "o que mudou". */
 export interface AtualizacaoInfo { versaoAnterior: number; atualizadoEm: string | null; tipo: string | null; descricao: string | null }
 
-/**
- * Clona as anotações BASE (pré-definidas do admin) para o conjunto do aluno, uma vez.
- * Idempotente por (estudante, versão, base_id) com ignoreDuplicates → base apagada
- * pelo aluno NÃO ressuscita (nunca sobrescreve, só insere se ausente).
- */
-async function garantirAnotacoesBase(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, versao: number, estudanteId: string) {
-  // Grifos editoriais (editorial=true) NÃO são clonados — são pintados como conteúdo (A4).
-  let sel = await svc.from('simulado_documento_anotacoes_base')
-    .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, editorial')
-    .eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
-  if (sel.error && /editorial|column/i.test(String(sel.error.message))) {
-    sel = await svc.from('simulado_documento_anotacoes_base').select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota').eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false) as any
-  }
-  const bases = (sel.data ?? []).filter((b: any) => b.editorial !== true)
-  if (!bases?.length) return
-  const rows = (bases as any[]).map((b) => ({
-    tenant_id: tenantId, estudante_id: estudanteId, documento_id: documentoId, documento_versao: versao,
-    inicio_char: b.inicio_char, fim_char: b.fim_char, exact: b.exact, prefix: b.prefix, suffix: b.suffix,
-    cor: b.cor, nota: b.nota, origem: 'base', base_id: b.id,
-  }))
-  await svc.from('simulado_leitura_anotacoes').upsert(rows, { onConflict: 'estudante_id,documento_versao,base_id', ignoreDuplicates: true })
-}
-
 /** Carrega o documento para o leitor do aluno (após checar acesso). null = sem acesso/não existe. */
 export async function carregarDocumentoAluno(documentoId: string, estudanteId: string, tenantId: string): Promise<DocumentoCarregado | null> {
   const svc = createAdminClient()
@@ -298,18 +275,17 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     // Anotações (clona as base do admin, idempotente) — tolerante.
     (async (): Promise<AnotacaoAluno[]> => {
       try {
-        await garantirAnotacoesBase(svc, tenantId, documentoId, versao, estudanteId)
         // Select tolerante: `tipo` é coluna nova (migração pode não ter rodado) → tenta com ela e cai
         // para sem ela em erro, sem perder as anotações.
         let anot: any[] | null = null
         {
           const r = await svc.from('simulado_leitura_anotacoes')
             .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem, tipo')
-            .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+            .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false).neq('origem', 'base')
           if (r.error) {
             const r2 = await svc.from('simulado_leitura_anotacoes')
               .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem')
-              .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+              .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false).neq('origem', 'base')
             anot = r2.data as any[] | null
           } else anot = r.data as any[] | null
         }

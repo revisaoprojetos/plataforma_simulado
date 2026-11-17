@@ -8,7 +8,9 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { selecionarGrupos, contarMembrosGrupos as contarMembrosGruposSql } from '@/lib/simulado/grupos'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
-import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
+import { espinhaDeHtml } from '@/lib/leitura/reanchor'
+import { reancorarParcial } from '@/lib/leitura/reanchor-parcial'
+import { ajustarAnotacoesAoTexto } from '@/lib/leitura/reanchor-db'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { normalizarPontuacaoLeitura, bonusSequenciaLeitura, bonusConclusaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
@@ -175,16 +177,21 @@ async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: st
     if (ehAluno) q = q.eq('origem', 'propria')
     const { data: anots, error } = await q
     if (error || !anots?.length) continue
-    const novas = (anots as any[]).map((a) => {
-      const rec = reancorar(S, { inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '' })
-      const base: Record<string, unknown> = {
-        tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova,
-        inicio_char: rec?.inicio ?? a.inicio_char, fim_char: rec?.fim ?? a.fim_char,
-        exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota,
-      }
-      if (ehAluno) { base.estudante_id = a.estudante_id; base.origem = a.origem; base.base_id = a.base_id; base.revisao_necessaria = !rec }
-      else { base.ordem = a.ordem; if ('tipo_grifo' in a) { base.tipo_grifo = a.tipo_grifo; base.editorial = a.editorial } }
-      return base
+    // Reancoragem PARCIAL: o grifo acompanha só o que sobrou do texto (encurta se apagou início/fim; divide em
+    // dois se entrou texto no meio). Só marca revisão quando o trecho inteiro sumiu.
+    const novas = (anots as any[]).flatMap((a) => {
+      const seg = reancorarParcial(S, { inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '' })
+      const trechos = seg.length ? seg : [null]
+      return trechos.map((t, k) => {
+        const base: Record<string, unknown> = {
+          tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova,
+          inicio_char: t?.inicio ?? a.inicio_char, fim_char: t?.fim ?? a.fim_char,
+          exact: t?.exact ?? a.exact, prefix: t ? t.prefix : a.prefix, suffix: t ? t.suffix : a.suffix, cor: a.cor, nota: a.nota,
+        }
+        if (ehAluno) { base.estudante_id = a.estudante_id; base.origem = a.origem; base.base_id = k === 0 ? a.base_id : null; base.revisao_necessaria = !t }
+        else { base.ordem = a.ordem; if ('tipo_grifo' in a) { base.tipo_grifo = a.tipo_grifo; base.editorial = a.editorial } }
+        return base
+      })
     })
     // As PRÓPRIAS têm base_id=NULL — NÃO dá para usar upsert com onConflict incluindo base_id
     // (NULL não conflita de forma confiável → colapsaria/perderia os grifos do aluno). Insert direto,
@@ -220,6 +227,8 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
     const artigos = (cont as any)?.artigos ?? 0
     // 1) sobrescreve o conteúdo da versão publicada
     await svc.from('simulado_documento_conteudos').update({ html, artigos }).eq('documento_id', documentoId).eq('versao', pub)
+    // Os grifos dos alunos desta versão acompanham o texto novo (só some/encurta/divide o que mudou).
+    try { await ajustarAnotacoesAoTexto(svc, g.tenantId, documentoId, pub, espinhaDeHtml(limparCabecalhoHtml(html))) } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
     // 2) copia os dispositivos do rascunho para a versão publicada (tolerante à migração A3 ausente)
     try {
       const { data: disp } = await svc.from('simulado_lei_dispositivos').select('*').eq('documento_id', documentoId).eq('versao', rasc)
@@ -410,6 +419,14 @@ export async function atualizarAnotacaoBase(id: string, patch: { cor?: string; n
   let res = await svc.from('simulado_documento_anotacoes_base').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
   if (res.error && /tipo_grifo|editorial|column/i.test(String(res.error.message))) { const { tipo_grifo, editorial, ...base } = dados as any; res = await svc.from('simulado_documento_anotacoes_base').update(base).eq('id', id).eq('tenant_id', g.tenantId) }
   if (res.error) return { ok: false, error: res.error.message }
+  // Propaga cor/nota às cópias dos alunos (senão o aluno continua vendo a versão antiga do grifo).
+  const copia: Record<string, unknown> = {}
+  if ('cor' in patch && patch.cor) copia.cor = patch.cor
+  if ('nota' in patch) copia.nota = patch.nota || null
+  if (Object.keys(copia).length) {
+    await svc.from('simulado_leitura_anotacoes').update({ ...copia, atualizado_em: new Date().toISOString() })
+      .eq('tenant_id', g.tenantId).eq('base_id', id).eq('origem', 'base').eq('deletado', false)
+  }
   return { ok: true }
 }
 
@@ -418,6 +435,10 @@ export async function excluirAnotacaoBase(id: string): Promise<{ ok: boolean; er
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_documento_anotacoes_base').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  // Propaga aos alunos: a cópia (origem 'base') que cada aluno recebeu some também. Só as cópias DESTA base
+  // (base_id) — grifos próprios do aluno nunca são tocados.
+  await svc.from('simulado_leitura_anotacoes').update({ deletado: true, atualizado_em: new Date().toISOString() })
+    .eq('tenant_id', g.tenantId).eq('base_id', id).eq('origem', 'base').eq('deletado', false)
   return { ok: true }
 }
 
