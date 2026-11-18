@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.24.2 — 2026-11-18
+
+- **Cronograma Adaptativo:** a caixa "com atualização" saiu de ao lado do botão Baixar. Agora, ao clicar em **Baixar**, abre um pop-up com a opção **Incluir folha de atualização** (a escolha fica lembrada).
+- **Liberação (dados):** Direito Empresarial entrou na matriz do Extensivo com as regras das demais disciplinas (turmas Julho pelo cronograma; Agosto/Setembro em duplas a cada 14 dias) e a planilha foi vinculada às Aulas 01–09.
+
+---
+
 ## 4.24.1 — 2026-11-18
 
 - **Correção urgente (Cronograma Adaptativo):** a tela do cronograma ficava em branco para todos os alunos na 4.24.0 (só o cabeçalho, "Salvo neste navegador"). Uma linha ficou fora da função `carregarLocal()` no iframe (SyntaxError). Corrigido, e novo teste (`iframe-sintaxe.test.ts`) compila os scripts inline do cronograma e do leitor da jurisprudência antes de cada deploy.
