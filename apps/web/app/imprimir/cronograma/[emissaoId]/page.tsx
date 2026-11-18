@@ -3,6 +3,9 @@ import { PrintButton } from '@/components/aluno/print-button'
 import { CronogramaImprimivel } from '@/components/cronograma/cronograma-imprimivel'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { createAdminClient } from '@/lib/supabase/server'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { BLOQUEIA_PDF_DO_CRONOGRAMA, MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { verificarRenderToken } from '@/lib/pdf/render-token'
 import {
   abrirEmissao,
@@ -47,6 +50,16 @@ export default async function ImprimirCronogramaPage({
 
   const sessao = porToken ? null : await getSessaoAluno()
   if (!porToken && !sessao) redirect('/aluno/entrar')
+
+  // INTERRUPTOR CENTRAL de downloads (tema.downloads_aluno; ausente = bloqueado): a impressão direta do aluno é o "download" do cronograma.
+  // O caminho do Gotenberg (token) só existe se o PDF foi pedido — e o pedido já é barrado em /api/aluno/cronograma-pdf.
+  if (!porToken && sessao && BLOQUEIA_PDF_DO_CRONOGRAMA && await bloqueioDownloadsAluno(createAdminClient(), sessao.tenantId, sessao.estudanteId, { origem: 'cronograma', tipoOrigem: 'pdf', titulo: 'Cronograma (impressão)' })) {
+    return (
+      <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
+        <p>{MENSAGEM_DOWNLOAD_INDISPONIVEL}.</p>
+      </div>
+    )
+  }
 
   const r = porToken
     ? await abrirEmissaoParaRender(emissaoId, tok!.t)

@@ -11,6 +11,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { carregarLeitura, urlDownloadAluno } from '@/lib/conteudo/leitor'
 import { minhaAvaliacao } from '@/lib/demandas/demandas'
 import { createAdminClient } from '@/lib/supabase/server'
+import { downloadsAlunoLiberados } from '@/lib/conteudo/politica-download'
 import { novidadesDoDocumento } from '@/lib/admin-revisao/atualizacoes'
 import { redirect } from 'next/navigation'
 import { numeroDaVersao } from '@/lib/conteudo/atualizacoes-registro'
@@ -53,7 +54,8 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
   // Metadados + conteúdo real da versão atual + grifos do aluno; link de download (gate de acesso).
   const [leitura, downloadUrl] = await Promise.all([
     carregarLeitura(materialId, sessao.estudanteId),
-    urlDownloadAluno(materialId, sessao.estudanteId),
+    // INTERRUPTOR CENTRAL (tema.downloads_aluno; ausente = bloqueado): sem URL assinada na página e sem log de "bloqueado" a cada abertura.
+    downloadsAlunoLiberados(createAdminClient(), sessao.tenantId, sessao.estudanteId).then((ok) => (ok ? urlDownloadAluno(materialId, sessao.estudanteId) : null)),
   ])
 
   // Sem acesso / não publicado / inexistente → estado vazio elegante (não quebra).
@@ -170,7 +172,7 @@ export default async function LeitorPage({ params }: { params: Promise<{ materia
                 <Muted size={13}>pág. <b style={{ color: 'var(--ink)' }}>7</b> / 26</Muted>
                 <Btn kind="secondary" size="sm" icon="zoom">Tela grande</Btn>
                 {/* Baixar → URL assinada do arquivo original (null quando sem permissão de baixar) */}
-                <Btn kind="secondary" size="sm" icon="download" href={downloadUrl ?? '#'}>Baixar</Btn>
+                {downloadUrl ? <Btn kind="secondary" size="sm" icon="download" href={downloadUrl}>Baixar</Btn> : null}
               </Row>
             </Row>
             <Row>

@@ -29,7 +29,7 @@ async function chamarEmissoes(corpo: Record<string, unknown>): Promise<{ ok: boo
   }
 }
 
-export function RevisaoFixoEmbed({ theme, emissaoId, tituloInicial, semDatas }: { theme: InternaTheme; emissaoId: string; tituloInicial: string; semDatas: boolean }) {
+export function RevisaoFixoEmbed({ theme, emissaoId, tituloInicial, semDatas, downloadsOk = false }: { theme: InternaTheme; emissaoId: string; tituloInicial: string; semDatas: boolean; downloadsOk?: boolean }) {
   const router = useRouter()
   const frame = useRef<HTMLIFrameElement | null>(null)
   const [titulo, setTitulo] = useState(tituloInicial)
@@ -107,7 +107,7 @@ export function RevisaoFixoEmbed({ theme, emissaoId, tituloInicial, semDatas }: 
 
   return (
     <>
-      <CronogramaAdaptativoEmbed theme={theme} modo="revisao-fixo" emissaoId={emissaoId} abaInicial={semDatas ? 'semana' : 'hoje'} iframeRef={frame} />
+      <CronogramaAdaptativoEmbed theme={theme} downloadsOk={downloadsOk} modo="revisao-fixo" emissaoId={emissaoId} abaInicial={semDatas ? 'semana' : 'hoje'} iframeRef={frame} />
 
       {modal === 'renomear' && (
         <NovaModal titulo="Renomear cronograma" sub="Só para você distinguir os seus cronogramas." onClose={() => setModal(null)} w={460}>

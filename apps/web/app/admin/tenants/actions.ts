@@ -1,4 +1,5 @@
 'use server'
+import { esquecer as esquecerCacheTema } from '@/lib/cache/relatorio-cache'
 import type { VisibilidadeModo, AparenciaInput, EmbedConfigInput, RbacCategoria } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
@@ -192,6 +193,7 @@ export async function salvarTemaSuperAction(tenantId: string, tema: Record<strin
   const { error } = await svc.from('simulado_tenants').update({ tema: merged }).eq('id', tenantId)
   if (error) throw new Error(`Erro ao salvar tema: ${error.message}`)
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: tenantId, antes: (anterior?.tema as Record<string, unknown>) ?? {}, depois: merged, tenantId })
+  await esquecerCacheTema(`bib-politica:${tenantId}`).catch(() => {}) // interruptor de downloads (tema.downloads_aluno) vale já, sem esperar os 30s do cache
   revalidatePath('/', 'layout')
   revalidatePath(`/super/plataformas/${tenantId}`)
   return { ok: true }

@@ -9,7 +9,7 @@ import type { LinhaDownloads, ResumoDownloads, AlunoNoConteudo, EventoDownload, 
 
 const POR_PAGINA = 25
 const fmtBrt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—')
-const MOTIVOS: Record<string, string> = { politica: 'Download desativado na plataforma', documento: 'Download desativado no documento', permissao: 'Sem permissão de baixar', nao_liberado: 'Material ainda não liberado', tipo: 'Tipo não baixável', indisponivel: 'Arquivo indisponível' }
+const MOTIVOS: Record<string, string> = { downloads_desativados: 'Downloads desativados na plataforma', politica: 'Download desativado na plataforma', documento: 'Download desativado no documento', permissao: 'Sem permissão de baixar', nao_liberado: 'Material ainda não liberado', tipo: 'Tipo não baixável', indisponivel: 'Arquivo indisponível' }
 const ORIGENS: [string, string][] = [['', 'Todas as origens'], ['cronograma', 'Cronograma'], ['biblioteca', 'Biblioteca'], ['produto', 'Produtos'], ['midia', 'Mídia'], ['outro', 'Outros']]
 const VISOES: [VisaoDownloads, string][] = [['conteudo', 'Por conteúdo'], ['meta', 'Por meta'], ['aluno', 'Por aluno']]
 

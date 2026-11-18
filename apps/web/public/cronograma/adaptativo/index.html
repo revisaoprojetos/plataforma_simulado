@@ -963,10 +963,13 @@ function toast(msg) {
    GET /api/aluno/biblioteca/baixar?doc=<id>: o servidor confere o acesso, põe a CAPA da Biblioteca como 1ª folha (se houver)
    e devolve o arquivo com o NOME do documento (Content-Disposition). Aqui só baixamos o blob e damos o nome do cabeçalho. */
 const ICDL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;margin-right:5px;vertical-align:-2px"><path d="M8 2.5v7M5 7l3 3 3-3M3 13h10"/></svg>';
+/* INTERRUPTOR de downloads do aluno: o portal passa ?dl=1 SÓ quando o tenant permite (tema.downloads_aluno === 'permitido'). Ausente = sem botões de baixar
+   (o servidor também barra: 403 "Download indisponível no momento"). */
+const DL_OK = (() => { try { return new URLSearchParams(location.search).get('dl') === '1'; } catch (e) { return false; } })();
 /* Caixa "Incluir atualização" (folha com a última atualização do material, depois da capa): escolha lembrada no navegador. */
 const ATZ_KEY = 'rv:dl-atz';
 const atzMarcada = () => { try { return localStorage.getItem(ATZ_KEY) === '1'; } catch (e) { return false; } };
-const botaoBaixar = (doc, meta) => (doc ? `<button type="button" class="btn sm ghost" data-acao="baixar" data-doc="${esc(doc)}" data-meta="${esc(meta || '')}" title="Baixar o documento desta meta">${ICDL}Baixar</button>` : '');
+const botaoBaixar = (doc, meta) => (doc && DL_OK ? `<button type="button" class="btn sm ghost" data-acao="baixar" data-doc="${esc(doc)}" data-meta="${esc(meta || '')}" title="Baixar o documento desta meta">${ICDL}Baixar</button>` : '');
 function nomeDoCabecalho(h) {
   const m8 = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(h || ''); if (m8) { try { return decodeURIComponent(m8[1].trim()); } catch (e) {} }
   const m = /filename\s*=\s*"([^"]+)"/i.exec(h || ''); return m ? m[1] : 'documento';
@@ -1044,10 +1047,10 @@ function carregarLocal() {
   try { const x = JSON.parse(localStorage.getItem(CHAVE) || 'null'); if (x && x.v === 2 && x.plano) return x; } catch (e) {}
   return null;
 }
+function carregarPerfilLegado() { try { const x = JSON.parse(localStorage.getItem(CHAVE_BASE) || 'null'); return x && x.perfil ? { perfil: x.perfil } : null; } catch (e) { return null; } }
 function cfgVazia() {
   return { start: hojeISO(), horas: [0, 0, 0, 0, 0, 0, 0], discs: [...ESSENCIAIS], metas: { pf: true, fl: true, qu: true, lp: true }, arranjo: 'pdf', revModelo: 'pdflash', revisao: { ativa: true, cada: REV_PADRAO }, motor: Motor28.VERSAO_MOTOR };
 }
-function carregarPerfilLegado() { try { const x = JSON.parse(localStorage.getItem(CHAVE_BASE) || 'null'); return x && x.perfil ? { perfil: x.perfil } : null; } catch (e) { return null; } }
 function novoEstado() {
   return { v: 2, cfg: cfgVazia(), plano: {}, fim: 1, prog: {}, log: {}, extras: [], notas: {}, reorgs: [], revs: {}, detalhes: {}, pausa: null, perfil: null, exemplo: true, atualizado: { estado: 0, progresso: 0, notas: 0 } };
 }
@@ -1114,10 +1117,10 @@ const API_CRONO = '/api/aluno/cronograma/adaptativo';
 const sujo = new Set(); let saveT = null;
 function salvar(...partes) {
   if (TESTE || REVFIXO) return;
+  if (!HIDRATOU && !CRIAR) return; /* NUNCA grava/envia o S local antes de o servidor hidratar com sucesso (S local pode ser de outro aluno/plano) */
   const agora = Date.now();
   for (const p of partes) { S.atualizado[p] = agora; sujo.add(p); }
   if (CRIAR) { sujo.clear(); return; } /* rascunho só em memória */
-  if (!HIDRATOU && !CRIAR) return; /* NUNCA grava/envia o S local antes de o servidor hidratar com sucesso (S local pode ser de outro aluno/plano) */
   try { if (CHAVE) localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {}
   clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 1200);
 }
@@ -1192,9 +1195,6 @@ function rodar(id) {
 function parar() { if (!RUN) return; registrarTempo(); RUN = null; clearInterval(tick); salvar('progresso'); manterTelaAcesa(false); }
 /* MATRIZ = AUTORIDADE: material bloqueado (docId → 'AAAA-MM-DD' | '') vindo do servidor; meta bloqueada não abre, não inicia e não conclui. */
 let DOCS_BLOQ = {};
-function bloqMeta(id) { try { const i = info(id), d = i && i.doc; return d && Object.prototype.hasOwnProperty.call(DOCS_BLOQ, d) ? DOCS_BLOQ[d] : null; } catch (e) { return null; } }
-function dataBloq(v) { return v ? v.slice(8, 10) + '/' + v.slice(5, 7) + '/' + v.slice(0, 4) : ''; }
-function avisoBloq(id) { const v = bloqMeta(id); if (v === null) return false; toast(v ? 'Este material será liberado em ' + dataBloq(v) + '.' : 'Este material ainda não foi liberado.'); return true; }
 /* MATERIAL INDISPONÍVEL: aulas cujo documento saiu da Biblioteca sem substituto seguro. Não somem nem deslocam o plano; o progresso fica guardado. */
 let INDISP = [];
 function avisoIndisp() {
@@ -1205,6 +1205,9 @@ function avisoIndisp() {
     return `<div class="aviso alerta" style="margin-bottom:18px"><span><b>Material indisponível — fale com o suporte.</b> ${INDISP.length === 1 ? 'Uma aula do seu plano está' : INDISP.length + ' aulas do seu plano estão'} sem material no momento (${l}${mais}). Seu progresso nelas está guardado e não é perdido; a aula volta sozinha quando o material for restabelecido.</span></div>`;
   } catch (e) { return ''; }
 }
+function bloqMeta(id) { try { const i = info(id), d = i && i.doc; return d && Object.prototype.hasOwnProperty.call(DOCS_BLOQ, d) ? DOCS_BLOQ[d] : null; } catch (e) { return null; } }
+function dataBloq(v) { return v ? v.slice(8, 10) + '/' + v.slice(5, 7) + '/' + v.slice(0, 4) : ''; }
+function avisoBloq(id) { const v = bloqMeta(id); if (v === null) return false; toast(v ? 'Este material será liberado em ' + dataBloq(v) + '.' : 'Este material ainda não foi liberado.'); return true; }
 function iniciarMeta(id) {
   if (avisoBloq(id) && !feito(id)) return;
   if (FOCO && FOCO.id !== id) parar();
@@ -2116,6 +2119,7 @@ function salvarNota(campo, valor) {
 
 /* ---------- exportar DOCX (modelo da Revisão) ---------- */
 async function baixarDocx() {
+  if (!DL_OK) { toast('Download indisponível no momento'); return; }
   const btn = $('#btn-docx');
   let dl = null;
   try { dl = window.claude?.use ? await claude.use('downloads') : null; } catch (e) {}
@@ -2442,6 +2446,7 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'ini-form') { e.preventDefault(); enviarInicio(); return; } if (e.target.id === 'extra-form') { e.preventDefault(); enviarExtra(); return; } if (e.target.id === 'foco-form') { e.preventDefault(); encerrarMeta(true); } if (e.target.id === 'parc-form') { e.preventDefault(); const id = e.target.dataset.id, v = $('#parc-v').value.trim(); if (!v) { $('#parc-v').focus(); return; } (S.prog[id] ||= {}).parou = { v, em: hojeISO() }; PARCIAL = null; salvar('progresso'); reagendarParada(id, v); } });
 window.addEventListener('hashchange', () => { if (TESTE) return; const h = location.hash.slice(1); if (TELAS.includes(h) && h !== TELA) irPara(h, true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && RUN) { registrarTempo(); salvar('progresso'); } });
+if (!DL_OK) $('#btn-docx').hidden = true;
 $('#btn-docx').addEventListener('click', baixarDocx);
 
 /* ============================================================
@@ -3378,7 +3383,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       <div class="painel bloco rv-acoes">
         <h3>Este cronograma</h3>
         <button type="button" class="btn" data-acao="rv-act" data-a="renomear">Renomear</button>
-        ${REV.indisponivel ? '' : '<button type="button" class="btn" data-acao="rv-act" data-a="pdf" id="rv-pdf-cfg">Salvar em PDF</button>'}
+        ${REV.indisponivel || !DL_OK ? '' : '<button type="button" class="btn" data-acao="rv-act" data-a="pdf" id="rv-pdf-cfg">Salvar em PDF</button>'}
         ${REV.arquivada ? '<button type="button" class="btn" data-acao="rv-act" data-a="restaurar">Restaurar</button>' : ''}
         <button type="button" class="btn perigo" data-acao="rv-act" data-a="apagar">Apagar</button>
       </div>
@@ -3505,7 +3510,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
     if (ac && !ac.querySelector('.rv-btn')) {
       const mk = (a, rot) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-band rv-btn'; b.dataset.acao = 'rv-act'; b.dataset.a = a; b.textContent = rot; return b; };
       ac.appendChild(mk('renomear', 'Renomear'));
-      if (!REV.indisponivel) ac.appendChild(mk('pdf', 'Salvar em PDF'));
+      if (!REV.indisponivel && DL_OK) ac.appendChild(mk('pdf', 'Salvar em PDF'));
     }
   }
 
@@ -3661,12 +3666,12 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
   // Override: envia as partes sujas para a API em vez da nuvem.
   enviarNuvem = async function () {
     if ((typeof TESTE !== 'undefined' && TESTE) || CRIAR) { sujo.clear(); return; }
+    if (!HIDRATOU) { sujo.clear(); return; } /* GET falhou/pendente: não envia o S local ao servidor */
     var partes = [].concat(Array.from(sujo)); sujo.clear();
     var falhou = false;
     for (var k = 0; k < partes.length; k++) {
       var p = partes[k];
       try {
-    if (!HIDRATOU) { sujo.clear(); return; } /* GET falhou/pendente: não envia o S local ao servidor */
         var corpo = { acao: 'sync', parte: p, doc: docDe(p), planoId: PLANO_ID || undefined, sigAS: SIG_AS || undefined }, enviada = null;
         if (p === 'progresso') { corpo.tocadas = tocadasProg(); enviada = snapProg(); }
         var r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(corpo) });
@@ -3676,26 +3681,26 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
           carregarDoServidor(1); return;
         }
         if (!r.ok) throw new Error('http ' + r.status);
+        var jr = await r.json().catch(function () { return null; });
+        if (p === 'estado' && jr && jr.planoId && !PLANO_ID) { PLANO_ID = jr.planoId; if (EST_ID) CHAVE = CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID; } /* 1º plano criado pelo sync */
         if (p === 'progresso') { /* o servidor RECUSA concluir meta de material bloqueado/sem acesso: reverte local e avisa */
           var rec = jr && jr.recusadas ? Object.keys(jr.recusadas) : [];
           if (rec.length) {
             rec.forEach(function (mid) { var q = S.prog[mid]; if (q) { delete q.s; delete q.em; } if (enviada) delete enviada[mid]; });
             var r0 = jr.recusadas[rec[0]]; toast(r0.motivo === 'sem_acesso' ? 'Você não tem acesso a este material; a meta não foi concluída.' : (r0.liberaEm ? 'Este material será liberado em ' + dataBloq(r0.liberaEm) + '. A meta não foi concluída.' : 'Este material ainda não foi liberado. A meta não foi concluída.'));
-        var jr = await r.json().catch(function () { return null; });
-        if (p === 'estado' && jr && jr.planoId && !PLANO_ID) { PLANO_ID = jr.planoId; if (EST_ID) CHAVE = CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID; } /* 1º plano criado pelo sync */
             renderTudo();
           }
-        }
-      } catch (e) { falhou = true; sujo.add(p); }
-    }
-    if (falhou) { clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 5000); marcarSync(false, 'Salvo neste navegador'); }
-    else marcarSync(true, 'Salvo na sua conta');
           if (enviada) PROG_BASE = enviada;
           if (jr && jr.ignoradas && jr.ignoradas.length) { /* o servidor ignorou conclusões sem ação explícita (estado local desatualizado): recarrega a verdade */
             sujo.clear(); clearTimeout(saveT); HIDRATOU = false;
             toast('Algumas marcações estavam desatualizadas e foram ignoradas. Carregamos a versão atual.');
             carregarDoServidor(1); return;
           }
+        }
+      } catch (e) { falhou = true; sujo.add(p); }
+    }
+    if (falhou) { clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 5000); marcarSync(false, 'Salvo neste navegador'); }
+    else marcarSync(true, 'Salvo na sua conta');
   };
 
   // Aplica o CONTEÚDO vindo do backend (disciplinas classificadas + aulas da Biblioteca
@@ -3760,23 +3765,23 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       limparErroCarga();
       if (j && j.conteudo) aplicarConteudo(j.conteudo);
       DOCS_BLOQ = (j && j.docsBloqueados && typeof j.docsBloqueados === 'object') ? j.docsBloqueados : {};
+      INDISP = (j && Array.isArray(j.indisponiveis)) ? j.indisponiveis : [];
       if (!(j && j.ok && j.estado) || CRIAR) document.body.classList.remove('rv-carregando'); /* sem plano: onboarding legítimo */
       if (CRIAR) {
         // Modo criar: só o CONTEÚDO do servidor; o plano existente é ignorado (não hidrata S, não grava cache).
         R = null; PREV = null; indexar(); renderTudo(); marcarSync(false, 'Novo cronograma · salvo ao gerar'); pedirTema();
         return;
-      INDISP = (j && Array.isArray(j.indisponiveis)) ? j.indisponiveis : [];
       }
       if (j && j.ok && j.estado) {
         var c = j;
+        PLANO_ID = c.planoId || null; EST_ID = c.estudanteId || null; SIG_AS = c.sigAS || null;
+        CHAVE = EST_ID && PLANO_ID ? CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID + (SIG_AS ? ':' + SIG_AS : '') : null; /* cache local por estudante+plano; o cache GLOBAL antigo nunca é aplicado */
+        try { localStorage.removeItem(CHAVE_BASE); } catch (e) {}
         S.cfg = c.estado.cfg; S.plano = c.estado.plano || {}; S.fim = c.estado.fim || 1;
         S.revs = c.estado.revs || {}; S.detalhes = c.estado.detalhes || {}; S.pausa = c.estado.pausa || null; S.exemplo = !!c.estado.exemplo;
         S.titulo = c.estado.titulo || '';
         S.prog = (c.progresso && c.progresso.prog) || {};
         S.notas = (c.notas && c.notas.notas) || {};
-        PLANO_ID = c.planoId || null; EST_ID = c.estudanteId || null; SIG_AS = c.sigAS || null;
-        CHAVE = EST_ID && PLANO_ID ? CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID + (SIG_AS ? ':' + SIG_AS : '') : null; /* cache local por estudante+plano; o cache GLOBAL antigo nunca é aplicado */
-        try { localStorage.removeItem(CHAVE_BASE); } catch (e) {}
         S.extras = (c.progresso && c.progresso.extras) || c.estado.extras || [];
         S.atualizado = { estado: 1, progresso: 1, notas: 1 };
         PROG_BASE = snapProg(); HIDRATOU = true; /* a partir daqui (e só daqui) salvar() pode gravar/enviar */
@@ -3788,12 +3793,12 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
         marcarSync(true, 'Salvo na sua conta');
       } else {
         // Sem plano no servidor: primeiro acesso -> começa pela configuração (com o conteúdo real já aplicado).
+        EST_ID = (j && j.estudanteId) || null; PLANO_ID = null; CHAVE = null; PROG_BASE = {}; HIDRATOU = true;
         indexar();
         irPara('configurar', true);
         renderTudo();
         marcarSync(false, 'Salvo neste navegador');
       }
-        EST_ID = (j && j.estudanteId) || null; PLANO_ID = null; CHAVE = null; PROG_BASE = {}; HIDRATOU = true;
     } catch (e) { clearTimeout(tm); falhaCarga(tentativa, e && e.name === 'AbortError' ? 'O servidor demorou mais de 40 segundos.' : 'Falha ao carregar (' + ((e && e.message) || 'erro') + ').'); }
   }
   carregarDoServidor(1);

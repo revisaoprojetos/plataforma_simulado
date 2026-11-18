@@ -4,6 +4,8 @@ import { getCurrentAccess, isSuperAdmin } from '@/lib/auth/permissions'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getStorage } from '@/lib/storage'
 import { BUCKET_PDFS, tokenPdfValido } from '@/lib/storage/pdf-acesso'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -78,6 +80,22 @@ async function autorizarPorSessao(path: string): Promise<{ ok: true } | { ok: fa
   return { ok: false, status: access.userId || aluno ? 404 : 401 }
 }
 
+/**
+ * ?download= (attachment) de MATERIAL do simulado (caderno de questões/gabarito comentado em `materiais/{tenant}/…`) por ALUNO/link-token:
+ * sujeito ao interruptor central (tema.downloads_aluno; ausente = bloqueado). ADMIN e testador global passam. Fail-closed (tenant ilegível = bloqueia).
+ * NÃO afeta ler/renderizar (sem ?download= e ?stream=1 seguem como sempre) nem `relatorios/…` e jobs de PDF (resultado do próprio aluno).
+ */
+async function downloadMaterialBloqueado(path: string): Promise<boolean> {
+  const tenantId = path.split('/')[1] ?? ''
+  if (!UUID.test(tenantId)) return true
+  const access = await getCurrentAccess()
+  if (access.userId && access.tenantId === tenantId && (access.isAdmin || access.permissions.length > 0)) return false
+  if (access.userId && (await isSuperAdmin())) return false
+  const aluno = await getSessaoAluno()
+  const alvo = aluno && aluno.tenantId === tenantId ? aluno : null
+  return !!(await bloqueioDownloadsAluno(createAdminClient(), tenantId, alvo?.estudanteId ?? null, alvo ? { origem: 'outro', tipoOrigem: 'pdf', titulo: 'Material do simulado' } : undefined))
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: partes } = await params
   if (!partes?.length) return negar(404)
@@ -102,6 +120,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   const q = req.nextUrl.searchParams
   const download = q.get('download')
   const stream = q.get('stream') === '1'
+  if (download && path.startsWith('materiais/') && (await downloadMaterialBloqueado(path))) {
+    return new NextResponse(MENSAGEM_DOWNLOAD_INDISPONIVEL, { status: 403, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
+  }
 
   try {
     if (download || stream) {

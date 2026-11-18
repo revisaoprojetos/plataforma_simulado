@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Save, Loader2, Captions, History, FileText } from 'lucide-react'
+import { Save, Loader2, Captions, History, FileText, Download } from 'lucide-react'
+import { modoDownloadsDoTema, patchTemaDownloads } from '@/lib/conteudo/downloads-aluno-pura'
 import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -61,6 +62,19 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
     })
   }
 
+  // Downloads pelos alunos — interruptor central por PLATAFORMA (tema.downloads_aluno). Desligado (padrão/ausente) = bloqueado.
+  const [dlAluno, setDlAluno] = useState<boolean>(modoDownloadsDoTema(tema) === 'permitido')
+  const [pendingDl, startDl] = useTransition()
+  function toggleDlAluno() {
+    const next = !dlAluno
+    if (next && !window.confirm('Permitir que os alunos baixem materiais (Biblioteca, cronogramas, aulas do produto e cadernos)?')) return
+    setDlAluno(next)
+    startDl(async () => {
+      try { await salvarTema(patchTemaDownloads(next)); toast.success(next ? 'Downloads liberados para os alunos.' : 'Downloads desativados para os alunos.') }
+      catch (err) { setDlAluno(!next); toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
+    })
+  }
+
   function salvar() {
     start(async () => {
       try {
@@ -72,6 +86,21 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
 
   return (
     <div className="max-w-xl space-y-5">
+      {/* Downloads pelos alunos — interruptor central por PLATAFORMA (auto-save) */}
+      <div className="rounded-xl border bg-card p-4">
+        <button type="button" role="switch" aria-checked={dlAluno} onClick={toggleDlAluno} disabled={pendingDl}
+          className="flex w-full items-start gap-3 text-left disabled:opacity-60">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Download className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">Permitir downloads pelos alunos {pendingDl && <Loader2 className="h-3.5 w-3.5 animate-spin" />}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">Desligado (padrão): os alunos continuam lendo tudo no leitor, mas <b>não conseguem baixar</b> nada. O bloqueio vale na <b>Biblioteca</b>, nos <b>cronogramas</b> (material, PDF e DOCX do plano), nas <b>aulas do produto</b> e nos <b>cadernos</b> do simulado, e é aplicado no servidor. Não afeta o download feito pela equipe nem o PDF de resultado/relatório do próprio aluno. Pode levar até 30 s para valer.</span>
+          </span>
+          <span className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${dlAluno ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${dlAluno ? 'left-[22px]' : 'left-0.5'}`} />
+          </span>
+        </button>
+      </div>
+
       {/* Leitor de desafios — interruptor por PLATAFORMA (auto-save) */}
       <div className="rounded-xl border bg-card p-4">
         <button type="button" role="switch" aria-checked={ocultarLeg} onClick={toggleOcultarLeg} disabled={pendingLeg}

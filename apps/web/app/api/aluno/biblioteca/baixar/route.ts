@@ -1,4 +1,5 @@
-import { registrarDownload } from '@/lib/conteudo/politica-download'
+import { registrarDownload, bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -60,6 +61,8 @@ async function baixar(request: NextRequest): Promise<Response> {
   const metaParam = sp.get('meta')
   const metaId = metaParam && /^[\w:.\-]{1,120}$/.test(metaParam) ? metaParam : null
   const svc = createAdminClient()
+  // INTERRUPTOR CENTRAL (tema.downloads_aluno; ausente = bloqueado): decide antes de qualquer outra coisa. Testador global passa.
+  if (await bloqueioDownloadsAluno(svc, sessao.tenantId, sessao.estudanteId, { documentoId: doc, origem: 'cronograma', metaId, produtoId })) return json(403, MENSAGEM_DOWNLOAD_INDISPONIVEL)
   const lib = await liberacaoDoc(svc, sessao.tenantId, sessao.estudanteId, doc)
   if (lib.bloqueado) {
     await registrarDownload(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: doc, origem: 'cronograma', metaId, produtoId, resultado: 'bloqueado', motivo: 'nao_liberado' })
@@ -71,7 +74,7 @@ async function baixar(request: NextRequest): Promise<Response> {
     if (prep.erro === 'tipo') return json(409, 'Este material não pode ser baixado (só PDF e documentos de texto). Abra-o no leitor.')
     if (prep.erro === 'inexistente') return json(404, 'Este material não está mais disponível.')
     if (prep.erro === 'indisponivel') return json(503, 'O arquivo deste material não está disponível agora. Tente novamente em instantes.')
-    if (prep.erro === 'politica' || prep.erro === 'documento') return json(403, 'O download deste material está desativado. Abra-o no leitor da plataforma.')
+    if (prep.erro === 'politica' || prep.erro === 'documento') return json(403, MENSAGEM_DOWNLOAD_INDISPONIVEL)
     return json(403, 'Você não tem permissão para baixar este material.')
   }
 

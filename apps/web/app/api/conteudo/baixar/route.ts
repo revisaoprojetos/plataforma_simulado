@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { urlDownloadAluno } from '@/lib/conteudo/leitor'
 import { createAdminClient } from '@/lib/supabase/server'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { liberacaoDoc } from '@/lib/cronograma/adaptativo/liberacao'
 
 // Download do arquivo ORIGINAL de um documento da Biblioteca pelo ALUNO. Gate server-side (acesso por
@@ -13,6 +15,11 @@ export async function GET(request: NextRequest) {
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
   const doc = new URL(request.url).searchParams.get('doc')
   if (!doc) return NextResponse.json({ message: 'doc ausente.' }, { status: 400 })
+  // INTERRUPTOR CENTRAL (tema.downloads_aluno; ausente = bloqueado). Testador global passa.
+  const produto = new URL(request.url).searchParams.get('produto')
+  if (await bloqueioDownloadsAluno(createAdminClient(), sessao.tenantId, sessao.estudanteId, { documentoId: /^[0-9a-f-]{36}$/i.test(doc) ? doc : null, origem: produto ? 'produto' : 'biblioteca', produtoId: produto })) {
+    return NextResponse.json({ message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
+  }
   // Cronograma Adaptativo: download só do material já liberado no plano do aluno (mensagem específica).
   const lib = await liberacaoDoc(createAdminClient(), sessao.tenantId, sessao.estudanteId, doc)
   if (lib.bloqueado) {

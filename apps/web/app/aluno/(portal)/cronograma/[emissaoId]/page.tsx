@@ -3,6 +3,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { InternaPageRoot } from '@/components/brand/interna/page-shell'
+import { downloadsAlunoLiberados } from '@/lib/conteudo/politica-download'
 import { RevisaoFixoEmbed } from '@/components/brand/interna/cronograma/revisao-fixo-embed'
 import { Btn, Card, Muted } from '@/components/nova/ui'
 
@@ -49,6 +50,7 @@ export default async function EmissaoPage({ params }: { params: Promise<{ emissa
       emissaoId={emissao.id}
       tituloInicial={emissao.titulo ?? ''}
       semDatas={!!emissao.formulario?.semDatas}
+      downloadsOk={await downloadsAlunoLiberados(createAdminClient(), sessao.tenantId, sessao.estudanteId)}
     />
   )
 }

@@ -182,7 +182,7 @@ const h = vi.hoisted(() => ({ arquivos: new Map<string, Uint8Array>(), capaUrl: 
 vi.mock('@/lib/aluno-session', () => ({ getSessaoAluno: async () => ({ estudanteId: 'e1', tenantId: 't1' }) }))
 vi.mock('@/lib/supabase/server', () => ({ createAdminClient: () => ({}) }))
 vi.mock('@/lib/cronograma/adaptativo/liberacao', () => ({ liberacaoDoc: async () => ({ bloqueado: false }) }))
-vi.mock('@/lib/conteudo/politica-download', () => ({ registrarDownload: async () => {} }))
+vi.mock('@/lib/conteudo/politica-download', () => ({ registrarDownload: async () => {}, bloqueioDownloadsAluno: async () => null }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: async () => ({ ok: true }) }))
 vi.mock('@/lib/acessos/registro', () => ({ registrarAtividade: async () => {} }))
 vi.mock('@/lib/conteudo/capa-pagina-server', () => ({ capaEPaginaDoDocumento: async () => ({ capaUrl: h.capaUrl, paginaInicial: h.pagina }) }))

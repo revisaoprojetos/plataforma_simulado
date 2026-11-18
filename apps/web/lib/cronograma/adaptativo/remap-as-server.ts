@@ -7,7 +7,7 @@ import { chavesUnicas } from './catalogo-override'
 import { lerDetalhesMetas, gravarDetalhesMetas, espelharEmSegundoPlano } from './plano-metas'
 import { registrarGeracao } from './log-geracao'
 import type { PlanoRow } from './dados'
-import { assinaturaDoCfg, camposAssinatura, hashAS, docIdDaChave, type AssinaturaAS } from './remap-as'
+import { assinaturaDoCfg, assinaturaPorEvidencia, camposAssinatura, hashAS, docIdDaChave, type AssinaturaAS } from './remap-as'
 import { remapearEstadoComRelink } from './relink-documento'
 import { resolverRelinks, titulosDeOrfas } from './relink-documento-server'
 
@@ -45,7 +45,9 @@ const COLS_META = 'tenant_id,estudante_id,plano_id,meta_id,estado,parcial_v,parc
 
 async function lerLinhas(svc: SupabaseClient, tenantId: string, planoId: string): Promise<LinhaMeta[]> {
   const ler = (cols: string) => fetchAll<any>(() => svc.from(T_META).select(cols).eq('tenant_id', tenantId).eq('plano_id', planoId).order('meta_id', { ascending: true }), 1000, 'remap_as:metas')
-  try { return await ler(COLS_META + ',concluido_em,cert') } catch { return await ler(COLS_META) } // migração 20261110020000 pendente
+  // concluido_em NUNCA pode ficar de fora: sem ele a linha movida perde a data de conclusão (incidente 18/11: a coluna `cert` não existe → o fallback antigo descartava as duas).
+  try { return await ler(COLS_META + ',concluido_em,cert') } catch { /* `cert` ausente */ }
+  try { return await ler(COLS_META + ',concluido_em') } catch { return await ler(COLS_META) } // migração de concluido_em pendente
 }
 
 async function gravarLinhas(svc: SupabaseClient, linhas: LinhaMeta[]): Promise<string | null> {
@@ -61,6 +63,19 @@ async function apagarLinhas(svc: SupabaseClient, tenantId: string, planoId: stri
     if (error) return error.message
   }
   return null
+}
+
+
+/** RASTREIO por identificação: todo remapeamento grava (estudante, plano, motivo, evidência, antes×depois) na auditoria. Nunca interrompe a operação. */
+async function rastrear(svc: SupabaseClient, tenantId: string, row: PlanoRow, motivo: string, depois: Record<string, unknown>) {
+  try {
+    await svc.from('simulado_audit_logs').insert({
+      tenant_id: tenantId, ator_tipo: 'sistema', tabela: T_PLANO, entidade: T_PLANO, entidade_id: row.id, operacao: 'RECORRIGIR',
+      dados_anteriores: { estudante_id: row.estudante_id ?? null, plano_id: row.id, motivo },
+      dados_novos: { estudante_id: row.estudante_id ?? null, plano_id: row.id, ...depois },
+      detalhes: { origem: 'remap_as', ...depois }, criado_em: new Date().toISOString(),
+    })
+  } catch { /* rastreio best-effort */ }
 }
 
 function log(svc: SupabaseClient, tenantId: string, row: PlanoRow, ok: boolean, texto: string, n?: number) {
@@ -81,7 +96,7 @@ export async function garantirAS(svc: SupabaseClient, tenantId: string, row: Pla
 async function garantirASInterno(svc: SupabaseClient, tenantId: string, row: PlanoRow, pre?: ConteudoBanco | Promise<ConteudoBanco> | null): Promise<ResGarantir> {
   if (row.exemplo) return { row, consistente: true, remapeou: false }
   const cfg = (row.cfg ?? {}) as Record<string, unknown>
-  const guardada = assinaturaDoCfg(cfg)
+  let guardada = assinaturaDoCfg(cfg)
   const atual = await chavesAtuais(svc, tenantId, pre)
   // AS "vazio" (carga falhou ou Biblioteca sem aulas → catálogo do modelo): NÃO é referência confiável
   if (atual.vazio || !atual.chaves.length) return { row, consistente: !guardada, remapeou: false }
@@ -100,12 +115,21 @@ async function garantirASInterno(svc: SupabaseClient, tenantId: string, row: Pla
     return !error && (data?.length ?? 0) > 0
   }
 
-  // ── plano LEGADO (sem assinatura): não dá para provar o AS da geração → grava a atual e segue (sem adivinhar) ──
+  // ── plano LEGADO (sem assinatura): tenta PROVAR o AS da geração pelo espelho relacional (plano_meta, gravado na geração) ──
+  let evidencia: { provas: number; deslocadas: number; ausentes: number } | null = null
+  if (!guardada) {
+    try {
+      const ev = await fetchAll<{ meta_id: string; k: string | null; disciplina: string | null }>(() => svc.from('simulado_cronograma_adaptativo_plano_meta').select('meta_id,k:aula_key,disciplina,documento_id').eq('tenant_id', tenantId).eq('plano_id', row.id).order('meta_id', { ascending: true }) as never, 1000, 'remap_as:evidencia')
+      const prova = assinaturaPorEvidencia(ev.map((e: any) => ({ meta_id: e.meta_id, chave: e.k ?? (e.documento_id ? 'd:' + e.documento_id : null), disciplina: e.disciplina })), Object.keys((row.plano || {}) as object), atual)
+      if (prova) { guardada = prova.assinatura; evidencia = prova }
+    } catch { /* sem espelho/coluna: segue o caminho antigo */ }
+  }
+  // sem prova: não dá para saber o AS da geração → grava a atual e segue (sem adivinhar), mas DEIXA RASTRO p/ conferência
   if (!guardada) {
     const cfgNovo = { ...cfg, ...camposAssinatura(atual) }
     const ok = await travar(cfgNovo)
     if (!ok) return { row, consistente: true, remapeou: false }
-    log(svc, tenantId, row, true, `remap_sem_base: assinatura gravada (${atual.chaves.length} aulas); sem remapeamento retroativo`)
+    log(svc, tenantId, row, true, `remap_sem_base: assinatura gravada (${atual.chaves.length} aulas); sem evidencia suficiente p/ remapear (revisar se o aluno relatar aula trocada)`)
     return { row: { ...row, cfg: cfgNovo as unknown as PlanoRow['cfg'], atualizado_em: agora }, consistente: true, remapeou: false }
   }
 
@@ -164,7 +188,8 @@ async function garantirASInterno(svc: SupabaseClient, tenantId: string, row: Pla
   if (errFin || !fin?.length) { await desfazer(); log(svc, tenantId, row, false, `remap_falhou_plano: ${errFin?.message ?? 'concorrencia'}`); return { row, consistente: false, remapeou: false } }
   if (Object.keys(detalhes).length) await gravarDetalhesMetas(svc, row.id, r.detalhes, r.plano)
   espelharEmSegundoPlano(svc, row.id) // grade/cfg mudaram → o espelho relacional (e o arquivamento de órfãos) se refaz
-  log(svc, tenantId, row, true, `remap_as: ${resumo}`.slice(0, 500), r.mudancas.length)
+  log(svc, tenantId, row, true, `remap_as: ${evidencia ? `[evidencia plano_meta: provas=${evidencia.provas} deslocadas=${evidencia.deslocadas} ausentes=${evidencia.ausentes}] ` : ''}${resumo}`.slice(0, 500), r.mudancas.length)
+  await rastrear(svc, tenantId, row, evidencia ? 'assinatura provada por evidencia (plano sem assinatura)' : 'documentos do AS mudaram desde a geracao', { resumo, evidencia, mudancas: r.mudancas.length, estatisticas: r.stats })
   for (const x of rl.relinks) log(svc, tenantId, row, true, `relink_doc: ${docIdDaChave(x.chaveAntiga)} -> ${x.docNovo} | ${x.titulo}`.slice(0, 500), 1) // acao 'remap_as' (CHECK do log); o prefixo 'relink_doc:' identifica
   for (const x of rl.ambiguos) log(svc, tenantId, row, false, `relink_doc_ambiguo: ${x.docAntigo} candidatos=${x.candidatos.join(',')} (nao relinkado)`.slice(0, 500), 0)
   return { row: { ...row, cfg: cfgFinal as unknown as PlanoRow['cfg'], plano: r.plano as PlanoRow['plano'], revs: r.revs as unknown as PlanoRow['revs'], atualizado_em: fimEm }, consistente: true, remapeou: true }

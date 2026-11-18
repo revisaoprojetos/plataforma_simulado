@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getSessaoAluno } from '@/lib/aluno-session'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
 import { assinarUrlPdf } from '@/lib/storage/pdf-acesso'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
@@ -54,6 +57,11 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
   if (!sim) return NextResponse.json({ message: 'Simulado não encontrado.' }, { status: 404 })
 
+  // INTERRUPTOR CENTRAL (tema.downloads_aluno; ausente = bloqueado). Rota por token (sem sessão obrigatória): vale a política do tenant do simulado.
+  const alu = await getSessaoAluno().catch(() => null)
+  if (await bloqueioDownloadsAluno(svc, (sim as any).tenant_id, alu && alu.tenantId === (sim as any).tenant_id ? alu.estudanteId : null, alu && alu.tenantId === (sim as any).tenant_id ? { origem: 'outro', tipoOrigem: 'caderno', titulo: String((sim as any).titulo ?? '') } : undefined)) {
+    return NextResponse.json({ message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
+  }
   const regras = ((sim as any).regras ?? {}) as any
   if (regras.enunciado_liberado === false) return NextResponse.json({ message: 'Indisponível.' }, { status: 403 })
 

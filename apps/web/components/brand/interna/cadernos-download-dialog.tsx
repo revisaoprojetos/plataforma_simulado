@@ -62,7 +62,7 @@ function Tile({ d, baixando, onBaixar }: { d: DownloadSimulado; baixando: boolea
 export function CadernosDownloadDialog({ simuladoId, titulo, brand, theme, onClose }: {
   simuladoId: string; titulo?: string; brand: Brand; theme: InternaTheme; onClose: () => void
 }) {
-  const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
+  const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro' | 'bloqueado'>('carregando')
   const [downloads, setDownloads] = useState<DownloadSimulado[]>([])
   const [nome, setNome] = useState(titulo ?? '')
   const { baixandoId, baixar } = useBaixar()
@@ -76,6 +76,7 @@ export function CadernosDownloadDialog({ simuladoId, titulo, brand, theme, onClo
         const j = await res.json()
         if (!vivo.current) return
         if (!res.ok) { setEstado('erro'); return }
+        if (j.bloqueado) { setEstado('bloqueado'); return } // interruptor central: downloads desativados pela plataforma
         setDownloads(Array.isArray(j.downloads) ? j.downloads : [])
         if (j.titulo) setNome(j.titulo)
         setEstado('ok')
@@ -112,6 +113,8 @@ export function CadernosDownloadDialog({ simuladoId, titulo, brand, theme, onClo
         <div className="cdd-body">
           {estado === 'carregando' ? (
             <div className="cdd-estado"><Loader2 size={22} className="cdd-spin" /><span>Carregando cadernos…</span></div>
+          ) : estado === 'bloqueado' ? (
+            <div className="cdd-estado"><span>Download indisponível no momento.</span></div>
           ) : estado === 'erro' ? (
             <div className="cdd-estado"><span>Não foi possível carregar os cadernos agora.</span></div>
           ) : downloads.length === 0 ? (

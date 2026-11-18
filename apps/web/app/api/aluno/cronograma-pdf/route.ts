@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
 import { enfileirarPdfCaderno } from '@/lib/queue/pdf-queue'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { BLOQUEIA_PDF_DO_CRONOGRAMA, MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { registrarDownloadCronograma } from '@/app/aluno/(portal)/cronograma/download-actions'
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +50,10 @@ export async function POST(request: NextRequest) {
   // A emissão tem de ser DESTE aluno. É o que autoriza assinar o token depois — o token
   // abre a página sem cookie, então a checagem tem de acontecer aqui e não lá.
   const svc = createAdminClient()
+  // INTERRUPTOR CENTRAL de downloads (tema.downloads_aluno; ausente = bloqueado). Sem `semFila` → a tela NÃO cai na impressão do navegador.
+  if (BLOQUEIA_PDF_DO_CRONOGRAMA && await bloqueioDownloadsAluno(svc, sessao.tenantId, sessao.estudanteId, { origem: 'cronograma', tipoOrigem: 'pdf', titulo: 'Cronograma (PDF)' })) {
+    return NextResponse.json({ message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
+  }
   const { data: emissao } = await svc
     .from('simulado_cronograma_emissoes')
     .select('id, titulo, cronograma_nome')

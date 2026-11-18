@@ -4,6 +4,8 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { InternaPageShell } from '@/components/brand/interna/page-shell'
 import { CronogramaAdaptativoEmbed } from '@/components/brand/interna/cronograma/adaptativo-embed'
+import { createAdminClient } from '@/lib/supabase/server'
+import { downloadsAlunoLiberados } from '@/lib/conteudo/politica-download'
 import { carregarMeusCronogramas, type OrdemMeus } from '@/lib/cronograma/meus'
 import { CronogramaHome } from './_hub/home'
 import { EscolherTipo } from './_hub/escolher-tipo'
@@ -38,9 +40,12 @@ export default async function CronogramaAlunoPage({ searchParams }: { searchPara
   const criar = sp.criar !== undefined ? (um(sp.criar) ?? '') : null
   const ver = um(sp.ver)
 
+  // Interruptor de downloads do tenant (tema.downloads_aluno; ausente = bloqueado) → botões Baixar/PDF/DOCX do iframe. O servidor barra de qualquer forma.
+  const dlOk = (ver === 'adaptativo' || criar === 'adaptativo') ? await downloadsAlunoLiberados(createAdminClient(), sessao.tenantId, sessao.estudanteId) : false
+
   // ── Adaptativo: visualizar o plano fixado ──
   if (ver === 'adaptativo' && dados.tipos.adaptativo) {
-    return <CronogramaAdaptativoEmbed modo="ver" theme={it.theme} />
+    return <CronogramaAdaptativoEmbed modo="ver" theme={it.theme} downloadsOk={dlOk} />
   }
 
   // ── Criar ──
@@ -49,7 +54,7 @@ export default async function CronogramaAlunoPage({ searchParams }: { searchPara
     if (!revisao && !adaptativo) redirect('/aluno/cronograma')
     const alvo = criar === 'adaptativo' && adaptativo ? 'adaptativo' : criar === 'revisao' && revisao ? 'revisao' : null
 
-    if (alvo === 'adaptativo') return <CronogramaAdaptativoEmbed modo="criar" theme={it.theme} />
+    if (alvo === 'adaptativo') return <CronogramaAdaptativoEmbed modo="criar" theme={it.theme} downloadsOk={dlOk} />
 
     if (alvo === 'revisao') {
       const modeloId = um(sp.modelo)

@@ -89,6 +89,41 @@ export function parteAula(id: string): ParteAula | null {
 }
 const preencher = (tpl: string, idx: number): string => tpl.replace('#', String(idx))
 
+// ── assinatura PROVADA por evidência (plano sem assinatura) ──────────────────────────────────────────
+export interface EvidenciaMeta { meta_id: string; chave: string | null; disciplina?: string | null }
+export interface AssinaturaProvada { assinatura: AssinaturaAS; provas: number; deslocadas: number; ausentes: number }
+/** Máximo de chaves da evidência que podem não existir mais no AS atual (documentos removidos). Acima disso a evidência é suspeita. */
+export const MAX_AUSENTES_EVIDENCIA = 0.05
+
+/**
+ * Reconstrói a assinatura do AS NA GERAÇÃO a partir do espelho relacional (plano_meta.documento_id/aula_key, gravado na geração).
+ * Regra de segurança (qualquer falha → null = comportamento antigo, só carimba a atual):
+ *  · cada índice tem UMA chave (conflito → null) e todo índice referenciado pela grade tem evidência (cobertura 100%);
+ *  · só vale se algum índice DIFERE do AS atual (senão não há o que remapear);
+ *  · no máximo 5% das chaves da evidência podem ter sumido do AS atual (documento removido legítimo).
+ * Índices sem evidência (aulas fora do plano) viram `?:<idx>` — nunca casam com nada e ninguém os referencia.
+ */
+export function assinaturaPorEvidencia(evid: EvidenciaMeta[], idsGrade: string[], atual: AssinaturaAS): AssinaturaProvada | null {
+  const porIdx = new Map<number, { k: string; disc: string }>()
+  for (const e of evid) {
+    const pa = parteAula(e.meta_id); if (!pa || !e.chave) continue
+    const ja = porIdx.get(pa.idx)
+    if (ja && ja.k !== e.chave) return null
+    if (!ja) porIdx.set(pa.idx, { k: e.chave, disc: String(e.disciplina ?? '') })
+  }
+  if (!porIdx.size) return null
+  for (const id of idsGrade) { const pa = parteAula(id); if (pa && !porIdx.has(pa.idx)) return null }
+  const atuais = new Set(atual.chaves)
+  let deslocadas = 0, ausentes = 0
+  for (const [i, v] of porIdx) { if (atual.chaves[i] !== v.k) deslocadas++; if (!atuais.has(v.k)) ausentes++ }
+  if (!deslocadas || ausentes > Math.ceil(porIdx.size * MAX_AUSENTES_EVIDENCIA)) return null
+  const n = Math.max(atual.chaves.length, Math.max(...porIdx.keys()) + 1)
+  const chaves: string[] = [], discs: string[] = []
+  for (let i = 0; i < n; i++) { const v = porIdx.get(i); chaves.push(v?.k ?? `?:${i}`); discs.push(v?.disc ?? atual.discs[i] ?? '') }
+  return { assinatura: { chaves, discs }, provas: porIdx.size, deslocadas, ausentes }
+}
+
+
 export const PREFIXO_ORFA = 'og:'
 export const idOrfao = (chave: string, tpl: string): string => `${PREFIXO_ORFA}${encodeURIComponent(chave)}:${tpl}`
 export function lerOrfao(id: string): { chave: string; tpl: string } | null {

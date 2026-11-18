@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.25.0 — 2026-11-18
+
+### Downloads do aluno — interruptor central
+- Nova chave por plataforma `tema.downloads_aluno` (`permitido` | `bloqueado`; **ausente = bloqueado**), ligada/desligada em Configurações › Avançado ("Permitir downloads pelos alunos").
+- Desligado: somem os botões **Baixar**, **Salvar em PDF** e **Baixar DOCX** (cronograma adaptativo, Revisão, leitor, Biblioteca) e o servidor responde 403 "Download indisponível no momento" em todas as rotas de download do aluno (documentos, cadernos de simulado, PDF e DOCX do cronograma, mídia). Admin e testador global não são afetados; ler no leitor continua normal.
+
+### Cronograma — posições deslocadas (incidente do JurisFull)
+- **376 planos** com aulas deslocadas por uma posição (documento removido em 17/11) foram remapeados por documento, com prova de 100% de coberturas; datas de conclusão preservadas.
+- **Regra permanente:** plano sem assinatura passa a ser provado pela evidência gravada na geração (`plano_meta.documento_id`) em vez de apenas carimbado; o remapeamento nunca mais descarta `concluido_em`; todo remapeamento grava **rastreio por aluno e plano** na auditoria (ação RECORRIGIR) com motivo, evidência e estatísticas.
+
+---
+
 ## 4.24.2 — 2026-11-18
 
 - **Cronograma Adaptativo:** a caixa "com atualização" saiu de ao lado do botão Baixar. Agora, ao clicar em **Baixar**, abre um pop-up com a opção **Incluir folha de atualização** (a escolha fica lembrada).

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
+import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
+import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
 import type { Page } from 'puppeteer-core'
 import { obterBrowserPdf, agendarFecharBrowserPdf } from '@/lib/pdf/browser'
@@ -50,6 +52,9 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id, simulado_id, estudante_id').eq('id', sessao).maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+
+  // INTERRUPTOR CENTRAL de downloads do aluno (tema.downloads_aluno; ausente = bloqueado): o caderno do simulado em PDF também fica sob ele.
+  if ((sess as any).tenant_id && await bloqueioDownloadsAluno(svc, (sess as any).tenant_id, (sess as any).estudante_id ?? null)) return NextResponse.json({ message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
 
   // Auditoria: o aluno baixou o caderno (PDF). Best-effort.
   if ((sess as any).tenant_id) {

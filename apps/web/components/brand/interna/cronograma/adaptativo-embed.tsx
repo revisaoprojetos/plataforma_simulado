@@ -29,13 +29,15 @@ function resolverCor(varName: string): string {
 // modo 'revisao-fixo': plano do cronograma REVISÃO (emissão, grade congelada) nas MESMAS telas Hoje/Semana, somente leitura do plano
 // (dados de /api/aluno/cronograma/revisao-iframe; ver lib/cronograma/revisao-iframe.ts). Exige `emissaoId`. `iframeRef` expõe o
 // <iframe> ao portal (ele responde ao iframe: título novo / PDF em andamento).
-export function CronogramaAdaptativoEmbed({ theme, modo = 'ver', novo, emissaoId, abaInicial, iframeRef }: {
+export function CronogramaAdaptativoEmbed({ theme, modo = 'ver', novo, emissaoId, abaInicial, iframeRef, downloadsOk = false }: {
   theme: InternaTheme
   modo?: 'ver' | 'criar' | 'revisao-fixo'
   novo?: boolean
   emissaoId?: string
   abaInicial?: 'hoje' | 'semana' | 'configurar'
   iframeRef?: { current: HTMLIFrameElement | null }
+  /** Interruptor de downloads do tenant (tema.downloads_aluno). false (padrão) = o iframe NÃO mostra Baixar/Salvar em PDF/Baixar DOCX (`dl=1` só quando true). */
+  downloadsOk?: boolean
 }) {
   const revisaoFixo = modo === 'revisao-fixo' && !!emissaoId
   const criar = !revisaoFixo && (modo === 'criar' || !!novo)
@@ -167,7 +169,7 @@ export function CronogramaAdaptativoEmbed({ theme, modo = 'ver', novo, emissaoId
       <iframe
         key={tentativa}
         ref={(el) => { ref.current = el; if (iframeRef) iframeRef.current = el }}
-        src={`/cronograma/adaptativo/index.html?theme=${tema}&v=${APP_VERSION}${bust}${query}${hash}`}
+        src={`/cronograma/adaptativo/index.html?theme=${tema}&v=${APP_VERSION}${bust}${downloadsOk ? '&dl=1' : ''}${query}${hash}`}
         title={revisaoFixo ? 'Cronograma Revisão' : 'Cronograma Adaptativo'}
         onLoad={() => { recebeuReady.current = true; setSemSinal(false); enviarTema(); setTimeout(enviarTema, 120); setTimeout(enviarTema, 400); setTimeout(enviarTema, 1000); setPronto(true) }}
         style={{ width: '100%', height: altura, border: 0, display: 'block', background: 'transparent', opacity: pronto ? 1 : 0, transform: pronto ? 'none' : 'translateY(10px)', transition: 'opacity .45s ease, transform .45s ease' }}
