@@ -1021,10 +1021,10 @@ function msgErroMotor(e) {
 }
 let S = null;
 function carregarLocal() {
+  if (!CHAVE) return null; /* sem estudante+plano conhecidos (antes da hidratação) NÃO existe cache confiável */
   try { const x = JSON.parse(localStorage.getItem(CHAVE) || 'null'); if (x && x.v === 2 && x.plano) return x; } catch (e) {}
   return null;
 }
-  if (!CHAVE) return null; /* sem estudante+plano conhecidos (antes da hidratação) NÃO existe cache confiável */
 function cfgVazia() {
   return { start: hojeISO(), horas: [0, 0, 0, 0, 0, 0, 0], discs: [...ESSENCIAIS], metas: { pf: true, fl: true, qu: true, lp: true }, arranjo: 'pdf', revModelo: 'pdflash', revisao: { ativa: true, cada: REV_PADRAO }, motor: Motor28.VERSAO_MOTOR };
 }
