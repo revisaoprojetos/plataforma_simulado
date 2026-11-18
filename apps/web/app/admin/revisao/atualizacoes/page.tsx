@@ -1,17 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { buttonVariants } from '@/components/ui/button'
 import { RevisaoHead, RevisaoAbas, RevisaoCard } from '@/components/admin/revisao/ui'
 import { BuscaGet, KpiGrade, Nota, Paginacao, lerPaginacao } from '@/components/admin/revisao/pedagogico-ui'
-import { TIPOS_ATUALIZACAO, NOME_TIPO_ATUALIZACAO, type TipoAtualizacao } from '@/lib/admin-revisao/biblioteca-tipos'
-import { AVISO_MIGRACAO_ATUALIZACOES, listarFila, listarHistorico, opcoesMateriais, resumoAtualizacoes } from '@/lib/admin-revisao/atualizacoes'
-import { formatBrt } from '@/lib/brt'
+import { TIPOS_ATUALIZACAO } from '@/lib/admin-revisao/biblioteca-tipos'
+import { AVISO_MIGRACAO_ATUALIZACOES, AVISO_MIGRACAO_ESPEC, listarFila, listarHistorico, opcoesFiltrosHistorico, opcoesMateriais, resumoAtualizacoes } from '@/lib/admin-revisao/atualizacoes'
+import { filtrosParaParams, lerFiltrosHistorico } from '@/lib/admin-revisao/atualizacoes-filtros'
 import { cn } from '@/lib/utils'
-import { FilaLista, FormPedido, FormRegistrar } from './atualizacoes-client'
+import { FilaLista, FormPedido, FormRegistrar, RegistrarModal } from './atualizacoes-client'
+import { LinhaHist } from './linha-hist'
 
 export const metadata: Metadata = { title: 'Central de Atualizações' }
 export const dynamic = 'force-dynamic'
@@ -20,13 +21,6 @@ const BASE = '/admin/revisao/atualizacoes'
 type SP = Record<string, string | string[] | undefined>
 const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const PILL: Record<TipoAtualizacao, string> = {
-  legislacao: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  jurisprudencia: 'bg-primary/10 text-primary',
-  correcao: 'bg-muted text-muted-foreground',
-  conteudo_novo: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  sem_atualizacao: 'bg-muted text-muted-foreground',
-}
 
 // CENTRAL DE ATUALIZAÇÕES (Plataforma Revisão · Pedagógico). Abas por ?aba= (fila | nova | hist). A página só LÊ.
 export default async function AtualizacoesRevisaoPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -36,7 +30,9 @@ export default async function AtualizacoesRevisaoPage({ searchParams }: { search
   const tenantId = access.tenantId
   const sp = await searchParams
   const a = um(sp.aba)
-  const aba = a === 'nova' || a === 'hist' ? a : 'fila'
+  const aba = a === 'hist' ? a : 'fila'
+  // "Registrar atualização" é um pop-up (não uma aba): ?registrar=1; o antigo ?aba=nova continua abrindo o pop-up
+  const registrar = podeEditar && (um(sp.registrar) === '1' || a === 'nova')
   const svc = createAdminClient()
   const { pagina, porPagina } = lerPaginacao(sp)
   const resumo = await resumoAtualizacoes(svc, tenantId)
@@ -47,7 +43,7 @@ export default async function AtualizacoesRevisaoPage({ searchParams }: { search
         secao="Pedagógico"
         titulo="Central de Atualizações"
         subtitulo="Tudo o que muda nos materiais por lei nova, julgado novo ou correção. Cada atualização registrada vira o selo “Atualizado em” e as “Novidades da versão” que o aluno vê no PDF."
-        acoes={podeEditar ? <Link href={`${BASE}?aba=nova`} className={buttonVariants()}><Plus />Registrar atualização</Link> : undefined}
+        acoes={podeEditar ? <Link href={`${BASE}?aba=${aba}&registrar=1`} className={buttonVariants()}><Plus />Registrar atualização</Link> : undefined}
       />
       <KpiGrade colunas={3} itens={[
         { valor: resumo.fila, rotulo: 'materiais para atualizar', alerta: true },
@@ -56,12 +52,12 @@ export default async function AtualizacoesRevisaoPage({ searchParams }: { search
       ]} />
       {resumo.semTabela && <Nota destaque>{AVISO_MIGRACAO_ATUALIZACOES}</Nota>}
       <RevisaoAbas
-        abas={[{ id: 'fila', titulo: 'Para atualizar', contagem: resumo.fila }, { id: 'nova', titulo: 'Registrar atualização' }, { id: 'hist', titulo: 'Histórico' }]}
+        abas={[{ id: 'fila', titulo: 'Para atualizar', contagem: resumo.fila }, { id: 'hist', titulo: 'Histórico' }]}
         atual={aba} base={BASE}
       />
       {aba === 'fila' && <AbaFila svc={svc} tenantId={tenantId} pagina={pagina} porPagina={porPagina} podeEditar={podeEditar} sp={sp} />}
-      {aba === 'nova' && <AbaNova svc={svc} tenantId={tenantId} sp={sp} podeEditar={podeEditar} />}
-      {aba === 'hist' && <AbaHistorico svc={svc} tenantId={tenantId} sp={sp} />}
+      {registrar && <RegistrarModal aberto hrefFechar={`${BASE}?aba=${aba}`}><AbaNova svc={svc} tenantId={tenantId} sp={sp} aba={aba} /></RegistrarModal>}
+      {aba === 'hist' && <AbaHistorico svc={svc} tenantId={tenantId} sp={sp} podeEditar={podeEditar} />}
     </div>
   )
 }
@@ -91,8 +87,7 @@ async function AbaFila({ svc, tenantId, pagina, porPagina, podeEditar, sp }: { s
   )
 }
 
-async function AbaNova({ svc, tenantId, sp, podeEditar }: { svc: Svc; tenantId: string; sp: SP; podeEditar: boolean }) {
-  if (!podeEditar) return <SemPermissao>Você não tem permissão para registrar atualizações.</SemPermissao>
+async function AbaNova({ svc, tenantId, sp, aba }: { svc: Svc; tenantId: string; sp: SP; aba: string }) {
   const docRaw = um(sp.doc)
   const doc = docRaw && UUID.test(docRaw) ? docRaw : null
   const src = um(sp.src) ?? ''
@@ -102,49 +97,89 @@ async function AbaNova({ svc, tenantId, sp, podeEditar }: { svc: Svc; tenantId: 
   const opcoes = await opcoesMateriais(svc, tenantId, mq, doc)
   return (
     <div className="space-y-3">
-      <BuscaGet placeholder="Buscar o material pelo título (aula, lei, edição…)" q={mq} ocultos={{ aba: 'nova', doc: doc ?? undefined, src: src || undefined }} />
+      <BuscaGet nome="mq" placeholder="Buscar o material pelo título (aula, lei, edição…)" q={mq} ocultos={{ aba, registrar: '1', doc: doc ?? undefined, src: src || undefined }} />
       <FormRegistrar key={`${doc}-${opcoes.map((o) => o.id).join(',')}`} opcoes={opcoes} docInicial={doc} origem={origem} />
     </div>
   )
 }
 
-async function AbaHistorico({ svc, tenantId, sp }: { svc: Svc; tenantId: string; sp: SP }) {
-  const q = (um(sp.q) ?? '').trim().slice(0, 80)
-  const tp = um(sp.tipo)
-  const tipo = TIPOS_ATUALIZACAO.find((t) => t.id === tp)?.id ?? null
+const CAMPO_FILTRO = 'h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+async function AbaHistorico({ svc, tenantId, sp, podeEditar }: { svc: Svc; tenantId: string; sp: SP; podeEditar: boolean }) {
+  const f = lerFiltrosHistorico(sp)
   const { pagina, porPagina } = lerPaginacao(sp)
-  const h = await listarHistorico(svc, tenantId, { q, tipo, pagina, porPagina })
-  const pars = { aba: 'hist', q: q || undefined, tipo: tipo ?? undefined }
+  const [h, opts] = await Promise.all([
+    listarHistorico(svc, tenantId, { ...f, pagina, porPagina }),
+    opcoesFiltrosHistorico(svc, tenantId),
+  ])
+  const pp = porPagina !== 25 ? String(porPagina) : undefined
+  const pars = filtrosParaParams(f, { aba: 'hist' })
+  const qs = (extra: Record<string, string | undefined>) => {
+    const u = new URLSearchParams()
+    for (const [k, v] of Object.entries({ ...pars, pp, ...extra })) if (v) u.set(k, v)
+    return `${BASE}?${u}`
+  }
+  const proxDir = (col: 'quando' | 'tipo') => (f.sort === col && f.dir === 'desc' ? 'asc' : 'desc')
+  const seta = (col: 'quando' | 'tipo') => (f.sort === col ? (f.dir === 'desc' ? ' ↓' : ' ↑') : '')
+  const algumFiltro = !!(f.q || f.tipo || f.disciplina || f.de || f.ate || f.registrador)
+  const exportar = new URLSearchParams(Object.entries(filtrosParaParams(f)).filter(([, v]) => !!v) as [string, string][])
   return (
     <>
-      <BuscaGet placeholder="Buscar no texto da atualização" q={q} ocultos={{ aba: 'hist', tipo: tipo ?? undefined, pp: porPagina !== 25 ? String(porPagina) : undefined }} />
+      {h.semEspec && !h.semTabela && <Nota destaque>{AVISO_MIGRACAO_ESPEC}{h.registradorIgnorado && ' O filtro “quem registrou” foi ignorado até lá.'}</Nota>}
+      <BuscaGet placeholder="Buscar no texto, na fonte ou no trecho afetado" q={f.q} ocultos={{ ...filtrosParaParams({ ...f, q: '' }), aba: 'hist', pp }} />
       <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
         <span className="text-muted-foreground">Tipo</span>
         {[{ id: null, nome: 'Todos' }, ...TIPOS_ATUALIZACAO].map((t) => (
-          <Link key={t.id ?? 'todos'} href={`${BASE}?${new URLSearchParams({ aba: 'hist', ...(q ? { q } : {}), ...(t.id ? { tipo: t.id } : {}) })}`}
-            className={cn('rounded-lg border px-2.5 py-1 font-medium', tipo === t.id ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{t.nome}</Link>
+          <Link key={t.id ?? 'todos'} href={qs({ tipo: t.id ?? undefined, p: undefined })}
+            className={cn('rounded-lg border px-2.5 py-1 font-medium', f.tipo === t.id ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{t.nome}</Link>
         ))}
       </div>
+      <form method="get" className="mb-3 grid gap-2 rounded-2xl border bg-card p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-6">
+        <input type="hidden" name="aba" value="hist" />
+        {f.q && <input type="hidden" name="q" value={f.q} />}
+        {f.tipo && <input type="hidden" name="tipo" value={f.tipo} />}
+        {pp && <input type="hidden" name="pp" value={pp} />}
+        {f.sort !== 'quando' && <input type="hidden" name="sort" value={f.sort} />}
+        {f.dir !== 'desc' && <input type="hidden" name="dir" value={f.dir} />}
+        <label className="space-y-1 text-xs text-muted-foreground lg:col-span-2">Disciplina
+          <select name="disc" defaultValue={f.disciplina ?? ''} className={CAMPO_FILTRO}>
+            <option value="">Todas</option>
+            {opts.disciplinas.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">Quem registrou
+          <select name="reg" defaultValue={f.registrador ?? ''} className={CAMPO_FILTRO}>
+            <option value="">Todos</option>
+            {opts.registradores.map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">De
+          <input type="date" name="de" defaultValue={f.de ?? ''} className={CAMPO_FILTRO} />
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">Até
+          <input type="date" name="ate" defaultValue={f.ate ?? ''} className={CAMPO_FILTRO} />
+        </label>
+        <div className="flex items-end gap-1.5">
+          <button type="submit" className={buttonVariants({ size: 'sm' })}>Filtrar</button>
+          {algumFiltro && <Link href={`${BASE}?aba=hist`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>Limpar</Link>}
+          <a href={`/api/admin/revisao/atualizacoes/exportar${exportar.size ? `?${exportar}` : ''}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}><Download />CSV</a>
+        </div>
+      </form>
       <RevisaoCard className="p-2">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5 font-medium">Material</th><th className="px-3 py-2.5 font-medium">Tipo</th>
-                <th className="px-3 py-2.5 font-medium">O que mudou</th><th className="px-3 py-2.5 font-medium">Quando</th><th className="px-3 py-2.5 font-medium">Alunos</th>
+                <th className="px-3 py-2.5 font-medium">Material</th>
+                <th className="px-3 py-2.5 font-medium"><Link href={qs({ sort: 'tipo', dir: proxDir('tipo'), p: undefined })} className="hover:text-foreground">Tipo{seta('tipo')}</Link></th>
+                <th className="px-3 py-2.5 font-medium">O que mudou</th>
+                <th className="px-3 py-2.5 font-medium"><Link href={qs({ sort: 'quando', dir: proxDir('quando'), p: undefined })} className="hover:text-foreground">Quando{seta('quando')}</Link></th>
+                <th className="px-3 py-2.5 font-medium">Registrado por</th><th className="px-3 py-2.5 font-medium">Alunos</th>
               </tr>
             </thead>
             <tbody>
-              {h.rows.length === 0 && <tr><td colSpan={5} className="px-3 py-10 text-center text-muted-foreground">{h.semTabela ? AVISO_MIGRACAO_ATUALIZACOES : 'Nenhuma atualização registrada ainda.'}</td></tr>}
-              {h.rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-3 py-2.5"><b className="font-medium">{r.material}</b></td>
-                  <td className="px-3 py-2.5"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', PILL[r.tipo])}>{NOME_TIPO_ATUALIZACAO[r.tipo]}</span></td>
-                  <td className="min-w-[220px] px-3 py-2.5">{r.texto}</td>
-                  <td className="px-3 py-2.5 tabular-nums">{formatBrt(r.quando)}</td>
-                  <td className="px-3 py-2.5"><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', r.avisou ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{r.avisou ? 'Avisados' : 'Sem aviso'}</span></td>
-                </tr>
-              ))}
+              {h.rows.length === 0 && <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground">{h.semTabela ? AVISO_MIGRACAO_ATUALIZACOES : algumFiltro ? 'Nenhuma atualização com esses filtros.' : 'Nenhuma atualização registrada ainda.'}</td></tr>}
+              {h.rows.map((r) => <LinhaHist key={r.id} r={r} podeEditar={podeEditar} />)}
             </tbody>
           </table>
         </div>

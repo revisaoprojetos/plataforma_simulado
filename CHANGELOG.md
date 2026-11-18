@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.26.0 — 2026-11-18
+
+### Central de Atualizações (admin) — mais funções
+- **Especificação** em cada atualização: fonte/origem (com link), data da mudança, trecho afetado e "avisar quem já baixou" (registra a intenção).
+- **Histórico com filtros** (disciplina, tipo, período, quem registrou, busca e ordenação) e **exportação em CSV**.
+- **Por material:** botão "Abrir no editor" e linha do tempo das atualizações (`/admin/revisao/atualizacoes/material/[id]`).
+- **Registro em lote** (até 100 materiais, 1 auditoria por lote, sem duplicar ao reenviar).
+- ⚠️ Migração `20261126000000_atualizacoes_especificacao` (sem ela o código segue funcionando, com aviso).
+
+### Central de Dúvidas
+- Na aba "Problemas em materiais", o título do material abre direto no editor da Biblioteca.
+
+---
+
 ## 4.25.0 — 2026-11-18
 
 ### Downloads do aluno — interruptor central

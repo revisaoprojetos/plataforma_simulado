@@ -10,7 +10,7 @@ import {
   type ThreadDuvida,
 } from '@/lib/revisao/duvidas'
 import { BarraBusca, KpiCard, KpiGrid, Nota, PaginaNav, ParamsInt, Pilula, ThFixo, ThOrd, hrefCom, type QS } from '../_comp/lista'
-import { CorrigidoBotao, ResponderDuvida } from './duvidas-client'
+import { CorrigidoBotao, MaterialAbreEditor, ResponderDuvida } from './duvidas-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,7 +151,7 @@ async function AbaProblemas({ svc, tenantId, qs, podeEditar }: Ctx & { podeEdita
                 const t = TIPO_REP[r.tipo] ?? TIPO_REP.outro
                 return (
                   <tr key={r.id} className="align-top hover:bg-muted/40">
-                    <td className="px-3 py-2.5"><b className="block font-medium">{r.material}</b><span className="text-xs text-muted-foreground">{r.pagina} · {r.aluno}</span></td>
+                    <td className="px-3 py-2.5">{r.documentoId && podeEditar ? <MaterialAbreEditor documentoId={r.documentoId} titulo={r.material} /> : <b className="block font-medium">{r.material}</b>}<span className="text-xs text-muted-foreground">{r.pagina} · {r.aluno}</span></td>
                     <td className="px-3 py-2.5"><Pilula tipo={t.t}>{t.l}</Pilula></td>
                     <td className="min-w-[14rem] px-3 py-2.5">{r.texto}</td>
                     <td className="whitespace-nowrap px-3 py-2.5">{r.quando}</td>

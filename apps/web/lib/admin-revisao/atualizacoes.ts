@@ -3,6 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { carregarPastasResolvidas, sanear } from './biblioteca'
 import { TIPOS_BIB, type TipoAtualizacao } from './biblioteca-tipos'
 import { comFallbackFlags, montarTagAtualizacao } from '@/lib/conteudo/atualizacoes-tipos'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { sqlQuery } from '@/lib/data/sql'
+import { periodoBrtParaIso, type FiltroHistorico } from './atualizacoes-filtros'
 
 // CENTRAL DE ATUALIZAÇÕES (Plataforma Revisão) — só leitura. Cada registro vira o selo "Atualizado em" e as
 // "Novidades da versão" no topo do PDF do aluno (ver `novidadesDoDocumento`, usado pelo leitor do aluno).
@@ -19,17 +22,24 @@ export interface ItemFila {
   origem: string
   quando: string
 }
-export interface LinhaHistorico { id: string; documentoId: string; material: string; tipo: TipoAtualizacao; texto: string; quando: string; avisou: boolean }
+export interface LinhaHistorico {
+  id: string; documentoId: string; material: string; tipo: TipoAtualizacao; texto: string; quando: string; avisou: boolean
+  /** Campos ADITIVOS (migrações 20261119010000 / 20261126000000): ausentes → null/false. */
+  ocorridaEm: string | null; rotulo: string | null; disciplina: string | null; registradoPor: string | null
+  fonteOrigem: string | null; fonteUrl: string | null; trechoAfetado: string | null; avisarJaBaixou: boolean
+}
 export interface OpcaoMaterial { id: string; rotulo: string }
 
 const SCHEMA_AUSENTE = /relation .* does not exist|could not find the table|schema cache|does not exist/i
 export const AVISO_MIGRACAO_ATUALIZACOES = 'Aplique a migração 20261112010000 (Central de Atualizações) para registrar e listar atualizações.'
 
-const NOME_TIPO_MAT = Object.fromEntries(TIPOS_BIB.map((t) => [t.id, t.nome])) as Record<string, string>
+export const AVISO_MIGRACAO_ESPEC = 'Aplique a migração 20261126000000 (especificação das atualizações) para ver fonte, trecho afetado, “quem registrou” e o filtro por pessoa.'
 
-/** "PDFull · Aula 19 – …" — rótulo do material: tipo (pela subpasta) + título. Só dos documentos pedidos. */
-export async function rotulosDeMateriais(svc: SupabaseClient, tenantId: string, ids: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
+const NOME_TIPO_MAT =Object.fromEntries(TIPOS_BIB.map((t) => [t.id, t.nome])) as Record<string, string>
+
+/** "PDFull · Aula 19 – …" — rótulo do material (tipo pela subpasta + título) e a disciplina herdada. Só dos documentos pedidos. */
+export async function detalhesDeMateriais(svc: SupabaseClient, tenantId: string, ids: string[]): Promise<Map<string, { rotulo: string; disciplina: string | null }>> {
+  const out = new Map<string, { rotulo: string; disciplina: string | null }>()
   const unicos = [...new Set(ids.filter(Boolean))]
   if (!unicos.length) return out
   const docs: any[] = []
@@ -40,9 +50,15 @@ export async function rotulosDeMateriais(svc: SupabaseClient, tenantId: string, 
   const pastas = await carregarPastasResolvidas(svc, tenantId)
   for (const d of docs) {
     const t = d.categoria === 'jurisclub' ? 'jurisclub' : d.tipo_origem === 'questoes' ? 'questoes' : (d.pasta_id ? pastas.get(d.pasta_id)?.tipo : null) ?? (d.tipo_origem === 'video' ? null : 'pdfull')
-    out.set(d.id, `${t ? NOME_TIPO_MAT[t] ?? t : 'Videoaula'} · ${d.titulo ?? 'Sem título'}`)
+    out.set(d.id, { rotulo: `${t ? NOME_TIPO_MAT[t] ?? t : 'Videoaula'} · ${d.titulo ?? 'Sem título'}`, disciplina: (d.pasta_id ? pastas.get(d.pasta_id)?.disciplina : null) ?? null })
   }
   return out
+}
+
+/** "PDFull · Aula 19 – …" — rótulo do material: tipo (pela subpasta) + título. Só dos documentos pedidos. */
+export async function rotulosDeMateriais(svc: SupabaseClient, tenantId: string, ids: string[]): Promise<Map<string, string>> {
+  const d = await detalhesDeMateriais(svc, tenantId, ids)
+  return new Map([...d].map(([k, v]) => [k, v.rotulo]))
 }
 
 /** Início do mês corrente em Brasília (ISO UTC) e o nome do mês — p/ o KPI "atualizações em <mês>". */
@@ -98,29 +114,155 @@ export async function listarFila(svc: SupabaseClient, tenantId: string, pagina: 
   return { rows: itens, total: nRep + nPed }
 }
 
-export async function listarHistorico(
-  svc: SupabaseClient, tenantId: string, opts: { q: string; tipo: TipoAtualizacao | null; pagina: number; porPagina: number },
-): Promise<{ rows: LinhaHistorico[]; total: number; semTabela: boolean }> {
-  const off = (Math.max(1, opts.pagina) - 1) * opts.porPagina
-  let b = svc.from('simulado_conteudo_atualizacoes').select('id, documento_id, tipo, texto, avisar_alunos, criado_em', { count: 'exact' }).eq('tenant_id', tenantId)
-  const q = sanear(opts.q)
-  if (q) b = b.ilike('texto', `%${q}%`)
-  if (opts.tipo) b = b.eq('tipo', opts.tipo)
-  // Registros excluídos (soft) do novo registro de versões não aparecem; antes da migração 20261119010000 o filtro falha → refaz sem ele.
-  let res = await b.eq('deletado', false).order('criado_em', { ascending: false }).order('id', { ascending: true }).range(off, off + opts.porPagina - 1)
-  if (res.error && /deletado/.test(res.error.message)) {
-    let b2 = svc.from('simulado_conteudo_atualizacoes').select('id, documento_id, tipo, texto, avisar_alunos, criado_em', { count: 'exact' }).eq('tenant_id', tenantId)
-    if (q) b2 = b2.ilike('texto', `%${q}%`)
-    if (opts.tipo) b2 = b2.eq('tipo', opts.tipo)
-    res = await b2.order('criado_em', { ascending: false }).order('id', { ascending: true }).range(off, off + opts.porPagina - 1)
+const TAB = 'simulado_conteudo_atualizacoes'
+const COLS_BASE = 'id, documento_id, tipo, texto, avisar_alunos, criado_em'
+const TABELA_AUSENTE = /relation .* does not exist|could not find the table/i
+/** Níveis de leitura, do mais completo ao legado: cada um só é usado se o anterior falhar por COLUNA ausente. */
+const NIVEIS = [
+  { cols: `${COLS_BASE}, ocorrida_em, rotulo, criado_por, fonte_origem, fonte_url, trecho_afetado, avisar_ja_baixou, registrado_por`, deletado: true, ocorrida: true, espec: true },
+  { cols: `${COLS_BASE}, ocorrida_em, rotulo, criado_por`, deletado: true, ocorrida: true, espec: false },
+  { cols: COLS_BASE, deletado: false, ocorrida: false, espec: false },
+] as const
+type Nivel = (typeof NIVEIS)[number]
+const LIMITE_VARREDURA = 20000
+
+export interface OpcoesHistorico extends Partial<FiltroHistorico> { pagina: number; porPagina: number; documentoId?: string | null }
+export interface ResultadoHistorico { rows: LinhaHistorico[]; total: number; semTabela: boolean; /** colunas da migração 20261126000000 ausentes */ semEspec: boolean; /** filtro "quem registrou" pedido mas sem a coluna */ registradorIgnorado: boolean }
+
+function aplicarFiltros(svc: SupabaseClient, tenantId: string, f: OpcoesHistorico, nv: Nivel, cols: string, contar: boolean) {
+  let b = svc.from(TAB).select(cols, contar ? { count: 'exact' } : undefined).eq('tenant_id', tenantId)
+  if (f.documentoId) b = b.eq('documento_id', f.documentoId)
+  const q = sanear(f.q ?? '')
+  if (q) b = nv.espec ? b.or(`texto.ilike.%${q}%,fonte_origem.ilike.%${q}%,trecho_afetado.ilike.%${q}%`) : b.ilike('texto', `%${q}%`)
+  if (f.tipo) b = b.eq('tipo', f.tipo)
+  const { ini, fim } = periodoBrtParaIso(f.de ?? null, f.ate ?? null)
+  const colData = nv.ocorrida ? 'ocorrida_em' : 'criado_em'
+  if (ini) b = b.gte(colData, ini)
+  if (fim) b = b.lt(colData, fim)
+  if (f.registrador && nv.espec) b = b.or(`registrado_por.eq.${f.registrador},and(registrado_por.is.null,criado_por.eq.${f.registrador})`)
+  if (nv.deletado) b = b.eq('deletado', false)
+  const asc = f.dir === 'asc'
+  if (f.sort === 'tipo') b = b.order('tipo', { ascending: asc }).order(colData, { ascending: false })
+  else b = b.order(colData, { ascending: asc })
+  return b.order('id', { ascending: true })
+}
+
+/** Documentos (não excluídos) das pastas de uma disciplina (herdada pela árvore de pastas). */
+async function documentosDaDisciplina(svc: SupabaseClient, tenantId: string, disciplina: string): Promise<Set<string>> {
+  const pastas = await carregarPastasResolvidas(svc, tenantId)
+  const pastaIds = [...pastas.values()].filter((p) => p.disciplina === disciplina).map((p) => p.id)
+  if (!pastaIds.length) return new Set()
+  const rows = await fetchAllByIn<{ id: string }>(pastaIds, (ch) => svc.from('simulado_conteudo_documentos').select('id').eq('tenant_id', tenantId).eq('deletado', false).in('pasta_id', ch).order('id', { ascending: true }), { chunk: 80 })
+  return new Set(rows.map((r) => r.id))
+}
+
+/** Nomes (user_metadata.nome ou e-mail) de até 40 usuários distintos. */
+async function nomesDeUsuarios(svc: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
+  const nomes = new Map<string, string>()
+  await Promise.all([...new Set(ids.filter(Boolean))].slice(0, 40).map(async (uid) => {
+    try { const { data } = await svc.auth.admin.getUserById(uid); const u = data?.user; if (u) nomes.set(uid, ((u.user_metadata as any)?.nome as string) || u.email || uid.slice(0, 8)) } catch { /* sem nome */ }
+  }))
+  return nomes
+}
+
+/** Lê UMA janela (offset/limite) do histórico no nível dado. Paginação server-side (.range + count); com disciplina, varre ids e fatia. */
+async function lerNivel(svc: SupabaseClient, tenantId: string, f: OpcoesHistorico, nv: Nivel, off: number, lim: number): Promise<{ error: any } | { error: null; data: any[]; total: number }> {
+  if (f.disciplina) {
+    const docs = await documentosDaDisciplina(svc, tenantId, f.disciplina)
+    if (!docs.size) return { error: null, data: [], total: 0 }
+    const ordem: string[] = []
+    for (let de = 0; de < LIMITE_VARREDURA; de += 1000) {
+      const { data, error } = await aplicarFiltros(svc, tenantId, f, nv, 'id, documento_id', false).range(de, de + 999)
+      if (error) return { error }
+      for (const r of (data ?? []) as any[]) if (docs.has(r.documento_id)) ordem.push(r.id)
+      if (!data || data.length < 1000) break
+    }
+    const ids = ordem.slice(off, off + lim)
+    const rows: any[] = []
+    if (ids.length) {
+      const { data, error } = await svc.from(TAB).select(nv.cols).eq('tenant_id', tenantId).in('id', ids.slice(0, 80)).limit(80)
+      if (error) return { error }
+      const por = new Map(((data ?? []) as any[]).map((r) => [r.id, r]))
+      for (const id of ids) if (por.has(id)) rows.push(por.get(id))
+      // janelas > 80 (exportação): demais ids em chunks de 80
+      for (let i = 80; i < ids.length; i += 80) {
+        const { data: d2, error: e2 } = await svc.from(TAB).select(nv.cols).eq('tenant_id', tenantId).in('id', ids.slice(i, i + 80)).limit(80)
+        if (e2) return { error: e2 }
+        for (const r of (d2 ?? []) as any[]) por.set(r.id, r)
+        for (const id of ids.slice(i, i + 80)) if (por.has(id)) rows.push(por.get(id))
+      }
+    }
+    return { error: null, data: rows, total: ordem.length }
   }
-  const { data, count, error } = res
-  if (error) return { rows: [], total: 0, semTabela: SCHEMA_AUSENTE.test(error.message) }
-  const rotulos = await rotulosDeMateriais(svc, tenantId, (data ?? []).map((r: any) => r.documento_id))
+  const data: any[] = []
+  let total = 0
+  for (let de = off; de < off + lim; de += 1000) {
+    const ate = Math.min(de + 999, off + lim - 1)
+    const r = await aplicarFiltros(svc, tenantId, f, nv, nv.cols, de === off).range(de, ate)
+    if (r.error) return { error: r.error }
+    if (de === off) total = r.count ?? 0
+    data.push(...((r.data ?? []) as any[]))
+    if (!r.data || r.data.length < ate - de + 1) break
+  }
+  return { error: null, data, total }
+}
+
+async function lerHistorico(svc: SupabaseClient, tenantId: string, f: OpcoesHistorico, off: number, lim: number): Promise<ResultadoHistorico> {
+  let nivelUsado = 0
+  let res: Awaited<ReturnType<typeof lerNivel>> = { error: { message: 'nenhum' } }
+  for (let i = 0; i < NIVEIS.length; i++) {
+    nivelUsado = i
+    res = await lerNivel(svc, tenantId, f, NIVEIS[i], off, lim)
+    if ('data' in res) break
+    const msg = String((res.error as any)?.message ?? '')
+    if (TABELA_AUSENTE.test(msg)) break // tabela não existe: níveis menores não ajudam
+  }
+  const vazio = { rows: [] as LinhaHistorico[], total: 0, semEspec: false, registradorIgnorado: false }
+  if (!('data' in res)) return { ...vazio, semTabela: SCHEMA_AUSENTE.test(String((res.error as any)?.message ?? '')) }
+  const nv = NIVEIS[nivelUsado]
+  const data = res.data
+  const [det, nomes] = await Promise.all([
+    detalhesDeMateriais(svc, tenantId, data.map((r) => r.documento_id)),
+    nv.espec || nv.ocorrida ? nomesDeUsuarios(svc, data.map((r) => r.registrado_por ?? r.criado_por).filter(Boolean)) : Promise.resolve(new Map<string, string>()),
+  ])
   return {
-    total: count ?? 0, semTabela: false,
-    rows: ((data ?? []) as any[]).map((r) => ({ id: r.id, documentoId: r.documento_id, material: rotulos.get(r.documento_id) ?? 'Material', tipo: r.tipo, texto: r.texto, quando: r.criado_em, avisou: !!r.avisar_alunos })),
+    total: res.total, semTabela: false, semEspec: !nv.espec, registradorIgnorado: !!f.registrador && !nv.espec,
+    rows: data.map((r) => {
+      const uid = r.registrado_por ?? r.criado_por ?? null
+      return {
+        id: r.id, documentoId: r.documento_id, material: det.get(r.documento_id)?.rotulo ?? 'Material', tipo: r.tipo, texto: r.texto, quando: r.ocorrida_em ?? r.criado_em, avisou: !!r.avisar_alunos,
+        ocorridaEm: r.ocorrida_em ?? null, rotulo: r.rotulo ?? null, disciplina: det.get(r.documento_id)?.disciplina ?? null, registradoPor: uid ? nomes.get(uid) ?? null : null,
+        fonteOrigem: r.fonte_origem ?? null, fonteUrl: r.fonte_url ?? null, trechoAfetado: r.trecho_afetado ?? null, avisarJaBaixou: !!r.avisar_ja_baixou,
+      }
+    }),
   }
+}
+
+/** Histórico paginado (server-side) com filtros: busca, tipo, disciplina, período (BRT), quem registrou e ordenação. `documentoId` = linha do tempo de um material. */
+export async function listarHistorico(svc: SupabaseClient, tenantId: string, opts: OpcoesHistorico): Promise<ResultadoHistorico> {
+  return lerHistorico(svc, tenantId, opts, (Math.max(1, opts.pagina) - 1) * opts.porPagina, opts.porPagina)
+}
+
+/** Exportação: mesmos filtros, até `limite` linhas (varre em janelas de 1000, com .order por criado/ocorrida + id único). */
+export async function listarHistoricoParaExportar(svc: SupabaseClient, tenantId: string, f: Partial<FiltroHistorico>, limite: number): Promise<ResultadoHistorico> {
+  return lerHistorico(svc, tenantId, { ...f, pagina: 1, porPagina: limite }, 0, limite)
+}
+
+/** Opções dos filtros do Histórico: disciplinas (pastas-disciplina) e quem já registrou (nomes). */
+export async function opcoesFiltrosHistorico(svc: SupabaseClient, tenantId: string): Promise<{ disciplinas: string[]; registradores: { id: string; nome: string }[] }> {
+  const pastas = await carregarPastasResolvidas(svc, tenantId)
+  const disciplinas = [...new Set([...pastas.values()].filter((p) => p.disciplinaId).map((p) => p.nome))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  let ids: string[] = []
+  const viaSql = await sqlQuery<{ id: string }>(`select distinct coalesce(registrado_por, criado_por)::text as id from simulado_conteudo_atualizacoes where tenant_id = $1 and coalesce(registrado_por, criado_por) is not null limit 100`, [tenantId])
+  if (viaSql) ids = viaSql.map((r) => r.id)
+  else {
+    let r = await svc.from(TAB).select('registrado_por, criado_por').eq('tenant_id', tenantId).order('criado_em', { ascending: false }).limit(1000)
+    if (r.error) r = await svc.from(TAB).select('criado_por').eq('tenant_id', tenantId).order('criado_em', { ascending: false }).limit(1000) as any
+    ids = [...new Set(((r.data ?? []) as any[]).map((x) => x.registrado_por ?? x.criado_por).filter(Boolean))] as string[]
+  }
+  const nomes = await nomesDeUsuarios(svc, ids)
+  const registradores = ids.map((id) => ({ id, nome: nomes.get(id) ?? id.slice(0, 8) })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  return { disciplinas, registradores }
 }
 
 /** Materiais para o seletor (busca por título; no máx. 30) + o documento pré-selecionado, se houver. */

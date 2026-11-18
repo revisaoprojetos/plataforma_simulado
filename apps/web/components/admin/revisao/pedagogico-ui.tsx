@@ -29,13 +29,13 @@ export function Nota({ children, destaque, icone }: { children: React.ReactNode;
 }
 
 /** Busca por GET (sem JS): preserva os demais parâmetros por inputs ocultos e volta à página 1. */
-export function BuscaGet({ placeholder, q, ocultos }: { placeholder: string; q: string; ocultos: Record<string, string | undefined> }) {
+export function BuscaGet({ placeholder, q, ocultos, nome = 'q' }: { placeholder: string; q: string; ocultos: Record<string, string | undefined>; /** nome do parâmetro da busca na URL (padrão q) */ nome?: string }) {
   return (
     <form method="get" className="mb-3">
       {Object.entries(ocultos).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
       <label className="flex w-full items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-ring">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        <input name="q" defaultValue={q} placeholder={placeholder} autoComplete="off" className="w-full bg-transparent outline-none placeholder:text-muted-foreground" />
+        <input name={nome} defaultValue={q} placeholder={placeholder} autoComplete="off" className="w-full bg-transparent outline-none placeholder:text-muted-foreground" />
       </label>
     </form>
   )

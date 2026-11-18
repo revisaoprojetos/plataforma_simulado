@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Check, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
 import { encaminharDuvidaRevisao, marcarReporteCorrigido, responderDuvidaRevisao } from './actions'
 
 // Interações (client) da Central de Dúvidas: responder, encaminhar e marcar problema como corrigido.
@@ -52,3 +53,24 @@ export function CorrigidoBotao({ id }: { id: string }) {
     })}><Check className="h-4 w-4" />Corrigido</Button>
   )
 }
+
+/** Título do material reportado: abre o MESMO editor da Biblioteca (OnlyOffice) com o documento certo. Sem edição no editor (não é .docx) → cai na tela do material. */
+export function MaterialAbreEditor({ documentoId, titulo }: { documentoId: string; titulo: string }) {
+  const router = useRouter()
+  const [pend, start] = useTransition()
+  function abrir() {
+    start(async () => {
+      const t = toast.loading('Abrindo o editor…')
+      try {
+        const res = await abrirEdicaoDocx(documentoId); toast.dismiss(t)
+        if (!res.ok || !res.versaoId) { toast.info(res.error || 'Este material não abre no editor; abrindo a tela do material.'); router.push(`/admin/biblioteca/conteudo/${documentoId}/gerenciar`); return }
+        window.location.href = `/admin/biblioteca/editar/${res.versaoId}?origem=${encodeURIComponent(window.location.pathname + window.location.search)}`
+      } catch (e: any) { toast.dismiss(t); toast.error('Falha ao abrir o editor: ' + (e?.message || 'erro desconhecido')) }
+    })
+  }
+  return (
+    <button type="button" onClick={abrir} disabled={pend} title="Abrir este material no editor"
+      className="block text-left font-medium text-primary underline-offset-2 hover:underline disabled:opacity-60">{titulo}</button>
+  )
+}
+
