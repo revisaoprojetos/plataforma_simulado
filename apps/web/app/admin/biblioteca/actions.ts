@@ -24,6 +24,8 @@ import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-p
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { normalizarMetadados, type Metadados } from '@/lib/conteudo/metadados'
 import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
+import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas } from '@/lib/conteudo/dependencias-documento'
+import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
 // Cada uma tem suas próprias pastas via folder_area.
@@ -297,6 +299,8 @@ export async function moverPasta(id: string, paiId: string | null): Promise<{ ok
   if (!g.ok) return g
   if (id === paiId) return { ok: false, error: 'Pasta não pode ser pai de si mesma.' }
   const svc = createAdminClient()
+  const recusa = await recusaPastaEmUso(g.tenantId, [id], 'movida')
+  if (recusa) return { ok: false, error: recusa }
   const { error } = await svc.from(PASTAS).update({ pai_id: paiId }).eq('tenant_id', g.tenantId).eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/biblioteca')
@@ -307,11 +311,17 @@ export async function removerPasta(id: string): Promise<{ ok: boolean; error?: s
   const g = await guard('update')
   if (!g.ok) return g
   const svc = createAdminClient()
+  // TRAVA: pasta (ou subpasta) com documento EM USO por plano de aluno ativo não pode ser removida.
+  const recusa = await recusaPastaEmUso(g.tenantId, [id], 'excluída')
+  if (recusa) return { ok: false, error: recusa }
+  const { data: docsPasta } = await svc.from('simulado_conteudo_documentos').select('id, pasta_id').eq('tenant_id', g.tenantId).eq('pasta_id', id).eq('deletado', false).limit(1000)
   // reparenta filhos e documentos para a raiz, depois remove (não apaga documentos)
   await svc.from(PASTAS).update({ pai_id: null }).eq('tenant_id', g.tenantId).eq('pai_id', id)
   await svc.from('simulado_conteudo_documentos').update({ pasta_id: null }).eq('tenant_id', g.tenantId).eq('pasta_id', id)
   const { error } = await svc.from(PASTAS).update({ deletado: true }).eq('tenant_id', g.tenantId).eq('id', id)
   if (error) return { ok: false, error: error.message }
+  // Auditoria: a pasta removida esvaziou (docs foram p/ a raiz) — registra pasta, qtd, ids e ator.
+  await registrarAudit({ operacao: 'DELETE', entidade: PASTAS, entidadeId: id, tenantId: g.tenantId, atorId: g.atorId, antes: { documentos: (docsPasta ?? []).length, ids: (docsPasta ?? []).map((d: any) => d.id).slice(0, 200) }, depois: { deletado: true, documentos_movidos_para_raiz: (docsPasta ?? []).length } }).catch(() => {})
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }
@@ -334,6 +344,7 @@ export async function definirPastaDisciplinaCronograma(pastaId: string, input: {
   const { data: pasta } = await svc.from(PASTAS).select('id, nome, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   const classificacao = input.classificacao && (CLASS_CRONO as readonly string[]).includes(input.classificacao) ? input.classificacao : null
+  { const recusa = await recusaPastaEmUso(g.tenantId, [pastaId], 'reclassificada (disciplina/tipo)'); if (recusa) return { ok: false, error: recusa } }
 
   // 1) Disciplina: a já vinculada; senão uma existente de mesmo nome; senão cria uma nova com o nome da pasta.
   let disciplinaId = (pasta as any).disciplina_id as string | null
@@ -366,6 +377,7 @@ export async function removerPastaDisciplinaCronograma(pastaId: string): Promise
   const svc = createAdminClient()
   const { data: pasta } = await svc.from(PASTAS).select('id, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  { const recusa = await recusaPastaEmUso(g.tenantId, [pastaId], 'desvinculada da disciplina'); if (recusa) return { ok: false, error: recusa } }
   const { error } = await svc.from(PASTAS).update({ disciplina_id: null }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, antes: { disciplina_id: (pasta as any).disciplina_id }, depois: { disciplina_id: null }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
@@ -383,6 +395,7 @@ export async function definirTipoMaterialSubpasta(pastaId: string, tipo: string 
   const svc = createAdminClient()
   const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  { const recusa = await recusaPastaEmUso(g.tenantId, [pastaId], 'ter o tipo de material alterado'); if (recusa) return { ok: false, error: recusa } }
   const { error } = await svc.from(PASTAS).update({ cronograma_tipo_material: valor }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: /column .* does not exist|cronograma_tipo_material|schema cache/i.test(error.message) ? 'Rode a migração do cronograma por pasta (coluna cronograma_tipo_material).' : error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { cronograma_tipo_material: valor }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
@@ -443,12 +456,20 @@ export async function listarPastasConteudo(categoria: Categoria = 'conteudo'): P
   return (rows ?? []).filter((p) => !p.deletado).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null }))
 }
 
-export async function moverDocumento(documentoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string }> {
+export async function moverDocumento(documentoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string; bloqueado?: boolean }> {
   const g = await guard('update')
   if (!g.ok) return g
   const svc = createAdminClient()
+  const { data: atual } = await svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle()
+  if (!atual) return { ok: false, error: 'Documento não encontrado.' }
+  // TRAVA: documento em uso por plano de aluno ativo não muda de pasta (mover para a mesma pasta é no-op).
+  if ((atual as any).pasta_id !== pastaId) {
+    const uso = await recusarSeEmUso(svc, g.tenantId, [{ id: documentoId, titulo: (atual as any).titulo }], 'mover')
+    if (uso.bloqueados[0]) return { ok: false, error: uso.bloqueados[0].motivo, bloqueado: true }
+  }
   const { error } = await svc.from('simulado_conteudo_documentos').update({ pasta_id: pastaId }).eq('tenant_id', g.tenantId).eq('id', documentoId)
   if (error) return { ok: false, error: error.message }
+  if ((atual as any).pasta_id !== pastaId) await registrarPastasEsvaziadas(svc, { tenantId: g.tenantId, atorId: g.atorId, acao: 'mover', saindo: [{ id: documentoId, pasta_id: (atual as any).pasta_id }], destinoId: pastaId })
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }
@@ -639,10 +660,11 @@ export async function criarConteudoQuestoes(input: {
 
 /** Publica uma NOVA versão a partir de um novo arquivo → reconcilia contra a anterior (carrega uids). */
 export async function publicarNovaVersao(input: {
-  documentoId: string; nomeArquivo: string; mime?: string; dataBase64: string; publicar?: boolean
-}): Promise<{ ok: boolean; error?: string; versaoId?: string; reconc?: any }> {
+  documentoId: string; nomeArquivo: string; mime?: string; dataBase64: string; publicar?: boolean; confirmarTeste?: boolean
+}): Promise<{ ok: boolean; error?: string; versaoId?: string; reconc?: any; precisaConfirmarTeste?: boolean }> {
   const g = await guard('update')
   if (!g.ok) return g
+  if (input.publicar) { const r = await recusarSePublicarTeste(g.tenantId, input.documentoId, input.confirmarTeste); if (r) return { ok: false, error: r, precisaConfirmarTeste: true } }
   const tipo = tipoDoArquivo(input.nomeArquivo, input.mime)
   if (!tipo) return { ok: false, error: 'Formato não suportado.' }
   const data = bytesDeBase64(input.dataBase64)
@@ -663,9 +685,19 @@ export async function publicarNovaVersao(input: {
   return { ok: true, versaoId: nv.versaoId, reconc: rec }
 }
 
-export async function publicarDocumento(documentoId: string, versaoId?: string): Promise<{ ok: boolean; error?: string }> {
+/** PREVENÇÃO: documento 'TESTE'/'Cópia' em pasta de disciplina do cronograma não publica sem `confirmarTeste`. Devolve a mensagem de recusa (ou null). */
+async function recusarSePublicarTeste(tenantId: string, documentoId: string, confirmarTeste?: boolean): Promise<string | null> {
+  if (confirmarTeste) return null
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle()
+  if (!data) return null
+  return (await recusarPublicarTeste(svc, tenantId, [data as { id: string; titulo: string; pasta_id: string | null }])).get(documentoId) ?? null
+}
+
+export async function publicarDocumento(documentoId: string, versaoId?: string, opts?: { confirmarTeste?: boolean }): Promise<{ ok: boolean; error?: string; precisaConfirmarTeste?: boolean }> {
   const g = await guard('update')
   if (!g.ok) return g
+  { const r = await recusarSePublicarTeste(g.tenantId, documentoId, opts?.confirmarTeste); if (r) return { ok: false, error: r, precisaConfirmarTeste: true } }
   const alvo = versaoId || (await ultimaVersao(documentoId))?.id
   if (!alvo) return { ok: false, error: 'Nenhuma versão para publicar.' }
   const r = await definirVersaoAtual(documentoId, alvo)
@@ -677,10 +709,15 @@ export async function publicarDocumento(documentoId: string, versaoId?: string):
   return { ok: true }
 }
 
-export async function removerDocumento(documentoId: string): Promise<{ ok: boolean; error?: string }> {
+export async function removerDocumento(documentoId: string): Promise<{ ok: boolean; error?: string; bloqueado?: boolean }> {
   const g = await guard('update')
   if (!g.ok) return g
   const svc = createAdminClient()
+  // TRAVA CENTRAL: documento com vínculos (grifos, metas, progresso, produtos…) ou EM USO por plano ativo NÃO vai à lixeira.
+  const { data: doc } = await svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false).maybeSingle()
+  if (!doc) return { ok: false, error: 'Documento não encontrado ou já na lixeira.' }
+  const trava = await bloquearSeTemVinculos(svc, g.tenantId, [{ id: documentoId, titulo: (doc as any).titulo }])
+  if (trava.bloqueados[0]) return { ok: false, error: trava.bloqueados[0].motivo, bloqueado: true }
   // Soft-delete → Lixeira. Esta tabela NÃO tem o trigger de carimbo (só as 8 núcleo),
   // então setamos deletado_em/deletado_por explicitamente (senão o purge 30d nunca varre).
   const { error } = await svc
@@ -689,6 +726,7 @@ export async function removerDocumento(documentoId: string): Promise<{ ok: boole
     .eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { deletado: true } })
+  await registrarPastasEsvaziadas(svc, { tenantId: g.tenantId, atorId: g.atorId, acao: 'lixeira', saindo: [{ id: documentoId, pasta_id: (doc as any).pasta_id }] })
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }

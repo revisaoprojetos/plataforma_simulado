@@ -11,6 +11,8 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { definirVersaoAtual } from '@/lib/conteudo/documentos'
+import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas } from '@/lib/conteudo/dependencias-documento'
+import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 
 // AÇÕES EM LOTE da Biblioteca (admin). Estende as ações unitárias existentes (mover, status, acesso,
 // visibilidade, legenda, lixeira) para N documentos — e para pastas (vale para os documentos contidos,
@@ -151,6 +153,10 @@ async function acaoStatus(ctx: Ctx, a: Extract<AcaoLote, { tipo: 'status' }>): P
     (await atualizar(ctx, ctx.docs.map((d) => d.id), { status: a.status, atualizado_em: agora })).forEach((v, k) => erros.set(k, v))
     return erros
   }
+  // PREVENÇÃO: 'TESTE'/'Cópia' em pasta de disciplina do cronograma só publica com confirmação explícita (confirmarTeste)
+  const recusados = await recusarPublicarTeste(ctx.svc, ctx.tenantId, ctx.docs, a.confirmarTeste)
+  recusados.forEach((msg, id) => erros.set(id, msg))
+  if (recusados.size) ctx = { ...ctx, docs: ctx.docs.filter((d) => !recusados.has(d.id)) }
   // Publicar: quem já tem versão atual (ou é "questões", sem arquivo) só troca o status; os demais
   // ganham a ÚLTIMA versão como atual via definirVersaoAtual (mesmos efeitos do publicar unitário).
   const simples = ctx.docs.filter((d) => d.versao_atual_id || d.tipo_origem === 'questoes')
@@ -271,16 +277,40 @@ export async function executarLote(alvo: AlvoLote, acoesIn: AcaoLote[]): Promise
     const porAcao: ResultadoLote['porAcao'] = []
     for (const a of acoes) {
       let e: Erros
+      // TRAVA CENTRAL: lixeira → recusa quem tem vínculos/está em uso; mover/categoria/despublicar → recusa quem está
+      // EM USO por plano de aluno ativo. Processa só os livres e devolve o motivo dos bloqueados (nunca falha tudo por um).
+      const bloq: Erros = new Map()
+      let ctxA: Ctx = ctx
+      const acaoTrava = a.tipo === 'lixeira' ? 'excluir' : a.tipo === 'mover' ? 'mover' : a.tipo === 'categoria' ? 'categoria' : a.tipo === 'status' && a.status !== 'publicado' ? 'despublicar' : null
+      if (acaoTrava) {
+        const refs = ctx.docs.map((d) => ({ id: d.id, titulo: d.titulo }))
+        const t = a.tipo === 'lixeira' ? await bloquearSeTemVinculos(svc, g.tenantId, refs) : await recusarSeEmUso(svc, g.tenantId, refs, acaoTrava)
+        for (const b of t.bloqueados) bloq.set(b.id, b.motivo)
+        // Mudança de pasta/coleção arrasta pastas: recusa se a pasta (ou subpasta) do escopo tiver documento em uso.
+        if (a.tipo === 'categoria' && ctx.res.escopo.size) {
+          const msg = await recusaPastaEmUso(g.tenantId, [...ctx.res.topo], 'mudar de coleção')
+          if (msg) for (const d of ctx.docs) if (!bloq.has(d.id)) bloq.set(d.id, msg)
+        }
+        const livres = new Set(ctx.docs.filter((d) => !bloq.has(d.id)).map((d) => d.id))
+        ctxA = { ...ctx, docs: ctx.docs.filter((d) => livres.has(d.id)) }
+      }
       try {
-        e = a.tipo === 'mover' ? await acaoMover(ctx, a)
-          : a.tipo === 'categoria' ? await acaoCategoria(ctx, a)
-          : a.tipo === 'status' ? await acaoStatus(ctx, a)
-          : a.tipo === 'acesso' ? await acaoAcesso(ctx, a)
-          : a.tipo === 'visibilidade' ? await acaoVisibilidade(ctx, a)
-          : a.tipo === 'legenda' ? await acaoLegenda(ctx, a)
-          : await acaoLixeira(ctx)
+        e = !ctxA.docs.length ? new Map()
+          : a.tipo === 'mover' ? await acaoMover(ctxA, a)
+          : a.tipo === 'categoria' ? await acaoCategoria(ctxA, a)
+          : a.tipo === 'status' ? await acaoStatus(ctxA, a)
+          : a.tipo === 'acesso' ? await acaoAcesso(ctxA, a)
+          : a.tipo === 'visibilidade' ? await acaoVisibilidade(ctxA, a)
+          : a.tipo === 'legenda' ? await acaoLegenda(ctxA, a)
+          : await acaoLixeira(ctxA)
       } catch (err: any) {
-        e = new Map(res.docs.map((d) => [d.id, err?.message || 'Falha inesperada.'] as [string, string]))
+        e = new Map(ctxA.docs.map((d) => [d.id, err?.message || 'Falha inesperada.'] as [string, string]))
+      }
+      bloq.forEach((msg, id) => e.set(id, msg))
+      // Auditoria "pasta esvaziada" (último documento saiu por mover/lixeira/categoria).
+      if (acaoTrava === 'excluir' || acaoTrava === 'mover' || acaoTrava === 'categoria') {
+        const saindo = ctxA.docs.filter((d) => !e.has(d.id)).map((d) => ({ id: d.id, pasta_id: d.pasta_id, titulo: d.titulo }))
+        if (saindo.length) await registrarPastasEsvaziadas(svc, { tenantId: g.tenantId, atorId: g.atorId, acao: `lote:${a.tipo}`, saindo, destinoId: a.tipo === 'mover' ? a.destinoId ?? null : null })
       }
       e.forEach((msg, id) => (errosPorDoc.get(id) ?? errosPorDoc.set(id, []).get(id)!).push(`${a.tipo}: ${msg}`))
       porAcao.push({ tipo: a.tipo, ok: res.docs.length - e.size, falhas: e.size })

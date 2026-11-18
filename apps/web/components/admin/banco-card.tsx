@@ -34,7 +34,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
     start(async () => {
       const r = await excluirBanco(id)
       if (r.ok) router.refresh()
-      else toast.error(r.error ?? 'Erro')
+      else toast.error(r.error ?? 'Erro', { duration: 15000 }) // inclui a recusa por questões em uso
     })
   }
 

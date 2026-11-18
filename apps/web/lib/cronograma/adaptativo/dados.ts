@@ -16,6 +16,11 @@ import { catalogoIdDoTenant, lerPaginasReais } from './catalogo-override-db'
 import { espelharEmSegundoPlano, lerDetalhesMetas, gravarDetalhesMetas } from './plano-metas'
 import { sanearDetalhes, dataConclusao, certValido } from './meta-ids'
 import { registrarGeracao, registrarEventoMeta, registrarSync, type OrigemGeracao } from './log-geracao'
+import { planejarProgresso, emParaCliente, type ProgEnviado, type MetaAtual } from './progresso-regras'
+import { garantirAS, chavesAtuais } from './remap-as-server'
+import { camposAssinatura, idOrfao, type AssinaturaAS } from './remap-as'
+import { titulosDeOrfas } from './relink-documento-server'
+import type { ConteudoBanco } from './conteudo-banco'
 
 // Camada server do Cronograma Adaptativo. Backend-first: a página chama `carregarAdaptativo`
 // e recebe o snapshot pronto. Mutações via estas funções (expostas por rotas /api, pois
@@ -42,6 +47,7 @@ export interface MetaRow {
   /** data REAL de conclusão e acertos (migração 20261110020000; ausentes em bancos sem a migração). */
   concluido_em?: string | null
   cert?: number | null
+  atualizado_em?: string | null
 }
 export interface PlanoRow {
   id: string
@@ -53,6 +59,8 @@ export interface PlanoRow {
   revs: Record<number, Array<[string, DataISO]>>
   pausa: { desde: DataISO } | null
   exemplo: boolean
+  /** usado como lock otimista do remapeamento por chave (remap-as-server.ts) */
+  atualizado_em?: string
 }
 
 /** Monta o Estado do motor a partir das linhas do banco. */
@@ -79,7 +87,7 @@ function montarEstado(plano: PlanoRow, metas: MetaRow[]): Estado {
   }
 }
 
-const COLS_PLANO = 'id,estudante_id,titulo,cfg,plano,fim,revs,pausa,exemplo'
+const COLS_PLANO = 'id,estudante_id,titulo,cfg,plano,fim,revs,pausa,exemplo,atualizado_em'
 // Lê UM plano do aluno. Com planoId → aquele plano (validado por tenant+estudante).
 // Sem planoId → o FIXADO (foco); se não houver fixado, cai no mais recente não-arquivado.
 async function lerPlanoRow(svc: SupabaseClient, tenantId: string, estId: string, planoId?: string | null): Promise<PlanoRow | null> {
@@ -97,7 +105,7 @@ async function lerPlanoRow(svc: SupabaseClient, tenantId: string, estId: string,
   return (rec as unknown as PlanoRow) || null
 }
 async function lerMetas(svc: SupabaseClient, tenantId: string, planoId: string): Promise<MetaRow[]> {
-  const COLS = 'meta_id,estado,parcial_v,parcial_em,grau,estrelas,res,err,tempo_seg,modo,nota'
+  const COLS = 'meta_id,estado,parcial_v,parcial_em,grau,estrelas,res,err,tempo_seg,modo,nota,atualizado_em'
   const r = await svc.from(T_META).select(COLS + ',concluido_em,cert').eq('tenant_id', tenantId).eq('plano_id', planoId)
   if (!r.error) return (r.data as unknown as MetaRow[]) || []
   // migração 20261110020000 pendente (sem concluido_em/cert): lê como antes
@@ -173,6 +181,22 @@ function ultimoArtigo(texto: string): number | null {
   return n
 }
 
+/** Campos do cfg que pertencem ao SERVIDOR (assinatura do AS por chave de documento + metas órfãs): o iframe não os recebe nem os dita. */
+const CAMPOS_SERVIDOR = ['chavesAS', 'discsAS', 'sigAS', 'orfas'] as const
+function semCamposServidor<T extends object>(cfg: T): T {
+  const out: Record<string, unknown> = { ...(cfg as Record<string, unknown>) }
+  for (const k of [...CAMPOS_SERVIDOR, 'remapEm']) delete out[k]
+  return out as T
+}
+/** cfg do cliente + campos do servidor vindos do plano gravado (ou, plano novo, a assinatura do AS atual). */
+function comCamposServidor<T extends object>(cfgCli: T, doPlano: object | null | undefined, assinatura?: AssinaturaAS | null): T {
+  const out = semCamposServidor(cfgCli) as Record<string, unknown>
+  const src = (doPlano ?? {}) as Record<string, unknown>
+  for (const k of CAMPOS_SERVIDOR) if (src[k] !== undefined) out[k] = src[k]
+  if (out.chavesAS === undefined && assinatura && assinatura.chaves.length) Object.assign(out, camposAssinatura(assinatura))
+  return out as T
+}
+
 /** Carimba cfg com o motor/catálogo atuais e disciplinas canônicas (planos gerados agora já estão corretos). */
 function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null, catalogoId: string = CATALOGO_HTML.id, motor: string = VERSAO_MOTOR): CfgPlano {
   return {
@@ -195,7 +219,11 @@ function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null, catalogoId: string 
  *  · semanas de revisão futuras são remontadas.
  * Backup do plano anterior em storage (cronograma/backup-catalogo/<tenant>/<planoId>.json) antes de gravar.
  */
-export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: PlanoRow): Promise<PlanoRow> {
+export async function migrarPlano(svc: SupabaseClient, tenantId: string, row0: PlanoRow, conteudoPre?: ConteudoBanco | Promise<ConteudoBanco> | null): Promise<PlanoRow> {
+  // REMAPEAMENTO POR CHAVE PRIMEIRO: a grade só é regenerada sobre ids posicionais já alinhados ao AS atual (remap-as-server.ts).
+  const g = await garantirAS(svc, tenantId, row0, { conteudo: conteudoPre })
+  if (!g.consistente) return g.row // não dá para provar o alinhamento (AS indisponível/remap recusado): NÃO regenera
+  const row = g.row
   const cfg = (row.cfg || {}) as CfgPlano
   // id do catálogo EFETIVO (base + versão do overlay do admin): salvar o Catálogo de metas muda o id → o plano migra 1x.
   const catId = await catalogoIdDoTenant(svc, tenantId)
@@ -328,15 +356,22 @@ async function gerarAdaptativoBase(
   svc: SupabaseClient, tenantId: string, estId: string,
   cfg: Cfg, opc: OpcGerar,
 ): Promise<ResGerar> {
-  const conteudo = await carregarConteudo(svc, tenantId)
+  const conteudo = await carregarConteudoBanco(svc, tenantId) // superset de carregarConteudo (+ chaves estáveis p/ a assinatura do plano)
   // `novo` => cria OUTRO cronograma (e fixa). Senão => recalcula o plano em FOCO (fixado).
-  const alvo = opc.novo ? null : await lerPlanoRow(svc, tenantId, estId)
+  const alvo0 = opc.novo ? null : await lerPlanoRow(svc, tenantId, estId)
+  // ids do plano em foco alinhados ao AS atual ANTES de usar fixos/progresso posicionais
+  const ga = alvo0 ? await garantirAS(svc, tenantId, alvo0, { conteudo }) : null
+  if (ga && !ga.consistente) return { ok: false, error: 'as_inconsistente' }
+  const alvo = ga ? ga.row : null
+  const sigCli = typeof (cfg as { sigAS?: unknown }).sigAS === 'string' ? ((cfg as unknown) as { sigAS: string }).sigAS : null
+  if (alvo && sigCli && (alvo.cfg as { sigAS?: string }).sigAS && sigCli !== (alvo.cfg as { sigAS?: string }).sigAS) return { ok: false, error: 'plano_divergente' } // iframe em outro referencial de aulas
   // fixos = metas concluídas (não se movem), lidas do plano alvo se existir
   // fixos = concluídas + passadas + com progresso (tempo/notas/parada) — nada estudado se perde (2.8 §8)
   let fixos: Record<string, [DataISO, number]> = {}
   const metasAlvo = alvo ? await lerMetas(svc, tenantId, alvo.id) : []
   if (alvo && opc.ancora) fixos = fixosPreservados(alvo.plano || {}, metasAlvo, opc.ancora)
   cfg = carimbar(cfg as CfgPlano, alvo?.cfg as CfgPlano | undefined, await catalogoIdDoTenant(svc, tenantId))
+  { const at = await chavesAtuais(svc, tenantId, conteudo); cfg = comCamposServidor(cfg, alvo?.cfg, at.vazio ? null : at) as Cfg } // assinatura do AS com que esta grade nasce
   const detalhesAtuais = alvo ? await lerDetalhesMetas(svc, alvo.id) : {}
   const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP, {
     detalhes: detalhesAtuais,
@@ -459,13 +494,15 @@ export async function patchMetaAdaptativo(
     const { data: ant } = await svc.from(T_META).select('estado').eq('tenant_id', tenantId).eq('plano_id', row.id).eq('meta_id', metaId).maybeSingle()
     estadoAntes = (ant as { estado?: string | null } | null)?.estado ?? null
   }
+  // já estava concluída e o cliente não mandou data: NÃO recarimba (preserva a data real da 1ª conclusão)
+  if (estadoAntes === 'done' && patch.estado === 'done' && dataConclusao((patch as Record<string, unknown>).concluido_em) == null) delete payload.concluido_em
   let { error } = await svc.from(T_META).upsert(payload, { onConflict: 'plano_id,meta_id' })
   if (error && /concluido_em|\bcert\b/i.test(error.message)) { // migração 20261110020000 pendente: grava sem as colunas novas
     const { concluido_em: _c, cert: _k, ...semNovas } = payload
     ;({ error } = await svc.from(T_META).upsert(semNovas, { onConflict: 'plano_id,meta_id' }))
   }
   if (error) return { ok: false, error: error.message }
-  if (estadoAntes !== undefined) registrarEventoMeta(svc, { tenantId, planoId: row.id, estudanteId: estId, metaId, de: estadoAntes, para: (patch.estado as string | null | undefined) ?? null })
+  if (estadoAntes !== undefined) registrarEventoMeta(svc, { tenantId, planoId: row.id, estudanteId: estId, metaId, de: estadoAntes, para: (patch.estado as string | null | undefined) ?? null, origem: 'meta_clique' })
   return { ok: true }
 }
 
@@ -511,10 +548,10 @@ export interface DocsModelo {
 }
 
 /** Lê os 3 docs do modelo a partir das tabelas (ou nulls se não há plano). */
-export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId: string): Promise<DocsModelo & { extras: unknown[] }> {
+export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId: string, opc: { conteudo?: ConteudoBanco | Promise<ConteudoBanco> | null } = {}): Promise<DocsModelo & { extras: unknown[]; planoId: string | null; sigAS: string | null; indisponiveis: MaterialIndisponivel[] }> {
   const row0 = await lerPlanoRow(svc, tenantId, estId)
-  if (!row0) return { estado: null, progresso: null, notas: null, extras: [] }
-  const row = await migrarPlano(svc, tenantId, row0)
+  if (!row0) return { estado: null, progresso: null, notas: null, extras: [], planoId: null, sigAS: null, indisponiveis: [] }
+  const row = await migrarPlano(svc, tenantId, row0, opc.conteudo) // já remapeia por chave de documento (garantirAS)
   const { data: raw } = await svc.from(T_PLANO).select('extras').eq('id', row.id).maybeSingle()
   const extras = ((raw as { extras?: unknown[] } | null)?.extras) || []
   const metas = await lerMetas(svc, tenantId, row.id)
@@ -524,7 +561,8 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
   for (const m of metas) {
     const p: ProgMeta = {}
     if (m.estado) p.s = m.estado
-    if (m.estado === 'done' && m.concluido_em) p.em = m.concluido_em.slice(0, 10) as DataISO
+    const em = emParaCliente(m) // done legado sem data usa atualizado_em (nunca deixa o cliente sem `em` → sem recarimbo)
+    if (em) p.em = em as DataISO
     if (m.tempo_seg) p.t = m.tempo_seg
     if (m.parcial_v) p.parou = { v: m.parcial_v, em: (m.parcial_em || '') as DataISO }
     if (m.modo) p.modo = m.modo
@@ -538,12 +576,42 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
     if (Object.keys(n).length) notas[m.meta_id] = n
   }
   return {
-    estado: { cfg: row.cfg, plano: row.plano || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, titulo: row.titulo ?? null, extras, detalhes },
+    // cfg SEM a assinatura/órfãs (campos do servidor; o iframe só recebe `sigAS` p/ provar que está no mesmo referencial ao salvar)
+    estado: { cfg: semCamposServidor(row.cfg), plano: row.plano || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, titulo: row.titulo ?? null, extras, detalhes },
     progresso: { prog, extras },
     notas: { notas },
     extras,
+    planoId: row.id,
+    indisponiveis: await materiaisIndisponiveis(svc, tenantId, row, prog),
+    sigAS: typeof (row.cfg as { sigAS?: unknown }).sigAS === 'string' ? ((row.cfg as unknown) as { sigAS: string }).sigAS : null,
   }
 }
+
+/** Aula do plano cujo material (documento) saiu da Biblioteca (apagado/despublicado/movido) e NÃO tem substituto seguro. A aula NÃO some do cronograma:
+ *  o progresso fica guardado (cfg.orfas / linhas 'og:…') e o iframe mostra 'Material indisponível' (sem concluir). Volta sozinha se o documento voltar. */
+export interface MaterialIndisponivel {
+  chave: string; docId: string | null; titulo: string | null; disciplina: string | null
+  metas: Array<{ id: string; tipo: string; data: string | null; horas: number | null; estado: string | null }>
+}
+async function materiaisIndisponiveis(svc: SupabaseClient, tenantId: string, row: PlanoRow, prog: Record<string, ProgMeta>): Promise<MaterialIndisponivel[]> {
+  try {
+    const orf = ((row.cfg as unknown as { orfas?: Record<string, { titulo?: string; disc?: string; plano?: Record<string, [string, number]> }> }).orfas) ?? {}
+    const chaves = Object.keys(orf)
+    if (!chaves.length) return []
+    const faltam = chaves.filter((k) => !orf[k].titulo)
+    const extra = faltam.length ? await titulosDeOrfas(svc, tenantId, row.id, faltam) : new Map()
+    return chaves.map((k) => {
+      const o = orf[k], x = extra.get(k)
+      const tpls = new Set<string>(Object.keys(o.plano ?? {}))
+      for (const id of Object.keys(prog)) { const m = /^og:([^:]+):(.+)$/.exec(id); if (m && safeDecode(m[1]) === k) tpls.add(m[2]) }
+      return {
+        chave: k, docId: x?.docId ?? (/^d:([0-9a-f-]{36})/i.exec(k)?.[1] ?? null), titulo: o.titulo ?? x?.titulo ?? null, disciplina: o.disc ?? x?.disciplina ?? null,
+        metas: [...tpls].map((tpl) => ({ id: idOrfao(k, tpl), tipo: tpl.split(':')[0], data: o.plano?.[tpl]?.[0] ?? null, horas: o.plano?.[tpl]?.[1] ?? null, estado: prog[idOrfao(k, tpl)]?.s ?? null })),
+      }
+    })
+  } catch { return [] }
+}
+const safeDecode = (s: string): string => { try { return decodeURIComponent(s) } catch { return s } }
 
 const ID_META = /^(pf|pp|fl|qu|lp|rf|rq|jp):[A-Za-z0-9:_-]{1,60}$/
 /** Grade { meta_id: [AAAA-MM-DD, horas] }: ids no formato do motor, data ISO, horas numéricas; limite de tamanho. */
@@ -556,7 +624,7 @@ export function gradeValida(g: unknown): boolean {
 }
 
 /** Grava um doc do modelo. parte ∈ 'estado'|'progresso'|'notas'. */
-export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>): Promise<{ ok: boolean; error?: string; recusadas?: Record<string, { motivo: string; liberaEm: string | null }> }> {
+export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>, opts?: { planoId?: string | null; tocadas?: string[] | null; sigAS?: string | null }): Promise<{ ok: boolean; error?: string; recusadas?: Record<string, { motivo: string; liberaEm: string | null }>; ignoradas?: string[]; planoId?: string }> {
   if (parte === 'estado') {
     let cfg = doc.cfg as CfgPlano
     if (!cfg || !cfg.start) return { ok: false, error: 'cfg_invalido' }
@@ -572,7 +640,14 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     // O alvo é lido ANTES de gravar: preserva a descrição do LegProc antigo e carimba o catálogo quando o plano
     // veio do motor atual do iframe (um iframe antigo em cache não carimba → a correção roda no próximo acesso).
     const t0Sync = Date.now()
-    const alvo = await lerPlanoRow(svc, tenantId, estId)
+    const alvo0 = await lerPlanoRow(svc, tenantId, estId)
+    if (alvo0 && opts?.planoId && opts.planoId !== alvo0.id) return { ok: false, error: 'plano_divergente' } // iframe desatualizado/outro plano: não sobrescreve a grade do plano em foco
+    const alvo = alvo0 ? (await garantirAS(svc, tenantId, alvo0)).row : null // ids do plano alinhados ao AS atual (remap por chave)
+    // o iframe prova em qual referencial de aulas está (sigAS devolvido no GET): divergiu => a grade dele usa índices antigos → 409 e recarrega
+    const sigCli = opts?.sigAS ?? (typeof (doc.cfg as { sigAS?: unknown } | undefined)?.sigAS === 'string' ? (doc.cfg as { sigAS: string }).sigAS : null)
+    const sigSrv = (alvo?.cfg as { sigAS?: string } | undefined)?.sigAS
+    if (alvo && sigCli && sigSrv && sigCli !== sigSrv) { registrarGeracao(svc, { tenantId, estudanteId: estId, planoId: alvo.id, acao: 'sync', origem: 'iframe', ok: false, erro: 'as_divergente: estado' }); return { ok: false, error: 'plano_divergente' } }
+    { const at = alvo ? null : await chavesAtuais(svc, tenantId).catch(() => null); cfg = comCamposServidor(cfg, alvo?.cfg, at && !at.vazio ? at : null) } // assinatura/órfãs são do servidor (o iframe não as dita)
     const catId = await catalogoIdDoTenant(svc, tenantId)
     if (planoUsaMotorAtual(cfg.motor)) cfg = carimbar(cfg, alvo?.cfg as CfgPlano | undefined, catId, cfg.motor)
     else if (cfg.catalogo === catId) cfg = { ...cfg, catalogo: undefined }
@@ -591,7 +666,7 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
       const { error } = await svc.from(T_PLANO).update(upd).eq('id', alvo.id)
       if (!error) { if (detalhesDoc !== undefined) await gravarDetalhesMetas(svc, alvo.id, detalhesDoc, campos.plano); espelharEmSegundoPlano(svc, alvo.id) }
       registrarSync(svc, { tenantId, estudanteId: estId, planoId: alvo.id, t0: t0Sync, erro: error?.message ?? null, depois: { cfg, plano: campos.plano, fim: campos.fim }, antes: { cfg: alvo.cfg, plano: alvo.plano } })
-      return error ? { ok: false, error: error.message } : { ok: true }
+      return error ? { ok: false, error: error.message } : { ok: true, planoId: alvo.id }
     }
     // Sem plano: só cria se a grade não for vazia (nada de plano vazio por auto-save). Fixa (é o 1º do aluno).
     if (Object.keys((doc.plano || {}) as object).length === 0) return { ok: true }
@@ -605,42 +680,45 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
       espelharEmSegundoPlano(svc, novoId)
     }
     registrarSync(svc, { tenantId, estudanteId: estId, planoId: (novo as { id?: string } | null)?.id ?? null, t0: t0Sync, erro: error?.message ?? null, depois: { cfg, plano: campos.plano, fim: campos.fim }, antes: null })
-    return error ? { ok: false, error: error.message } : { ok: true }
+    return error ? { ok: false, error: error.message } : { ok: true, planoId: (novo as { id?: string } | null)?.id }
   }
-  const row = await lerPlanoRow(svc, tenantId, estId)
-  if (!row) return { ok: false, error: 'sem_plano' }
+  const row0 = await lerPlanoRow(svc, tenantId, estId)
+  if (!row0) return { ok: false, error: 'sem_plano' }
+  // GUARDA ANTI-MISTURA: o cliente diz de qual plano é o estado que ele edita; diferente do FIXADO → nada é gravado (409).
+  if (opts?.planoId && opts.planoId !== row0.id) return { ok: false, error: 'plano_divergente' }
+  const row = (await garantirAS(svc, tenantId, row0)).row // ids do plano alinhados ao AS atual (remap por chave)
+  // GUARDA DE REFERENCIAL: ids de meta são posicionais; se o iframe está em outro AS (catálogo mudou depois da carga), não grava (409 → recarrega).
+  const sigRow = (row.cfg as { sigAS?: string }).sigAS
+  if (opts?.sigAS && sigRow && opts.sigAS !== sigRow) { registrarGeracao(svc, { tenantId, estudanteId: estId, planoId: row.id, acao: 'sync', origem: 'iframe', ok: false, erro: `as_divergente: ${parte}` }); return { ok: false, error: 'plano_divergente' } }
   if (parte === 'progresso') {
-    const prog = (doc.prog || {}) as Record<string, ProgMeta & { concluidoEm?: string }>
+    const prog = (doc.prog || {}) as Record<string, ProgEnviado>
+    const hoje = hojeCal()
+    // Estado ATUAL das metas citadas (p/ não regravar o que não mudou e preservar concluido_em).
+    const ids = Object.keys(prog)
+    const atual: Record<string, MetaAtual | undefined> = {}
+    for (let k = 0; k < ids.length; k += 150) {
+      const fatia = ids.slice(k, k + 150)
+      let r = await svc.from(T_META).select('meta_id,estado,tempo_seg,parcial_v,parcial_em,modo,concluido_em,atualizado_em').eq('tenant_id', tenantId).eq('plano_id', row.id).in('meta_id', fatia)
+      if (r.error) r = await svc.from(T_META).select('meta_id,estado,tempo_seg,parcial_v,parcial_em,modo,atualizado_em').eq('tenant_id', tenantId).eq('plano_id', row.id).in('meta_id', fatia) as typeof r // migração 20261110020000 pendente
+      if (r.error) return { ok: false, error: r.error.message } // sem o estado atual não dá p/ decidir com segurança
+      for (const m of (r.data ?? []) as unknown as Array<MetaAtual & { meta_id: string }>) atual[m.meta_id] = { ...m, concluido_em: m.concluido_em ?? null }
+    }
+    const plano = planejarProgresso({ prog, atual, tocadas: opts?.tocadas, hoje })
+    if (plano.loteRecusado) registrarGeracao(svc, { tenantId, estudanteId: estId, planoId: row.id, acao: 'sync', origem: 'iframe', ok: false, erro: `lote_recusado: ${plano.ignoradas.length} conclusoes novas sem tocadas` })
+    else if (plano.ignoradas.length) registrarGeracao(svc, { tenantId, estudanteId: estId, planoId: row.id, acao: 'sync', origem: 'iframe', ok: false, erro: `conclusoes_ignoradas_sem_acao: ${plano.ignoradas.length}` })
     // FONTE ÚNICA (matriz): conclusão NOVA de meta cujo material está bloqueado (data/regra) ou sem acesso é RECUSADA — não grava 'done'
     // (nem conta p/ progresso/XP/sequência). Conclusões já gravadas não são revertidas. Falha de consulta = não recusa.
     let recusadas: Record<string, { motivo: string; liberaEm: string | null }> = {}
-    const pedidas = Object.entries(prog).filter(([, p]) => p?.s === 'done').map(([id]) => id)
-    if (pedidas.length) {
+    const novas = plano.gravar.filter((l) => l.estado === 'done' && atual[l.meta_id]?.estado !== 'done').map((l) => l.meta_id)
+    if (novas.length) {
       try {
-        const ja = new Set<string>()
-        for (let k = 0; k < pedidas.length; k += 150) {
-          const { data } = await svc.from(T_META).select('meta_id').eq('tenant_id', tenantId).eq('plano_id', row.id).eq('estado', 'done').in('meta_id', pedidas.slice(k, k + 150))
-          for (const r of (data ?? []) as Array<{ meta_id: string }>) ja.add(r.meta_id)
-        }
-        const novas = pedidas.filter((id) => !ja.has(id))
-        if (novas.length) {
-          const { metasAdaptativoBloqueadas } = await import('@/lib/cronograma/gate-meta')
-          recusadas = await metasAdaptativoBloqueadas(svc, tenantId, estId, novas)
-          for (const id of Object.keys(recusadas)) prog[id] = { ...prog[id], s: undefined, em: undefined, concluidoEm: undefined } as typeof prog[string]
-        }
+        const { metasAdaptativoBloqueadas } = await import('@/lib/cronograma/gate-meta')
+        recusadas = await metasAdaptativoBloqueadas(svc, tenantId, estId, novas)
       } catch { recusadas = {} }
     }
-    const entradas = Object.entries(prog)
-    const temProg = (p: ProgMeta) => !!(p && (p.s || p.t || p.parou || p.modo))
-    const hoje = hojeCal()
-    // data REAL de conclusão: a enviada pelo iframe (em/concluidoEm); concluída sem data → hoje (o servidor carimba). Só vale com s='done'.
-    const rows = entradas.filter(([, p]) => temProg(p)).map(([meta_id, p]) => ({
-      tenant_id: tenantId, estudante_id: estId, plano_id: row.id, meta_id,
-      estado: p.s ?? null, tempo_seg: p.t || 0,
-      parcial_v: p.parou?.v ?? null, parcial_em: p.parou?.em || null, modo: p.modo ?? null,
-      concluido_em: p.s === 'done' ? (dataConclusao(p.em) ?? dataConclusao(p.concluidoEm) ?? hoje) : null,
-      atualizado_em: new Date().toISOString(),
-    }))
+    const gravar = plano.gravar.filter((l) => !recusadas[l.meta_id])
+    const agora = new Date().toISOString()
+    const rows = gravar.map((l) => ({ tenant_id: tenantId, estudante_id: estId, plano_id: row.id, ...l, atualizado_em: agora }))
     if (rows.length) {
       let { error } = await svc.from(T_META).upsert(rows, { onConflict: 'plano_id,meta_id' })
       if (error && /concluido_em/i.test(error.message)) ({ error } = await svc.from(T_META).upsert(rows.map(({ concluido_em: _c, ...r }) => r), { onConflict: 'plano_id,meta_id' })) // migração 20261110020000 pendente
@@ -649,19 +727,24 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     // Metas que o aluno DESMARCOU chegam como objeto vazio ({}) no doc. Sem zerar aqui, a coluna
     // `estado` ('done'/'missed') antiga permanecia no banco e a meta "voltava marcada" ao recarregar.
     // Zera SÓ as colunas de progresso — a MESMA linha guarda as notas (grau/estrelas/res/err), que ficam.
-    const limpar = entradas.filter(([, p]) => !temProg(p)).map(([meta_id]) => meta_id)
+    const limpar = plano.limpar
     for (let k = 0; k < limpar.length; k += 150) {
       const { error } = await svc.from(T_META)
-        .update({ estado: null, tempo_seg: 0, parcial_v: null, parcial_em: null, modo: null, concluido_em: null, atualizado_em: new Date().toISOString() })
+        .update({ estado: null, tempo_seg: 0, parcial_v: null, parcial_em: null, modo: null, concluido_em: null, atualizado_em: agora })
         .eq('tenant_id', tenantId).eq('plano_id', row.id).in('meta_id', limpar.slice(k, k + 150))
       let erro = error
       if (erro && /concluido_em/i.test(erro.message)) ({ error: erro } = await svc.from(T_META)
-        .update({ estado: null, tempo_seg: 0, parcial_v: null, parcial_em: null, modo: null, atualizado_em: new Date().toISOString() })
+        .update({ estado: null, tempo_seg: 0, parcial_v: null, parcial_em: null, modo: null, atualizado_em: agora })
         .eq('tenant_id', tenantId).eq('plano_id', row.id).in('meta_id', limpar.slice(k, k + 150)))
       if (erro) return { ok: false, error: erro.message }
     }
+    // Auditoria: 1 evento por transição de estado (marcar/desmarcar, inclusive em lote/limpar e conclusão de aula inteira).
+    for (const ev of plano.eventos) {
+      if (recusadas[ev.metaId]) continue
+      registrarEventoMeta(svc, { tenantId, planoId: row.id, estudanteId: estId, metaId: ev.metaId, de: ev.de, para: ev.para, origem: 'sync_iframe' })
+    }
     if (Array.isArray(doc.extras)) await svc.from(T_PLANO).update({ extras: doc.extras }).eq('id', row.id)
-    return Object.keys(recusadas).length ? { ok: true, recusadas } : { ok: true }
+    return { ok: true, ...(Object.keys(recusadas).length ? { recusadas } : {}), ...(plano.ignoradas.length ? { ignoradas: plano.ignoradas } : {}) }
   }
   if (parte === 'notas') {
     const notas = (doc.notas || {}) as Record<string, { grau?: number; res?: number; err?: number; diff?: number; cert?: number }>
@@ -682,8 +765,9 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
 
 /** Para o DOCX/relatório: devolve Estado + snapshot cru. */
 export async function estadoParaRender(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = hojeCal()) {
-  const row = await lerPlanoRow(svc, tenantId, estId)
-  if (!row) return null
+  const row0 = await lerPlanoRow(svc, tenantId, estId)
+  if (!row0) return null
+  const row = (await garantirAS(svc, tenantId, row0)).row // ids alinhados ao AS atual antes de renderizar
   const metas = await lerMetas(svc, tenantId, row.id)
   const est = montarEstado(row, metas)
   const conteudo = comLegado(await carregarConteudo(svc, tenantId), row.cfg)

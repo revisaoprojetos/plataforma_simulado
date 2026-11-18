@@ -30,14 +30,63 @@ function permitida(t: string): t is SoftDeleteTabela {
  * Soft delete: marca deletado=true (esconde das telas, mantém no banco/Lixeira).
  * Roda server-side com service-role; grava deletado_por = admin logado e filtra por tenant.
  */
-export async function softDelete(tabela: SoftDeleteTabela, ids: string | string[]) {
-  const arr = (Array.isArray(ids) ? ids : [ids]).filter(Boolean)
+export async function softDelete(
+  tabela: SoftDeleteTabela,
+  ids: string | string[],
+): Promise<{ error: Error | null; count: number; bloqueadas?: { id: string; motivo: string }[]; mensagem?: string }> {
+  let arr = (Array.isArray(ids) ? ids : [ids]).filter(Boolean)
   if (!permitida(tabela)) return { error: new Error(`Tabela não permitida: ${tabela}`), count: 0 }
   if (!arr.length) return { error: null, count: 0 }
   const access = await getCurrentAccess()
   if (!access.userId) return { error: new Error('Sem sessão.'), count: 0 }
 
   const svc = createAdminClient()
+
+  // TRAVA CENTRAL (questões e bancos): recusa o que tem vínculo (respostas/simulados/documentos/cronograma/
+  // cadernos…). Processa só as livres; devolve as bloqueadas com o motivo. Falha FECHADO se não der p/ verificar.
+  let bloqueadas: { id: string; motivo: string }[] | undefined
+  let mensagem: string | undefined
+  if (tabela === 'simulado_questoes' || tabela === 'simulado_pastas') {
+    try {
+      const { bloquearSeTemVinculos, dependenciasBanco } = await import('@/lib/questoes/dependencias-questao')
+      if (tabela === 'simulado_questoes') {
+        const r = await bloquearSeTemVinculos(svc, access.tenantId ?? null, arr)
+        if (r.bloqueadas.length) {
+          bloqueadas = r.bloqueadas.map((b) => ({ id: b.id, motivo: b.motivo }))
+          mensagem = r.mensagem
+          arr = r.livres
+        }
+      } else {
+        const livres: string[] = []
+        const msgs: string[] = []
+        for (const id of arr) {
+          const d = await dependenciasBanco(svc, access.tenantId ?? null, id)
+          if (d.emUso) { (bloqueadas ??= []).push({ id, motivo: d.mensagem }); msgs.push(d.mensagem) } else livres.push(id)
+        }
+        if (bloqueadas) { mensagem = msgs.slice(0, 3).join(' ') + (msgs.length > 3 ? ` (+${msgs.length - 3} outros)` : ''); arr = livres }
+      }
+    } catch (e) {
+      return { error: new Error(`Exclusão recusada: não foi possível verificar os vínculos (${(e as Error).message}). Nada foi apagado.`), count: 0 }
+    }
+    if (!arr.length) return { error: new Error(mensagem ?? 'Exclusão recusada: itens em uso.'), count: 0, bloqueadas, mensagem }
+  }
+
+  // TRAVA CENTRAL (documentos da Biblioteca): vínculos ou "em uso" por plano ativo ⇒ recusa. Falha fechado.
+  if (tabela === 'simulado_conteudo_documentos' && access.tenantId) {
+    try {
+      const { bloquearSeTemVinculos } = await import('@/lib/conteudo/dependencias-documento')
+      const r = await bloquearSeTemVinculos(svc, access.tenantId, arr.map((id) => ({ id })))
+      if (r.bloqueados.length) {
+        bloqueadas = r.bloqueados.map((b) => ({ id: b.id, motivo: b.motivo }))
+        mensagem = r.bloqueados[0].motivo + (r.bloqueados.length > 1 ? ` (+${r.bloqueados.length - 1} outros)` : '')
+        arr = r.livres.map((l) => l.id)
+      }
+    } catch (e) {
+      return { error: new Error(`Exclusão recusada: não foi possível verificar os vínculos (${(e as Error).message}). Nada foi apagado.`), count: 0 }
+    }
+    if (!arr.length) return { error: new Error(mensagem ?? 'Exclusão recusada: documentos com vínculos.'), count: 0, bloqueadas, mensagem }
+  }
+
   const deletadoEm = new Date().toISOString()
   // UPDATE em lotes de 200: um `.in('id', arr)` com 1000+ ids gera URL gigante que o
   // proxy do Supabase pendura (~180s). fetchAllByIn é só p/ SELECT; aqui fatiamos à mão.
@@ -55,7 +104,7 @@ export async function softDelete(tabela: SoftDeleteTabela, ids: string | string[
     if (error && !primeiroErro) primeiroErro = error as Error
     count += data?.length ?? 0
   }
-  return { error: primeiroErro, count }
+  return { error: primeiroErro, count, bloqueadas, mensagem }
 }
 
 /** Restaura (deletado=false). O trigger limpa deletado_em/por. */

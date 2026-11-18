@@ -112,8 +112,12 @@ export function QuestoesTabela({ questoes }: { questoes: LinhaQuestao[] }) {
     const r = await excluirQuestoes(ids)
     setExcluindo(false)
     setUso(null); setPendentes([])
-    if (r.ok) { toast.success(`${r.count ?? ids.length} questão(ões) excluída(s)`); limpar(); router.refresh() }
-    else toast.error(r.error ?? 'Erro ao excluir.')
+    if (r.ok) {
+      toast.success(`${r.count ?? ids.length} questão(ões) excluída(s)`)
+      // Trava de vínculos: as que estão em uso NÃO foram apagadas — mostra o motivo.
+      if (r.bloqueadas?.length) toast.warning(`${r.bloqueadas.length} questão(ões) não foram excluídas`, { description: r.mensagem, duration: 15000 })
+      limpar(); router.refresh()
+    } else toast.error(r.error ?? 'Erro ao excluir.', { duration: 15000 })
   }
 
   return (

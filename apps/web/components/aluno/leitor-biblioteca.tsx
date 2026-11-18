@@ -9,11 +9,15 @@
 //      pdf, grifos, ... } } quando o iframe avisa 'leitor-jus-ready';
 //   2) a cada mudança o iframe manda 'leitor-jus-grifos' → reconciliamos com /api/conteudo/grifo-pdf.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
+import type { GrifoDesatualizado } from '@/lib/conteudo/grifos-versao'
+import { GrifosAntigosAviso } from '@/components/aluno/grifos-antigos-aviso'
+import { espinhaDoDocumento, ancoraDoGrifo, ancoraParaApi, gravarAncora, gravarReancoragem } from '@/components/aluno/grifos-pdf-espinha'
+import { recalcularGrifo, type Espinha } from '@/lib/conteudo/pdf-texto-ancora'
 import { APP_VERSION } from '@/lib/version'
 import { prepararHtmlLegproc } from '@/lib/leitura/legproc-caixas'
 import { DestinoCadernoDialog } from '@/components/aluno/cadernos/destino-caderno-dialog'
@@ -26,7 +30,7 @@ import {
 import { R } from '@/lib/nova/rotas'
 
 // LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
-const LEITOR_REV = 'lp73'
+const LEITOR_REV = 'lp74'
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
@@ -58,7 +62,7 @@ const geoTexto = (g: GrifoTexto) => `${g.pid}|${g.s}|${g.e}`
 export type ParteCrono = { id: string; i: number; f: number; r: string }
 
 export function LeitorBiblioteca({
-  documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
+  documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, grifosAntigos = [], voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
   partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false, marca, video,
   semProgresso = false, posicaoInicialPct = 0, versaoTag, atualizacoes,
 }: {
@@ -77,7 +81,7 @@ export function LeitorBiblioteca({
   documentoId: string; versaoId: string; titulo: string; pdfUrl: string | null
   /** Documento LegProc: lê em TEXTO (HTML rico) com STF/STJ recolhíveis, em vez do PDF fiel. */
   texto?: { html: string; grifos: GrifoTexto[]; ocultarLegendaTabela?: boolean; modeloJuris?: boolean }
-  grifos: GrifoPdf[]; voltarHref?: string; paginaInicial?: number; paginaMinima?: number
+  grifos: GrifoPdf[]; /** grifos de versão anterior incompatível (não pintados; listados p/ reaplicar/descartar) */ grifosAntigos?: GrifoDesatualizado[]; voltarHref?: string; paginaInicial?: number; paginaMinima?: number
   partesCrono?: ParteCrono[]; metaCrono?: string; tempoBase?: number
   /** Tempo DETERMINADO da meta (planejado, segundos) → contagem regressiva no leitor; 0 = sem. */ tempoDeterminadoSeg?: number
   /** Religar a legenda de categorias (LegProc) neste doc. Padrão false = oculta na Biblioteca. */ mostrarLegenda?: boolean
@@ -211,6 +215,19 @@ export function LeitorBiblioteca({
   const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
   dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase }
 
+  // VÍNCULO DO GRIFO = TEXTO (lib/conteudo/pdf-texto-ancora.ts); rects são cache de desenho. Espinha do PDF aberto: lazy, 1x.
+  const pdfDocRef = useRef<any>(null)
+  const espinhaRef = useRef<Promise<Espinha | null> | null>(null)
+  const obterEspinha = useCallback((): Promise<Espinha | null> => {
+    if (!espinhaRef.current) espinhaRef.current = (async () => { try { return pdfDocRef.current ? await espinhaDoDocumento(pdfDocRef.current) : null } catch { return null } })()
+    return espinhaRef.current
+  }, [])
+  // grifos de versão anterior RECUPERADOS pelo texto (rects recalculados) → entram na pintura; os que sobram seguem no aviso
+  const [recuperados, setRecuperados] = useState<GrifoPdf[]>([])
+  const [antigosRest, setAntigosRest] = useState<GrifoDesatualizado[] | null>(null)
+  const [extrasAntigos, setExtrasAntigos] = useState<GrifoDesatualizado[]>([])
+  const grifosIni = useMemo(() => [...iniciais, ...recuperados], [iniciais, recuperados])
+
   const inflight = useRef(new Set<Promise<unknown>>())
   const enviadosT = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
   useEffect(() => {
@@ -219,8 +236,8 @@ export function LeitorBiblioteca({
   }, [texto])
   useEffect(() => {
     enviados.current.clear()
-    for (const g of iniciais) { const e = aEngine(g); enviados.current.set(e.id, { serverId: g.id, hash: hashGrifo(e), geo: geoGrifo(e) }) }
-  }, [iniciais])
+    for (const g of grifosIni) { const e = aEngine(g); enviados.current.set(e.id, { serverId: g.id, hash: hashGrifo(e), geo: geoGrifo(e) }) }
+  }, [grifosIni])
 
   // carrega os metadados do PDF (nº de páginas + tamanho de cada uma na MESMA escala que o iframe usará)
   useEffect(() => {
@@ -234,6 +251,7 @@ export function LeitorBiblioteca({
         pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER
         const pdf = await pdfjs.getDocument({ url: pdfUrl }).promise
         if (!vivo) return
+        pdfDocRef.current = pdf; espinhaRef.current = null
         const v1 = (await pdf.getPage(1)).getViewport({ scale: 1 })
         const scale = Math.max(0.8, Math.min(2, LARGURA_ALVO / v1.width))
         // Mede o tamanho de cada página em PARALELO (lotes de 16): o loop 1-a-1 (await por página)
@@ -251,6 +269,24 @@ export function LeitorBiblioteca({
           for (let k = 0; k < vps.length; k++) pages[ini + k] = { w: Math.round(vps[k].width), h: Math.round(vps[k].height) }
         }
         if (!vivo) return
+        // Grifos de versão anterior: antes de pintar, tenta RECUPERAR cada um pelo TEXTO (âncora gravada ou texto+página) na versão atual.
+        // Só os que o texto não localiza (removido/ambíguo) ficam no aviso. Nada é apagado.
+        if (grifosAntigos.length) {
+          try {
+            const esp = await obterEspinha()
+            if (esp) {
+              const rec: GrifoPdf[] = []; const resto: GrifoDesatualizado[] = []
+              for (const g of grifosAntigos) {
+                const r = g.texto || g.ancora ? recalcularGrifo(esp, { texto: g.texto, pagina: g.pagina, ancora: g.ancora }) : null
+                if (!r) { resto.push(g); continue }
+                rec.push({ id: g.id, pagina: r.pagina, rects: r.rects, cor: g.cor, tool: g.tool, nota: g.nota, texto: g.texto, ancora: r.ancora })
+                if (r.confianca >= 0.85) void gravarReancoragem(g.id, r.pagina, r.rects, r.ancora, esp) // cache + versão (best-effort)
+              }
+              if (!vivo) return
+              setRecuperados(rec); setAntigosRest(resto)
+            }
+          } catch { /* mantém a lista de antigos como veio */ }
+        }
         clearTimeout(limite)
         setPdfMeta({ url: pdfUrl, scale, pages }); setErroPdf(null) // chegou depois do timeout → some o aviso
       } catch (e: any) {
@@ -288,7 +324,7 @@ export function LeitorBiblioteca({
         pdf: texto ? null : pdfMeta ? { url: pdfMeta.url, scale: pdfMeta.scale, pages: pdfMeta.pages } : null,
         // LEGPROC (texto): HTML rico já com os entendimentos STF/STJ recolhíveis (lib da Lei Seca) + grifos por âncora de trecho.
         ...(texto ? { html: htmlTexto() } : {}),
-        grifos: texto ? texto.grifos : iniciais.map(aEngine),
+        grifos: texto ? texto.grifos : grifosIni.map(aEngine),
         caminho: ['Biblioteca', d.titulo], voltarHref: d.voltarHref, questoesHref: d.voltarHref,
         paginaInicial: d.paginaInicial || 1,
         posicaoPct: texto ? posicaoInicialPct || 0 : 0,
@@ -306,7 +342,7 @@ export function LeitorBiblioteca({
         tempoDeterminadoSeg: d.tempoDeterminadoSeg || 0, tempoBaseSeg: d.tempoBase || 0,
       },
     }, '*')
-  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto, posicaoInicialPct, versaoTag, atualizacoes])
+  }, [pdfMeta, grifosIni, pdfUrl, texto, htmlTexto, posicaoInicialPct, versaoTag, atualizacoes])
 
   const reconciliar = useCallback(async (grifos: GrifoEngine[]) => {
     if (busy.current) { pendente.current = grifos; return }
@@ -340,9 +376,16 @@ export function LeitorBiblioteca({
         // geometria nova ou alterada → apaga a antiga (se houver) e cria
         if (info) { await del(info.serverId); map.delete(g.id) }
         try {
+          // Âncora de TEXTO do trecho (espinha do PDF): geometria→texto confirmada pelo texto selecionado. Espera até 6s; sem ela grava só os rects.
+          let ancora: ReturnType<typeof ancoraParaApi> | undefined
+          try {
+            const esp = await Promise.race([obterEspinha(), new Promise<null>((ok) => setTimeout(() => ok(null), 6000))])
+            const a = esp ? ancoraDoGrifo(esp, { pagina: Number(g.sec.slice(1)) || 1, rects: g.rects, texto: g.text }) : null
+            if (a && esp) ancora = ancoraParaApi(a, esp)
+          } catch { /* sem âncora */ }
           const r = await fetch('/api/conteudo/grifo-pdf', {
             method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin',
-            body: JSON.stringify({ documento_id: d.documentoId, versao_id: d.versaoId, pagina: Number(g.sec.slice(1)) || 1, rects: g.rects, cor: g.c, tool: g.t, nota: g.note, texto: g.text }),
+            body: JSON.stringify({ documento_id: d.documentoId, versao_id: d.versaoId, pagina: Number(g.sec.slice(1)) || 1, rects: g.rects, cor: g.c, tool: g.t, nota: g.note, texto: g.text, ancora }),
           })
           const j = await r.json().catch(() => ({}))
           if (r.ok && j?.id) map.set(g.id, { serverId: j.id, hash: h, geo }); else falhou = true
@@ -356,6 +399,55 @@ export function LeitorBiblioteca({
       if (pendente.current) { const p = pendente.current; pendente.current = null; void reconciliar(p) }
     }
   }, [])
+
+  // Grifo "fora do texto" (o texto sob os rects não casa: PDF reconvertido/layout mudou): em vez de ocultar, RECALCULA os rects
+  // pelo TEXTO (âncora gravada ou texto+página) e manda ao iframe. Só vira "desatualizado" (aviso) se o texto não existe mais.
+  const grifosRef = useRef(new Map<string, GrifoPdf>())
+  useEffect(() => { grifosRef.current = new Map(grifosIni.map((g) => [g.id, g])) }, [grifosIni])
+  useEffect(() => {
+    if (texto) return
+    const ids = new Set<string>(); let t: ReturnType<typeof setTimeout> | undefined
+    const rodar = async () => {
+      const lote = [...ids]; ids.clear()
+      const esp = await obterEspinha(); if (!esp) return
+      const naoLoc: GrifoDesatualizado[] = []
+      for (const id of lote) {
+        const g = grifosRef.current.get(id); if (!g) continue
+        const r = recalcularGrifo(esp, { texto: g.texto, pagina: g.pagina, ancora: g.ancora })
+        if (!r) { naoLoc.push({ ...g, versaoId: null }); continue }
+        iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-grifo-rects', id, sec: 'p' + r.pagina, rects: r.rects }, '*')
+        const e: GrifoEngine = { ...aEngine(g), sec: 'p' + r.pagina, rects: r.rects }
+        const info = enviados.current.get(id)
+        if (info) enviados.current.set(id, { serverId: info.serverId, hash: hashGrifo(e), geo: geoGrifo(e) }) // não dispara apaga+recria
+        if (r.confianca >= 0.85) void gravarReancoragem(id, r.pagina, r.rects, r.ancora, esp)
+      }
+      if (naoLoc.length) setExtrasAntigos((x) => [...x, ...naoLoc.filter((n) => !x.some((y) => y.id === n.id))])
+    }
+    const onMsg = (e: MessageEvent) => {
+      if (e.source !== iframeRef.current?.contentWindow) return
+      const m = e.data; if (!m || typeof m !== 'object' || m.type !== 'leitor-jus-grifo-fora-do-texto' || !m.id) return
+      ids.add(String(m.id)); clearTimeout(t); t = setTimeout(() => void rodar(), 500)
+    }
+    window.addEventListener('message', onMsg)
+    return () => { window.removeEventListener('message', onMsg); clearTimeout(t) }
+  }, [texto, obterEspinha])
+
+  // BACKFILL preguiçoso: grifos antigos SEM âncora de texto ganham uma (geometria→texto confirmada pelo `texto`, ou texto único na
+  // página gravada; ambíguo = não grava). PATCH idempotente do próprio aluno; 1x por (doc, versão, nº de pendentes).
+  useEffect(() => {
+    if (texto || !pdfMeta) return
+    const faltam = grifosIni.filter((g) => !g.ancora && g.rects.length)
+    if (!faltam.length) return
+    const chave = `ancora-bf:${documentoId}:${versaoId}:${faltam.length}`
+    try { if (localStorage.getItem(chave)) return } catch { /* sem storage: tenta mesmo assim */ }
+    const t = setTimeout(async () => {
+      const esp = await obterEspinha(); if (!esp) return
+      let falhou = false
+      for (const g of faltam) { const a = ancoraDoGrifo(esp, g); if (a && !(await gravarAncora(g.id, a, esp))) falhou = true }
+      if (!falhou) try { localStorage.setItem(chave, '1') } catch { /* ignore */ }
+    }, 4000)
+    return () => clearTimeout(t)
+  }, [pdfMeta, grifosIni, texto, documentoId, versaoId, obterEspinha])
 
   // Grifos do modo TEXTO → /api/conteudo/anotacao (âncora = trecho_uid + offsets). Grifo em bloco sem uid
   // (pid efêmero 'x…') não tem âncora estável no servidor: fica só na sessão.
@@ -694,6 +786,11 @@ export function LeitorBiblioteca({
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
       <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia} allowFullScreen allow="fullscreen"
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
+      {!texto && pdfMeta && (() => {
+        const base = antigosRest ?? grifosAntigos
+        const lista = [...base, ...extrasAntigos.filter((x) => !base.some((y) => y.id === x.id))]
+        return lista.length > 0 ? <GrifosAntigosAviso key={lista.map((x) => x.id).join(',')} documentoId={documentoId} pdfUrl={pdfUrl} antigos={lista} /> : null
+      })()}
       <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)}
         cadernoPadraoId={cad.current.destinos.leitura.caderno_id} onSalvo={aoSalvarCaderno} />
       <DestinoCadernoDialog cor={dstCor} open={dstAberto} onOpenChange={(o) => { setDstAberto(o); if (!o) { try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-foco-dst' }, '*') } catch { /* ignore */ } } }}

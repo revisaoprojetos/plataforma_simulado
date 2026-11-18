@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, Rows3, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
-  Undo2, Redo2, RotateCcw, Eraser, PartyPopper, BookOpenCheck, Eye, EyeOff,
+  Undo2, Redo2, RotateCcw, Eraser, PartyPopper, BookOpenCheck, Eye, EyeOff, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
@@ -16,7 +16,7 @@ import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-apare
 import { estiloEspacamento, DEFAULT_ESPACAMENTO } from '@/lib/leitura/espacamento'
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
 import { adaptarLeituraEscuro } from '@/lib/leitura/adaptar-escuro'
-import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
+import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel, type Box } from '@/lib/leitura/anotacoes-engine'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
@@ -243,6 +243,18 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   const [passado, setPassado] = useState<AcaoGrifo[][]>([]) // histórico p/ voltar
   const [futuro, setFuturo] = useState<AcaoGrifo[][]>([])   // p/ avançar
   const opLock = useRef(false) // impede reentrância (clique/Enter rápido) nas operações de grifo
+  // Fila dos POSTs de grifo novo: o grifo aparece NA HORA (otimista) e só o POST é serializado — nunca
+  // descarta a seleção (2º traço de caneta antes do 1º POST voltar). pendPost>0 → outras ops aguardam.
+  const filaPost = useRef<Promise<unknown>>(Promise.resolve())
+  const pendPost = useRef(0)
+  const opOcupado = () => {
+    const o = opLock.current || pendPost.current > 0
+    if (o) toast.message('Salvando o grifo anterior… tente de novo em instantes.')
+    return o
+  }
+  // Âncoras que NÃO acharam o texto neste documento (texto editado/removido). Nunca apagadas sozinhas.
+  const [orfaos, setOrfaos] = useState<string[]>([])
+  const [soOrfaos, setSoOrfaos] = useState(false) // painel "Minhas anotações" filtrado nos órfãos
   const [rectsPorId, setRectsPorId] = useState<Record<string, RectRel[]>>({})
   const [barraDir, setBarraDir] = useState(false)
   const [sel, setSel] = useState<{ anc: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }; x: number; y: number } | null>(null)
@@ -470,28 +482,33 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   const recomputarGrifos = useCallback(() => {
     const root = contentRef.current, ov = overlayRef.current
     if (!root || !ov) return
-    // A espinha (texto) só muda com o HTML; modo/fonte/colW mudam só o LAYOUT (rects). Reusa a espinha
-    // memoizada nesses refluxos — construí-la varre todos os text nodes (caro em leis grandes).
-    let esp = espinhaRef.current
-    // Reconstrói se: não há espinha, o HTML mudou, OU os nós ficaram "soltos" (DOM re-renderizado) —
-    // com nós soltos, ancoraParaRange falharia e os grifos não apareceriam.
-    const solta = !!esp && esp.nodes.length > 0 && !root.contains(esp.nodes[0].node)
-    if (!esp || solta || espinhaHtmlRef.current !== doc.html) { esp = construirEspinha(root); espinhaRef.current = esp; espinhaHtmlRef.current = doc.html }
+    // Espinha SEMPRE reconstruída: prepararCaixas*/prepararSelos*/MutationObserver movem nós depois da
+    // 1ª construção; memoizar por doc.html deixava offsets defasados (grifo no lugar errado/órfão falso).
+    // É uma varredura de text nodes, barata perto do getClientRects — e este callback já é coalescido.
+    const esp = construirEspinha(root)
+    espinhaRef.current = esp; espinhaHtmlRef.current = doc.html
     const base = ov.getBoundingClientRect()
+    const cache = new Map<Element, Box | null>() // clip por ancestral (1 getComputedStyle por elemento)
     const map: Record<string, RectRel[]> = {}
+    const sem: string[] = []
     for (const a of anotacoes) {
       const range = ancoraParaRange(esp, { inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix })
-      if (range) { const rs = rectsDoRange(range, base); if (rs.length) map[a.id] = rs }
+      if (!range) { if (!a.id.startsWith('tmp-')) sem.push(a.id); continue } // órfão: não pinta, NÃO apaga
+      const rs = rectsDoRange(range, base, { limite: root, cache })
+      if (rs.length) map[a.id] = rs
     }
     setRectsPorId(map)
+    setOrfaos((p) => (p.length === sem.length && p.every((x, i) => x === sem[i]) ? p : sem))
     // Grifos editoriais (mesmo motor de rects)
     const gmap: Record<string, { rects: RectRel[]; tipo: string }> = {}
     for (const g of grifos) {
       const range = ancoraParaRange(esp, { inicio: g.inicio, fim: g.fim, exact: g.exact, prefix: g.prefix, suffix: g.suffix })
-      if (range) { const rs = rectsDoRange(range, base); if (rs.length) gmap[g.id] = { rects: rs, tipo: g.tipo } }
+      if (range) { const rs = rectsDoRange(range, base, { limite: root, cache }); if (rs.length) gmap[g.id] = { rects: rs, tipo: g.tipo } }
     }
     setGrifosRects(gmap)
   }, [anotacoes, grifos, doc.html])
+  // Sempre aponta p/ a versão mais nova (usada por handlers/observers criados em outros efeitos).
+  const recomputarRef = useRef(recomputarGrifos); recomputarRef.current = recomputarGrifos
   useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, zoomPag, doc.html, slots])
 
   // Reflow por RESIZE real da janela E pelo colapso/expansão das caixas STJ/STF (que disparam
@@ -519,8 +536,24 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     if (ct && typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; onResize() }) })
       ro.observe(ct)
+      if (viewportRef.current) ro.observe(viewportRef.current) // largura da viewport (rotação/split-view no tablet)
     }
-    return () => { window.removeEventListener('resize', onResize); ro?.disconnect(); if (raf) cancelAnimationFrame(raf) }
+    // Layout TARDIO (tablet): fontes web, imagens e zoom de pinça/rotação mudam o fluxo sem disparar
+    // 'resize' → rects defasados. Recalcula (debounce) em fonts.ready, load de <img>, visualViewport.resize
+    // e ao fim da transição de abrir/fechar caixa (inclui "Já cobrado" no :hover).
+    let deb: ReturnType<typeof setTimeout> | undefined
+    const agendar = () => { if (deb) clearTimeout(deb); deb = setTimeout(() => { deb = undefined; onResize() }, 120) }
+    let vivo = true
+    try { (document as Document & { fonts?: FontFaceSet }).fonts?.ready.then(() => { if (vivo) agendar() }) } catch { /* ok */ }
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    vv?.addEventListener('resize', agendar)
+    ct?.addEventListener('load', agendar, true) // 'load' de <img> não borbulha → captura
+    ct?.addEventListener('transitionend', agendar)
+    return () => {
+      vivo = false; if (deb) clearTimeout(deb)
+      vv?.removeEventListener('resize', agendar); ct?.removeEventListener('load', agendar, true); ct?.removeEventListener('transitionend', agendar)
+      window.removeEventListener('resize', onResize); ro?.disconnect(); if (raf) cancelAnimationFrame(raf)
+    }
   }, [recomputarGrifos, modo, colW])
 
   // Grifos do Revisão (cores INLINE do conteúdo): OCULTA (semGrifos) e/ou RECOLORE por matiz com as cores
@@ -684,6 +717,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   function onTouchStart(e: React.TouchEvent) { touchX.current = e.touches[0]?.clientX ?? null }
   function onTouchEnd(e: React.TouchEvent) {
     if (modo !== 'flip' || touchX.current == null) return
+    // Seleção em andamento ou caneta/borracha armada: o gesto é de GRIFAR, não de virar página.
+    if (ferramenta || window.getSelection()?.isCollapsed === false) { touchX.current = null; return }
     const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current
     if (Math.abs(dx) > 40) irPara(pagina + (dx < 0 ? 1 : -1))
     touchX.current = null
@@ -789,6 +824,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     // Espinha SEMPRE fresca aqui: garante que os text nodes batem com o DOM atual (a cache pode ter
     // nós "soltos" se o conteúdo foi re-renderizado) → senão rangeParaAncora falharia e nada grifava.
     const esp = construirEspinha(root)
+    espinhaRef.current = esp; espinhaHtmlRef.current = doc.html // mesma espinha p/ pular/buscar → offsets no mesmo espaço
     const anc = rangeParaAncora(root, esp, range)
     if (!anc || !anc.exact.trim()) {
       if (ferramenta && ferramenta !== 'apagar') toast.message('Não consegui marcar esse trecho — selecione o texto de novo.')
@@ -806,9 +842,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
 
   // TOUCH/TABLET: seleção por toque (alças) NÃO dispara `onMouseUp` → o grifo não funcionava no
   // Samsung/iPad. Escuta `selectionchange` (com debounce até a seleção estabilizar) e reaproveita
-  // `aoSelecionar`. Só no modo rolagem (no flip o toque é para virar página).
+  // `aoSelecionar`. No flip também (tablet): o popover com "Grifar" aparece; swipe só vira página sem seleção.
   useEffect(() => {
-    if (modo === 'flip') return
     let t: ReturnType<typeof setTimeout> | undefined
     const onSelChange = () => {
       if (t) clearTimeout(t)
@@ -823,6 +858,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     return () => { document.removeEventListener('selectionchange', onSelChange); if (t) clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modo, ferramenta])
+
+  // Virou a página (flip): o popover de seleção pertence à página anterior → fecha.
+  useEffect(() => { setSel(null) }, [pagina])
 
   // ── Primitivas (API + estado). IDs são ESTÁVEIS: exclusão é soft-delete e "voltar" é undelete
   //    do MESMO id (nunca recria) — então os batches do histórico podem ser reusados sem
@@ -859,13 +897,15 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   // Grifa uma âncora na cor dada — OTIMISTA: aparece na hora (id temporário) e só depois troca pelo
   // id real do servidor. Em falha, remove. Sem esperar o round-trip → sem atraso visual.
   async function grifarAncora(a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }, cor: string, tipo: 'grifo' | 'nota' = 'grifo', nota: string | null = null): Promise<string | null> {
-    if (opLock.current) return null
+    // Sem descartar: aplica otimista e enfileira só o POST (serializado por filaPost; postAnotacao não lança).
     const tmpId = `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}`
     const otim: AnotacaoAluno = { id: tmpId, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota, origem: 'propria', tipo }
     setAnotacoes((p) => [...p, otim])
-    opLock.current = true
-    const id = await postAnotacao(otim)
-    opLock.current = false
+    pendPost.current++
+    const minha = filaPost.current.then(() => postAnotacao(otim))
+    filaPost.current = minha
+    let id: string | null = null
+    try { id = await minha } finally { pendPost.current-- }
     if (!id) { setAnotacoes((p) => p.filter((x) => x.id !== tmpId)); toast.error(tipo === 'nota' ? 'Erro ao anotar.' : 'Erro ao grifar.'); return null }
     const real: AnotacaoAluno = { ...otim, id }
     setAnotacoes((p) => p.map((x) => (x.id === tmpId ? real : x)))
@@ -891,7 +931,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   // (doc.grifos) quanto os ASSADOS no HTML (spans data-grifo, via classe) — que a seleção toca.
   // Tudo num batch → o undo/reset traz tudo de volta.
   async function apagarNoRange(inicio: number, fim: number, range?: Range) {
-    if (opLock.current) return
+    if (opOcupado()) return
     const meus = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
     const editoriais = grifos.filter((g) => !grifosOcultos.has(g.id) && g.inicio < fim && g.fim > inicio)
     // Grifos assados no HTML: acha os spans [data-grifo] que a seleção cruza (interseção de DOM).
@@ -925,7 +965,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   }
 
   async function atualizarAnotacao(id: string, patch: Partial<Pick<AnotacaoAluno, 'cor' | 'nota'>>) {
-    if (opLock.current) return
+    if (opOcupado()) return
     const atual = anotacoes.find((a) => a.id === id); if (!atual) return
     const de = { cor: atual.cor, nota: atual.nota }
     const para = { cor: patch.cor ?? atual.cor, nota: 'nota' in patch ? (patch.nota ?? null) : atual.nota }
@@ -937,7 +977,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   }
 
   async function excluirAnotacao(id: string) {
-    if (opLock.current) return
+    if (opOcupado()) return
     const a = anotacoes.find((x) => x.id === id); if (!a) return
     opLock.current = true
     const ok = await removerServidor(a)
@@ -972,7 +1012,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   }
 
   async function resetarGrifos() {
-    if (opLock.current) return
+    if (opOcupado()) return
     const meus = anotacoes.filter((a) => a.origem === 'propria')
     if (!meus.length) { toast.message('Você não tem grifos próprios para resetar.'); return }
     opLock.current = true
@@ -987,7 +1027,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   // ── Voltar / Avançar. Como os ids são estáveis (soft-delete/undelete), o MESMO batch é só
   //    movido entre as pilhas — sem reescrever ids. ──
   async function desfazer() {
-    if (opLock.current) return
+    if (opOcupado()) return
     const b = passado[passado.length - 1]; if (!b) return
     opLock.current = true
     let falhou = false
@@ -1006,7 +1046,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     if (falhou) avisarFalha()
   }
   async function refazer() {
-    if (opLock.current) return
+    if (opOcupado()) return
     const b = futuro[futuro.length - 1]; if (!b) return
     opLock.current = true
     let falhou = false
@@ -1026,10 +1066,11 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   }
 
   function pularAnotacao(a: AnotacaoAluno) {
-    const esp = espinhaRef.current; if (!esp) return
+    const root = contentRef.current; if (!root) return
+    const esp = construirEspinha(root) // fresca: a memoizada pode ter sido invalidada por transformações do DOM
     const range = ancoraParaRange(esp, { inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix })
     const el = range?.startContainer.parentElement
-    if (!el) return
+    if (!el) { toast.message('Esse trecho não foi encontrado neste texto (o conteúdo pode ter mudado). Sua anotação foi mantida.'); return }
     if (modo !== 'flip') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
@@ -1285,6 +1326,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     // se o conteúdo montar/mutar depois (era o motivo de "não recolher igual no admin" no aluno).
     let mo: MutationObserver | null = null
     let rodando = false
+    let recompRaf = 0
     const aplicarCore = () => {
       // TAGS de selo (<rg>, <essencial>…) viram a IMAGEM do selo — ANTES do resto (p/ contar como <img>).
       prepararSelosLeitura(cont)
@@ -1338,6 +1380,10 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       rodando = true
       mo?.disconnect()
       try { aplicarCore() } finally { mo?.observe(cont, { childList: true, subtree: true }); rodando = false }
+      // As transformações movem nós de lugar → a espinha anterior fica defasada. Invalida e re-pinta os
+      // grifos (coalescido por rAF; recomputarGrifos reconstrói a espinha do zero).
+      espinhaRef.current = null
+      if (!recompRaf) recompRaf = requestAnimationFrame(() => { recompRaf = 0; recomputarRef.current() })
     }
     aplicar()
     const raf = requestAnimationFrame(aplicar)
@@ -1345,7 +1391,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     const raf2 = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
     mo = new MutationObserver(() => aplicar())
     mo.observe(cont, { childList: true, subtree: true })
-    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo?.disconnect(); cont.removeEventListener('click', onCab); cont.removeEventListener('keydown', onKey); for (const l of limpezasTab) l() }
+    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); if (recompRaf) cancelAnimationFrame(recompRaf); mo?.disconnect(); cont.removeEventListener('click', onCab); cont.removeEventListener('keydown', onKey); for (const l of limpezasTab) l() }
   }, [doc.html, artigosCobrados])
 
   return (
@@ -1471,6 +1517,13 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             <button onClick={() => setBarraDir((v) => !v)} title="Minhas anotações" className={cn('inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors', barraDir && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }}>
               <Highlighter className="h-4 w-4" /> {anotacoes.length > 0 && <span className="tabular-nums">{anotacoes.length}</span>}
             </button>
+            {/* Aviso discreto: anotações que não acharam o trecho (texto mudou). Abre o painel já filtrado. */}
+            {orfaos.length > 0 && (
+              <button onClick={() => { setSoOrfaos(true); setBarraDir(true) }} title={`${orfaos.length} anotação(ões) não encontrada(s) neste texto — ver lista`}
+                className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-muted dark:text-amber-400" style={{ borderColor: '#0000001a' }}>
+                <AlertTriangle className="h-4 w-4" /> <span className="hidden tabular-nums md:inline">{orfaos.length} não encontrada{orfaos.length > 1 ? 's' : ''}</span><span className="tabular-nums md:hidden">{orfaos.length}</span>
+              </button>
+            )}
             <div className="hidden items-center gap-2 sm:flex">
               <div className="h-1.5 w-28 overflow-hidden rounded-full" style={{ background: '#00000018' }}>
                 <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
@@ -1601,8 +1654,10 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             <div className="absolute z-30 -translate-x-1/2 rounded-xl border bg-popover p-1.5 shadow-lg" style={{ left: sel.x, top: sel.y }}
               onMouseDown={(e) => e.preventDefault() /* não perde a seleção ao clicar */}>
               <div className="flex items-center gap-1">
+                {/* "Grifar" explícito (tablet/celular, inclusive no modo virar-página): toque numa cor aplica. Alvos maiores em toque. */}
+                <span className="mr-0.5 inline-flex items-center gap-1 pl-1 text-xs font-semibold text-foreground"><Highlighter className="h-4 w-4" /> Grifar</span>
                 {CORES_GRIFO.map((c) => (
-                  <button key={c} onClick={() => criarAnotacao(c)} className="h-6 w-6 rounded-full border border-black/10 transition hover:scale-110" style={{ background: c }} aria-label={`Grifar em ${c}`} />
+                  <button key={c} onClick={() => criarAnotacao(c)} className="h-6 w-6 rounded-full border border-black/10 transition hover:scale-110 [@media(pointer:coarse)]:h-9 [@media(pointer:coarse)]:w-9" style={{ background: c }} aria-label={`Grifar em ${c}`} />
                 ))}
                 <span className="mx-0.5 h-5 w-px bg-border" />
                 <button onClick={criarNota} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Adicionar nota ao trecho"><StickyNote className="h-4 w-4" /> Nota</button>
@@ -1714,18 +1769,32 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
                   </div>
                 </div>
               ))}
-              {[...anotacoes].sort((a, b) => a.inicio - b.inicio).map((a) => (
-              <div key={a.id} className="rounded-lg border p-2" style={{ borderColor: '#0000001a' }}>
+              {orfaos.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs" style={{ color: cores.fg }}>
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="leading-snug">{orfaos.length} anotação(ões) não encontrada(s) neste texto. Elas continuam salvas; só você decide apagar.</p>
+                    <button onClick={() => setSoOrfaos((v) => !v)} className="mt-1 font-medium underline underline-offset-2">{soOrfaos ? 'Ver todas as anotações' : 'Ver só as não encontradas'}</button>
+                  </div>
+                </div>
+              )}
+              {[...anotacoes].filter((a) => !soOrfaos || !orfaos.length || orfaos.includes(a.id)).sort((a, b) => a.inicio - b.inicio).map((a) => (
+              <div key={a.id} className={cn('rounded-lg border p-2', orfaos.includes(a.id) && 'border-dashed')} style={{ borderColor: '#0000001a' }}>
                 <div className="flex items-start gap-2">
                   {a.tipo === 'nota'
                     ? <span className="mt-1.5 h-1 w-3 shrink-0 rounded-full" style={{ background: a.cor }} title="Nota" />
                     : <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full" style={{ background: a.cor }} />}
                   <button onClick={() => pularAnotacao(a)} className="min-w-0 flex-1 text-left text-xs leading-snug" style={{ color: cores.fg }} title="Ir ao trecho">
+                    {orfaos.includes(a.id) && <span className="mr-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-px align-middle text-[9px] font-semibold text-amber-700 dark:text-amber-300">Não encontrada</span>}
                     {a.tipo === 'nota' && <span className="mr-1 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-px align-middle text-[9px] font-semibold text-primary"><StickyNote className="h-2.5 w-2.5" /> Nota</span>}
                     <span className="line-clamp-3">{a.exact}</span>
                   </button>
                   <button onClick={() => pularAnotacao(a)} className="shrink-0 rounded p-1" style={{ color: cores.muted }} aria-label="Ir ao trecho"><Crosshair className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => excluirAnotacao(a.id)} className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive" aria-label="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <button onClick={async () => {
+                    // Órfã: o texto não foi achado, então o aluno confirma antes (nunca é apagada automaticamente).
+                    if (orfaos.includes(a.id) && !(await confirmar({ titulo: 'Apagar esta anotação?', mensagem: 'O trecho não foi encontrado neste texto. Ao apagar, ela some da sua lista (dá pra desfazer no histórico).', confirmar: 'Apagar', destrutivo: true }))) return
+                    excluirAnotacao(a.id)
+                  }} className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive" aria-label="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="mt-1.5 flex items-center gap-1 pl-5">
                   {CORES_GRIFO.map((c) => (

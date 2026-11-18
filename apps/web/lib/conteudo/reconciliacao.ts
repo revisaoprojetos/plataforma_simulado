@@ -6,6 +6,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { alinhar, type TrechoVersao } from './alinhamento'
 import { extrairTrechosHtml } from './trechos'
 import { emitirEvento } from './outbox'
+import { localizarNoTrecho, localizarEntreTrechos } from './anotacao-ancora'
 
 // RECONCILIAÇÃO (Fase 2/6) — o coração do "grifo sobrevive à edição". Ao publicar uma nova versão:
 //   1. estrutura o HTML em trechos;
@@ -133,20 +134,45 @@ export async function reconciliarVersao(input: {
     const oldTextByUid = new Map(velhosDB.map((v) => [v.uid, v.texto]))     // L7: diff antes/depois no aviso
     const novoTextByUid = new Map(linhas.map((l) => [l.uid, l.texto]))
     const anots = (await fetchAll<any>(() => svc.from(T_AN)
-      .select('id, trecho_uid, estado')
+      .select('id, trecho_uid, estado, texto_ancora, inicio_offset, fim_offset, contexto_antes, contexto_depois')
       .eq('tenant_id', tenantId).eq('documento_id', input.documentoId))) ?? []
     const avisos: any[] = []
-    const atualiz: { id: string; estado: string }[] = []
+    const atualiz: { id: string; estado: string; patch?: Record<string, unknown> }[] = []
+    // ÂNCORA DE TEXTO (anotacao-ancora.ts): antes de marcar 'alterada'/'órfã' por uid/hash, re-localiza o `texto_ancora`
+    // (exact + contexto) no trecho novo (ou, p/ órfã, único entre os trechos novos). Achou → 'ativa', offsets/contexto atualizados, SEM aviso.
+    const novoTextoPorUid = new Map(linhas.map((l) => [l.uid, l.texto as string]))
+    const trechosNovos = linhas.map((l) => ({ uid: l.uid, texto: l.texto as string }))
     for (const an of anots) {
       const uid = an.trecho_uid as string
       const antes = oldHashByUid.get(uid)
+      const ref = { texto_ancora: String(an.texto_ancora ?? ''), inicio_offset: Number(an.inicio_offset) || 0, fim_offset: Number(an.fim_offset) || 0, contexto_antes: an.contexto_antes, contexto_depois: an.contexto_depois }
       if (!novoHashByUid.has(uid)) {
-        // uid sumiu → órfã
+        const rel = localizarEntreTrechos(ref, trechosNovos)
+        if (rel) {
+          // mudou de trecho (alinhamento por uid perdeu): texto idêntico e único → deixa de ser órfã, mas fica 'alterada' + aviso
+          // (as coordenadas do leitor podem divergir das do banco; o aluno é avisado em vez de confiarmos cegamente)
+          atualiz.push({ id: an.id, estado: 'alterada', patch: { trecho_uid: rel.uid, inicio_offset: rel.inicio, fim_offset: rel.fim, contexto_antes: rel.contextoAntes, contexto_depois: rel.contextoDepois } })
+          avisos.push({ tenant_id: tenantId, anotacao_id: an.id, versao_de_id: input.versaoAnteriorId, versao_para_id: input.versaoNovaId, trecho_antes: oldTextByUid.get(uid) ?? null, trecho_depois: novoTextoPorUid.get(rel.uid) ?? null, status: 'pendente' })
+          res.anotacoes.alteradas++
+          continue
+        }
+        // uid sumiu e o texto não foi achado → órfã
         if (an.estado !== 'orfa') atualiz.push({ id: an.id, estado: 'orfa' })
         avisos.push({ tenant_id: tenantId, anotacao_id: an.id, versao_de_id: input.versaoAnteriorId, versao_para_id: input.versaoNovaId, trecho_antes: oldTextByUid.get(uid) ?? null, trecho_depois: null, status: 'pendente' })
         res.anotacoes.orfas++
       } else if (antes !== undefined && antes !== novoHashByUid.get(uid)) {
-        // uid sobreviveu, texto mudou → alterada + aviso
+        const rel = localizarNoTrecho(ref, novoTextoPorUid.get(uid) ?? '', oldTextByUid.get(uid))
+        // offsets só são reescritos quando as coordenadas do leitor (DOM) e do banco concordam no texto ANTIGO (≈77% dos casos); senão mantém o fluxo antigo (alterada + aviso)
+        const alinhado = (oldTextByUid.get(uid) ?? '').slice(ref.inicio_offset, ref.fim_offset) === ref.texto_ancora
+        if (rel && (rel.metodo === 'offset' || alinhado)) {
+          // o trecho mudou, mas o texto grifado continua lá → ativa (offsets/contexto atualizados), sem aviso
+          const patch: Record<string, unknown> = { contexto_antes: rel.contextoAntes, contexto_depois: rel.contextoDepois }
+          if (rel.inicio !== ref.inicio_offset || rel.fim !== ref.fim_offset) { patch.inicio_offset = rel.inicio; patch.fim_offset = rel.fim }
+          atualiz.push({ id: an.id, estado: 'ativa', patch })
+          res.anotacoes.ativas++
+          continue
+        }
+        // uid sobreviveu, texto mudou E o texto grifado não foi achado → alterada + aviso
         if (an.estado !== 'alterada') atualiz.push({ id: an.id, estado: 'alterada' })
         avisos.push({ tenant_id: tenantId, anotacao_id: an.id, versao_de_id: input.versaoAnteriorId, versao_para_id: input.versaoNovaId, trecho_antes: oldTextByUid.get(uid) ?? null, trecho_depois: novoTextByUid.get(uid) ?? null, status: 'pendente' })
         res.anotacoes.alteradas++
@@ -156,7 +182,7 @@ export async function reconciliarVersao(input: {
         res.anotacoes.ativas++
       }
     }
-    for (const u of atualiz) await svc.from(T_AN).update({ estado: u.estado, versao_validada_id: input.versaoNovaId, atualizada_em: new Date().toISOString() }).eq('tenant_id', tenantId).eq('id', u.id)
+    for (const u of atualiz) await svc.from(T_AN).update({ ...(u.patch ?? {}), estado: u.estado, versao_validada_id: input.versaoNovaId, atualizada_em: new Date().toISOString() }).eq('tenant_id', tenantId).eq('id', u.id)
     // anotações que já estavam ativas apontam para a nova versão validada
     await svc.from(T_AN).update({ versao_validada_id: input.versaoNovaId }).eq('tenant_id', tenantId).eq('documento_id', input.documentoId).eq('estado', 'ativa')
     if (avisos.length) await svc.from(T_AV).upsert(avisos, { onConflict: 'anotacao_id,versao_para_id', ignoreDuplicates: true })

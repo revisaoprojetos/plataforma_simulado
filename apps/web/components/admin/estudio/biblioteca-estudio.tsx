@@ -15,8 +15,10 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Home, ChevronRight, FolderPlus, FolderOpen, Folder, Pencil, FolderInput, Trash2,
-  Replace, Link2, Download, SquarePen, Eye,
+  Replace, Link2, Download, SquarePen, Eye, EyeOff,
 } from 'lucide-react'
+import { avisarRecusaDocumento, avisarRecusasLote } from '@/components/biblioteca/recusa-documento'
+import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { formatBrt } from '@/lib/brt'
 import { cn } from '@/lib/utils'
@@ -101,22 +103,23 @@ export function BibliotecaEstudio({
     })
     if (!ok) return
     const r = l.kind === 'pasta' ? await removerPasta(l.id) : await removerDocumento(l.id)
-    if (!r.ok) { toast.error(r.error || 'Falha ao excluir.'); return }
+    if (!r.ok) { if ((r as any).bloqueado && l.kind !== 'pasta') avisarRecusaDocumento(r.error || 'Exclusão recusada.', l.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: l }), onOcultado: refresh, forcar: { acao: 'lixeira' } }); else toast.error(r.error || 'Falha ao excluir.', { duration: 15000 }); return }
     toast.success('Excluído.'); refresh()
   }
   const baixar = (l: LinhaBiblioteca) => baixarDocumento(l.id)
   async function moverPara(l: LinhaBiblioteca, destino: string | null) {
     const r = l.kind === 'pasta' ? await moverPasta(l.id, destino) : await moverDocumento(l.id, destino)
-    if (!r.ok) { toast.error(r.error || 'Falha ao mover.'); return }
+    if (!r.ok) { if ((r as any).bloqueado && l.kind !== 'pasta') avisarRecusaDocumento(r.error || 'Mudança recusada.', l.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: l }), onOcultado: refresh, forcar: { acao: 'mover', valor: destino } }); else toast.error(r.error || 'Falha ao mover.', { duration: 15000 }); return }
     toast.success('Movido.'); refresh()
   }
   async function excluirLote(s: DataTableSelection) {
     const alvos = linhas.filter((l) => s.ids.includes(l.id))
     if (!alvos.length) { toast.message('Selecione um ou mais itens desta página.'); return }
     if (!(await confirmar({ titulo: 'Enviar para a Lixeira', mensagem: `Enviar ${alvos.length} ${alvos.length === 1 ? 'item' : 'itens'} para a Lixeira?`, confirmar: 'Enviar para a Lixeira', destrutivo: true }))) return
-    let erros = 0
-    for (const l of alvos) { const r = l.kind === 'pasta' ? await removerPasta(l.id) : await removerDocumento(l.id); if (!r.ok) erros++ }
-    erros ? toast.error(`${erros} não excluído(s).`) : toast.success('Concluído.')
+    let erros = 0; const motivos: { id: string; motivo: string }[] = []
+    for (const l of alvos) { const r = l.kind === 'pasta' ? await removerPasta(l.id) : await removerDocumento(l.id); if (!r.ok) { erros++; motivos.push({ id: l.id, motivo: r.error || '' }) } }
+    if (motivos.length) avisarRecusasLote(motivos, alvos.length)
+    else toast.success('Concluído.')
     s.clear(); refresh()
   }
 
@@ -167,7 +170,8 @@ export function BibliotecaEstudio({
   ] : [
     { label: 'Editar documento', icon: <SquarePen className="h-4 w-4" />, onClick: () => editar(l) },
     { label: 'Aulas vinculadas', icon: <Link2 className="h-4 w-4" />, onClick: () => setModal({ tipo: 'aulas', row: l }) },
-    { label: 'Substituir arquivo', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: l }) },
+    { label: 'Substituir documento', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: l }) },
+    { label: 'Ocultar do aluno', icon: <EyeOff className="h-4 w-4" />, onClick: () => { void definirVisibilidadeConteudo(l.id, false).then((r) => r.ok ? (toast.success('Documento oculto para os alunos. Nada foi apagado.'), refresh()) : toast.error(r.error || 'Falha ao ocultar.')) } },
     { label: 'Baixar', icon: <Download className="h-4 w-4" />, onClick: () => baixar(l) },
     { label: 'Mover', icon: <FolderInput className="h-4 w-4" />, onClick: () => setModal({ tipo: 'mover', row: l }) },
     { label: 'Excluir', icon: <Trash2 className="h-4 w-4" />, destructive: true, separatorBefore: true, onClick: () => excluir(l) },
@@ -325,7 +329,7 @@ function Detalhe({
           <div className="grid grid-cols-2 gap-2">
             <Btn onClick={onAbrir} icon={<Eye className="h-[15px] w-[15px]" />} label="Visualizar" />
             <Btn onClick={onAulas} icon={<Link2 className="h-[15px] w-[15px]" />} label="Aulas vinculadas" />
-            <Btn onClick={onSubstituir} icon={<Replace className="h-[15px] w-[15px]" />} label="Substituir arquivo" />
+            <Btn onClick={onSubstituir} icon={<Replace className="h-[15px] w-[15px]" />} label="Substituir documento" />
             <Btn onClick={onBaixar} icon={<Download className="h-[15px] w-[15px]" />} label="Baixar" />
             <Btn onClick={onMover} icon={<FolderInput className="h-[15px] w-[15px]" />} label="Mover" />
             <Btn onClick={onExcluir} icon={<Trash2 className="h-[15px] w-[15px]" />} label="Excluir" destrutivo />

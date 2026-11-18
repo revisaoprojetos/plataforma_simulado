@@ -120,7 +120,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
     tenantId ? liberacaoDoc(supa, tenantId, sessao.estudanteId, id) : Promise.resolve(null),
     getTenantTheme().catch(() => null),
     tenantId ? resolverVideoLeitura(supa, tenantId, id, sessao.estudanteId).catch(() => null) : Promise.resolve(null),
-    carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null }).catch(() => null),
+    carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null }).catch((e) => { console.error('[leitor-falha] excecao ao abrir', id, 'aluno', sessao.estudanteId, (e as Error)?.message ?? e); return null }),
     !paginaExplicitaP && !doCronogramaP && tenantId ? lerProgressoLeituraAluno(tenantId, sessao.estudanteId, id).catch(() => null) : Promise.resolve(null),
     // Novidades da versão (registro de atualizações PUBLICADAS e visíveis ao aluno).
     tenantId ? novidadesDoDocumento(supa, tenantId, id).catch(() => null) : Promise.resolve(null),
@@ -131,6 +131,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   if (!doc) {
     // Sem 404 mudo: explica o motivo (em preparação / não publicado / sem acesso / não existe / falha temporária).
     const d = await diagnosticarFalhaLeitura(id, sessao.estudanteId)
+    // Telemetria de falha (antes era 404 mudo): motivo por documento/aluno nos logs do app → agrupar por motivo no Portainer.
+    console.warn('[leitor-falha]', d.motivo, 'doc', id, 'aluno', sessao.estudanteId, d.liberaEm ? 'libera ' + d.liberaEm : '')
     return <MaterialIndisponivel motivo={d.motivo} titulo={d.titulo} voltarHref={voltarHref} liberaEm={d.liberaEm} />
   }
   const video = doc.kind === 'midia' ? null : video0
@@ -216,6 +218,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       titulo={leitura.titulo}
       pdfUrl={leitura.pdfUrl}
       grifos={leitura.grifos}
+      grifosAntigos={leitura.grifosAntigos}
       voltarHref={voltarHref}
       paginaInicial={paginaAbrir}
       partesCrono={partesCrono}

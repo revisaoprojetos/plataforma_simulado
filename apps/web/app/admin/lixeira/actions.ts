@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softRestore, SOFT_DELETE_TABELAS, type SoftDeleteTabela } from '@/lib/soft-delete'
+import { bloquearSeTemVinculos } from '@/lib/conteudo/dependencias-documento'
 
 // tabela → { tipo exibido, coluna de rótulo (ou __sessao = composto Aluno — Simulado) }
 const CFG: Record<SoftDeleteTabela, { tipo: string; rotulo: string }> = {
@@ -115,6 +116,29 @@ export async function excluirDefinitivo(tabela: SoftDeleteTabela, id: string) {
   if (!access.userId || !access.tenantId) return { ok: false, error: 'Sem sessão.' }
   if (!(SOFT_DELETE_TABELAS as readonly string[]).includes(tabela)) return { ok: false, error: 'Tabela não permitida.' }
   const svc = createAdminClient()
+  // TRAVA: questão/banco com vínculos (respostas, simulados, documentos, cronograma, cadernos…) não é apagado
+  // definitivamente (o delete físico cascatearia/quebraria histórico). Fica na Lixeira até o vínculo sumir.
+  if (tabela === 'simulado_questoes' || tabela === 'simulado_pastas') {
+    try {
+      const dep = await import('@/lib/questoes/dependencias-questao')
+      if (tabela === 'simulado_questoes') {
+        const r = await dep.bloquearSeTemVinculos(svc, access.tenantId, [id], { acao: 'excluir definitivamente' })
+        if (r.bloqueadas.length) return { ok: false, error: r.mensagem }
+      } else {
+        const d = await dep.dependenciasBanco(svc, access.tenantId, id)
+        if (d.emUso) return { ok: false, error: d.mensagem }
+      }
+    } catch (e) {
+      return { ok: false, error: `Exclusão definitiva recusada: não foi possível verificar os vínculos (${(e as Error).message}).` }
+    }
+  }
+  // TRAVA CENTRAL (documentos): vínculos (grifos/metas/progresso/produtos) ou "em uso" por plano ativo → nunca apaga
+  // (as FKs são CASCADE e levariam grifos e metas dos alunos junto).
+  if (tabela === 'simulado_conteudo_documentos') {
+    const { data: d } = await svc.from(tabela).select('id, titulo').eq('id', id).eq('tenant_id', access.tenantId).maybeSingle()
+    const trava = await bloquearSeTemVinculos(svc, access.tenantId, [{ id, titulo: (d as any)?.titulo }])
+    if (trava.bloqueados[0]) return { ok: false, error: trava.bloqueados[0].motivo }
+  }
   const { error } = await svc.from(tabela).delete().eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', true)
   if (error) return { ok: false, error: `Não foi possível excluir definitivamente (ainda há vínculos): ${error.message}` }
   await registrarAudit({ operacao: 'DELETE', entidade: tabela, entidadeId: id, depois: { definitivo: true } })

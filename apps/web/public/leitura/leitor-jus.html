@@ -1878,6 +1878,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
 (()=>{
 const __boot=(RAW_INJECTED, CFG_INJECTED)=>{
 const CFG=CFG_INJECTED||{};
+const pdfDesat=new Map(); // id do grifo de PDF → true se o texto dele não está mais sob os rects (não pintar; ver paintPdf)
 const nav=(to)=>{try{if(window.parent!==window)window.parent.postMessage({type:'leitor-jus-nav',to},'*')}catch(_){}
   const href=to==='questoes'?CFG.questoesHref:CFG.voltarHref;if(window.parent===window&&href)location.href=href};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2663,6 +2664,7 @@ function ancoraParaRange(esp,a){let inicio=a.inicio,fim=a.fim;
 // Range (pode cruzar vários blocos) → segmentos {pid,s,e,sec,text} nos blocos [data-pid] intersectados.
 function segmentosDoRange(range){const segs=[];
   for(const b of $$('#article [data-pid]')){
+    if(CFG.modo!=='biblioteca'&&b.querySelector('[data-pid]'))continue; // bloco-pai de outro bloco grifável: só as folhas geram segmento
     let cruza;try{cruza=range.intersectsNode(b)}catch(_){cruza=false}if(!cruza)continue;
     const bc=document.createRange();bc.selectNodeContents(b);
     const r1=document.createRange();r1.selectNodeContents(b);
@@ -2674,21 +2676,27 @@ function segmentosDoRange(range){const segs=[];
     const sc=secOf(b);segs.push({pid:b.dataset.pid,s,e,sec:sc?sc.id:'',text:t.slice(s,e)})}
   return segs}
 // âncora text-quote de UM grifo já criado (pid+s+e) → p/ persistir no servidor.
-function ancoraDoGrifo(a){try{const b=blockOf(a.pid);if(!b)return null;const tn=textNodes(b);let pos=0,sN=null,sO=0,eN=null,eO=0;
-  for(const n of tn){const L=n.nodeValue.length;if(sN===null&&pos+L>=a.s){sN=n;sO=a.s-pos}if(pos+L>=a.e){eN=n;eO=a.e-pos;break}pos+=L}
-  if(!sN||!eN)return null;const r=document.createRange();r.setStart(sN,sO);r.setEnd(eN,eO);return rangeParaAncora(construirEspinha(),r)}catch(_){return null}}
+// z (opcional) = último segmento de um grupo multi-bloco: a âncora cobre de a.s (bloco a) até z.e (bloco z).
+function ancoraDoGrifo(a,z,esp){try{z=z||a;const bs=blockOf(a.pid),be=blockOf(z.pid);if(!bs||!be)return null;let pos=0,sN=null,sO=0,eN=null,eO=0;
+  for(const n of textNodes(bs)){const L=n.nodeValue.length;if(pos+L>=a.s){sN=n;sO=a.s-pos;break}pos+=L}
+  pos=0;for(const n of textNodes(be)){const L=n.nodeValue.length;if(pos+L>=z.e){eN=n;eO=z.e-pos;break}pos+=L}
+  if(!sN||!eN)return null;const r=document.createRange();r.setStart(sN,sO);r.setEnd(eN,eO);return rangeParaAncora(esp||construirEspinha(),r)}catch(_){return null}}
 function grifoPayload(a,anc){return {inicio:anc.inicio,fim:anc.fim,exact:anc.exact,prefix:anc.prefix,suffix:anc.suffix,cor:corToHex(a.c),nota:a.note||'',tipo:a.t==='ul'?'nota':'grifo'}}
 function emitGrifo(op,payload){if(!GRIFO_SERVER)return;try{window.parent.postMessage(Object.assign({type:'leitor-jus-grifo',op},payload),'*')}catch(_){}}
 // Grupo = todos os segmentos de um mesmo grifo (multi-bloco). Edição propaga a todos + 1 upd no servidor.
 function grupoAn(a){return (GRIFO_SERVER&&a&&a.gid)?S.an.filter(x=>x.gid===a.gid):[a]}
 // Edição ANTES do servidor devolver o srvId do 'add' (ex.: criou o grifo e já escreveu o comentário): marca o grupo
 // como pendente e envia o 'upd' assim que o 'leitor-jus-grifo-saved' chegar (senão cor/nota se perdiam).
-const GRIFO_PEND=new Set();
-function setCorGrupo(a,c){grupoAn(a).forEach(x=>{x.c=c;anMarks(x.id).forEach(m=>m.dataset.c=c)});if(GRIFO_SERVER){if(a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(c),nota:(a.note||null)});else if(a.gid)GRIFO_PEND.add(a.gid)}}
-function setNotaGrupo(a,nota){a.note=nota;refreshTail(a);try{cadAuto(a)}catch(_){}if(GRIFO_SERVER){if(a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(a.c),nota:(nota||null)});else if(a.gid)GRIFO_PEND.add(a.gid)}}
+// O HOST mantém uma fila SERIALIZADA POR cid (=gid): upd/del emitidos antes do id existir esperam o add terminar, então
+// aqui basta SEMPRE emitir com cid (e o id, se já conhecido). Não há mais "pendente" local a reenviar no saved.
+var ORFAS=[]; // anotações não encontradas neste texto (var: renderPanels pode rodar antes desta linha)
+function setCorGrupo(a,c){grupoAn(a).forEach(x=>{x.c=c;anMarks(x.id).forEach(m=>m.dataset.c=c)});if(GRIFO_SERVER&&(a.gid||a.srvId))emitGrifo('upd',{cid:a.gid||null,id:a.srvId||null,cor:corToHex(c),nota:(a.note||null)})}
+function setNotaGrupo(a,nota){a.note=nota;refreshTail(a);try{cadAuto(a)}catch(_){}if(GRIFO_SERVER&&(a.gid||a.srvId))emitGrifo('upd',{cid:a.gid||null,id:a.srvId||null,cor:corToHex(a.c),nota:(nota||null)})}
 // id do servidor chega de volta → casa pelo cid (=gid do grupo) e marca todos os segmentos.
-window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-saved'||!m.cid||!m.id)return;const grp=(S.an||[]).filter(a=>a.gid===m.cid);grp.forEach(a=>{a.srvId=m.id});
-  if(GRIFO_PEND.has(m.cid)&&grp.length){GRIFO_PEND.delete(m.cid);const h=grp.find(x=>x.note)||grp[0];emitGrifo('upd',{id:m.id,cor:corToHex(grp[0].c),nota:(h.note||null)})}});
+// (gid apagado antes do saved: nada a fazer aqui — o del já está na fila do host e apaga a linha criada.)
+window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-saved'||!m.cid||!m.id)return;(S.an||[]).filter(a=>a.gid===m.cid).forEach(a=>{a.srvId=m.id})});
+// Adicionar: sempre com cid (idempotência no servidor + serialização no host).
+function emitAdd(gid,a,anc){if(!GRIFO_SERVER||!gid||!a||!anc)return;emitGrifo('add',{cid:gid,a:grifoPayload(a,anc)})}
 
 renderDay();
 if(CFG.modo==='biblioteca'){
@@ -2702,7 +2710,11 @@ if(CFG.modo==='biblioteca'){
   // Blocos grifáveis do Juris: além de parágrafos/listas, inclui TÍTULOS (h2/h3), TABELAS (td/th) e citações
   // (blockquote) — antes o aluno "não conseguia grifar" título/tabela (sem data-pid, selInfo retornava null).
   // Índice global em ordem de documento (comma-selector respeita a ordem do DOM) → mantém o `ord()` do caderno.
-  $$('#article .sec h2, #article .flow p, #article .flow li, #article .flow h3, #article .flow h4, #article .flow td, #article .flow th, #article .flow blockquote, #article .tese p, #article .law p').forEach((el,i)=>{if(!el.dataset.pid)el.dataset.pid='b'+i});
+  // SÓ blocos "folha" (sem outro bloco grifável dentro): li>p, td>p, blockquote>p (comum em Word) davam 2 pids p/ o mesmo
+  // texto → marks aninhados, cor dobrada e duplicata em "Meus grifos". O índice i continua sobre a lista completa →
+  // os pids dos blocos folha NÃO mudam (grifos locais antigos seguem casando).
+  const SEL_BLOCOS='#article .sec h2, #article .flow p, #article .flow li, #article .flow h3, #article .flow h4, #article .flow td, #article .flow th, #article .flow blockquote, #article .tese p, #article .law p';
+  $$(SEL_BLOCOS).forEach((el,i)=>{if(!el.dataset.pid&&!el.querySelector(SEL_BLOCOS.replace(/#article /g,'')))el.dataset.pid='b'+i});
 }
 const secs=$$('#article .sec');
 const secOf=el=>el.closest('.sec');
@@ -3101,22 +3113,46 @@ if(!S.cards){S.cards=[];save('cards')}
 // em segmentos pintáveis; grifos "órfãos" (texto mudou) são apenas ignorados — nunca pintam errado.
 let GRIFO_ORFAOS=0;
 if(GRIFO_SERVER){
-  const legacy=Array.isArray(S.an)?S.an.slice():[];
-  const esp=construirEspinha();const srv=[];
-  (Array.isArray(CFG.grifos)?CFG.grifos:[]).forEach(g=>{try{
-    const r=ancoraParaRange(esp,{inicio:g.inicio,fim:g.fim,exact:g.exact,prefix:g.prefix,suffix:g.suffix});if(!r){GRIFO_ORFAOS++;return}
-    const segs=segmentosDoRange(r);if(!segs.length){GRIFO_ORFAOS++;return}
+  // Candidatos locais (NUNCA descartados): grifos da chave do aluno, os que ficaram "órfãos" locais numa abertura
+  // anterior (an_orf) e, 1x, os da chave LEGADA sem uid (v<4.22.2: eram os que o POST nunca gravou).
+  const cand=[],vistos=new Set();
+  const addCand=a=>{if(!a||typeof a!=='object'||!a.pid||vistos.has(a.id))return;vistos.add(a.id);cand.push(a)};
+  (Array.isArray(S.an)?S.an:[]).forEach(addCand);
+  (store.get('an_orf',[])||[]).forEach(addCand);
+  const importarLegado=!!CFG.uid&&!store.get('an_migr_leg',false);
+  if(importarLegado){try{const raw=localStorage.getItem('rv4:'+dayKey+':an');const v=raw?JSON.parse(raw):[];if(Array.isArray(v))v.forEach(addCand)}catch(_){}}
+  const esp=construirEspinha();const srv=[];const srvIds=new Set();
+  (Array.isArray(CFG.grifos)?CFG.grifos:[]).forEach(g=>{srvIds.add(g.id);try{
+    // ancoraParaRange já cai em recuperarEsp → recuperarNorm (espaços/nbsp/zero-width) antes de declarar órfão.
+    const r=ancoraParaRange(esp,{inicio:g.inicio,fim:g.fim,exact:g.exact,prefix:g.prefix,suffix:g.suffix});
+    const segs=r?segmentosDoRange(r):[];
+    if(!segs.length){ORFAS.push({k:'s',key:g.id,text:g.exact||'',note:g.nota||'',cor:hexToCor(g.cor)});return}
     const gid='s'+g.id,tool=(g.tipo==='nota')?'ul':'hl';
     segs.forEach((sg,k)=>srv.push({id:uid(),gid,srvId:g.id,pid:sg.pid,s:sg.s,e:sg.e,t:tool,c:hexToCor(g.cor),note:k===0?(g.nota||''):'',sec:sg.sec,text:sg.text}));
-  }catch(_){}});
+  }catch(_){ORFAS.push({k:'s',key:g.id,text:g.exact||'',note:g.nota||'',cor:hexToCor(g.cor)})}});
   S.an=srv;
-  if(GRIFO_ORFAOS)setTimeout(()=>{try{toast(GRIFO_ORFAOS+(GRIFO_ORFAOS===1?' anotação não pôde':' anotações não puderam')+' ser localizada(s): o texto do material foi atualizado')}catch(_){}},2500);
-  // Migração 1x: aluno tinha grifos só no localStorage e o servidor está vazio → sobe p/ o servidor.
-  // Só migra se a chave é DESTE aluno (CFG.uid): dados sem dono conhecido (chave antiga compartilhada) NUNCA sobem.
-  if(CFG.uid&&!srv.length&&legacy.length&&!store.get('an_migr',false)){
-    legacy.forEach(a=>{try{const anc=ancoraDoGrifo(a);if(!anc)return;a.gid=a.gid||('m'+a.id);S.an.push(a);emitGrifo('add',{cid:a.gid,a:grifoPayload(a,anc)})}catch(_){}});
-    store.set('an_migr',true);
-  }
+  // Reenvio: grifo local que o servidor NÃO conhece (por posição) sobe de novo com o mesmo cid (idempotente no servidor).
+  // Origem 's…' = veio do servidor (se sumiu de lá, foi apagado em outro aparelho): não ressuscita.
+  const grupos=new Map();cand.forEach(a=>{const k=a.gid||('m'+a.id);(grupos.get(k)||grupos.set(k,[]).get(k)).push(a)});
+  const orfLocal=[];
+  grupos.forEach((g,gid)=>{try{
+    if(gid.charAt(0)==='s')return;
+    const f=g[0],l=g[g.length-1],bf=blockOf(f.pid),bl=blockOf(l.pid);
+    const ok=bf&&bl&&f.text&&l.text&&bf.textContent.slice(f.s,f.e)===f.text&&bl.textContent.slice(l.s,l.e)===l.text;
+    const anc=ok?ancoraDoGrifo(f,l,esp):null;
+    if(!anc){orfLocal.push(...g);return}
+    const conhecido=g.some(a=>a.srvId&&srvIds.has(a.srvId))||(CFG.grifos||[]).some(x=>x.exact===anc.exact&&x.inicio===anc.inicio)||srv.some(x=>x.pid===f.pid&&x.s===f.s&&x.e===f.e);
+    if(conhecido)return;
+    g.forEach(a=>{a.gid=gid;delete a.srvId;S.an.push(a)});
+    const h=g.find(x=>x.note)||f;
+    emitAdd(gid,Object.assign({},f,{note:h.note||''}),anc);
+  }catch(_){}});
+  store.set('an_orf',orfLocal);
+  if(importarLegado)store.set('an_migr_leg',true); // legado importado 1x (a chave legada NÃO é apagada)
+  const locOrf=new Map();orfLocal.forEach(a=>{const k=a.gid||('m'+a.id);(locOrf.get(k)||locOrf.set(k,[]).get(k)).push(a)});
+  locOrf.forEach((g,k)=>ORFAS.push({k:'l',key:k,text:g.map(x=>x.text||'').join(' '),note:(g.find(x=>x.note)||{}).note||'',cor:g[0].c||'y'}));
+  GRIFO_ORFAOS=ORFAS.length;
+  if(GRIFO_ORFAOS)setTimeout(()=>{try{toast(GRIFO_ORFAOS+(GRIFO_ORFAOS===1?' anotação não foi encontrada':' anotações não foram encontradas')+' neste texto. Veja em Meus grifos',{label:'Ver',fn:()=>setNb(true)});renderPanels()}catch(_){}},2500);
 }
 S.an.forEach(paint);
 
@@ -3127,17 +3163,16 @@ function undo(){if(!undoStack.length)return;const prev=S.an;redoStack.push(JSON.
 function redo(){if(!redoStack.length)return;const prev=S.an;undoStack.push(JSON.stringify(S.an));S.an=JSON.parse(redoStack.pop());afterHist('Refeito',prev)}
 // Undo/redo também sincroniza o SERVIDOR (antes: desfazer + recarregar reexibia o grifo). Compara por gid:
 // sumiu → del; reapareceu → add (novo srvId volta pelo 'saved'); cor/nota mudou → upd.
-const SRVMAP={};
+// A fila do HOST (por cid) resolve o id do servidor: aqui emitimos só por cid (=gid), sem depender de SRVMAP/srvId.
+// Undo de criação → del; redo → add com o MESMO cid (servidor idempotente devolve/restaura a mesma linha).
 function syncHistServidor(prev){if(!GRIFO_SERVER)return;try{
-  (prev||[]).forEach(a=>{if(a.gid&&a.srvId)SRVMAP[a.gid]=a.srvId});
   const grp=arr=>{const m=new Map();(arr||[]).forEach(a=>{if(!a.gid)return;(m.get(a.gid)||m.set(a.gid,[]).get(a.gid)).push(a)});return m};
   const antes=grp(prev),depois=grp(S.an);
-  antes.forEach((g,gid)=>{if(!depois.has(gid)){const id=SRVMAP[gid];if(id){emitGrifo('del',{id});delete SRVMAP[gid]}}});
+  antes.forEach((g,gid)=>{if(!depois.has(gid))emitGrifo('del',{cid:gid,id:(g.find(x=>x.srvId)||{}).srvId||null})});
   depois.forEach((g,gid)=>{
-    if(!antes.has(gid)){g.forEach(a=>{delete a.srvId});const anc=ancoraDoGrifo(g[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(g[0],anc)});return}
-    const id=SRVMAP[gid]||g[0].srvId;if(id)g.forEach(a=>{a.srvId=id});
+    if(!antes.has(gid)){const anc=ancoraDoGrifo(g[0]);if(anc)emitAdd(gid,g[0],anc);return}
     const h=g.find(x=>x.note)||g[0],o=antes.get(gid),ho=o.find(x=>x.note)||o[0];
-    if(id&&(g[0].c!==o[0].c||(h.note||'')!==(ho.note||'')))emitGrifo('upd',{id,cor:corToHex(g[0].c),nota:(h.note||null)})})
+    if(g[0].c!==o[0].c||(h.note||'')!==(ho.note||''))emitGrifo('upd',{cid:gid,id:(g.find(x=>x.srvId)||{}).srvId||null,cor:corToHex(g[0].c),nota:(h.note||null)})})
 }catch(_){}}
 function afterHist(msg,prev){save('an');repaintAll();syncHistServidor(prev);renderPanels();updUndo();toast(msg)}
 // Indicador de sincronização dos grifos (o host faz retry/backoff e informa o estado).
@@ -3148,7 +3183,12 @@ function afterHist(msg,prev){save('an');repaintAll();syncHistServidor(prev);rend
   window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-status')return;const c=mk();clearTimeout(tm);
     if(m.estado==='sync'){c.textContent='Salvando…';c.style.color='var(--ink-2)';c.style.display='flex'}
     else if(m.estado==='ok'){c.textContent='Salvo';c.style.color='var(--ok)';c.style.display='flex';tm=setTimeout(()=>{c.style.display='none'},1800)}
-    else{c.textContent='Não foi possível salvar. Verifique a conexão';c.style.color='var(--bad)';c.style.display='flex';try{toast('Falha ao salvar anotação. Verifique a conexão e tente novamente.')}catch(_){}tm=setTimeout(()=>{c.style.display='none'},6000)}})
+    else if(m.estado==='aviso'){try{toast(m.msg||'Aviso')}catch(_){}}
+    else{const n=m.naoSync||0;
+      // O grifo continua pintado e guardado neste aparelho; o host tenta de novo (rede/60 s) e a abertura seguinte reenvia.
+      c.textContent=n?(n===1?'1 grifo não sincronizado':n+' grifos não sincronizados')+' · seguem salvos neste aparelho, tentaremos de novo':'Não foi possível salvar. Verifique a conexão';
+      c.style.color='var(--bad)';c.style.display='flex';try{toast('Falha ao salvar anotação. Ela segue neste aparelho e será reenviada.')}catch(_){}
+      if(!n)tm=setTimeout(()=>{c.style.display='none'},6000)}})
 })();
 function updUndo(){$('#anUndo').disabled=!undoStack.length;$('#anRedo').disabled=!redoStack.length}
 $('#anUndo').onclick=undo;$('#anRedo').onclick=redo;
@@ -3310,8 +3350,11 @@ function selInfoPdf(){
   for(const rc of rectsDoTextoPdf(r)){
     if(rc.width<1||rc.height<1)continue;const cx=rc.left+rc.width/2,cy=rc.top+rc.height/2;
     const el=pageEls.find(p=>{const b=p.getBoundingClientRect();return cx>=b.left&&cx<=b.right&&cy>=b.top&&cy<=b.bottom});
-    if(!el)continue;const pp=$('.pdfpage',el);const b=pp.getBoundingClientRect();
-    const rect={x0:(rc.left-b.left)/b.width,y0:(rc.top-b.top)/b.height,x1:(rc.right-b.left)/b.width,y1:(rc.bottom-b.top)/b.height};
+    if(!el)continue;const pp=$('.pdfpage',el);if(!pp)continue;const b=caixaFolhaPdf(pp);
+    if(!(b.width>8&&b.height>8))continue; // página sem caixa (oculta/colapsada) → dividir por ~0 gerava NaN/Infinity
+    // text layer NÃO pronta (ainda sem endOfContent) ou com caixa diferente da folha (escala errada) → não grava rect
+    const tlp=$('.pdftl',pp);if(!tlp||!tlp.__eoc)continue;const tb=tlp.getBoundingClientRect();if(Math.abs(tb.width-b.width)>b.width*0.03||Math.abs(tb.height-b.height)>b.height*0.03)continue;
+    const rect=rectNormPdf(rc,b);if(!rect)continue; // normaliza + clamp 0..1 + descarta degenerado
     (porPag.get(el.id)??porPag.set(el.id,[]).get(el.id)).push(rect);if(!first)first=rc;
   }
   if(!porPag.size||!first)return null;
@@ -3334,17 +3377,54 @@ function rectsDoTextoPdf(r){
     if(!r.intersectsNode(n)){if(dentro)break;continue}
     dentro=true;if(!n.nodeValue.trim()||!n.parentElement||!n.parentElement.closest('.pdftl'))continue;add(n)}
   return out}
+// rect da tela → rect 0..1 da folha (clamp; null se NaN/vazio/minúsculo). Espelha lib/conteudo/pdf-rects.ts (testado).
+// CAIXA DE REFERÊNCIA ÚNICA dos rects (salvar, pintar, hit-test): o CANVAS da folha (= viewport do pdf.js, mesma
+// caixa da camada de texto). NÃO usar o .pdfpage: ele é item flex (.pdf-sec{display:flex}) e ENCOLHE em tela
+// estreita (tablet retrato: 820→788px) enquanto canvas/texto (absolutos, px fixos) não → o overlay em % da .pdfpage
+// ficava comprimido/deslocado em relação ao texto.
+function caixaFolhaPdf(pp){const cv=$('canvas',pp);return (cv||pp).getBoundingClientRect()}
+function dimFolhaPdf(pp){const cv=$('canvas',pp);const w=parseFloat(cv&&cv.style.width)||parseFloat(pp.style.width)||pp.offsetWidth,h=parseFloat(cv&&cv.style.height)||parseFloat(pp.style.height)||pp.offsetHeight;return {w,h}}
+function rectNormPdf(rc,b){
+  if(!b||!(b.width>0)||!(b.height>0))return null;
+  const c=v=>Math.max(0,Math.min(1,v));
+  const x0=c((rc.left-b.left)/b.width),y0=c((rc.top-b.top)/b.height),x1=c((rc.right-b.left)/b.width),y1=c((rc.bottom-b.top)/b.height);
+  if(![x0,y0,x1,y1].every(Number.isFinite))return null;
+  if(x1-x0<0.002||y1-y0<0.002)return null;
+  return {x0:+x0.toFixed(5),y0:+y0.toFixed(5),x1:+x1.toFixed(5),y1:+y1.toFixed(5)}}
 function mergeRects(rects){
   const srt=rects.slice().sort((a,b)=>a.y0-b.y0||a.x0-b.x0);const lines=[];
-  for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6&&r.x0<=l.x1+0.03&&r.x1>=l.x0-0.03);
+  for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6&&r.x0<=l.x1+0.015&&r.x1>=l.x0-0.015);
     if(ln){ln.x0=Math.min(ln.x0,r.x0);ln.x1=Math.max(ln.x1,r.x1);ln.y0=Math.min(ln.y0,r.y0);ln.y1=Math.max(ln.y1,r.y1)}else lines.push({...r})}
-  return lines;
+  // dedupe: descarta linha totalmente contida em outra (sobreposição escurecia o multiply)
+  return lines.filter((l,i)=>!lines.some((o,j)=>j!==i&&o.x0<=l.x0+1e-4&&o.x1>=l.x1-1e-4&&o.y0<=l.y0+1e-4&&o.y1>=l.y1-1e-4&&(j<i||o.x1-o.x0>l.x1-l.x0||o.y1-o.y0>l.y1-l.y0)));
 }
+// Grifos cujo TEXTO não está mais sob os rects (PDF editado/trocado, layout antigo, rect salvo numa caixa errada)
+// NÃO são pintados (ficariam como barra sem texto/deslocada). Não apaga nada: só deixa de desenhar. Não persistido.
+function textoSobRects(pp,rects){const tl=$('.pdftl',pp);if(!tl||!tl.__eoc)return null;const b=caixaFolhaPdf(pp);if(!(b.width>8&&b.height>8))return null;
+  const w=document.createTreeWalker(tl,NodeFilter.SHOW_TEXT);const out=[];
+  for(let n=w.nextNode();n;n=w.nextNode()){if(!n.nodeValue.trim())continue;const rg=document.createRange();rg.selectNodeContents(n);const rc=rg.getBoundingClientRect();if(!(rc.width>0))continue;
+    const cx=(rc.left+rc.width/2-b.left)/b.width,cy=(rc.top+rc.height/2-b.top)/b.height;
+    if(rects.some(r=>cx>=r.x0&&cx<=r.x1&&cy>=r.y0&&cy<=r.y1))out.push(n.nodeValue)}
+  return out.join(' ')}
+function grifoPdfCasaTexto(a,pp){
+  if(!a.text||!a.rects||!a.rects.length)return null;const sob=textoSobRects(pp,a.rects);if(sob===null)return null; // não dá p/ verificar agora
+  if(!sob.trim())return false; // barra sem NENHUM texto por baixo
+  const nrm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ');
+  const ws=nrm(sob).split(' ').filter(x=>x.length>=3);if(!ws.length)return true;
+  const hay=' '+nrm(a.text)+' ';if(ws.filter(x=>hay.includes(x)).length/ws.length<0.6)return false;
+  // inverso (só quando o grifo é de uma página só, tamanho parecido com o texto sob os rects): as palavras do grifo
+  // precisam estar sob os rects — pega o grifo deslocado p/ uma linha vizinha, que ainda "casa" no sentido direto
+  const wt=nrm(a.text).split(' ').filter(x=>x.length>=3);const hs=' '+nrm(sob)+' ';
+  if(wt.length>=4&&wt.length<=ws.length*1.5+3&&wt.filter(x=>hs.includes(x)).length/wt.length<0.75)return false;
+  return true}
 function paintPdf(a){const sec=$('#'+a.sec);if(!sec)return;const pp=$('.pdfpage',sec);if(!pp)return;
-  (a.rects||[]).forEach(r=>{const d=document.createElement('div');d.className='pdfov';d.dataset.aid=a.id;d.dataset.t=a.t;d.dataset.c=a.c;
-    d.style.cssText=`left:${r.x0*100}%;top:${r.y0*100}%;width:${(r.x1-r.x0)*100}%;height:${(r.y1-r.y0)*100}%`;pp.appendChild(d)})}
+  if(!pdfDesat.has(a.id)){const ok=grifoPdfCasaTexto(a,pp);if(ok!==null){pdfDesat.set(a.id,!ok);if(!ok)try{console.warn('[leitor-jus][pdf] grifo fora do texto (não pintado):',a.id,a.sec);window.parent.postMessage({type:'leitor-jus-grifo-fora-do-texto',sec:a.sec,id:a.id},'*')}catch(_){}}}
+  if(pdfDesat.get(a.id))return;
+  const dm=dimFolhaPdf(pp); // overlay em PX da caixa do canvas (não em % do .pdfpage, que pode encolher no flex)
+  (a.rects||[]).forEach(r=>{const c=v=>Math.max(0,Math.min(1,+v));const x0=c(r.x0),y0=c(r.y0),x1=c(r.x1),y1=c(r.y1);if(![x0,y0,x1,y1].every(Number.isFinite)||x1<=x0||y1<=y0)return;r={x0,y0,x1,y1};const d=document.createElement('div');d.className='pdfov';d.dataset.aid=a.id;d.dataset.t=a.t;d.dataset.c=a.c;
+    d.style.cssText=dm.w>0&&dm.h>0?`left:${(r.x0*dm.w).toFixed(2)}px;top:${(r.y0*dm.h).toFixed(2)}px;width:${((r.x1-r.x0)*dm.w).toFixed(2)}px;height:${((r.y1-r.y0)*dm.h).toFixed(2)}px`:`left:${r.x0*100}%;top:${r.y0*100}%;width:${(r.x1-r.x0)*100}%;height:${(r.y1-r.y0)*100}%`;pp.appendChild(d)})}
 function applyPdf(t,c){const i=pendingSel;if(!i||!i._all)return null;commit();let last=null;
-  for(const [sec,rects] of i._all){const a={id:uid(),sec,rects,t,c:t==='bd'?'k':c,note:'',text:i.text};S.an.push(a);paintPdf(a);last=a;try{cadAuto(a)}catch(_){}}
+  for(const [sec,rects] of i._all){const a={id:uid(),sec,rects,t,c:t==='bd'?'k':c,note:'',text:i.text};pdfDesat.set(a.id,false);S.an.push(a);paintPdf(a);last=a;try{cadAuto(a)}catch(_){}}
   save('an');getSelection().removeAllRanges();hideTool();renderPanels();return last}
 function erasePdf(i){if(!i||!i._all)return;const rem=new Set();
   for(const [sec,rects] of i._all)S.an.filter(a=>a.sec===sec&&(a.rects||[]).some(gr=>rects.some(sr=>gr.x0<sr.x1&&gr.x1>sr.x0&&gr.y0<sr.y1&&gr.y1>sr.y0))).forEach(a=>rem.add(a.id));
@@ -3459,10 +3539,10 @@ article.addEventListener('click',e=>{
   if(CFG.modo==='biblioteca'&&CFG.pdf){
     if(!getSelection().isCollapsed||doc.classList.contains('hide-mine'))return;
     // clique num grifo (overlay é pointer-events:none) → hit-test por coordenada na página
-    for(const el of $$('#article .pdf-sec')){const pp=$('.pdfpage',el);if(!pp)continue;const b=pp.getBoundingClientRect();
+    for(const el of $$('#article .pdf-sec')){const pp=$('.pdfpage',el);if(!pp)continue;const b=caixaFolhaPdf(pp);
       if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)continue;
       const x=(e.clientX-b.left)/b.width,y=(e.clientY-b.top)/b.height;
-      const hit=S.an.find(a=>a.sec===el.id&&(a.rects||[]).some(r=>x>=r.x0&&x<=r.x1&&y>=r.y0&&y<=r.y1));
+      const hit=S.an.find(a=>a.sec===el.id&&!pdfDesat.get(a.id)&&(a.rects||[]).some(r=>x>=r.x0&&x<=r.x1&&y>=r.y0&&y<=r.y1));
       if(hit){e.stopPropagation();
         if(S.set.tool==='eraser'){commit();removeAn(hit.id);toast('Marcação apagada',{label:'Desfazer',fn:undo});return}
         activeAn=hit;pendingSel=null;showTool({left:e.clientX,right:e.clientX,top:e.clientY-4,bottom:e.clientY+4,width:0,height:8},true);return}
@@ -3484,14 +3564,15 @@ function apply(t,c,silent){if(ehPdf())return applyPdf(t,c);const i=pendingSel;if
     const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
   save('an');getSelection().removeAllRanges();hideTool();renderPanels();
   try{created.forEach(cadAuto)}catch(_){}
-  if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}
+  if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitAdd(gid,created[0],anc)}
   try{if(created.length&&navigator.vibrate&&matchMedia('(pointer:coarse)').matches&&!matchMedia('(prefers-reduced-motion:reduce)').matches)navigator.vibrate(8)}catch(_){}
   if(!silent)toast(TOOLS[t]+' aplicado',{label:'Desfazer',fn:undo});return created[0]||null}
-function removeAn(id,render=true,quiet){let ids=[id],srvId=null;
-  if(GRIFO_SERVER){const a0=S.an.find(x=>x.id===id);if(a0&&a0.gid){ids=S.an.filter(a=>a.gid===a0.gid).map(a=>a.id);srvId=a0.srvId}}
+function removeAn(id,render=true,quiet){let ids=[id],srvId=null,gid=null;
+  if(GRIFO_SERVER){const a0=S.an.find(x=>x.id===id);if(a0){srvId=a0.srvId||null;if(a0.gid){gid=a0.gid;ids=S.an.filter(a=>a.gid===a0.gid).map(a=>a.id);srvId=ids.map(i3=>(S.an.find(a=>a.id===i3)||{}).srvId).find(Boolean)||srvId}}}
   ids.forEach(i2=>{if(CFG.modo==='biblioteca'&&CFG.pdf){anMarks(i2).forEach(m=>m.remove())}else{unwrap(anMarks(i2))}});
   S.an=S.an.filter(a=>ids.indexOf(a.id)<0);save('an');
-  if(GRIFO_SERVER&&srvId)emitGrifo('del',{id:srvId});
+  // del SEMPRE com cid: se o id ainda não voltou (add em voo/retry), o host espera o add terminar e apaga a linha criada.
+  if(GRIFO_SERVER&&(gid||srvId))emitGrifo('del',{cid:gid,id:srvId});
   if(render)renderPanels()}
 function erase(i){const hit=S.an.filter(a=>a.pid===i.pid&&a.s<i.e&&a.e>i.s);if(!hit.length)return;commit();
   if(GRIFO_SERVER){const seen=new Set();hit.forEach(a=>{const g=a.gid||a.id;if(seen.has(g))return;seen.add(g);removeAn(a.id,false)});save('an');renderPanels();$('#anHint').textContent='Trecho limpo · Ctrl Z desfaz';return}
@@ -3516,7 +3597,7 @@ function toggleNoSel(t,c){const i=pendingSel;if(!i)return;const segs=selSegs(i),
     segs.forEach(sg=>{S.an.filter(a=>a.pid===sg.pid&&a.t===t&&a.s<sg.e&&a.e>sg.s).forEach(a=>removeAn(a.id,false,true));
       const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
     save('an');renderPanels();try{created.forEach(cadAuto)}catch(_){}
-    if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}}
+    if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitAdd(gid,created[0],anc)}}
   showTool(i.rect,false);marcarAtivos()}                                       // MANTÉM a barra no mesmo trecho
 $$('.cd',tool).forEach(d=>d.onclick=()=>{const c=d.dataset.c;
   if(activeAn){commit();setCorGrupo(activeAn,c);save('an');renderPanels();$$('.cd',tool).forEach(x=>x.classList.toggle('on',x.dataset.c===c));return}
@@ -3603,16 +3684,26 @@ function sorted(list){return list.slice().sort((a,b)=>{
 function item(a){return `<div class="item" data-aid="${esc(a.id)}" data-c="${esc(a.c)}"><q>${esc(a.text)}</q>${a.note?`<div class="nt">${esc(a.note)}</div>`:''}
   <div class="meta"><span>${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}${a.ex?' · exemplo':''}</span><span class="sp"></span><span class="acts">${CAD.on?`<button data-act="cad" class="${CAD.salvos[a.id]?'on':''}" title="${CAD.salvos[a.id]?'Já salvo em caderno · salvar de novo':'Salvar no caderno'}" aria-label="Salvar no caderno"><svg class="i"><use href="#i-bm"/></svg></button>`:''}<button data-act="note" title="Nota"><svg class="i"><use href="#i-note"/></svg></button><button data-act="card" title="Criar cartão"><svg class="i"><use href="#i-cards"/></svg></button><button data-act="sheet" title="Levar para a folha"><svg class="i"><use href="#t-send"/></svg></button><button data-act="del" title="Remover"><svg class="i"><use href="#i-trash"/></svg></button></span></div></div>`}
 function grouped(list){return secs.map((s,i)=>{const hs=sorted(list.filter(a=>a.sec===s.id));return hs.length?`<div class="group-h">Tema ${pad(i+1)}</div>`+hs.map(item).join(''):''}).join('')}
+// "Anotações não encontradas neste texto": grifos que não ancoram (texto do material mudou). Ficam guardados; só o ALUNO apaga
+// (2 cliques: Apagar → Confirmar). Nunca apagamos automaticamente.
+function orfasHTML(){const L=(typeof ORFAS!=='undefined'&&ORFAS)||[];if(!L.length)return '';
+  return '<div class="group-h">Anotações não encontradas neste texto</div><p class="empty" style="margin:0 0 6px">O texto do material mudou e não achamos onde estas anotações estavam. Elas continuam guardadas; apague só se quiser.</p>'+
+    L.map(o=>`<div class="item" data-c="${esc(o.cor||'y')}"><q>${esc(o.text||'')}</q>${o.note?`<div class="nt">${esc(o.note)}</div>`:''}<div class="meta"><span>Não localizada</span><span class="sp"></span><span class="acts"><button data-orfdel="${o.k}|${esc(String(o.key))}" title="${o.conf?'Clique de novo para apagar':'Apagar'}" aria-label="${o.conf?'Confirmar apagar':'Apagar'}"><svg class="i"><use href="#i-trash"/></svg>${o.conf?' Confirmar':''}</button></span></div></div>`).join('')}
+function apagarOrfa(k,key){const i=ORFAS.findIndex(o=>o.k===k&&String(o.key)===String(key));if(i<0)return;const o=ORFAS[i];
+  if(!o.conf){ORFAS.forEach(x=>x.conf=false);o.conf=true;renderPanels();return}
+  if(k==='s')emitGrifo('del',{cid:'s'+o.key,id:o.key});
+  else store.set('an_orf',(store.get('an_orf',[])||[]).filter(a=>(a.gid||('m'+a.id))!==String(key)));
+  ORFAS.splice(i,1);renderPanels();toast('Anotação apagada')}
 function renderPanels(){const counts={};S.an.forEach(a=>counts[a.t]=(counts[a.t]||0)+1);
   $('#hlFilter').innerHTML=`<button class="chip ${anFilter==='all'?'on':''}" data-f="all">Todas <small>${S.an.length}</small></button>`+Object.keys(TOOLS).filter(t=>counts[t]).map(t=>`<button class="chip ${anFilter===t?'on':''}" data-f="${t}">${TOOLS[t]} <small>${counts[t]}</small></button>`).join('');
   const qn=(anQ||'').trim().toLowerCase();
   const list=S.an.filter(a=>(anFilter==='all'||a.t===anFilter)&&(!qn||((a.text||'')+' '+(a.note||'')+' '+(COLORS[a.c]||'')).toLowerCase().includes(qn)));
-  $('#hlList').innerHTML=list.length?grouped(list):(qn?'<p class="empty">Nenhuma marcação encontrada.</p>':'<p class="empty">Nenhuma marcação ainda.<br>Escolha uma ferramenta na barra acima do texto e selecione um trecho.</p>');
+  $('#hlList').innerHTML=(list.length?grouped(list):(qn?'<p class="empty">Nenhuma marcação encontrada.</p>':'<p class="empty">Nenhuma marcação ainda.<br>Escolha uma ferramenta na barra acima do texto e selecione um trecho.</p>'))+orfasHTML();
   const notes=S.an.filter(a=>a.note);
   $('#ntList').innerHTML=notes.length?grouped(notes):'<p class="empty">Suas notas aparecem aqui e na margem do texto.</p>';
   $('#nHl').textContent=S.an.length;$('#nNt').textContent=notes.length;renderNotes();renderCards()}
 $('#hlFilter').onclick=e=>{const c=e.target.closest('.chip');if(c){anFilter=c.dataset.f;renderPanels()}};
-['#hlList','#ntList'].forEach(sel=>$(sel).onclick=e=>{const it=e.target.closest('.item');if(!it)return;const a=S.an.find(x=>x.id===it.dataset.aid);if(!a)return;const b=e.target.closest('[data-act]');
+['#hlList','#ntList'].forEach(sel=>$(sel).onclick=e=>{const od=e.target.closest('[data-orfdel]');if(od){e.stopPropagation();const p=od.dataset.orfdel.split('|');apagarOrfa(p[0],p.slice(1).join('|'));return}const it=e.target.closest('.item');if(!it)return;const a=S.an.find(x=>x.id===it.dataset.aid);if(!a)return;const b=e.target.closest('[data-act]');
   if(b){e.stopPropagation();const k=b.dataset.act;if(k==='del'){commit();removeAn(a.id);toast('Marcação removida',{label:'Desfazer',fn:undo})}if(k==='cad'){cadSalvarAn(a);return}if(k==='card')openCardFrom(a);if(k==='sheet')sendToSheet(a);if(k==='note'){jumpAn(a);setTimeout(()=>openNote(a),420)}return}jumpAn(a)});
 function jumpAn(a){const m=anMarks(a.id)[0];if(!m)return;if(!isWide())setNb(false);goto(a.sec,{el:m});setTimeout(()=>{anMarks(a.id).forEach(x=>x.classList.add('flash'));setTimeout(()=>anMarks(a.id).forEach(x=>x.classList.remove('flash')),1400)},300)}
 function copyAll(){const out=secs.map((s,i)=>{const hs=sorted(S.an.filter(a=>a.sec===s.id));return hs.length?`Tema ${pad(i+1)} · ${s.dataset.title}\n`+hs.map(a=>`- [${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}] ${a.text}${a.note?`\n  Nota: ${a.note}`:''}`).join('\n'):''}).filter(Boolean).join('\n\n');copy(out||'Sem marcações ainda.','Resumo copiado')}
@@ -3972,6 +4063,10 @@ else {
   // senão qualquer dia cairia no DEMO "Dia 01". Handshake robusto: re-anuncia 'ready' até o dia chegar
   // (cobre a corrida de montagem em que a 1ª msg é perdida).
   window.addEventListener('message',(e)=>{const m=e&&e.data;if(e.source!==window.parent)return;if(m&&m.type==='leitor-jus-day')__kick(m.html||'', m.cfg||{})});
+  // Re-ancoragem por TEXTO: o host recalculou os rects de um grifo (texto não casava com os rects salvos) → atualiza o CACHE de desenho e repinta.
+  window.addEventListener('message',(e)=>{const m=e&&e.data;if(e.source!==window.parent||!m||m.type!=='leitor-jus-grifo-rects')return;try{
+    const a=(S.an||[]).find(x=>x.id===m.id);if(!a||!Array.isArray(m.rects)||!m.rects.length||!/^p\d+$/.test(String(m.sec||'')))return;
+    a.rects=m.rects;a.sec=m.sec;pdfDesat.set(a.id,false);repaintAll()}catch(_){}});
   const __ping=()=>{try{window.parent.postMessage({type:'leitor-jus-ready'},'*')}catch(_){}};
   __ping();
   let __tries=0; const __iv=setInterval(()=>{ if(__started||++__tries>40){clearInterval(__iv);return;} __ping(); }, 300);

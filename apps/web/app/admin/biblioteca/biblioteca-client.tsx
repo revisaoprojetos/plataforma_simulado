@@ -530,12 +530,12 @@ export function BibliotecaClient() {
     toast.success('Renomeado.'); carregar(pastaAtual)
   }
   async function moverDoc(d: Doc, pastaId: string | null) {
-    const r = await moverDocumento(d.id, pastaId); if (!r.ok) return toast.error(r.error || 'Falha.')
+    const r = await moverDocumento(d.id, pastaId); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
     toast.success('Documento movido.'); carregar(pastaAtual)
   }
   async function arquivarDoc(d: Doc) {
     if (!(await confirmar({ titulo: 'Arquivar documento?', mensagem: `"${d.titulo}" deixa de aparecer para os alunos.`, confirmar: 'Arquivar', destrutivo: true }))) return
-    const r = await removerDocumento(d.id); if (!r.ok) return toast.error(r.error || 'Falha.')
+    const r = await removerDocumento(d.id); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
     toast.success('Documento arquivado.'); carregar(pastaAtual)
   }
   async function duplicarDoc(d: Doc) {
@@ -1045,7 +1045,7 @@ function DetalheDialog({ documentoId, pdfUrlInicial, capaInicial, onFechar, onMu
   }
   async function excluir() {
     if (!(await confirmar({ titulo: 'Arquivar documento?', mensagem: 'Ele deixa de aparecer para os alunos.', confirmar: 'Arquivar', destrutivo: true }))) return
-    const r = await removerDocumento(documentoId); if (!r.ok) return toast.error(r.error || 'Falha.')
+    const r = await removerDocumento(documentoId); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
     toast.success('Documento arquivado.'); onMudou(); onFechar()
   }
   async function editarNoOffice() {

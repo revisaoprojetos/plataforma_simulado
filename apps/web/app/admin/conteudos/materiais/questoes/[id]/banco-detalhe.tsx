@@ -99,7 +99,7 @@ export function BancoDetalhe({
       const ok = await confirmar({ titulo: 'Excluir banco', mensagem: `Enviar "${banco.nome}" para a lixeira? As questões não são apagadas.`, destrutivo: true, confirmar: 'Excluir' })
       if (!ok) return
       const r = await excluirBanco(banco.id)
-      if (!r.ok) { toast.error(r.error ?? 'Erro ao excluir.'); return }
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao excluir.', { duration: 15000 }); return }
       toast.success('Banco enviado para a lixeira.'); router.push(BASE)
     })
   }

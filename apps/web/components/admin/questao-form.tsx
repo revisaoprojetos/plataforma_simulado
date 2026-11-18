@@ -591,7 +591,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
     setExcluindo(true)
     const r = await onExcluir()
     if (r.ok) { toast.success('Questão excluída'); window.location.assign('/admin/questoes') }
-    else { setExcluindo(false); toast.error(r.error ?? 'Erro ao excluir') }
+    else { setExcluindo(false); toast.error(r.error ?? 'Erro ao excluir', { duration: 15000 }) }
   }
 
   async function handleFormSubmit(data: QuestaoFormData) {

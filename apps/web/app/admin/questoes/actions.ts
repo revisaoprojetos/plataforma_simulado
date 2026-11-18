@@ -443,15 +443,19 @@ export async function verificarUsoQuestoes(ids: string[]): Promise<{ ok: boolean
   return { ok: true, itens }
 }
 
-/** Exclui (soft-delete) questões em massa — vão para a lixeira, reversível. */
-export async function excluirQuestoes(ids: string[]): Promise<{ ok: boolean; count?: number; error?: string }> {
+/**
+ * Exclui (soft-delete) questões em massa — vão para a lixeira, reversível.
+ * TRAVA: questão com vínculo (respostas, simulados, documentos, cronograma, cadernos…) NÃO é excluída;
+ * as livres são processadas e as bloqueadas voltam em `bloqueadas` com o motivo (use "Arquivar" nelas).
+ */
+export async function excluirQuestoes(ids: string[]): Promise<{ ok: boolean; count?: number; error?: string; bloqueadas?: { id: string; motivo: string }[]; mensagem?: string }> {
   if (!(await checkPermission('questoes:delete'))) return { ok: false, error: 'Você não tem permissão para excluir questões.' }
   const qids = [...new Set((ids ?? []).filter(Boolean))]
   if (!qids.length) return { ok: false, error: 'Selecione ao menos uma questão.' }
-  const { error, count } = await softDelete('simulado_questoes', qids)
-  if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_questoes', entidadeId: qids[0], depois: { excluidas: count, ids: qids.slice(0, 50) } })
+  const { error, count, bloqueadas, mensagem } = await softDelete('simulado_questoes', qids)
+  if (error) return { ok: false, error: error.message, bloqueadas, mensagem }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_questoes', entidadeId: qids[0], depois: { excluidas: count, ids: qids.slice(0, 50), recusadas_por_vinculo: bloqueadas?.length ?? 0 } })
   revalidatePath('/admin/questoes')
   revalidatePath('/admin/banco-questoes')
-  return { ok: true, count }
+  return { ok: true, count, bloqueadas, mensagem }
 }

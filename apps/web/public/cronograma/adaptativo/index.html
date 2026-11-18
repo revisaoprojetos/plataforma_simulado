@@ -920,7 +920,13 @@ const ARR = {
 const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 const DIAS3 = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
 const CENTRAL = 'central@revisaoej.com.br';
-const CHAVE = 'rej-cronograma-v2';
+const CHAVE_BASE = 'rej-cronograma-v2'; /* chave LEGADA (global, compartilhada entre alunos/planos): nunca mais aplicada ao estado */
+let CHAVE = null; /* cache local NAMESPACEADO por estudante+plano ('rej-cronograma-v2:<est>:<plano>'); só existe após a hidratação do servidor */
+let PLANO_ID = null, EST_ID = null, HIDRATOU = false, PROG_BASE = {}, SIG_AS = null; /* SIG_AS = assinatura das aulas (por chave de documento) do estado carregado: o servidor recusa (409) se o catálogo mudou desde então */ /* PROG_BASE = assinatura do progresso como o SERVIDOR o conhece → deriva `tocadas` */
+const sigProg = p => (p && (p.s || p.parou || p.t || p.modo)) ? JSON.stringify([p.s || '', p.t || 0, p.parou ? p.parou.v : '', p.modo || '']) : '';
+const snapProg = () => { const o = {}; for (const id in (S.prog || {})) { const g = sigProg(S.prog[id]); if (g) o[id] = g; } return o; };
+/* ids que o ALUNO alterou nesta sessão (progresso diferente do que o servidor tem). Só estes podem virar/desfazer 'done' no servidor. */
+function tocadasProg() { const t = [], cur = snapProg(); for (const id of new Set([...Object.keys(cur), ...Object.keys(PROG_BASE)])) if ((cur[id] || '') !== (PROG_BASE[id] || '')) t.push(id); return t; }
 let aulasPor = {}; AS.forEach(a => aulasPor[a[0]] = (aulasPor[a[0]] || 0) + 1);
 
 /* ---------- utilidades ---------- */
@@ -1018,9 +1024,11 @@ function carregarLocal() {
   try { const x = JSON.parse(localStorage.getItem(CHAVE) || 'null'); if (x && x.v === 2 && x.plano) return x; } catch (e) {}
   return null;
 }
+  if (!CHAVE) return null; /* sem estudante+plano conhecidos (antes da hidratação) NÃO existe cache confiável */
 function cfgVazia() {
   return { start: hojeISO(), horas: [0, 0, 0, 0, 0, 0, 0], discs: [...ESSENCIAIS], metas: { pf: true, fl: true, qu: true, lp: true }, arranjo: 'pdf', revModelo: 'pdflash', revisao: { ativa: true, cada: REV_PADRAO }, motor: Motor28.VERSAO_MOTOR };
 }
+function carregarPerfilLegado() { try { const x = JSON.parse(localStorage.getItem(CHAVE_BASE) || 'null'); return x && x.perfil ? { perfil: x.perfil } : null; } catch (e) { return null; } }
 function novoEstado() {
   return { v: 2, cfg: cfgVazia(), plano: {}, fim: 1, prog: {}, log: {}, extras: [], notas: {}, reorgs: [], revs: {}, detalhes: {}, pausa: null, perfil: null, exemplo: true, atualizado: { estado: 0, progresso: 0, notas: 0 } };
 }
@@ -1090,7 +1098,8 @@ function salvar(...partes) {
   const agora = Date.now();
   for (const p of partes) { S.atualizado[p] = agora; sujo.add(p); }
   if (CRIAR) { sujo.clear(); return; } /* rascunho só em memória */
-  try { localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {}
+  if (!HIDRATOU && !CRIAR) return; /* NUNCA grava/envia o S local antes de o servidor hidratar com sucesso (S local pode ser de outro aluno/plano) */
+  try { if (CHAVE) localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {}
   clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 1200);
 }
 const NUVEM = { db: null, base: null, ativa: false };
@@ -1167,6 +1176,16 @@ let DOCS_BLOQ = {};
 function bloqMeta(id) { try { const i = info(id), d = i && i.doc; return d && Object.prototype.hasOwnProperty.call(DOCS_BLOQ, d) ? DOCS_BLOQ[d] : null; } catch (e) { return null; } }
 function dataBloq(v) { return v ? v.slice(8, 10) + '/' + v.slice(5, 7) + '/' + v.slice(0, 4) : ''; }
 function avisoBloq(id) { const v = bloqMeta(id); if (v === null) return false; toast(v ? 'Este material será liberado em ' + dataBloq(v) + '.' : 'Este material ainda não foi liberado.'); return true; }
+/* MATERIAL INDISPONÍVEL: aulas cujo documento saiu da Biblioteca sem substituto seguro. Não somem nem deslocam o plano; o progresso fica guardado. */
+let INDISP = [];
+function avisoIndisp() {
+  try {
+    if (!INDISP.length) return '';
+    const l = INDISP.slice(0, 4).map(x => esc((x.titulo || 'Aula sem título') + (x.disciplina ? ' · ' + x.disciplina : ''))).join('; ');
+    const mais = INDISP.length > 4 ? ' e mais ' + (INDISP.length - 4) : '';
+    return `<div class="aviso alerta" style="margin-bottom:18px"><span><b>Material indisponível — fale com o suporte.</b> ${INDISP.length === 1 ? 'Uma aula do seu plano está' : INDISP.length + ' aulas do seu plano estão'} sem material no momento (${l}${mais}). Seu progresso nelas está guardado e não é perdido; a aula volta sozinha quando o material for restabelecido.</span></div>`;
+  } catch (e) { return ''; }
+}
 function iniciarMeta(id) {
   if (avisoBloq(id) && !feito(id)) return;
   if (FOCO && FOCO.id !== id) parar();
@@ -2305,7 +2324,7 @@ function renderBanner() {
   if (TELA === 'configurar') { $('#banner').innerHTML = `<div class="boas-vindas"><svg class="bv-emb" viewBox="0 0 68 66" aria-hidden="true"><path fill-rule="evenodd" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.14)" stroke-width=".25" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z"></path><path class="bv-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" stroke-width=".45" stroke-linecap="round" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z"></path></svg><span class="rot">Configurar</span><h1>Ajustes do cronograma</h1><p>Mude as horas de estudo, inclua recessos ou troque disciplinas. As metas concluídas ficam como estão; o restante é recalculado quando você confirmar.</p></div>`; return; }
   if (S.pausa && TELA !== 'hoje') { $('#banner').innerHTML = `<div class="aviso pausa-aviso" style="margin-bottom:18px"><span><b>Cronograma pausado desde ${fDM(S.pausa.desde)}.</b> Ao retomar, as metas desse dia passam para o dia da retomada.</span><button type="button" class="btn sm ouro" data-acao="retomar">Retomar cronograma</button></div>`; return; }
   const n = TELA === 'hoje' || S.pausa ? 0 : atrasadas().length;
-  $('#banner').innerHTML = n ? `<div class="aviso alerta" style="margin-bottom:18px"><span><b>${n} ${n === 1 ? 'meta atrasada' : 'metas atrasadas'}.</b> Recalcule para redistribuir sem quebrar os prazos do método.</span><button type="button" class="btn sm prim" data-acao="reorg-banner">Organizar metas em atraso</button></div>` : '';
+  $('#banner').innerHTML = avisoIndisp() + (n ? `<div class="aviso alerta" style="margin-bottom:18px"><span><b>${n} ${n === 1 ? 'meta atrasada' : 'metas atrasadas'}.</b> Recalcule para redistribuir sem quebrar os prazos do método.</span><button type="button" class="btn sm prim" data-acao="reorg-banner">Organizar metas em atraso</button></div>` : '');
 }
 
 document.addEventListener('click', e => {
@@ -2822,7 +2841,7 @@ window.addEventListener('pagehide', () => { if (S && S.perfil && TUT !== null &&
 if (CRIAR) {
   /* estado LIMPO: ignora o plano existente (e o cache local dele); só reaproveita o perfil/ritmo de leitura já informado */
   S = novoEstado();
-  const loc = carregarLocal(); if (loc && loc.perfil) S.perfil = { ...loc.perfil };
+  const loc = carregarPerfilLegado(); if (loc && loc.perfil) S.perfil = { ...loc.perfil };
 } else S = (TESTE || REVFIXO ? null : carregarLocal()) || novoEstado();
 if (REVFIXO) S.exemplo = false; /* sem onboarding: o plano chega pronto do servidor */
 /* Segura a tela até o servidor responder: (1) sem cache o estado inicial é o de "primeiro acesso" — não mostrar essa tela antes de o servidor responder
@@ -3628,13 +3647,23 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
     for (var k = 0; k < partes.length; k++) {
       var p = partes[k];
       try {
-        var r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ acao: 'sync', parte: p, doc: docDe(p) }) });
+    if (!HIDRATOU) { sujo.clear(); return; } /* GET falhou/pendente: não envia o S local ao servidor */
+        var corpo = { acao: 'sync', parte: p, doc: docDe(p), planoId: PLANO_ID || undefined, sigAS: SIG_AS || undefined }, enviada = null;
+        if (p === 'progresso') { corpo.tocadas = tocadasProg(); enviada = snapProg(); }
+        var r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(corpo) });
+        if (r.status === 409) { /* o servidor tem OUTRO plano em foco (aba/dispositivo desatualizado): descarta o pendente e recarrega do servidor */
+          sujo.clear(); clearTimeout(saveT); HIDRATOU = false;
+          toast('Seu cronograma foi alterado em outra aba ou dispositivo. Carregamos a versão atual.');
+          carregarDoServidor(1); return;
+        }
         if (!r.ok) throw new Error('http ' + r.status);
         if (p === 'progresso') { /* o servidor RECUSA concluir meta de material bloqueado/sem acesso: reverte local e avisa */
-          var jr = await r.json().catch(function () { return null; }), rec = jr && jr.recusadas ? Object.keys(jr.recusadas) : [];
+          var rec = jr && jr.recusadas ? Object.keys(jr.recusadas) : [];
           if (rec.length) {
-            rec.forEach(function (mid) { var q = S.prog[mid]; if (q) { delete q.s; delete q.em; } });
+            rec.forEach(function (mid) { var q = S.prog[mid]; if (q) { delete q.s; delete q.em; } if (enviada) delete enviada[mid]; });
             var r0 = jr.recusadas[rec[0]]; toast(r0.motivo === 'sem_acesso' ? 'Você não tem acesso a este material; a meta não foi concluída.' : (r0.liberaEm ? 'Este material será liberado em ' + dataBloq(r0.liberaEm) + '. A meta não foi concluída.' : 'Este material ainda não foi liberado. A meta não foi concluída.'));
+        var jr = await r.json().catch(function () { return null; });
+        if (p === 'estado' && jr && jr.planoId && !PLANO_ID) { PLANO_ID = jr.planoId; if (EST_ID) CHAVE = CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID; } /* 1º plano criado pelo sync */
             renderTudo();
           }
         }
@@ -3642,6 +3671,12 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
     }
     if (falhou) { clearTimeout(saveT); saveT = setTimeout(enviarNuvem, 5000); marcarSync(false, 'Salvo neste navegador'); }
     else marcarSync(true, 'Salvo na sua conta');
+          if (enviada) PROG_BASE = enviada;
+          if (jr && jr.ignoradas && jr.ignoradas.length) { /* o servidor ignorou conclusões sem ação explícita (estado local desatualizado): recarrega a verdade */
+            sujo.clear(); clearTimeout(saveT); HIDRATOU = false;
+            toast('Algumas marcações estavam desatualizadas e foram ignoradas. Carregamos a versão atual.');
+            carregarDoServidor(1); return;
+          }
   };
 
   // Aplica o CONTEÚDO vindo do backend (disciplinas classificadas + aulas da Biblioteca
@@ -3711,6 +3746,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
         // Modo criar: só o CONTEÚDO do servidor; o plano existente é ignorado (não hidrata S, não grava cache).
         R = null; PREV = null; indexar(); renderTudo(); marcarSync(false, 'Novo cronograma · salvo ao gerar'); pedirTema();
         return;
+      INDISP = (j && Array.isArray(j.indisponiveis)) ? j.indisponiveis : [];
       }
       if (j && j.ok && j.estado) {
         var c = j;
@@ -3719,9 +3755,13 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
         S.titulo = c.estado.titulo || '';
         S.prog = (c.progresso && c.progresso.prog) || {};
         S.notas = (c.notas && c.notas.notas) || {};
+        PLANO_ID = c.planoId || null; EST_ID = c.estudanteId || null; SIG_AS = c.sigAS || null;
+        CHAVE = EST_ID && PLANO_ID ? CHAVE_BASE + ':' + EST_ID + ':' + PLANO_ID + (SIG_AS ? ':' + SIG_AS : '') : null; /* cache local por estudante+plano; o cache GLOBAL antigo nunca é aplicado */
+        try { localStorage.removeItem(CHAVE_BASE); } catch (e) {}
         S.extras = (c.progresso && c.progresso.extras) || c.estado.extras || [];
         S.atualizado = { estado: 1, progresso: 1, notas: 1 };
-        try { localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {}
+        PROG_BASE = snapProg(); HIDRATOU = true; /* a partir daqui (e só daqui) salvar() pode gravar/enviar */
+        try { if (CHAVE) localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {}
         indexar();
         if (!TELAS.includes(location.hash.slice(1))) irPara(S.exemplo ? 'configurar' : 'hoje', true);
         renderTudo();
@@ -3734,6 +3774,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
         renderTudo();
         marcarSync(false, 'Salvo neste navegador');
       }
+        EST_ID = (j && j.estudanteId) || null; PLANO_ID = null; CHAVE = null; PROG_BASE = {}; HIDRATOU = true;
     } catch (e) { clearTimeout(tm); falhaCarga(tentativa, e && e.name === 'AbortError' ? 'O servidor demorou mais de 40 segundos.' : 'Falha ao carregar (' + ((e && e.message) || 'erro') + ').'); }
   }
   carregarDoServidor(1);

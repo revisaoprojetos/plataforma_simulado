@@ -7,7 +7,7 @@ import { lerCfgMetas } from './config-metas'
 // REGISTRO do Cronograma Adaptativo (aba admin "Análise de uso"). TUDO best-effort: nunca lança, nunca atrasa a resposta
 // do aluno (a gravação roda em after()) e tolera a migração 20261119030000 ausente (a tabela some → o insert falha em silêncio).
 
-export type AcaoGeracao = 'gerar' | 'recalcular' | 'migrar' | 'sync' | 'fixar' | 'arquivar' | 'apagar' | 'pausar'
+export type AcaoGeracao = 'gerar' | 'recalcular' | 'migrar' | 'sync' | 'fixar' | 'arquivar' | 'apagar' | 'pausar' | 'remap_as' | 'remap_as'
 export type OrigemGeracao = 'aluno' | 'equipe' | 'migracao' | 'iframe'
 
 export interface RegistroGeracao {
@@ -46,12 +46,15 @@ export async function hashParamsTenant(svc: SupabaseClient, tenantId: string): P
 export function registrarGeracao(svc: SupabaseClient, r: RegistroGeracao): void {
   depois(async () => {
     const params_hash = await hashParamsTenant(svc, r.tenantId)
-    await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({
+    const linha = {
       tenant_id: r.tenantId, estudante_id: r.estudanteId, plano_id: r.planoId ?? null, acao: r.acao, origem: r.origem ?? 'aluno',
       ator_user_id: r.atorUserId ?? null, motor: r.motor ?? null, catalogo: r.catalogo ?? null, params_hash,
       ok: r.ok !== false, erro: r.erro ? String(r.erro).slice(0, 500) : null,
       ms: r.ms != null ? Math.max(0, Math.round(r.ms)) : null, n_metas: r.nMetas ?? null, fim: r.fim ?? null,
-    })
+    }
+    const { error } = await svc.from('simulado_cronograma_adaptativo_geracao_log').insert(linha)
+    // 'remap_as' só existe no CHECK depois da migração 20261125000000: antes dela, registra como 'migrar' com o rótulo no texto.
+    if (error && r.acao === 'remap_as') await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({ ...linha, acao: 'migrar', erro: ('[remap_as] ' + (r.erro ?? '')).slice(0, 500) })
   })
 }
 
@@ -83,12 +86,14 @@ export function registrarSync(svc: SupabaseClient, r: {
   })
 }
 
-/** Evento de meta: marcar/desmarcar (de → para). Estado anterior lido ANTES do upsert. Em after(). */
-export function registrarEventoMeta(svc: SupabaseClient, e: { tenantId: string; planoId: string; estudanteId: string; metaId: string; de: string | null; para: string | null }): void {
+/** Evento de meta: marcar/desmarcar (de → para). Estado anterior lido ANTES do upsert. Em after().
+ *  `origem` = canal da marcação ('meta_clique' = clique direto na meta; 'sync_iframe' = sincronização do cronograma) — coluna
+ *  `origem` da migração 20261125010000; se ainda não existir, grava sem ela (nunca perde o evento). */
+export function registrarEventoMeta(svc: SupabaseClient, e: { tenantId: string; planoId: string; estudanteId: string; metaId: string; de: string | null; para: string | null; origem?: 'meta_clique' | 'sync_iframe' | 'outro' }): void {
   if (e.de === e.para) return
   depois(async () => {
-    await svc.from('simulado_cronograma_adaptativo_meta_evento').insert({
-      tenant_id: e.tenantId, plano_id: e.planoId, estudante_id: e.estudanteId, meta_id: e.metaId, de: e.de, para: e.para,
-    })
+    const base = { tenant_id: e.tenantId, plano_id: e.planoId, estudante_id: e.estudanteId, meta_id: e.metaId, de: e.de, para: e.para }
+    const r = await svc.from('simulado_cronograma_adaptativo_meta_evento').insert({ ...base, origem: e.origem ?? 'outro' })
+    if (r.error && /origem/i.test(String(r.error.message))) await svc.from('simulado_cronograma_adaptativo_meta_evento').insert(base)
   })
 }

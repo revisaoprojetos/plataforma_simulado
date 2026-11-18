@@ -4,6 +4,8 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { dParse, dDow, semDe } from './motor28'
 import { chavesUnicas } from './catalogo-override'
+import { carregarInfoDocs } from './relink-documento-server'
+import { normalizarTituloDoc } from './relink-documento'
 import { rotuloMeta, semanaOrigemDaMeta, sanearDetalhes } from './meta-ids'
 import type { Detalhe } from './motor28'
 
@@ -17,6 +19,8 @@ import type { Detalhe } from './motor28'
 const T_PLANO = 'simulado_cronograma_adaptativo_plano'
 const T_PM = 'simulado_cronograma_adaptativo_plano_meta'
 const TIPO_NOME: Record<string, string> = { pf: 'PDFull', pp: 'PDFull (parte)', fl: 'PDFlash', qu: 'Questões', lp: 'LegProc', rf: 'Revisão PDFlash', rq: 'Revisão Questões', jp: 'Jurisprudência' }
+/** false depois que o banco recusar as colunas de snapshot (migração 20261125020000 pendente) — evita tentar de novo a cada lote. */
+let SNAP_COLS = true
 const ORDEM_TIPO: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4, jp: 4 }
 
 export interface LinhaPlanoMeta {
@@ -25,6 +29,8 @@ export interface LinhaPlanoMeta {
   disciplina: string | null; aula: string | null; titulo: string | null; documento_id: string | null; aula_key: string | null
   semana: number; dia: number; data_prevista: string; horas: number | null; ordem: number
   detalhes: Record<string, unknown> | null; semana_origem: number | null
+  /** SNAPSHOT do documento no momento do espelho (migração 20261125020000; opcionais: o código segue sem as colunas) */
+  doc_titulo?: string | null; doc_titulo_norm?: string | null; doc_pasta_id?: string | null
 }
 
 /** O que precisa do conteúdo p/ descrever as metas (enxuto e serializável → cacheável). */
@@ -32,17 +38,27 @@ export interface ConteudoDescricao {
   AS: Array<[string, string, string, string | null, string]>                          // disciplina, nº da aula, tema, documento, chave estável
   LP: Array<{ id: string; disc: string; lei: string; texto: string; doc: string | null }>
   WLP: string[][]; WLPdoc: Array<Array<string | null>>
+  /** snapshot por documento: t = título, n = título normalizado, p = pasta (opcional → sem snapshot) */
+  DOCS?: Record<string, { t: string; n: string; p: string | null }>
 }
 
 async function conteudoParaDescricao(svc: SupabaseClient, tenantId: string): Promise<ConteudoDescricao> {
   return remember<ConteudoDescricao>(`crono-adapt:plano-meta-conteudo:${tenantId}`, 120, async () => {
     const c = await carregarConteudoBanco(svc, tenantId)
     const chaves = chavesUnicas(c.AS ?? []) // chave estável da aula (d:<doc> · t:disc|tema) — independe da posição
-    return {
-      AS: (c.AS ?? []).map((a, i) => [String(a[0] ?? ''), String(a[1] ?? ''), String(a[2] ?? ''), (a[6] as string | undefined) ?? null, chaves[i]]),
-      LP: (c.LP ?? []).map((x) => ({ id: x.id, disc: x.disc, lei: x.lei, texto: x.texto, doc: x.doc ?? null })),
-      WLP: c.WLP ?? [], WLPdoc: (c.WLPdoc ?? []) as Array<Array<string | null>>,
-    }
+    const AS = (c.AS ?? []).map((a, i) => [String(a[0] ?? ''), String(a[1] ?? ''), String(a[2] ?? ''), (a[6] as string | undefined) ?? null, chaves[i]] as ConteudoDescricao['AS'][number])
+    const LP = (c.LP ?? []).map((x) => ({ id: x.id, disc: x.disc, lei: x.lei, texto: x.texto, doc: x.doc ?? null }))
+    const WLPdoc = (c.WLPdoc ?? []) as Array<Array<string | null>>
+    // SNAPSHOT do nome do documento (best-effort: falha → sem snapshot, o espelho segue igual)
+    const DOCS: NonNullable<ConteudoDescricao['DOCS']> = {}
+    try {
+      const ids = new Set<string>()
+      for (const a of AS) if (uuidOu(a[3])) ids.add(a[3] as string)
+      for (const l of LP) if (uuidOu(l.doc)) ids.add(l.doc as string)
+      for (const r of WLPdoc) for (const d of r ?? []) if (uuidOu(d)) ids.add(d as string)
+      for (const [id, d] of await carregarInfoDocs(svc, tenantId, [...ids])) DOCS[id] = { t: d.titulo ?? '', n: d.titulo_norm || normalizarTituloDoc(d.titulo), p: d.pasta_id ?? null }
+    } catch { /* sem snapshot */ }
+    return { AS, LP, WLP: c.WLP ?? [], WLPdoc, DOCS }
   })
 }
 
@@ -141,8 +157,10 @@ export function linhasDaGrade(
     const n = ordemNoDia.get(it.data) ?? 0; ordemNoDia.set(it.data, n + 1)
     const d = descrever(it.id, conteudo)
     const det = detalhes[it.id] ?? null
+    const sd = d.documento_id ? conteudo.DOCS?.[d.documento_id] : undefined
     return {
       tenant_id: ids.tenantId, estudante_id: ids.estudanteId, plano_id: ids.planoId, meta_id: it.id, ...d,
+      ...(sd ? { doc_titulo: sd.t, doc_titulo_norm: sd.n, doc_pasta_id: sd.p } : {}),
       detalhes: det, semana_origem: semanaOrigemDaMeta(it.id, det),
       semana: start ? semDe(start, it.data) : 1, dia: dDow(it.data), data_prevista: it.data, horas: it.horas, ordem: n,
     }
@@ -219,8 +237,10 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
     for (let k = 0; k < sairam.length; k += 150) await svc.from(T_PM).delete().eq('plano_id', row.id).in('meta_id', sairam.slice(k, k + 150))
     const agora = new Date().toISOString()
     for (let k = 0; k < linhas.length; k += 500) {
-      const lote = linhas.slice(k, k + 500).map((l) => ({ ...l, atualizado_em: agora }))
+      const lote = linhas.slice(k, k + 500).map(({ doc_titulo, doc_titulo_norm, doc_pasta_id, ...l }) => ({ ...l, ...(SNAP_COLS ? { doc_titulo, doc_titulo_norm, doc_pasta_id } : {}), atualizado_em: agora }))
       let { error: e3 } = await svc.from(T_PM).upsert(lote, { onConflict: 'plano_id,meta_id' })
+      // migração 20261125020000 (snapshot do documento) ainda não aplicada → grava sem essas colunas
+      if (e3 && /doc_titulo|doc_pasta_id/i.test(e3.message)) { SNAP_COLS = false; ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ doc_titulo: _a, doc_titulo_norm: _b, doc_pasta_id: _c, ...r }) => r), { onConflict: 'plano_id,meta_id' })) }
       // migração 20261106030000 (aula_key) ainda não aplicada → grava sem a coluna, sem derrubar o espelho
       if (e3 && /aula_key/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ aula_key: _k, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
       // migração 20261110020000 (detalhes/semana_origem) ainda não aplicada → grava sem essas colunas

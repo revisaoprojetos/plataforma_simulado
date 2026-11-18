@@ -2,6 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { chaveBaseAula } from './catalogo-override'
+import { carregarInfoDocs } from './relink-documento-server'
+import { normalizarTituloDoc } from './relink-documento'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 /**
@@ -21,10 +23,13 @@ export interface DefLinha {
   paginas: number | null; minutos: number | null; link_qc: string | null; link_tec: string | null
   documento_id: string | null; ordem: number | null; ativa: boolean; origem: string
   aula_key?: string | null // chave estável da aula (= chave, só p/ tipo aula) — independe de ref_pos
+  /** SNAPSHOT do documento (migração 20261125020000; opcional) */
+  doc_titulo?: string | null; doc_titulo_norm?: string | null; doc_pasta_id?: string | null
 }
 
 /** Puro (sem banco): as definições a partir do conteúdo efetivo. */
-export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unknown>>; ordem?: number[]; LP?: Array<{ id: string; disc: string; lei: string; texto: string; doc?: string | null; min?: number }> }): DefLinha[] {
+export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unknown>>; ordem?: number[]; LP?: Array<{ id: string; disc: string; lei: string; texto: string; doc?: string | null; min?: number }>; docs?: Record<string, { t: string; n: string; p: string | null }> }): DefLinha[] {
+  const snap = (doc: string | null): Partial<DefLinha> => { const d = doc ? c.docs?.[doc] : undefined; return d ? { doc_titulo: d.t, doc_titulo_norm: d.n, doc_pasta_id: d.p } : {} }
   const out: DefLinha[] = []
   const posOrdem = new Map<number, number>()
   ;(c.ordem ?? []).forEach((i, k) => { if (!posOrdem.has(i)) posOrdem.set(i, k) })
@@ -40,6 +45,7 @@ export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unkn
       paginas: typeof a[3] === 'number' && Number.isFinite(a[3]) ? Math.trunc(a[3]) : null, minutos: null,
       link_qc: String(a[4] ?? '') || null, link_tec: String(a[5] ?? '') || null, documento_id: doc,
       ordem: posOrdem.has(i) ? (posOrdem.get(i) as number) : null, ativa: temOrdem ? posOrdem.has(i) : true, origem: doc ? 'biblioteca' : 'catalogo',
+      ...snap(doc),
     })
   })
   ;(c.LP ?? []).forEach((l, k) => {
@@ -47,6 +53,7 @@ export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unkn
       tenant_id: tenantId, tipo: 'legproc', chave: l.id, ref_pos: null, disciplina: l.disc || null, numero: null, titulo: l.lei || null,
       texto: l.texto || null, paginas: null, minutos: typeof l.min === 'number' ? Math.trunc(l.min) : null, link_qc: null, link_tec: null,
       documento_id: uuidOu(l.doc), ordem: k, ativa: true, origem: uuidOu(l.doc) ? 'biblioteca' : 'catalogo',
+      ...snap(uuidOu(l.doc)),
     })
   })
   return out
@@ -56,13 +63,25 @@ export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unkn
 export async function sincronizarMetaDef(svc: SupabaseClient, tenantId: string): Promise<{ ok: boolean; motivo?: string; aulas?: number; legprocs?: number; desativadas?: number }> {
   try {
     const conteudo = await carregarConteudoBanco(svc, tenantId)
-    const defs = definicoesDoConteudo(tenantId, { AS: conteudo.AS as unknown as Array<Array<unknown>>, ordem: conteudo.ordem, LP: conteudo.LP })
+    let docs: Record<string, { t: string; n: string; p: string | null }> | undefined
+    try { // snapshot do nome do documento (best-effort)
+      const ids = [...conteudo.AS.map((a) => uuidOu((a as unknown as unknown[])[6])), ...(conteudo.LP ?? []).map((l) => uuidOu(l.doc))].filter(Boolean) as string[]
+      docs = {}
+      for (const [id, d] of await carregarInfoDocs(svc, tenantId, ids)) docs[id] = { t: d.titulo ?? '', n: d.titulo_norm || normalizarTituloDoc(d.titulo), p: d.pasta_id ?? null }
+    } catch { docs = undefined }
+    const defs = definicoesDoConteudo(tenantId, { AS: conteudo.AS as unknown as Array<Array<unknown>>, ordem: conteudo.ordem, LP: conteudo.LP, docs })
     const agora = new Date().toISOString()
     for (let k = 0; k < defs.length; k += 400) {
       const lote = defs.slice(k, k + 400).map((d) => ({ ...d, atualizado_em: agora }))
       let { error } = await svc.from(T).upsert(lote, { onConflict: 'tenant_id,tipo,chave' })
-      // migração 20261106030000 (aula_key) ainda não aplicada → grava sem a coluna
-      if (error && /aula_key/i.test(error.message)) ({ error } = await svc.from(T).upsert(lote.map(({ aula_key: _k, ...r }) => r), { onConflict: 'tenant_id,tipo,chave' }))
+      // colunas opcionais ausentes (aula_key: 20261106030000; snapshot do documento: 20261125020000) → regrava sem elas
+      let atual: Array<Record<string, unknown>> = lote
+      for (let t = 0; t < 2 && error; t++) {
+        if (/doc_titulo|doc_pasta_id/i.test(error.message)) atual = atual.map(({ doc_titulo: _a, doc_titulo_norm: _b, doc_pasta_id: _c, ...r }) => r)
+        else if (/aula_key/i.test(error.message)) atual = atual.map(({ aula_key: _k, ...r }) => r)
+        else break
+        ;({ error } = await svc.from(T).upsert(atual, { onConflict: 'tenant_id,tipo,chave' }))
+      }
       if (error) return { ok: false, motivo: /does not exist|schema cache/i.test(error.message) ? 'migracao_pendente' : error.message }
     }
     // o que existia e não está mais no conteúdo → inativa (não apaga: preserva histórico/análise)

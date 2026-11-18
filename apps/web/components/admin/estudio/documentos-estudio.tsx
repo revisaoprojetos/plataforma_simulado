@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Replace, Link2, Tag, Download, FolderInput, Trash2, ExternalLink, Upload, Play, Copy, FileText, SquarePen, Eye, ChevronRight,
+  Replace, Link2, Tag, Download, FolderInput, Trash2, ExternalLink, Upload, Play, Copy, FileText, SquarePen, Eye, EyeOff, ChevronRight,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { formatBrt } from '@/lib/brt'
@@ -32,6 +32,8 @@ import { TagsModal } from '@/components/admin/estudio/tags-modal'
 import { MoverModal } from '@/components/admin/estudio/mover-modal'
 import { VisualizarDocumento, editarDocumento, baixarDocumento } from '@/components/admin/estudio/abrir-documento'
 import { moverDocumento, removerDocumento } from '@/app/admin/biblioteca/actions'
+import { avisarRecusaDocumento, avisarRecusasLote } from '@/components/biblioteca/recusa-documento'
+import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
 import { etiquetasDoDocumento } from '@/app/admin/conteudos/materiais/biblioteca/actions'
 import type { RotuloVinculo, EtiquetaConteudo } from '@/app/admin/conteudos/materiais/biblioteca/tipos'
 
@@ -74,8 +76,13 @@ export function DocumentosEstudio({
   async function excluir(r: DocRow) {
     if (!(await confirmar({ titulo: 'Excluir', mensagem: `Excluir “${r.titulo}”? Vai para a Lixeira.`, confirmar: 'Excluir', destrutivo: true }))) return
     const res = await removerDocumento(r.id)
-    if (!res.ok) { toast.error(res.error || 'Falha ao excluir.'); return }
+    if (!res.ok) { if (res.bloqueado) avisarRecusaDocumento(res.error || 'Exclusão recusada.', r.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: r }), onOcultado: refresh, forcar: { acao: 'lixeira' } }); else toast.error(res.error || 'Falha ao excluir.'); return }
     toast.success('Excluído.'); if (sel?.id === r.id) setSel(null); refresh()
+  }
+  async function ocultar(r: DocRow) {
+    const res = await definirVisibilidadeConteudo(r.id, false)
+    if (!res.ok) { toast.error(res.error || 'Falha ao ocultar.'); return }
+    toast.success('Documento oculto para os alunos. Nada foi apagado.'); refresh()
   }
   const baixar = (r: DocRow) => baixarDocumento(r.id)
   /** docx → editor OnlyOffice real; demais tipos não têm editor → abre a visualização. */
@@ -91,15 +98,16 @@ export function DocumentosEstudio({
   }
   async function moverPara(r: DocRow, destino: string | null) {
     const res = await moverDocumento(r.id, destino)
-    if (!res.ok) { toast.error(res.error || 'Falha ao mover.'); return }
+    if (!res.ok) { if (res.bloqueado) avisarRecusaDocumento(res.error || 'Mudança recusada.', r.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: r }), onOcultado: refresh, forcar: { acao: 'mover', valor: destino } }); else toast.error(res.error || 'Falha ao mover.'); return }
     toast.success('Movido.'); refresh()
   }
   async function excluirLote(s: DataTableSelection) {
     if (!s.ids.length) { toast.message('Selecione um ou mais itens desta página.'); return }
     if (!(await confirmar({ titulo: 'Enviar para a Lixeira', mensagem: `Enviar ${s.ids.length} ${s.ids.length === 1 ? 'item' : 'itens'} para a Lixeira?`, confirmar: 'Enviar para a Lixeira', destrutivo: true }))) return
-    let erros = 0
-    for (const id of s.ids) { const r = await removerDocumento(id); if (!r.ok) erros++ }
-    erros ? toast.error(`${erros} não excluído(s).`) : toast.success('Concluído.')
+    let erros = 0; const bloqueados: { id: string; motivo: string }[] = []
+    for (const id of s.ids) { const r = await removerDocumento(id); if (!r.ok) { erros++; if (r.bloqueado) bloqueados.push({ id, motivo: r.error || '' }) } }
+    if (bloqueados.length) avisarRecusasLote(bloqueados, s.ids.length)
+    else erros ? toast.error(`${erros} não excluído(s).`) : toast.success('Concluído.')
     s.clear(); setSel(null); refresh()
   }
 
@@ -154,7 +162,8 @@ export function DocumentosEstudio({
   const rowActions = (r: DocRow): DataTableRowAction[] => ehArquivos ? [
     { label: 'Editar documento', icon: <SquarePen className="h-4 w-4" />, onClick: () => editar(r) },
     { label: 'Aulas vinculadas', icon: <Link2 className="h-4 w-4" />, onClick: () => setModal({ tipo: 'aulas', row: r }) },
-    { label: 'Substituir arquivo', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: r }) },
+    { label: 'Substituir documento', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: r }) },
+    { label: 'Ocultar do aluno', icon: <EyeOff className="h-4 w-4" />, onClick: () => ocultar(r) },
     { label: 'Baixar', icon: <Download className="h-4 w-4" />, onClick: () => baixar(r) },
     { label: 'Mover', icon: <FolderInput className="h-4 w-4" />, onClick: () => setModal({ tipo: 'mover', row: r }) },
     { label: 'Excluir', icon: <Trash2 className="h-4 w-4" />, destructive: true, separatorBefore: true, onClick: () => excluir(r) },
@@ -356,7 +365,7 @@ function DetalheArquivo({ row, vinc, vinculos, onEditar, onVisualizar, onAulas, 
       <div className="grid grid-cols-2 gap-2">
         <Btn onClick={onVisualizar} icon={<Eye className="h-[15px] w-[15px]" />} label="Visualizar" />
         <Btn onClick={onAulas} icon={<Link2 className="h-[15px] w-[15px]" />} label="Aulas vinculadas" />
-        <Btn onClick={onSubstituir} icon={<Replace className="h-[15px] w-[15px]" />} label="Substituir arquivo" />
+        <Btn onClick={onSubstituir} icon={<Replace className="h-[15px] w-[15px]" />} label="Substituir documento" />
         <Btn onClick={onBaixar} icon={<Download className="h-[15px] w-[15px]" />} label="Baixar" />
         <Btn onClick={onMover} icon={<FolderInput className="h-[15px] w-[15px]" />} label="Mover" />
         <Btn onClick={onExcluir} icon={<Trash2 className="h-[15px] w-[15px]" />} label="Excluir" destrutivo />

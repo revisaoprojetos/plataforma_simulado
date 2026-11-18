@@ -50,7 +50,7 @@ export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
       const r = await excluirDefinitivo(i.tabela, i.id)
       setActing(null)
       if (r.ok) { toast.success('Excluído definitivamente'); router.refresh() }
-      else toast.error(r.error ?? 'Erro ao excluir')
+      else toast.error(r.error ?? 'Erro ao excluir', { duration: 15000 }) // inclui recusa por vínculos (questão/banco em uso)
     })
   }
 

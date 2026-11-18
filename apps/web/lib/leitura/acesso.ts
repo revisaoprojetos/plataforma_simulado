@@ -280,18 +280,33 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
         let anot: any[] | null = null
         {
           const r = await svc.from('simulado_leitura_anotacoes')
-            .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem, tipo')
-            .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false).neq('origem', 'base')
+            .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem, tipo, base_id')
+            .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
           if (r.error) {
             const r2 = await svc.from('simulado_leitura_anotacoes')
-              .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem')
-              .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false).neq('origem', 'base')
+              .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem, base_id')
+              .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
             anot = r2.data as any[] | null
           } else anot = r.data as any[] | null
         }
-        return ((anot ?? []) as any[]).map((a) => ({
+        // Clones `origem='base'` ficam ocultos (o grifo editorial já vem pelo overlay) — EXCETO os que o aluno EDITOU
+        // (nota ou cor diferentes da base): esses voltam como grifos dele (origem 'propria').
+        const clones = (anot ?? []).filter((a) => a.origem === 'base')
+        const baseMap = new Map<string, { cor: any; nota: any }>()
+        const baseIds = [...new Set(clones.map((a) => a.base_id).filter(Boolean))] as string[]
+        for (let i = 0; i < baseIds.length; i += 80) {
+          const { data: bs } = await svc.from('simulado_documento_anotacoes_base').select('id, cor, nota').in('id', baseIds.slice(i, i + 80))
+          for (const b of (bs ?? []) as any[]) baseMap.set(b.id, { cor: b.cor, nota: b.nota })
+        }
+        const norm = (v: any) => String(v ?? '').trim()
+        const editado = (a: any) => {
+          const b = a.base_id ? baseMap.get(a.base_id) : undefined
+          if (!b) return norm(a.nota) !== ''
+          return norm(a.nota) !== norm(b.nota) || norm(a.cor) !== norm(b.cor)
+        }
+        return ((anot ?? []) as any[]).filter((a) => a.origem !== 'base' || editado(a)).map((a) => ({
           id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '',
-          cor: a.cor, nota: a.nota ?? null, origem: (a.origem === 'base' ? 'base' : 'propria') as 'base' | 'propria',
+          cor: a.cor, nota: a.nota ?? null, origem: 'propria' as 'base' | 'propria',
           tipo: (a.tipo === 'nota' ? 'nota' : 'grifo') as 'grifo' | 'nota',
         }))
       } catch { return [] }

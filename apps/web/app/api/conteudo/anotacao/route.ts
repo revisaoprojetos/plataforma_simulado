@@ -32,12 +32,28 @@ export async function POST(request: NextRequest) {
   if (!id) return NextResponse.json({ message: 'Trecho inválido.' }, { status: 400 })
 
   const tipo = ['destaque', 'nota', 'riscado', 'insercao'].includes(b.tipo) ? b.tipo : 'destaque'
-  const r = await svc.from(T_AN).insert({
+  // Identidade legível: rótulo/tipo do trecho (Art. 5º, §…) já vêm da estrutura do documento; contexto = vizinhança no texto do trecho.
+  const ini = Number(b.inicio_offset) || 0, fimO = Number(b.fim_offset) || 0
+  let sem: { rotulo?: string | null; contexto?: string | null; tipo_trecho?: string | null } = {}
+  try {
+    let q = svc.from('simulado_conteudo_trechos').select('rotulo, tipo, texto').eq('tenant_id', sessao.tenantId).eq('uid', b.trecho_uid)
+    if (b.versao_id) q = q.eq('versao_id', b.versao_id)
+    const { data: tr } = await q.order('ordem', { ascending: false }).limit(1).maybeSingle()
+    if (tr) {
+      const t = String((tr as any).texto ?? '')
+      sem = { rotulo: (tr as any).rotulo ? String((tr as any).rotulo).slice(0, 120) : null, tipo_trecho: (tr as any).tipo ? String((tr as any).tipo).slice(0, 20) : null,
+        contexto: t ? t.slice(Math.max(0, ini - 80), fimO + 80).trim().slice(0, 400) : null }
+    }
+  } catch { /* identidade é best-effort */ }
+  const base = {
     tenant_id: sessao.tenantId, aluno_id: sessao.estudanteId, documento_id: b.documento_id, trecho_uid: b.trecho_uid,
-    tipo, inicio_offset: Number(b.inicio_offset) || 0, fim_offset: Number(b.fim_offset) || 0,
+    tipo, inicio_offset: ini, fim_offset: fimO,
     texto_ancora: String(b.texto_ancora).slice(0, 4000), contexto_antes: b.contexto_antes ?? null, contexto_depois: b.contexto_depois ?? null,
     conteudo: b.conteudo ?? null, versao_criada_id: b.versao_id ?? null, versao_validada_id: b.versao_id ?? null, estado: 'ativa',
-  }).select('id').single()
+  }
+  // com rótulo/contexto/tipo (migração 20261125030000); sem a migração regrava sem eles
+  let r: any = await svc.from(T_AN).insert({ ...base, ...sem }).select('id').single()
+  if (r.error && Object.keys(sem).length && /rotulo|contexto|tipo_trecho|column|schema cache/i.test(String(r.error.message))) r = await svc.from(T_AN).insert(base).select('id').single()
   if (r.error) return NextResponse.json({ message: r.error.message }, { status: 500 })
   return NextResponse.json({ ok: true, id: (r.data as any).id })
 }

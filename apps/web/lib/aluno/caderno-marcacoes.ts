@@ -29,7 +29,9 @@ const corDe = (c: unknown, fallback: string = 'y') => COR[String(c ?? '').toLowe
 export type Marcacao = {
   id: string
   documentoId: string
-  pagina: number | null // null = leitor de texto antigo (sem página)
+  pagina: number | null // null = leitor de texto antigo (sem página). É só DICA: o vínculo real é a âncora de texto
+  /** rótulo legível do trecho ('Art. 5º', '§ 2º', 'Súmula 700'…), se a âncora de texto foi gravada */
+  rotulo?: string
   texto: string
   nota: string
   tag: TagCor
@@ -44,10 +46,12 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 /** Todas as marcações do aluno (grifos do PDF + anotações do leitor antigo), agrupadas por material. */
 export async function carregarMarcacoesAluno(svc: any, tenantId: string, alunoId: string): Promise<MaterialMarcado[]> {
   const [pdf, texto] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf')
-      .select('id, documento_id, pagina, cor, tool, nota, texto, criado_em')
-      .eq('tenant_id', tenantId).eq('aluno_id', alunoId)
-      .order('id', { ascending: true }), 1000, 'cadernos:grifos_pdf').catch(() => [] as any[]),
+    // com rótulo (migração 20261125030000); sem ela repete o select antigo
+    (async () => {
+      const q = (cols: string) => fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select(cols)
+        .eq('tenant_id', tenantId).eq('aluno_id', alunoId).order('id', { ascending: true }), 1000, 'cadernos:grifos_pdf')
+      return q('id, documento_id, pagina, cor, tool, nota, texto, criado_em, rotulo').catch(() => q('id, documento_id, pagina, cor, tool, nota, texto, criado_em')).catch(() => [] as any[])
+    })(),
     fetchAll<any>(() => svc.from('simulado_conteudo_anotacoes')
       .select('id, documento_id, tipo, texto_ancora, conteudo, criada_em')
       .eq('tenant_id', tenantId).eq('aluno_id', alunoId)
@@ -57,7 +61,7 @@ export async function carregarMarcacoesAluno(svc: any, tenantId: string, alunoId
   const todas: Marcacao[] = [
     ...pdf.map((g): Marcacao => ({
       id: g.id, documentoId: g.documento_id, pagina: Number(g.pagina) || 1,
-      texto: str(g.texto), nota: str(g.nota), criadoEm: g.criado_em ?? '',
+      texto: str(g.texto), nota: str(g.nota), criadoEm: g.criado_em ?? '', rotulo: str(g.rotulo) || undefined,
       ...corDe(g.cor, g.tool === 'st' ? 'k' : 'y'),
     })),
     ...texto.filter((a) => a.tipo !== 'insercao').map((a): Marcacao => ({

@@ -76,7 +76,11 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
 
   // Grifos/anotações que já existem NESTA versão (rascunho reaproveitado ou doc sem versionamento) acompanham o
   // texto novo: só some/encurta/divide o que o admin de fato apagou ou inseriu. Best-effort: não bloqueia o salvar.
-  try { await ajustarAnotacoesAoTexto(svc, tenantId, documentoId, versaoAlvo, espinhaDeHtml(limparCabecalhoHtml(html))) } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
+  // Conservador: grifo cujo texto ainda existe NÃO é tocado; juris é pulado (o cliente recupera por texto). Falhas só são logadas.
+  try {
+    const r = await ajustarAnotacoesAoTexto(svc, tenantId, documentoId, versaoAlvo, espinhaDeHtml(limparCabecalhoHtml(html)))
+    if (r.falhas > 0) console.error('[leitura] ajustarAnotacoes: falhas', r)
+  } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
 
   // Dispositivos estruturados (A3) — regrava para a versão alvo. Tolerante à migração ausente.
   try {

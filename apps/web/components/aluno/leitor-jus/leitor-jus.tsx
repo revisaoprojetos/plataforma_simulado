@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TopicosConfig } from '@/lib/leitura/topicos'
 import { SELOS } from '@/lib/leitura/selos'
 import { APP_VERSION } from '@/lib/version'
+import { criarFilaGrifos } from '@/lib/leitura/grifo-fila'
 import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
 
 // Tipo LOCAL (client-safe) do grifo do aluno. NÃO importar de '@/lib/leitura/acesso' — aquele módulo é
@@ -109,50 +110,63 @@ export function LeitorJus({
   // Relay de persistência de grifos: o iframe é isolado → o host fala com a API.
   // Fila com retry/backoff (rede instável no celular/tablet; 5xx transitório). Antes a falha era 100% silenciosa.
   // Informa o iframe (leitor-jus-grifo-status) p/ ele mostrar "Salvando… / Salvo / Erro ao salvar".
-  const pendGrifosRef = useRef(0)
-  const grifoFetch = useCallback(async (init: RequestInit & { method: string }, qs = ''): Promise<any> => {
-    const avisar = (estado: 'sync' | 'ok' | 'erro') => {
-      try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-grifo-status', estado, pendentes: pendGrifosRef.current }, '*') } catch { /* iframe fechado */ }
+  // A fila é SERIALIZADA POR cid (lib/leitura/grifo-fila.ts): del/upd que chegam antes do id esperam o add
+  // terminar; o add leva `cid` (idempotente no servidor); falha definitiva fica retida e é retomada.
+  const filaRef = useRef<ReturnType<typeof criarFilaGrifos> | null>(null)
+  const getFila = useCallback(() => {
+    if (filaRef.current) return filaRef.current
+    const post = (msg: Record<string, unknown>) => {
+      try { iframeRef.current?.contentWindow?.postMessage(msg, '*') } catch { /* iframe fechado */ }
     }
-    pendGrifosRef.current += 1
-    avisar('sync')
-    const esperas = [1500, 5000, 15000, 30000]
-    let resultado: any = null
-    let falhou = true
-    for (let i = 0; i <= esperas.length; i++) {
-      try {
-        const r = await fetch('/api/leitura/anotacao' + qs, { credentials: 'same-origin', ...init })
-        if (r.ok) { resultado = await r.json().catch(() => ({})); falhou = false; break }
-        // 4xx (exceto 408/429) não adianta repetir (sessão/permissão/validação).
-        if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) break
-      } catch { /* rede caiu: tenta de novo */ }
-      if (i < esperas.length) await new Promise((res) => setTimeout(res, esperas[i]))
-    }
-    pendGrifosRef.current = Math.max(0, pendGrifosRef.current - 1)
-    if (falhou) avisar('erro')
-    else if (pendGrifosRef.current === 0) avisar('ok')
-    return resultado
+    filaRef.current = criarFilaGrifos({
+      enviar: async ({ method, qs, body }) => {
+        try {
+          const txt = body === undefined ? undefined : JSON.stringify(body)
+          const r = await fetch('/api/leitura/anotacao' + qs, {
+            method, credentials: 'same-origin',
+            headers: txt ? { 'content-type': 'application/json' } : undefined,
+            body: txt,
+            // keepalive: a requisição sobrevive a navegação/fechar aba (limite ~64KB somado → só corpos pequenos).
+            keepalive: !txt || txt.length < 30000,
+          })
+          const json = await r.json().catch(() => ({}))
+          return { ok: r.ok, status: r.status, json }
+        } catch { return null }
+      },
+      esperar: (ms) => new Promise((res) => setTimeout(res, ms)),
+      onSaved: (cid, id) => post({ type: 'leitor-jus-grifo-saved', cid, id }),
+      onStatus: (s) => post({ type: 'leitor-jus-grifo-status', estado: s.estado, pendentes: s.pendentes, naoSync: s.naoSync }),
+      onAviso: (msg) => post({ type: 'leitor-jus-grifo-status', estado: 'aviso', msg }),
+    })
+    return filaRef.current
+  }, [])
+  // Retoma o que falhou definitivamente: ao voltar a rede e a cada 60 s (nunca descarta o grifo local).
+  useEffect(() => {
+    const retomar = () => { const f = filaRef.current; if (f && f.naoSincronizados > 0) f.retomarFalhas() }
+    const iv = setInterval(retomar, 60000)
+    window.addEventListener('online', retomar)
+    return () => { clearInterval(iv); window.removeEventListener('online', retomar) }
   }, [])
   const salvarGrifo = useCallback((m: any) => {
     const d = dadosRef.current
     if (!d.documentoId || !d.versao) return
-    const win = iframeRef.current?.contentWindow
-    if (m.op === 'add') {
+    const fila = getFila()
+    if (m.op === 'add' && m.cid) {
       const a = m.a || {}
-      void grifoFetch({
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
+      void fila.enviar({
+        op: 'add', cid: String(m.cid),
+        corpo: {
           documento_id: d.documentoId, versao: d.versao,
           inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '',
           cor: a.cor || undefined, nota: a.nota || undefined, tipo: a.tipo === 'nota' ? 'nota' : 'grifo',
-        }),
-      }).then((r) => { if (r?.id && win) win.postMessage({ type: 'leitor-jus-grifo-saved', cid: m.cid, id: r.id }, '*') })
-    } else if (m.op === 'upd' && m.id) {
-      void grifoFetch({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: m.id, cor: m.cor, nota: m.nota ?? null }) })
-    } else if (m.op === 'del' && m.id) {
-      void grifoFetch({ method: 'DELETE' }, '?id=' + encodeURIComponent(m.id))
+        },
+      })
+    } else if (m.op === 'upd' && (m.cid || m.id)) {
+      void fila.enviar({ op: 'upd', cid: m.cid || undefined, id: m.id || null, cor: m.cor, nota: m.nota ?? null })
+    } else if (m.op === 'del' && (m.cid || m.id)) {
+      void fila.enviar({ op: 'del', cid: m.cid || undefined, id: m.id || null })
     }
-  }, [grifoFetch])
+  }, [getFila])
 
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -171,10 +185,14 @@ export function LeitorJus({
       if (m.type === 'leitor-jus-nav') {
         const d = dadosRef.current
         const href = m.to === 'questoes' ? d.questoesHref : d.voltarHref
+        // Espera (até ~3 s) a fila de grifos esvaziar antes de sair: não cancela adds em andamento.
+        // O que ainda estiver em voo segue por fetch keepalive; o resto fica no localStorage e é reenviado na abertura.
+        const fila = filaRef.current
         const ir = () => { if (href) window.location.href = href }
+        const esvaziada = fila ? fila.esvaziar(3000) : Promise.resolve()
         // "Concluir leitura" → grava a conclusão (pct 100) ANTES de fechar, p/ o arcade liberar o quiz do dia.
-        if (m.to === 'questoes') { void postProgresso({ pct: 100, concluir: true, desafio: d.desafio }).then(ir) }
-        else ir()
+        if (m.to === 'questoes') { void Promise.all([postProgresso({ pct: 100, concluir: true, desafio: d.desafio }), esvaziada]).then(ir) }
+        else void esvaziada.then(ir)
       }
     }
     window.addEventListener('message', onMsg)

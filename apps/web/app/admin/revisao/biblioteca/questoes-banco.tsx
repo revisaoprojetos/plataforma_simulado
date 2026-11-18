@@ -262,7 +262,7 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
   // ── ações em massa ──
   async function concluir(r: { ok: boolean; error?: string }, okMsg: string) {
     setEmLote(null)
-    if (!r.ok) { toast.error(r.error || 'Não foi possível concluir.'); return false }
+    if (!r.ok) { toast.error(r.error || 'Não foi possível concluir.', { duration: 15000 }); return false }
     toast.success(okMsg); setSel(new Set()); await recarregar(); return true
   }
   async function avisoDeUso(lista: string[]): Promise<string> {
@@ -288,7 +288,11 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
     const aviso = await avisoDeUso(ids)
     if (!(await confirmar({ titulo: `Excluir ${n} ${n === 1 ? 'questão' : 'questões'}?`, mensagem: `Vão para a Lixeira (reversível).${aviso}`, confirmar: 'Excluir', destrutivo: true }))) return
     setEmLote('Excluindo')
-    await concluir(await api('excluir', { ids }), `${n} ${n === 1 ? 'questão enviada' : 'questões enviadas'} para a Lixeira.`)
+    const r = await api<{ count?: number; bloqueadas?: { id: string; motivo: string }[]; mensagem?: string }>('excluir', { ids })
+    // Trava de vínculos: questões em uso não são excluídas; mostra o motivo (use "Arquivar" nelas).
+    if (r.ok && r.bloqueadas?.length) toast.warning(`${r.bloqueadas.length} ${r.bloqueadas.length === 1 ? 'questão não foi excluída' : 'questões não foram excluídas'} (em uso)`, { description: r.mensagem, duration: 15000 })
+    const feitas = r.ok ? (r.count ?? n) : 0
+    await concluir(r, `${feitas} ${feitas === 1 ? 'questão enviada' : 'questões enviadas'} para a Lixeira.`)
   }
   async function aplicarSugestao(id: string, s: SugestaoQ) {
     const patch: PatchUI = {}

@@ -5,12 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { bloquearSeTemVinculos } from '@/lib/conteudo/dependencias-documento'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { selecionarGrupos, contarMembrosGrupos as contarMembrosGruposSql } from '@/lib/simulado/grupos'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml } from '@/lib/leitura/reanchor'
-import { reancorarParcial } from '@/lib/leitura/reanchor-parcial'
-import { ajustarAnotacoesAoTexto } from '@/lib/leitura/reanchor-db'
+import { decidirAjuste, type DecisaoAjuste } from '@/lib/leitura/reanchor-decisao'
+import { ajustarAnotacoesAoTexto, documentoEhJuris } from '@/lib/leitura/reanchor-db'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { normalizarPontuacaoLeitura, bonusSequenciaLeitura, bonusConclusaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
@@ -179,16 +180,21 @@ async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: st
     if (error || !anots?.length) continue
     // Reancoragem PARCIAL: o grifo acompanha só o que sobrou do texto (encurta se apagou início/fim; divide em
     // dois se entrou texto no meio). Só marca revisão quando o trecho inteiro sumiu.
+    // CONSERVADOR (decidirAjuste): texto ainda presente → copia sem alterar offsets (o cliente reancora por texto);
+    // só encurta/divide com alta confiança; senão copia intacto marcando revisão. Juris: copia intacto (espinha incompatível).
+    const juris = await documentoEhJuris(svc, tenantId, documentoId)
     const novas = (anots as any[]).flatMap((a) => {
-      const seg = reancorarParcial(S, { inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '' })
+      const d: DecisaoAjuste = juris ? { acao: 'manter' } : decidirAjuste(S, { inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '' })
+      const seg = d.acao === 'ajustar' ? d.trechos : d.acao === 'manter' && d.reposicionado ? [d.reposicionado] : []
       const trechos = seg.length ? seg : [null]
+      const revisar = d.acao === 'revisar'
       return trechos.map((t, k) => {
         const base: Record<string, unknown> = {
           tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova,
           inicio_char: t?.inicio ?? a.inicio_char, fim_char: t?.fim ?? a.fim_char,
           exact: t?.exact ?? a.exact, prefix: t ? t.prefix : a.prefix, suffix: t ? t.suffix : a.suffix, cor: a.cor, nota: a.nota,
         }
-        if (ehAluno) { base.estudante_id = a.estudante_id; base.origem = a.origem; base.base_id = k === 0 ? a.base_id : null; base.revisao_necessaria = !t }
+        if (ehAluno) { base.estudante_id = a.estudante_id; base.origem = a.origem; base.base_id = k === 0 ? a.base_id : null; base.revisao_necessaria = revisar ? true : (juris ? !!a.revisao_necessaria : false) }
         else { base.ordem = a.ordem; if ('tipo_grifo' in a) { base.tipo_grifo = a.tipo_grifo; base.editorial = a.editorial } }
         return base
       })
@@ -228,7 +234,10 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
     // 1) sobrescreve o conteúdo da versão publicada
     await svc.from('simulado_documento_conteudos').update({ html, artigos }).eq('documento_id', documentoId).eq('versao', pub)
     // Os grifos dos alunos desta versão acompanham o texto novo (só some/encurta/divide o que mudou).
-    try { await ajustarAnotacoesAoTexto(svc, g.tenantId, documentoId, pub, espinhaDeHtml(limparCabecalhoHtml(html))) } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
+    try {
+      const r = await ajustarAnotacoesAoTexto(svc, g.tenantId, documentoId, pub, espinhaDeHtml(limparCabecalhoHtml(html)))
+      if (r.falhas > 0) console.error('[leitura] ajustarAnotacoes: falhas', r)
+    } catch (e) { console.error('[leitura] ajustarAnotacoes', e) }
     // 2) copia os dispositivos do rascunho para a versão publicada (tolerante à migração A3 ausente)
     try {
       const { data: disp } = await svc.from('simulado_lei_dispositivos').select('*').eq('documento_id', documentoId).eq('versao', rasc)
@@ -280,6 +289,10 @@ export async function arquivarDocumento(documentoId: string, arquivar: boolean):
 export async function excluirDocumento(id: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:delete'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
+  // TRAVA CENTRAL: documento de leitura com grifos/anotações de alunos, progresso, quiz respondido ou favoritos NÃO é excluído.
+  const { data: docLeit } = await svc.from('simulado_documentos').select('id, titulo').eq('id', id).eq('tenant_id', g.tenantId).maybeSingle()
+  const trava = await bloquearSeTemVinculos(svc, g.tenantId, [{ id, titulo: (docLeit as any)?.titulo }], { origem: 'leitura' })
+  if (trava.bloqueados[0]) return { ok: false, error: trava.bloqueados[0].motivo }
   const { error } = await svc.from('simulado_documentos').update({ deletado: true, atualizado_em: new Date().toISOString() }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_documentos', entidadeId: id, atorId: g.atorId, tenantId: g.tenantId })

@@ -181,11 +181,17 @@ export function BancosAcervo({
         destrutivo: true, confirmar: 'Excluir',
       })
       if (!ok) return
+      // Banco com questões em uso (simulado/resposta/documento…) é recusado; os livres seguem.
+      const recusas: string[] = []
+      let enviados = 0
       for (const id of ids) {
         const r = await excluirBanco(id)
-        if (!r.ok) { toast.error(r.error ?? 'Erro ao excluir.'); return }
+        if (!r.ok) { recusas.push(r.error ?? 'Erro ao excluir.'); continue }
+        enviados++
       }
-      toast.success(ids.length === 1 ? 'Banco enviado para a lixeira.' : 'Bancos enviados para a lixeira.')
+      if (recusas.length) toast.error(`${recusas.length} banco(s) não foram excluídos`, { description: recusas.slice(0, 3).join(' '), duration: 15000 })
+      if (!enviados) return
+      toast.success(enviados === 1 ? 'Banco enviado para a lixeira.' : `${enviados} bancos enviados para a lixeira.`)
       setSelBanco(null)
       if (modo === 'banco') router.push(BASE); else router.refresh()
     })
@@ -218,8 +224,9 @@ export function BancosAcervo({
       })
       if (!ok) return
       const r = await excluirQuestoes(ids)
-      if (!r.ok) { toast.error(r.error ?? 'Erro ao excluir.'); return }
-      toast.success('Enviado para a Lixeira.'); router.push(`${BASE}?sel=${banco?.id ?? ''}`); router.refresh()
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao excluir.', { duration: 15000 }); return }
+      if (r.bloqueadas?.length) toast.warning(`${r.bloqueadas.length} questão(ões) não foram excluídas (em uso)`, { description: r.mensagem, duration: 15000 })
+      toast.success(`${r.count ?? ids.length} enviada(s) para a Lixeira.`); router.push(`${BASE}?sel=${banco?.id ?? ''}`); router.refresh()
     })
   }
   function exportarQuestoesCsv(ids: string[]) {

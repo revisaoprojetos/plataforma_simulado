@@ -55,9 +55,10 @@ export function reancorarParcial(S: string, a: AncoraParcial): TrechoGrifo[] {
     for (const idx of idxs) {
       const pre = S.slice(Math.max(0, idx - (a.prefix?.length ?? 0)), idx)
       const suf = S.slice(idx + ex.length, idx + ex.length + (a.suffix?.length ?? 0))
+      // Desempate por contexto: tamanho do trecho em comum com prefix/suffix originais (até 40) + proximidade.
       let sc = 0
-      if (a.prefix && pre.endsWith(a.prefix.slice(-8))) sc += 2
-      if (a.suffix && suf.startsWith(a.suffix.slice(0, 8))) sc += 2
+      if (a.prefix) { let k = 0; while (k < pre.length && k < a.prefix.length && pre[pre.length - 1 - k] === a.prefix[a.prefix.length - 1 - k]) k++; sc += k / 4 }
+      if (a.suffix) { let k = 0; while (k < suf.length && k < a.suffix.length && suf[k] === a.suffix[k]) k++; sc += k / 4 }
       sc -= Math.abs(idx - a.inicio) / 1000
       if (sc > bs) { bs = sc; best = idx }
     }

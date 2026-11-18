@@ -19,7 +19,7 @@ export type AlvoLote = {
 export type AcaoLote =
   | { tipo: 'mover'; destinoId: string | null }
   | { tipo: 'categoria'; categoria: Categoria }
-  | { tipo: 'status'; status: StatusLote }
+  | { tipo: 'status'; status: StatusLote; /** confirma publicar documento 'TESTE'/'Cópia' em pasta de disciplina do cronograma */ confirmarTeste?: boolean }
   | { tipo: 'acesso'; modo: ModoAcessoLote; grupoIds?: string[]; gruposModo?: 'substituir' | 'adicionar' }
   | { tipo: 'visibilidade'; oculto: boolean }
   | { tipo: 'legenda'; ocultarTabela?: boolean | null; categorias?: boolean }

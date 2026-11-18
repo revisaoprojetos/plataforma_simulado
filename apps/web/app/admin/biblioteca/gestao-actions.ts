@@ -14,6 +14,7 @@ import { registrarAudit } from '@/lib/audit'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { obterDocumento, listarVersoes } from '@/lib/conteudo/documentos'
 import { listarVinculosDoDocumento } from '@/lib/conteudo/vinculos'
+import { recusarSeEmUso } from '@/lib/conteudo/dependencias-documento'
 import type { KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 
 async function guard(acao: 'view' | 'update') {
@@ -357,6 +358,9 @@ export async function definirAgendamentoConteudo(documentoId: string, de: string
 export async function arquivarConteudo(documentoId: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('update'); if (!g.ok) return g
   const svc = createAdminClient()
+  // TRAVA: arquivar/despublicar documento EM USO por plano de aluno ativo é recusado (use Substituir/Ocultar).
+  const uso = await recusarSeEmUso(svc, g.tenantId, [{ id: documentoId }], 'despublicar')
+  if (uso.bloqueados[0]) return { ok: false, error: uso.bloqueados[0].motivo }
   const { error } = await svc.from('simulado_conteudo_documentos').update({ status: 'arquivado' }).eq('tenant_id', g.tenantId).eq('id', documentoId)
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { status: 'arquivado' }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})

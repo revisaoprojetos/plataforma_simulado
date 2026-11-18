@@ -39,6 +39,8 @@ type ResultadoTabela = {
   tabela: string
   purgados: number
   storageRemovidos?: number
+  /** Retidos na Lixeira por terem vínculos (questões/bancos em uso). */
+  retidos?: number
   pulada?: boolean
   erro?: string
 }
@@ -70,7 +72,53 @@ export async function POST(req: NextRequest) {
         1000,
         `lixeira-purge:${tabela}`,
       )
-      const ids = rows.map((r) => r.id)
+      let ids = rows.map((r) => r.id)
+
+      // 1b. TRAVA de vínculos: questão/banco com respostas, simulados, documentos, cronograma, cadernos…
+      //     NUNCA é apagado em definitivo (o DELETE cascatearia). Fica retido na Lixeira; erro ⇒ retém tudo.
+      if ((tabela === 'simulado_questoes' || tabela === 'simulado_pastas') && ids.length) {
+        try {
+          const dep = await import('@/lib/questoes/dependencias-questao')
+          if (tabela === 'simulado_questoes') {
+            const { purgaveis, retidas } = await dep.filtrarPurgaveisQuestoes(svc, alvo, ids)
+            res.retidos = retidas.length
+            ids = purgaveis
+          } else {
+            const ok: string[] = []
+            for (const id of ids) { if (!(await dep.dependenciasBanco(svc, alvo, id)).emUso) ok.push(id); else res.retidos = (res.retidos ?? 0) + 1 }
+            ids = ok
+          }
+        } catch (e) {
+          res.retidos = ids.length
+          res.erro = `trava de vínculos falhou, nada apagado: ${(e as Error).message}`
+          ids = []
+        }
+      }
+
+      // 1c. TRAVA de vínculos (DOCUMENTOS): grifos/anotações de alunos, metas, progresso, itens de produto, atualizações,
+      //     cadernos… e documento EM USO por plano ativo NUNCA são apagados (FKs CASCADE levariam tudo junto).
+      //     Ficam retidos na Lixeira indefinidamente; erro de verificação ⇒ retém tudo.
+      if (tabela === 'simulado_conteudo_documentos' && ids.length) {
+        try {
+          const { bloquearSeTemVinculos } = await import('@/lib/conteudo/dependencias-documento')
+          const linhas = await fetchAllByIn<{ id: string; tenant_id: string }>(
+            ids, (chunk) => svc.from(tabela).select('id, tenant_id').in('id', chunk).order('id', { ascending: true }), { chunk: 80, rotulo: 'lixeira-purge:doc-tenant' },
+          )
+          const porTenant = new Map<string, string[]>()
+          for (const l of linhas) (porTenant.get(l.tenant_id) ?? porTenant.set(l.tenant_id, []).get(l.tenant_id)!).push(l.id)
+          const ok: string[] = []
+          for (const [tid, dids] of porTenant) {
+            const r = await bloquearSeTemVinculos(svc, tid, dids.map((id) => ({ id })))
+            for (const l of r.livres) ok.push(l.id)
+            res.retidos = (res.retidos ?? 0) + r.bloqueados.length
+          }
+          ids = ok
+        } catch (e) {
+          res.retidos = ids.length
+          res.erro = `trava de vínculos (documentos) falhou, nada apagado: ${(e as Error).message}`
+          ids = []
+        }
+      }
 
       // 2. Storage: mapeia arquivo_key por documento ANTES de deletar (as versões
       //    somem em cascata com o documento). Removemos só dos que forem deletados.

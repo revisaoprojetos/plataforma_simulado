@@ -15,6 +15,7 @@ import { envolverSecoesPorTitulo } from '@/lib/leitura/titulos-expansivos'
 import { lerCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
+import { separarGrifosPorVersao, type VersaoInfo, type GrifoDesatualizado, type AncoraGravada } from './grifos-versao'
 
 // LEITOR do aluno (Fase 8) — monta a leitura a partir dos TRECHOS da versão atual (cada um com seu
 // uid, a âncora estável do grifo) + as anotações do aluno. A ancoragem é por (uid + offset no trecho):
@@ -493,8 +494,36 @@ async function regenerarHtmlRico(svc: any, tenantId: string, versaoId: string, a
 }
 
 // Grifo GEOMÉTRICO sobre o PDF: página + retângulos normalizados (0..1). Alinha sobre o canvas sem bugar.
-export interface GrifoPdf { id: string; pagina: number; rects: { x0: number; y0: number; x1: number; y1: number }[]; cor: string; tool: string; nota: string | null; texto: string | null }
-export interface LeituraPdf { documentoId: string; titulo: string; versaoId: string; pdfUrl: string | null; grifos: GrifoPdf[]; mostrarLegenda: boolean }
+export interface GrifoPdf { id: string; pagina: number; rects: { x0: number; y0: number; x1: number; y1: number }[]; cor: string; tool: string; nota: string | null; texto: string | null; /** âncora de TEXTO gravada (vínculo real; rects = cache) */ ancora?: AncoraGravada }
+export interface LeituraPdf { documentoId: string; titulo: string; versaoId: string; pdfUrl: string | null; grifos: GrifoPdf[]; /** grifos gravados numa versão ANTERIOR incompatível (não pintados; o aluno decide reaplicar/descartar) */ grifosAntigos?: GrifoDesatualizado[]; mostrarLegenda: boolean }
+
+/**
+ * Grifos do aluno SEPARADOS por compatibilidade com a versão atual (ver lib/conteudo/grifos-versao.ts): só os da versão atual
+ * (ou de versão com o mesmo arquivo/nº de páginas) são pintados; os de versão anterior incompatível voltam em `antigos`.
+ * NADA é apagado. Tolerante: coluna `versao_id`/`paginas` ausente degrada p/ pintar tudo (comportamento antigo).
+ */
+async function lerGrifosPdfDoAluno(svc: any, tenantId: string, documentoId: string, alunoId: string, versaoAtualId: string): Promise<{ grifos: GrifoPdf[]; antigos: GrifoDesatualizado[] }> {
+  // Com a âncora de TEXTO (migração 20261125030000); sem a migração o select falha → repete sem as colunas novas.
+  const sel = (cols: string) => fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select(cols).eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true }))
+  const rows = await sel('id, versao_id, pagina, rects, cor, tool, nota, texto, prefix, suffix, char_inicio, char_fim, ancora_texto, ancora_hash, rotulo, contexto, tipo_trecho')
+    .catch(() => sel('id, versao_id, pagina, rects, cor, tool, nota, texto, prefix, suffix, char_inicio, char_fim, ancora_texto'))
+    .catch(() => sel('id, versao_id, pagina, rects, cor, tool, nota, texto')).catch(() => [] as any[])
+  const lista = (rows ?? []) as any[]
+  const outras = [...new Set(lista.map((g) => g.versao_id).filter((v) => v && v !== versaoAtualId))] as string[]
+  const versoes = new Map<string, VersaoInfo>()
+  let atual: VersaoInfo = { id: versaoAtualId, hash: null, paginas: null }
+  if (outras.length) {
+    const ids = [versaoAtualId, ...outras]
+    let r: any = await svc.from('simulado_conteudo_versoes').select('id, hash_arquivo, paginas').eq('tenant_id', tenantId).in('id', ids)
+    if (r.error) r = await svc.from('simulado_conteudo_versoes').select('id, hash_arquivo').eq('tenant_id', tenantId).in('id', ids)
+    for (const v of (r.data ?? []) as any[]) {
+      const info: VersaoInfo = { id: v.id, hash: v.hash_arquivo ?? null, paginas: v.paginas ?? null }
+      if (v.id === versaoAtualId) atual = info; else versoes.set(v.id, info)
+    }
+  }
+  const { pintar, desatualizados } = separarGrifosPorVersao(lista, atual, versoes)
+  return { grifos: pintar, antigos: desatualizados }
+}
 
 /**
  * Leitura FIEL (PDF do editor) do aluno: devolve o PDF pixel-perfeito (OnlyOffice, cacheado) + os grifos
@@ -521,15 +550,12 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string, o
     // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
     remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}${areasPdf.temAreas ? `:a${areasPdf.variante}` : ''}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId, areasPdf).catch(() => null)) ?? undefined).then((u) => u ?? null),
     // tolerante à migração pendente: se a tabela não existir, trata como sem grifos.
-    fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
+    lerGrifosPdfDoAluno(svc, tenantId, documentoId, alunoId, doc.versao_atual_id),
     // Toggle da legenda de categorias (LegProc) por documento. Tolerante à migração pendente: se a coluna
     // legenda_categorias ainda não existe (erro) → null → legenda OCULTA (padrão da Biblioteca).
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
-  const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
-    id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
-  })).filter((g) => g.rects.length)
-  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias }
+  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos: grifosRows.grifos, grifosAntigos: grifosRows.antigos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias }
 }
 
 // ─────────── MÍDIA (vídeo/áudio) do aluno ───────────
@@ -712,7 +738,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     // Falha (conversão DOCX→PDF fora/lenta) NÃO entra no cache: `undefined` não é guardado pelo remember —
     // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
     remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}${areasAluno.temAreas ? `:a${areasAluno.variante}` : ''}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId, areasAluno).catch(() => null)) ?? undefined).then((u) => u ?? null),
-    fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
+    lerGrifosPdfDoAluno(svc, tenantId, documentoId, alunoId, doc.versao_atual_id),
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
   // RESERVA: PDF indisponível (OnlyOffice fora/cheio/lento ou documento sem PDF guardado) → lê em TEXTO em vez de
@@ -729,10 +755,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
       return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: htmlLt, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg, modeloJuris: (doc as any).categoria === 'jurisclub' } }
     }
   }
-  const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
-    id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
-  })).filter((g) => g.rects.length)
-  return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias || legendaLegproc } }
+  return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos: grifosRows.grifos, grifosAntigos: grifosRows.antigos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias || legendaLegproc } }
 }
 
 /** Chaves do admin (Metas & inteligência › Jurisprudência) aplicadas à leitura em TEXTO: `<tags>` → imagens de selo e
@@ -765,7 +788,7 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string, opt
     if (doc.status !== 'publicado') return null
     // Chaves de download: da PLATAFORMA (tema) e do DOCUMENTO (pode_baixar).
     const blq = await bloqueioDeDownload(svc, tenantId, documentoId)
-    if (blq) { await regDl('bloqueado', blq); return null }
+    if (blq) { await regDl('bloqueado', blq === 'politica' ? 'downloads_desativados' : blq); return null }
     // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     // pasta com permissão de baixar OU aula liberada do produto (D4: chaves de plataforma/documento já checadas em `blq`)
@@ -812,7 +835,7 @@ export async function prepararDownloadAluno(documentoId: string, alunoId: string
   if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
     if (doc.status !== 'publicado') return { ok: false, erro: 'negado' }
     const blq = await bloqueioDeDownload(svc, tenantId, documentoId)
-    if (blq) { await regDl('bloqueado', blq); return { ok: false, erro: blq === 'politica' ? 'politica' : 'documento' } }
+    if (blq) { await regDl('bloqueado', blq === 'politica' ? 'downloads_desativados' : blq); return { ok: false, erro: blq === 'politica' ? 'politica' : 'documento' } }
     const res = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     if (!(res.permitido ? res.permissoes.baixar : await docLiberadoViaProduto(svc, tenantId, alunoId, doc.id))) { await regDl('bloqueado', 'permissao'); return { ok: false, erro: 'negado' } }
     if (res.permitido && await docBloqueadoPorDataDoProduto(svc, tenantId, alunoId, doc.id)) { await regDl('bloqueado', 'nao_liberado'); return { ok: false, erro: 'negado' } }

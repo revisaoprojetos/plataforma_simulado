@@ -10,6 +10,7 @@ import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
+import { avisarRecusaDocumento } from '@/components/biblioteca/recusa-documento'
 import { CheckSelecao } from '@/components/biblioteca/selecao-lote'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
 import { MenuDoc } from '@/components/biblioteca/menus-drive'
@@ -99,7 +100,7 @@ export function MateriaisTabela(p: TabelaProps) {
     if (!(await confirmar({ titulo: 'Excluir material', mensagem: msg, confirmar: 'Excluir', destrutivo: true }))) return
     iniciar(async () => {
       const res = await removerDocumento(r.id)
-      if (!res.ok) { toast.error(res.error || 'Não foi possível excluir.'); return }
+      if (!res.ok) { if (res.bloqueado) avisarRecusaDocumento(res.error || 'Exclusão recusada.', r.id, { onSubstituir: () => setTroca(r), onOcultado: () => p.onMudou(), forcar: { acao: 'lixeira' } }); else toast.error(res.error || 'Não foi possível excluir.'); return }
       toast.success('Material enviado para a Lixeira.'); p.onMudou()
     })
   }

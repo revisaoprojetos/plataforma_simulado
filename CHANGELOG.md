@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.24.0 — 2026-11-18
+
+**Integridade de grifos, metas e exclusões (incidente de 17-18/11)**
+- **Grifos de PDF:** vínculo por TEXTO (âncora: texto, contexto, posição e hash estável; rótulo/tipo do trecho, ex. "Art. 5º"); retângulos viram só cache. Grifos de versão antiga são recalculados pelo texto, os que não casam vão para "N grifos de uma versão anterior" (Reaplicar/Descartar). Servidor grava sempre a versão atual. Overlay pinta pela caixa do canvas (corrige barras deslocadas no tablet) e não pinta grifo cujo texto não existe mais. Anotações de documento: reconciliação por texto (corta "alterada" falsa).
+- **Leitor Lei Seca / jurisprudência:** rects por trecho de texto (fim das faixas sem texto), caixas recolhidas ignoradas, espinha recalculada, fila de envio por grifo idempotente (sem reaparecer/duplicar/perder), esperar fila antes de navegar, anotações não encontradas listadas (só o aluno apaga). Reancoragem do servidor só age com alta confiança e nunca em documento de jurisprudência; grifos "base" do admin não chegam ao aluno.
+- **Cronograma Adaptativo:** conclusão em lote barrada (só o que o aluno tocou; máx. 8 novas por envio), `concluido_em` nunca recarimbado, recusa de plano divergente (409), cache local por aluno+plano, evento por meta com origem. Metas ligadas ao DOCUMENTO (chave `d:<uuid>`, assinatura do conteúdo, remapeamento por chave, relink automático de documento recriado, snapshot de nome, "Material indisponível"); `pf:<posição>` vira apelido. Rota admin de diagnóstico de ligações.
+- **Exclusão protegida:** documento e questão (e bancos/pastas) só saem sem vínculos e sem uso em plano de aluno não arquivado (individual, lote, lixeira, cron de 30 dias, mover, despublicar, tipo/disciplina de pasta); super-admin força com motivo registrado; "Substituir documento"/"Ocultar" na recusa; publicar "TESTE/Cópia" em pasta de disciplina pede confirmação. Triggers no banco (migrações 20261118110000/120000).
+- Migrações: 20261118100000, 20261118110000, 20261118120000, 20261125000000, 20261125010000, 20261125020000 (aplicadas) e 20261125030000 (âncora de grifos, opcional). Dependências: sem novas.
+
 ## 4.23.0 — 2026-11-17
 
 **Folha de atualização no download (admin e aluno)**
