@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.27.0 — 2026-11-19
+
+### Meus Cadernos — aba "Caderno (beta)" (OneNote do aluno)
+- Nova aba **beta** dentro de Meus Cadernos, visível só para o grupo de acesso configurado (`tema.caderno_beta_grupos`; hoje o grupo "Revisão") e para a equipe do Workspace. As 4 abas atuais não mudaram.
+- Caderno único com **seções e páginas**, editor de texto (TipTap) com salvamento automático (versão otimista, fila offline, aviso de conflito), busca, seções automáticas de Erros e Favoritos, e **Folha livre** com caixas de texto e caneta (S-Pen, recusa de toque da palma).
+- Servidor pronto para tags, inserir bloco do leitor e exportar página em PDF/DOCX (respeita o interruptor de downloads) — telas dessas funções ainda não existem.
+- ⚠️ Migrações: `20261127000000_caderno_onenote_fase1` e `20261127010000_caderno_onenote_importar` (já aplicadas) e `20261128000000_caderno_notebook_tags` (a aplicar, só para tags).
+
+### Cronograma — causas dos relatos de metas trocadas
+- **Rastreio:** toda reorganização grande do plano grava na auditoria o antes e o depois (estudante, plano, metas movidas) e guarda uma cópia da grade anterior.
+- **Revisão só depois do estudo:** revisão/questões de uma aula agendadas antes do PDFull não feito são recolocadas ao carregar o cronograma (com registro).
+- **Organizar atrasadas:** não roda antes de o servidor confirmar o estado do aluno, nunca reagenda meta já concluída (nem as partes de uma aula concluída) e devolve o dia original se o motor mexer.
+
+---
+
 ## 4.26.0 — 2026-11-18
 
 ### Central de Atualizações (admin) — mais funções
