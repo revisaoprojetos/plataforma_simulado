@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lerCfgMetas } from './config-metas'
+import { diffGrade, mudancaGrande, LIMIAR_AUDITORIA_GRADE, LIMIAR_SNAPSHOT_GRADE, type Grade } from './grade-diff'
 
 // REGISTRO do Cronograma Adaptativo (aba admin "Análise de uso"). TUDO best-effort: nunca lança, nunca atrasa a resposta
 // do aluno (a gravação roda em after()) e tolera a migração 20261119030000 ausente (a tabela some → o insert falha em silêncio).
@@ -76,6 +77,28 @@ export function registrarSync(svc: SupabaseClient, r: {
   depois(async () => {
     const ok = !r.erro
     if (ok && r.antes && digest(r.antes.plano) === digest(r.depois.plano) && digest(r.antes.cfg) === digest(r.depois.cfg)) return
+    // RASTREIO por identificação: reorganização grande (organizar atrasadas, regerar, mover em massa) grava ANTES×DEPOIS na auditoria
+    // (estudante, plano, quantas metas mudaram e o deslocamento) e, quando muito grande, uma CÓPIA da grade anterior para provar/reverter.
+    if (ok && r.antes && r.planoId) {
+      try {
+        const resumo = diffGrade(r.antes.plano as Grade, r.depois.plano as Grade)
+        if (mudancaGrande(resumo, LIMIAR_AUDITORIA_GRADE)) {
+          let snapshot: string | null = null
+          if (mudancaGrande(resumo, LIMIAR_SNAPSHOT_GRADE)) {
+            snapshot = `cronograma/backup-grade/${r.tenantId}/${r.planoId}-${Date.now()}.json`
+            const corpo = new Blob([JSON.stringify({ planoId: r.planoId, estudanteId: r.estudanteId, em: new Date().toISOString(), plano: r.antes.plano, cfg: r.antes.cfg })], { type: 'application/json' })
+            const { error: eUp } = await svc.storage.from('pdfs').upload(snapshot, corpo, { upsert: false, contentType: 'application/json' })
+            if (eUp) snapshot = null
+          }
+          await svc.from('simulado_audit_logs').insert({
+            tenant_id: r.tenantId, ator_tipo: 'estudante', ator_id: r.estudanteId, tabela: 'simulado_cronograma_adaptativo_plano', entidade: 'simulado_cronograma_adaptativo_plano', entidade_id: r.planoId, operacao: 'UPDATE',
+            dados_anteriores: { estudante_id: r.estudanteId, plano_id: r.planoId, ids_grade: Object.keys((r.antes.plano ?? {}) as object).length },
+            dados_novos: { estudante_id: r.estudanteId, plano_id: r.planoId, ...resumo, fim: r.depois.fim ?? null, copia_da_grade_anterior: snapshot },
+            detalhes: { origem: 'sync_iframe', motivo: 'reorganizacao_grande_da_grade' }, criado_em: new Date().toISOString(),
+          })
+        }
+      } catch { /* rastreio best-effort: nunca atrapalha o salvamento */ }
+    }
     const cfg = (r.depois.cfg ?? {}) as { motor?: string; catalogo?: string }
     const params_hash = await hashParamsTenant(svc, r.tenantId)
     await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({

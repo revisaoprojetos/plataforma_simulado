@@ -153,7 +153,7 @@ export function Seg({ items, active = 0, links, counts, style }: { items: string
 }
 
 /** Abas de seção: sublinhado dourado na ativa (padrão de abas de linha). */
-export function Tabs({ items, active = 0, links, counts }: { items: string[]; active?: number; links?: string[]; counts?: (number | null)[] }) {
+export function Tabs({ items, active = 0, links, counts }: { items: string[]; active?: number; links?: string[]; counts?: (number | string | null)[] }) {
   return (
     <nav aria-label="Seções" style={{ display: 'flex', gap: 26, borderBottom: '1px solid var(--line)', overflowX: 'auto' }}>
       {items.map((t, k) => {

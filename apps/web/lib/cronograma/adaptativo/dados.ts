@@ -16,6 +16,8 @@ import { catalogoIdDoTenant, lerPaginasReais } from './catalogo-override-db'
 import { espelharEmSegundoPlano, lerDetalhesMetas, gravarDetalhesMetas } from './plano-metas'
 import { sanearDetalhes, dataConclusao, certValido } from './meta-ids'
 import { registrarGeracao, registrarEventoMeta, registrarSync, type OrigemGeracao } from './log-geracao'
+import { revisoesAntesDoEstudo, aplicarAjustes } from './revisoes-coerentes'
+import type { Grade } from './grade-diff'
 import { planejarProgresso, emParaCliente, type ProgEnviado, type MetaAtual } from './progresso-regras'
 import { garantirAS, chavesAtuais } from './remap-as-server'
 import { camposAssinatura, idOrfao, type AssinaturaAS } from './remap-as'
@@ -555,6 +557,22 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
   const { data: raw } = await svc.from(T_PLANO).select('extras').eq('id', row.id).maybeSingle()
   const extras = ((raw as { extras?: unknown[] } | null)?.extras) || []
   const metas = await lerMetas(svc, tenantId, row.id)
+  // INVARIANTE (incidente Welber, 19/11): revisão/questões de uma aula nunca antes do estudo não feito. Cura na carga, com lock otimista e rastreio.
+  let planoServido = row.plano
+  if (!row.exemplo) {
+    try {
+      const ajustes = revisoesAntesDoEstudo((row.plano || {}) as unknown as Grade, new Set(metas.filter((m) => m.estado === 'done').map((m) => m.meta_id)))
+      if (ajustes.length) {
+        const novo = aplicarAjustes((row.plano || {}) as unknown as Grade, ajustes)
+        const { data: ok } = await svc.from(T_PLANO).update({ plano: novo as unknown as Record<string, unknown>, atualizado_em: new Date().toISOString() }).eq('id', row.id).eq('atualizado_em', row.atualizado_em).select('id')
+        if (ok?.length) {
+          planoServido = novo as unknown as typeof row.plano
+          registrarGeracao(svc, { tenantId, estudanteId: estId, planoId: row.id, acao: 'migrar', origem: 'migracao', ok: true, erro: `revisoes_coerentes: ${ajustes.length} revisao(oes) antes do estudo recolocadas (${ajustes.slice(0, 6).map((a) => a.id).join(',')})` })
+          await svc.from('simulado_audit_logs').insert({ tenant_id: tenantId, ator_tipo: 'sistema', tabela: T_PLANO, entidade: T_PLANO, entidade_id: row.id, operacao: 'RECORRIGIR', dados_anteriores: { estudante_id: estId, plano_id: row.id, motivo: 'revisao agendada antes do estudo (PDFull nao feito)' }, dados_novos: { estudante_id: estId, plano_id: row.id, ajustes }, detalhes: { origem: 'revisoes_coerentes' }, criado_em: new Date().toISOString() })
+        }
+      }
+    } catch { /* cura best-effort: nunca derruba o carregamento */ }
+  }
   const detalhes = await lerDetalhesMetas(svc, row.id)
   const prog: Record<string, ProgMeta> = {}
   const notas: Record<string, { grau?: number; res?: number; err?: number; diff?: number; cert?: number }> = {}
@@ -577,7 +595,7 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
   }
   return {
     // cfg SEM a assinatura/órfãs (campos do servidor; o iframe só recebe `sigAS` p/ provar que está no mesmo referencial ao salvar)
-    estado: { cfg: semCamposServidor(row.cfg), plano: row.plano || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, titulo: row.titulo ?? null, extras, detalhes },
+    estado: { cfg: semCamposServidor(row.cfg), plano: planoServido || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, titulo: row.titulo ?? null, extras, detalhes },
     progresso: { prog, extras },
     notas: { notas },
     extras,

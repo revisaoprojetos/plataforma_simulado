@@ -1098,7 +1098,9 @@ const feito = id => est(id) === 'done';
 const info = id => { const r = descrever(id, AS, WLP); r.id = id; return r; };
 const pos = id => S.plano[id] || RV[id];
 const horasDe = id => pos(id)?.[1] || 0;
-function atrasadas() { let h = hojeISO(); if (S.pausa && S.pausa.desde < h) h = S.pausa.desde; return Object.entries(S.plano).filter(([id, [d]]) => d < h && !feito(id)).map(([id]) => id); }
+/* Concluída = feita OU parte (pp:<aula>:<n>) de uma aula cujo PDFull (pf:<aula>) já foi concluído: a parte nunca volta como atrasada nem é reagendada (relato Gregory 19/11: reorganizar reincluía metas já realizadas). */
+const concluidaPorAula = id => { if (feito(id)) return true; const m = /^pp:(\d+):\d+$/.exec(id); return !!m && feito('pf:' + m[1]); };
+function atrasadas() { let h = hojeISO(); if (S.pausa && S.pausa.desde < h) h = S.pausa.desde; return Object.entries(S.plano).filter(([id, [d]]) => d < h && !concluidaPorAula(id)).map(([id]) => id); }
 const semAtual = () => Math.max(1, semDe(S.cfg.start, hojeISO()));
 
 /* ---------- persistência: navegador + conta ---------- */
@@ -2700,6 +2702,8 @@ document.addEventListener('dragend', limparArraste);
 /* ---------- organizar atrasadas, ajustar horas, retomar (dominó) ---------- */
 function reorganizar() {
   if (!usaMotorAtual(S.cfg)) return reorganizarLegado();
+  /* Nunca reorganiza a partir de estado local não confirmado pelo servidor (marcações podem estar desatualizadas → metas feitas pareceriam atrasadas). */
+  if (!HIDRATOU && !CRIAR && !TESTE) { toast('Aguarde o cronograma terminar de carregar e tente de novo.'); return; }
   const aPartir = RETOMA === 'amanha' ? dAdd(hojeISO(), 1) : hojeISO(); RETOMA = 'hoje';
   if (S.pausa) { toast('Retome o cronograma antes de organizar as metas.'); return; }
   const atrasos = atrasadas().filter(id => !ehAnterior(id));
@@ -2708,11 +2712,14 @@ function reorganizar() {
   const inicio = Motor28.proximoEstudo(S.cfg, aPartir);
   if (!inicio) { toast('Defina dias de estudo disponíveis para organizar as metas.'); return; }
   const fonte = {};
-  for (const [id, [d, h]] of Object.entries(planoCompleto())) { if (ehAnterior(id)) continue; fonte[id] = [!feito(id) && d < inicio ? inicio : d, h]; }
+  for (const [id, [d, h]] of Object.entries(planoCompleto())) { if (ehAnterior(id)) continue; fonte[id] = [!concluidaPorAula(id) && d < inicio ? inicio : d, h]; }
   try {
     const g = dominoNovo(fonte, S.cfg, inicio, {});
+    /* INVARIANTE: meta concluída NUNCA muda de dia nem some da grade numa reorganização — se o motor mexer, devolve o que era. */
+    let protegidas = 0;
+    for (const id of Object.keys(fonte)) { if (!concluidaPorAula(id)) continue; const o = fonte[id], n = g.plano[id]; if (!n || n[0] !== o[0] || n[1] !== o[1]) { g.plano[id] = [o[0], o[1]]; protegidas++; } }
     aplicarDomino(g, S.cfg);
-    (S.reorgs = S.reorgs || []).push({ em: hojeISO(), n: atrasos.length, tipo: 'organizar-atrasadas' });
+    (S.reorgs = S.reorgs || []).push({ em: hojeISO(), n: atrasos.length, tipo: 'organizar-atrasadas', protegidas });
     salvar('estado', 'progresso'); CONF = null; fecharFolha(); renderTudo();
     toast(`${atrasos.length} ${atrasos.length === 1 ? 'meta em atraso organizada' : 'metas em atraso organizadas'} a partir de ${fDM(inicio)}.`);
   } catch (e) { CONF = null; renderTudo(); avisoDlg('Não foi possível organizar as metas', msgErroMotor(e)); }

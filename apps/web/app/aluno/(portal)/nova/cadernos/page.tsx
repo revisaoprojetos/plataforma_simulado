@@ -19,12 +19,14 @@ import { carregarMarcacoesAluno, linkLeitor, type MaterialMarcado, type Marcacao
 import { cadernoDeErros, progressoCadernos } from '@/lib/aluno/cadernos-aluno'
 import { CriarCadernoCard } from './criar-caderno'
 import { bibliotecaLiberada } from '@/lib/nova/area-aluno-acesso'
+import { cadernoBetaLiberado } from '@/lib/aluno/caderno-beta-acesso'
+import { NotebookShell } from '@/components/aluno/notebook/notebook-shell'
 
 export const dynamic = 'force-dynamic'
 
-const ABAS = ['cadernos', 'anotacoes', 'grifos', 'salvos'] as const
+const ABAS = ['cadernos', 'anotacoes', 'grifos', 'salvos', 'beta'] as const
 type Aba = (typeof ABAS)[number]
-const ROTULOS = ['Cadernos', 'Anotações', 'Grifos', 'Salvos']
+const ROTULOS = ['Cadernos', 'Anotações', 'Grifos', 'Salvos', 'Caderno (beta)']
 const hrefAba = (a: Aba) => (a === 'cadernos' ? R.cadernos : `${R.cadernos}?aba=${a}`)
 
 // Grifos por material antes do "ver todos" (um aluno pode ter centenas num PDF só).
@@ -41,14 +43,19 @@ const cortar = (s: string, n = 420) => (s.length > n ? s.slice(0, n).trimEnd() +
 
 export default async function CadernosPage({ searchParams }: { searchParams: Promise<{ aba?: string; doc?: string }> }) {
   const sp = await searchParams
-  const aba: Aba = (ABAS as readonly string[]).includes(sp?.aba ?? '') ? (sp.aba as Aba) : 'cadernos'
   const docAberto = typeof sp?.doc === 'string' ? sp.doc : ''
 
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
   const { tenantId, estudanteId } = sessao
-  const bibLiberada = await bibliotecaLiberada(tenantId, estudanteId, sessao.email) // o botão "Abrir a Biblioteca" só p/ quem pode
+  const [bibLiberada, betaOk] = await Promise.all([
+    bibliotecaLiberada(tenantId, estudanteId, sessao.email), // o botão "Abrir a Biblioteca" só p/ quem pode
+    cadernoBetaLiberado({ tenantId, estudanteId, email: sessao.email }), // aba "Caderno (beta)": decisão do servidor (fail-closed)
+  ])
+  // ?aba=beta só vale p/ liberados; senão cai na aba padrão.
+  const abasVisiveis: readonly Aba[] = betaOk ? ABAS : ABAS.filter((a) => a !== 'beta')
+  const aba: Aba = (abasVisiveis as readonly string[]).includes(sp?.aba ?? '') ? (sp.aba as Aba) : 'cadernos'
 
   // Marcações sempre (as contagens de Grifos/Anotações saem delas); Salvos completo só na aba Salvos.
   const [{ data: cads }, materiais, salvos] = await Promise.all([
@@ -103,11 +110,13 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
       />
 
       <Tabs
-        items={ROTULOS}
-        active={ABAS.indexOf(aba)}
-        counts={[cadernos.length, totalNotas, totalGrifos, totalSalvos]}
-        links={ABAS.map(hrefAba)}
+        items={ROTULOS.slice(0, abasVisiveis.length)}
+        active={abasVisiveis.indexOf(aba)}
+        counts={[cadernos.length, totalNotas, totalGrifos, totalSalvos, 'BETA'].slice(0, abasVisiveis.length)}
+        links={abasVisiveis.map(hrefAba)}
       />
+
+      {aba === 'beta' && betaOk && <NotebookShell />}
 
       {aba === 'cadernos' && (
         <>
