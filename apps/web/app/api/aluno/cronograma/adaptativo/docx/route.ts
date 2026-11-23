@@ -5,8 +5,6 @@ import { estadoParaRender } from '@/lib/cronograma/adaptativo/dados'
 import { snapshotParaGrade } from '@/lib/cronograma/adaptativo/docx-adapter'
 import { gerarDocxCronograma } from '@/lib/cronograma/docx/cronograma'
 import { acharPaleta } from '@/lib/cronograma/paletas'
-import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
-import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 
 // GET /api/aluno/cronograma/adaptativo/docx — baixa o DOCX do Cronograma Adaptativo.
 // Gerado no processo (lib `docx`), sem Chromium. A4 paisagem, 1 página por semana.
@@ -16,8 +14,7 @@ export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ ok: false, message: 'Não autenticado.' }, { status: 401 })
   const svc = createAdminClient()
-  // INTERRUPTOR CENTRAL de downloads do aluno (tema.downloads_aluno; ausente = bloqueado): o DOCX do cronograma também fica sob ele.
-  if (await bloqueioDownloadsAluno(svc, sessao.tenantId, sessao.estudanteId, { documentoId: null, origem: 'cronograma', metaId: null, produtoId: null })) return NextResponse.json({ ok: false, message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
+  // DOCX do próprio cronograma NÃO está sob o interruptor central (vale só p/ materiais de conteúdo).
   const r = await estadoParaRender(svc, sessao.tenantId, sessao.estudanteId)
   if (!r) return NextResponse.json({ ok: false, message: 'Você ainda não tem cronograma.' }, { status: 404 })
   const grade = snapshotParaGrade(r.snapshot)

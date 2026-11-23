@@ -968,6 +968,7 @@ function toast(msg) {
 const ICDL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;margin-right:5px;vertical-align:-2px"><path d="M8 2.5v7M5 7l3 3 3-3M3 13h10"/></svg>';
 /* INTERRUPTOR de downloads do aluno: o portal passa ?dl=1 SÓ quando o tenant permite (tema.downloads_aluno === 'permitido'). Ausente = sem botões de baixar
    (o servidor também barra: 403 "Download indisponível no momento"). */
+/* DOCX/PDF do PRÓPRIO cronograma NÃO dependem do interruptor (só materiais de conteúdo dependem): sempre liberados. */ const DL_CRON = true;
 const DL_OK = (() => { try { return new URLSearchParams(location.search).get('dl') === '1'; } catch (e) { return false; } })();
 /* Caixa "Incluir atualização" (folha com a última atualização do material, depois da capa): escolha lembrada no navegador. */
 const ATZ_KEY = 'rv:dl-atz';
@@ -2130,7 +2131,7 @@ function salvarNota(campo, valor) {
 
 /* ---------- exportar DOCX (modelo da Revisão) ---------- */
 async function baixarDocx() {
-  if (!DL_OK) { toast('Download indisponível no momento'); return; }
+  if (!DL_CRON) { toast('Download indisponível no momento'); return; }
   const btn = $('#btn-docx');
   let dl = null;
   try { dl = window.claude?.use ? await claude.use('downloads') : null; } catch (e) {}
@@ -2457,7 +2458,7 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'ini-form') { e.preventDefault(); enviarInicio(); return; } if (e.target.id === 'extra-form') { e.preventDefault(); enviarExtra(); return; } if (e.target.id === 'foco-form') { e.preventDefault(); encerrarMeta(true); } if (e.target.id === 'parc-form') { e.preventDefault(); const id = e.target.dataset.id, v = $('#parc-v').value.trim(); if (!v) { $('#parc-v').focus(); return; } (S.prog[id] ||= {}).parou = { v, em: hojeISO() }; PARCIAL = null; salvar('progresso'); reagendarParada(id, v); } });
 window.addEventListener('hashchange', () => { if (TESTE) return; const h = location.hash.slice(1); if (TELAS.includes(h) && h !== TELA) irPara(h, true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && RUN) { registrarTempo(); salvar('progresso'); } });
-if (!DL_OK) $('#btn-docx').hidden = true;
+if (!DL_CRON) $('#btn-docx').hidden = true;
 $('#btn-docx').addEventListener('click', baixarDocx);
 
 /* ============================================================
@@ -2827,7 +2828,7 @@ function restaurarBackup() {
 const ehAdaptativa = id => /^(pf|fl):\d+:revisao:\d+$/.test(id);
 function motivoMeta(i) {
   const id = i.id, dt = (S.detalhes && S.detalhes[id]) || {};
-  if (/^rf:/.test(id) || dt.essencialNaoSelecionada) return 'Revisão da semana · PDFlash de essencial não selecionada';
+  if (/^rf:/.test(id) || dt.essencialNaoSelecionada) return 'Revisão da semana';
   if (ehAdaptativa(id)) {
     const pct = dt.percentualOrigem, o = dt.origem ? ' (' + String(dt.origem).replace(/^qu:/, 'questões da aula ') + ')' : '';
     return (i.tipo === 'pf' ? 'Releitura da revisão adaptativa' : 'PDFlash da revisão adaptativa') + (Number.isFinite(pct) ? ' · ' + (Math.round(pct * 10) / 10).toLocaleString('pt-BR') + '% de acerto' : '') + o;
@@ -3399,7 +3400,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
       <div class="painel bloco rv-acoes">
         <h3>Este cronograma</h3>
         <button type="button" class="btn" data-acao="rv-act" data-a="renomear">Renomear</button>
-        ${REV.indisponivel || !DL_OK ? '' : '<button type="button" class="btn" data-acao="rv-act" data-a="pdf" id="rv-pdf-cfg">Salvar em PDF</button>'}
+        ${REV.indisponivel || !DL_CRON ? '' : '<button type="button" class="btn" data-acao="rv-act" data-a="pdf" id="rv-pdf-cfg">Salvar em PDF</button>'}
         ${REV.arquivada ? '<button type="button" class="btn" data-acao="rv-act" data-a="restaurar">Restaurar</button>' : ''}
         <button type="button" class="btn perigo" data-acao="rv-act" data-a="apagar">Apagar</button>
       </div>
@@ -3526,7 +3527,7 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
     if (ac && !ac.querySelector('.rv-btn')) {
       const mk = (a, rot) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-band rv-btn'; b.dataset.acao = 'rv-act'; b.dataset.a = a; b.textContent = rot; return b; };
       ac.appendChild(mk('renomear', 'Renomear'));
-      if (!REV.indisponivel && DL_OK) ac.appendChild(mk('pdf', 'Salvar em PDF'));
+      if (!REV.indisponivel && DL_CRON) ac.appendChild(mk('pdf', 'Salvar em PDF'));
     }
   }
 

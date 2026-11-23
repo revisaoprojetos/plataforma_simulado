@@ -47,3 +47,15 @@ export function pdfProxyUrl(url: string | null | undefined): string {
   if (!path) return url
   return `${PROXY_PDF_BASE}/${pdfSegmentos(path)}${queryDe(url)}`
 }
+
+/**
+ * Content-Disposition do proxy de PDF: sempre com `filename` ASCII (leitores/iframes antigos ignoram `filename*`)
+ * + `filename*` UTF-8 percent-encoded. Garante extensão .pdf quando o nome pedido não tem.
+ */
+export function dispositionPdf(nome: string, anexo: boolean): string {
+  const limpo = (nome || 'arquivo.pdf').replace(/[\r\n"\/]+/g, '_')
+  const final = /\.pdf$/i.test(limpo) ? limpo : `${limpo}.pdf`
+  const ascii = final.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '_').replace(/["\%;]/g, '_')
+  const utf8 = encodeURIComponent(final).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
+  return `${anexo ? 'attachment' : 'inline'}; filename="${ascii}"; filename*=UTF-8''${utf8}`
+}

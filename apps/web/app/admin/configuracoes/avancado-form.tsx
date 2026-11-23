@@ -67,7 +67,7 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
   const [pendingDl, startDl] = useTransition()
   function toggleDlAluno() {
     const next = !dlAluno
-    if (next && !window.confirm('Permitir que os alunos baixem materiais (Biblioteca, cronogramas, aulas do produto e cadernos)?')) return
+    if (next && !window.confirm('Permitir que os alunos baixem os materiais de conteúdo (Biblioteca e materiais das aulas/cronograma)?')) return
     setDlAluno(next)
     startDl(async () => {
       try { await salvarTema(patchTemaDownloads(next)); toast.success(next ? 'Downloads liberados para os alunos.' : 'Downloads desativados para os alunos.') }
@@ -92,8 +92,8 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
           className="flex w-full items-start gap-3 text-left disabled:opacity-60">
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Download className="h-4 w-4" /></span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">Permitir downloads pelos alunos {pendingDl && <Loader2 className="h-3.5 w-3.5 animate-spin" />}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">Desligado (padrão): os alunos continuam lendo tudo no leitor, mas <b>não conseguem baixar</b> nada. O bloqueio vale na <b>Biblioteca</b>, nos <b>cronogramas</b> (material, PDF e DOCX do plano), nas <b>aulas do produto</b> e nos <b>cadernos</b> do simulado, e é aplicado no servidor. Não afeta o download feito pela equipe nem o PDF de resultado/relatório do próprio aluno. Pode levar até 30 s para valer.</span>
+            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">Downloads de materiais de conteúdo pelos alunos {pendingDl && <Loader2 className="h-3.5 w-3.5 animate-spin" />}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">Desligado (padrão): os alunos continuam lendo tudo no leitor, mas <b>não conseguem baixar os materiais de conteúdo</b> (documentos da <b>Biblioteca</b>, materiais das <b>aulas do produto</b> e do <b>cronograma</b>). O bloqueio é aplicado no servidor. <b>Não afeta</b> diagnósticos, cadernos de teste/questões, gabaritos, resultados/relatórios de simulados, o PDF/DOCX do próprio cronograma, a exportação do Caderno nem o download feito pela equipe. Pode levar até 30 s para valer.</span>
           </span>
           <span className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${dlAluno ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${dlAluno ? 'left-[22px]' : 'left-0.5'}`} />

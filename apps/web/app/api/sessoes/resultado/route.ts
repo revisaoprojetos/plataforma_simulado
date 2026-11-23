@@ -9,6 +9,7 @@ import { funcaoEtiquetaPorQuestao } from '@/lib/simulado/etiqueta-funcao'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { getStorage } from '@/lib/storage'
+import { assinarSat } from '@/lib/aluno/sat'
 
 // GET /api/sessoes/resultado?st={sessao_id}
 // Dados da central de revisão: resumo + questões com resposta do aluno.
@@ -162,7 +163,7 @@ export async function GET(request: NextRequest) {
     (async (): Promise<ModalidadeAluno[]> => {
       if (!bancoBaseIdV2) return []
       const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
-      return temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega, sessao.id) : []
+      return temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega, sessao.id, assinarSat(sessao.id, sessao.tenant_id)) : []
     })(),
   ])
   const cadernoId: string | null = null
@@ -304,6 +305,8 @@ export async function GET(request: NextRequest) {
     estudante_id: sessao.estudante_id ?? null,
     caderno_id: cadernoId,
     modalidades,
+    // Token de acesso (HMAC, 6 h) p/ os downloads de PDF desta sessão — o embed/login leve não tem cookie.
+    sat: assinarSat(sessao.id, sessao.tenant_id),
     posicao: sessao.posicao_ranking ?? null,
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,

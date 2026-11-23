@@ -6,18 +6,18 @@
  *  · Compatibilidade: a chave antiga `tema.biblioteca_politica.aluno_pode_baixar === true` (explícita) também libera,
  *    mas `downloads_aluno` (quando presente) sempre vence. Ausente nos dois = bloqueado.
  *
- * O que a chave governa (no SERVIDOR): documentos da Biblioteca/cronogramas/aulas do produto (rotas de baixar), mídia,
- * cadernos do simulado (caderno de questões / gabarito comentado do card) e o PDF do cronograma.
- * O que NÃO governa: ler no leitor (inclui o proxy /api/arquivo/pdf SEM ?download=), PDF de resultado/relatório do próprio
- * aluno (não é material de estudo), downloads do ADMIN.
+ * ESCOPO (decisão do usuário): SOMENTE downloads de MATERIAIS DE CONTEÚDO (documentos da Biblioteca, materiais de aula/produto/cronograma
+ * — rotas aluno/biblioteca/baixar, conteudo/baixar e arquivo/pdf ?download= de caminhos 'materiais/').
+ * NÃO governa: diagnóstico, cadernos de teste/questões, gabaritos, resultados/relatórios de simulados, PDF/DOCX do próprio cronograma,
+ * exportação do Caderno beta, ler no leitor, nem downloads do ADMIN.
  */
 export type ModoDownloads = 'bloqueado' | 'permitido'
 export type PapelDownload = 'aluno' | 'testador' | 'admin'
 
 export const MOTIVO_DOWNLOADS_DESATIVADOS = 'downloads_desativados'
 export const MENSAGEM_DOWNLOAD_INDISPONIVEL = 'Download indisponível no momento'
-/** O PDF do próprio cronograma (Revisão/Gerador) também fica sob o interruptor. Mude para false para liberá-lo sempre. */
-export const BLOQUEIA_PDF_DO_CRONOGRAMA = true
+/** @deprecated O PDF/DOCX do próprio cronograma NÃO está mais sob o interruptor (só materiais de conteúdo). Mantido por compatibilidade; sem uso nas rotas. */
+export const BLOQUEIA_PDF_DO_CRONOGRAMA = false
 
 export function modoDownloadsDoTema(tema: unknown): ModoDownloads {
   const t = (tema && typeof tema === 'object' ? tema : {}) as Record<string, unknown>

@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { BookOpen, MessageSquare, BarChart3, Download, Loader2, X, ArrowRight } from 'lucide-react'
 import { internaTokensStyle, type Brand, type InternaTheme } from './interna-tokens'
+import { baixarDeUrl, baixarViaFetch, nomeArquivoSeguro } from '@/lib/aluno/baixar-arquivo'
 import type { DownloadSimulado } from '@/lib/aluno/downloads-simulado'
 
 const ICONE = { caderno: BookOpen, gabarito: MessageSquare, diagnostico: BarChart3, folha: Download } as const
@@ -19,20 +20,18 @@ function useBaixar() {
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
   async function baixar(d: DownloadSimulado) {
     if (baixandoId) return
-    if (!/\/api\//.test(d.href)) { window.open(d.href, '_blank', 'noopener,noreferrer'); return }
+    if (!/\/api\//.test(d.href)) { // arquivo importado: link direto, SÍNCRONO (sem await → sem popup blocker)
+      if (baixarDeUrl(d.href, nomeArquivoSeguro(d.nome, 'pdf', 'caderno')) === 'falhou') toast.error('Não foi possível abrir o arquivo. Tente novamente.')
+      return
+    }
     setBaixandoId(d.modalidade)
     toast.loading('Gerando PDF…', { id: 'cadpdf' })
     try {
-      let res: Response | null = null
-      for (let i = 0; i < 3; i++) { res = await fetch(d.href); if (res.status !== 503) break; await new Promise((r) => setTimeout(r, 2000 * (i + 1))) }
-      if (!res || !res.ok) throw new Error('Não foi possível gerar o PDF agora. Tente novamente em instantes.')
-      const blob = await res.blob()
-      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `${(d.nome || 'caderno').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')}.pdf`
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      await baixarViaFetch(d.href, {
+        nome: nomeArquivoSeguro(d.nome, 'pdf', 'caderno'),
+        validar: (blob) => (/pdf/i.test(blob.type) ? null : 'O PDF gerado veio vazio. Tente novamente em instantes.'),
+        aoTentarDeNovo: () => toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' }),
+      })
       toast.success('Download concluído', { id: 'cadpdf', description: d.nome })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora.', { id: 'cadpdf' })

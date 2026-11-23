@@ -4,8 +4,6 @@ import { LIMITES_EXPORT, MIME_EXPORT, contentDisposition, docParaBlocos, parseFo
 import { ExportLimite, gerarDocx, gerarPdfDoc, gerarPdfFolha } from '@/lib/aluno/notebook-exportar-arquivos'
 import { validarFolha } from '@/lib/aluno/notebook-folha'
 import { uuidSchema } from '@/lib/aluno/notebook-tipos'
-import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
-import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -25,10 +23,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   const formato = parseFormato(request.nextUrl.searchParams.get('formato'))
   if (!formato) return resp400('formato deve ser pdf ou docx.')
 
-  // GUARDA CENTRAL de downloads do aluno (ausente = bloqueado)
-  if (await bloqueioDownloadsAluno(a.svc, a.tenantId, a.estudanteId, { titulo: 'caderno-beta', origem: 'outro' })) {
-    return erro(403, 'download_indisponivel', MENSAGEM_DOWNLOAD_INDISPONIVEL)
-  }
+  // Exportação do Caderno beta NÃO está sob o interruptor central (vale só p/ materiais de conteúdo).
   if (!limiteEscrita(`exp:${a.estudanteId}`, 3, 10_000)) return resp429()
 
   const { data, error } = await a.svc.from('simulado_aluno_notebook_paginas').select('id, titulo, tipo_pagina, doc, tinta')

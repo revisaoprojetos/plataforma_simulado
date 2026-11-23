@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { autorizarSessao } from '@/lib/aluno/autorizar-sessao'
 import { verificarRenderToken } from '@/lib/pdf/render-token'
 import { normalizarBuilder } from '@/lib/caderno-teste/tipos'
 import type { DiscBanco } from '@/lib/caderno-teste/previa'
@@ -33,13 +34,19 @@ export default async function ImprimirCadernoTestePage({ params, searchParams }:
   // Pode ver DADOS REAIS do aluno (PII/desempenho/respostas)? Token = render do próprio aluno; sessão = dono
   // (forçado adiante); admin só com permissão de resultados. Conteúdo-only (só questoes:view) vê placeholders.
   let podeDados = false
-  const tok = verificarRenderToken(sp.pdftoken)
-  if (tok && tok.r === 'caderno-teste' && tok.id === cadernoId) {
-    tenantId = tok.t; podeDados = true
-  } else if (sp.sessao) {
-    const { data: sess } = await svc.from('simulado_sessoes_prova').select('tenant_id').eq('id', sp.sessao).maybeSingle()
+  if (sp.sessao) {
+    // SEGURANÇA (IDOR): `?sessao=` puro NÃO basta — exige cookie do dono, admin com permissão OU render-token
+    // assinado para ESTA sessão+caderno (Chromium do /api/aluno/caderno-teste-pdf). Negação = 404 genérico.
+    const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id, estudante_id').eq('id', sp.sessao).maybeSingle()
     if (!sess) return semPermissao('Sessão não encontrada.')
+    const auth = await autorizarSessao(sess as any, { renderToken: sp.pdftoken, cadernoId, exigirDados: true, rota: 'imprimir/caderno-teste' })
+    if (!auth.ok) return semPermissao('Sessão não encontrada.')
     tenantId = (sess as any).tenant_id; podeDados = true
+  } else if (sp.pdftoken) {
+    // Token SEM sessão (caderno-teste-questoes: capability pública por desenho) — mantém o comportamento.
+    const tok = verificarRenderToken(sp.pdftoken)
+    if (!tok || tok.r !== 'caderno-teste' || tok.id !== cadernoId) return semPermissao()
+    tenantId = tok.t; podeDados = true
   } else {
     const access = await getCurrentAccess()
     if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:view'))) return semPermissao()

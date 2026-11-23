@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
-import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { resolverDownloadsSimulados } from '@/lib/aluno/downloads-simulado'
 
 // Lista de cadernos baixáveis de UM simulado (pop-up "Baixar" do card) — carregada SOB DEMANDA quando o
@@ -16,10 +14,7 @@ export async function GET(request: NextRequest) {
   if (!simuladoId) return NextResponse.json({ error: 'Simulado ausente.' }, { status: 400 })
 
   const svc = createAdminClient()
-  // INTERRUPTOR CENTRAL (tema.downloads_aluno; ausente = bloqueado): sem cadernos para baixar — nem a lista é montada.
-  if (await bloqueioDownloadsAluno(svc, sessao.tenantId, sessao.estudanteId, { origem: 'outro', tipoOrigem: 'caderno', titulo: 'Cadernos do simulado (lista)' })) {
-    return NextResponse.json({ titulo: null, downloads: [], bloqueado: true, message: MENSAGEM_DOWNLOAD_INDISPONIVEL })
-  }
+  // O interruptor central (downloads_aluno) vale só p/ materiais de conteúdo; diagnóstico/gabarito/cadernos do simulado seguem livres.
   const { data: sim } = await svc.from('simulado_simulados')
     .select('id, titulo, embed_token, regras, status, data_fim')
     .eq('id', simuladoId).eq('tenant_id', sessao.tenantId).is('owner_estudante_id', null).maybeSingle()

@@ -1,3 +1,4 @@
+import { assinarSat } from '@/lib/aluno/sat'
 import { emailSeguro, filtroEmailOr } from '@/lib/seguranca/email-seguro'
 import { NextRequest, NextResponse } from 'next/server'
 import { registrarAcesso, registrarAtividade, ipDeHeaders, type MetodoAcesso } from '@/lib/acessos/registro'
@@ -391,6 +392,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     sessao_id: sessaoId,
     sessionToken: sessaoId,
+    // Credencial dos downloads de PDF desta sessão (o embed não tem cookie). HMAC {sid,tid,exp 6 h}.
+    sat: assinarSat(sessaoId, tenantId),
     estudante_nome: estudante.nome,
   })
 }

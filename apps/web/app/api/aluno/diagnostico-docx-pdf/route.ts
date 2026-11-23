@@ -11,6 +11,7 @@ import { converterDocxParaPdf } from '@/lib/conteudo/thumb'
 import { carregarDadosBancoCore } from '@/lib/caderno-teste/dados-banco'
 import { uploadArquivo } from '@/lib/storage'
 import { DADOS_PREVIA } from '@/lib/teste/previa-dados'
+import { autorizarSessao } from '@/lib/aluno/autorizar-sessao'
 
 // Diagnóstico do EDITOR BETA (OnlyOffice) PARA O ALUNO: pega o .docx da versão, preenche com os VALORES
 // REAIS do aluno (vars da sessão) via docxtemplater e converte em PDF no OnlyOffice. Cacheado por
@@ -40,6 +41,10 @@ export async function GET(request: Request) {
   // Sessão = credencial do aluno + escopo do tenant.
   const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id, simulado_id, estudante_id').eq('id', sessaoId).maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  // SEGURANÇA (IDOR): o id da sessão sozinho NÃO basta. Dono (cookie) | admin | token `sat` do embed.
+  // Antes de qualquer leitura de dados/cache/auditoria. Negação = 404 genérico (não revela existência).
+  const auth = await autorizarSessao(sess as any, { sat: searchParams.get('sat'), rota: 'diagnostico-docx-pdf' })
+  if (!auth.ok) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   const tenantId = (sess as any).tenant_id as string
 
   // Resolve a versão MAIS NOVA do documento (o template JÁ EDITADO fica num rascunho mais novo que a

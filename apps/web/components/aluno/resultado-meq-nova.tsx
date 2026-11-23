@@ -70,6 +70,8 @@ interface QuestaoRev {
 }
 interface StatDisciplina { disciplina: string; acertos: number; total: number; percentual: number }
 interface Resultado {
+  /** Token de acesso aos PDFs desta sessão (embed sem cookie). */
+  sat?: string
   titulo: string
   nota: number | null
   acertos: number
@@ -214,6 +216,7 @@ export function ResultadoMeqNova({
     let apiUrl: string
     if (md?.cadernoTeste) {
       const q = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessionToken, nome: arquivo })
+      if (data?.sat) q.set('sat', data.sat)
       if (gab) q.set('gabarito', '1')
       apiUrl = `/api/aluno/caderno-teste-pdf?${q.toString()}`
     } else if (data?.caderno_id) {

@@ -52,18 +52,24 @@ describe('cobertura estrutural das rotas (a guarda existe; rota de leitura não 
   it.each([
     'app/api/aluno/biblioteca/baixar/route.ts',
     'app/api/conteudo/baixar/route.ts',
-    'app/api/aluno/cronograma-pdf/route.ts',
-    'app/api/aluno/simulado-downloads/route.ts',
-    'app/api/aluno/caderno-teste-questoes/route.ts',
-    'app/api/arquivo/pdf/[...path]/route.ts',
   ])('%s chama a guarda central', (p) => {
     expect(ler(p)).toContain('bloqueioDownloadsAluno')
   })
-  it('/api/arquivo/pdf só barra attachment (?download=) de materiais; ler/stream seguem livres', () => {
+  it('/api/arquivo/pdf (material do simulado) NÃO usa o interruptor: a liberação é a configurada no admin', () => {
     const src = ler('app/api/arquivo/pdf/[...path]/route.ts')
-    expect(src).toMatch(/if \(download && path\.startsWith\('materiais\/'\) && \(await downloadMaterialBloqueado\(path\)\)\)/)
-    // a guarda vem ANTES do bloco de bytes, mas condicionada a `download`: o ramo `stream`/redirect não a consulta
-    expect(src.indexOf('downloadMaterialBloqueado(path)')).toBeLessThan(src.indexOf("if (download || stream)"))
+    expect(src).not.toContain('bloqueioDownloadsAluno')
+    expect(src).not.toContain('downloadMaterialBloqueado')
+  })
+  it('rotas FORA do escopo (diagnóstico, cadernos, simulado, cronograma, caderno beta) não usam a guarda', () => {
+    for (const p of [
+      'app/api/aluno/cronograma-pdf/route.ts',
+      'app/api/aluno/simulado-downloads/route.ts',
+      'app/api/aluno/caderno-teste-questoes/route.ts',
+      'app/api/aluno/caderno-teste-pdf/route.ts',
+      'app/api/aluno/cronograma/adaptativo/docx/route.ts',
+      'app/api/aluno/notebook/paginas/[id]/exportar/route.ts',
+      'app/imprimir/cronograma/[emissaoId]/page.tsx',
+    ]) expect(ler(p)).not.toContain('bloqueioDownloadsAluno')
   })
   it('rotas de leitura/admin não usam a guarda', () => {
     for (const p of ['app/api/conteudo/fonte/route.ts', 'app/api/admin/biblioteca/download-lote/route.ts']) {

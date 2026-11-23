@@ -34,7 +34,7 @@ function comDownload(url: string, nome: string): string {
 const ehOffice = (r: NonNullable<EntregaRef>): boolean => !!(r.docId && r.versaoId) && !r.pdfUrl && !(r.cadernoId && r.itemId)
 const usavel = (r: EntregaRef | undefined): r is NonNullable<EntregaRef> => !!r && !!(r.pdfUrl || (r.cadernoId && r.itemId) || (r.docId && r.versaoId))
 
-function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolean }, r: NonNullable<EntregaRef>, sessaoId?: string): ModalidadeAluno {
+function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolean }, r: NonNullable<EntregaRef>, sessaoId?: string, sat?: string): ModalidadeAluno {
   const base: ModalidadeAluno = { id, nome, semGab: flags.semGab, comGab: flags.comGab }
   // PDF importado → baixa direto.
   // Bucket `pdfs` é PRIVADO: o localizador gravado vira link-token (curta duração) emitido no servidor.
@@ -43,7 +43,7 @@ function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolea
   // monta o pdfUrl pronto (consumidor que abre direto); senão o consumidor monta por realização (dlHref).
   if (ehOffice(r)) {
     const b: ModalidadeAluno = { ...base, office: { docId: r.docId! } }
-    return sessaoId ? { ...b, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(r.docId!)}&sessao=${encodeURIComponent(sessaoId)}`, nome) } : b
+    return sessaoId ? { ...b, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(r.docId!)}&sessao=${encodeURIComponent(sessaoId)}${sat ? `&sat=${encodeURIComponent(sat)}` : ''}`, nome) } : b
   }
   // Item gerado (caderno de teste) → download pela rota do caderno.
   if (r.cadernoId && r.itemId) return { ...base, cadernoTeste: { cadernoId: r.cadernoId, itemId: r.itemId } }
@@ -60,14 +60,14 @@ function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolea
  *  - Diagnóstico → só quando liberado.
  *  - Gabarito Comentado → só quando liberado (normalmente PDF importado).
  */
-export function modalidadesDoAlunoV2(entrega: EntregaSlots | null | undefined, sessaoId?: string): ModalidadeAluno[] {
+export function modalidadesDoAlunoV2(entrega: EntregaSlots | null | undefined, sessaoId?: string, sat?: string): ModalidadeAluno[] {
   const e = entrega ?? {}
   const out: ModalidadeAluno[] = []
   if (usavel(e.enunciado)) out.push(slot('enunciado', 'Caderno de Questões', { semGab: true, comGab: false }, e.enunciado))
   if (usavel(e.folha)) out.push(slot('folha', 'Folha de Respostas', { semGab: true, comGab: true }, e.folha))
   // Diagnóstico: entra sempre (o variant office vira `office:{docId}`; o consumidor monta a URL com o sessaoId
   // da realização — ou já vem pronto no pdfUrl quando o sessaoId foi passado aqui).
-  if (usavel(e.diagnostico)) out.push(slot('diagnostico', 'Diagnóstico', { semGab: false, comGab: true }, e.diagnostico, sessaoId))
+  if (usavel(e.diagnostico)) out.push(slot('diagnostico', 'Diagnóstico', { semGab: false, comGab: true }, e.diagnostico, sessaoId, sat))
   if (usavel(e.gabarito)) out.push(slot('gabarito', 'Gabarito Comentado', { semGab: false, comGab: true }, e.gabarito))
   return out
 }

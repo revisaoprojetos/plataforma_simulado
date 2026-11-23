@@ -1,5 +1,6 @@
 'use client'
 
+import { baixarDeUrl, baixarViaFetch, nomeArquivoSeguro } from '@/lib/aluno/baixar-arquivo'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -149,7 +150,7 @@ export function MeuSimuladoView({
   async function baixarCaderno(sessaoId: string, mod: string, nome: string, gab = false) {
     // Enunciado/gabarito = PDF importado: entrega direta do arquivo, sem gerar no servidor.
     const md = modalidades.find((m) => m.id === mod)
-    if (md?.pdfUrl) { abrir(md.pdfUrl); return }
+    if (md?.pdfUrl) { baixarDeUrl(md.pdfUrl, nomeArquivoSeguro(nome, 'pdf', 'caderno')); return } // síncrono, sem await
     if (!md?.cadernoTeste) return
     const chave = `${sessaoId}:${mod}:${gab ? 'g' : 's'}`
     if (baixando) return
@@ -162,28 +163,12 @@ export function MeuSimuladoView({
     setBaixando(chave)
     toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
     try {
-      // O PDF sobe um Chromium (limitado a 1 por réplica) — sob concorrência o servidor responde
-      // 503 "ocupado". Re-tenta algumas vezes com pausa crescente antes de desistir, e mostra a
-      // mensagem REAL do servidor (ex.: "servidor ocupado", "nenhum navegador…") em vez de genérica.
-      let res: Response | null = null
-      for (let tentativa = 0; tentativa < 3; tentativa++) {
-        res = await fetch(apiUrl)
-        if (res.status !== 503) break
-        toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' })
-        await new Promise((r) => setTimeout(r, 2000 * (tentativa + 1)))
-      }
-      if (!res || !res.ok) {
-        let msg = 'Não foi possível gerar o PDF agora. Tente novamente em instantes.'
-        try { const j = await res?.json(); if (j?.message) msg = j.message } catch { /* corpo não-JSON */ }
-        throw new Error(msg)
-      }
-      const blob = await res.blob()
-      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = `${arquivo}.pdf`
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      // PDF gerado no servidor (Chromium, 503 sob concorrência): o helper re-tenta e traduz 401/403/rede em mensagem clara.
+      await baixarViaFetch(apiUrl, {
+        nome: nomeArquivoSeguro(arquivo, 'pdf', 'caderno'),
+        validar: (blob) => (/pdf/i.test(blob.type) ? null : 'O PDF gerado veio vazio. Tente novamente em instantes.'),
+        aoTentarDeNovo: () => toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' }),
+      })
       toast.success('Download concluído', { id: 'cadpdf', description: nome })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })

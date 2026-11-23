@@ -58,6 +58,8 @@ interface StatDisciplina {
   percentual: number
 }
 interface Resultado {
+  /** Token de acesso aos PDFs desta sessão (embed sem cookie). */
+  sat?: string
   titulo: string
   nota: number | null
   acertos: number
@@ -275,6 +277,7 @@ export function RevisaoFinal({
     let apiUrl: string
     if (md?.cadernoTeste) {
       const qs = new URLSearchParams({ caderno: md.cadernoTeste.cadernoId, grupo: md.cadernoTeste.itemId, sessao: sessionToken, nome: arquivo })
+      if (data?.sat) qs.set('sat', data.sat)
       if (gab) qs.set('gabarito', '1')
       apiUrl = `/api/aluno/caderno-teste-pdf?${qs.toString()}`
     } else if (data?.caderno_id) {

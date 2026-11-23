@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.29.0 — 2026-11-23
+
+### Downloads do aluno
+- O interruptor central de downloads (v4.25.0, "ausente = bloqueado") agora vale **só para materiais de conteúdo** da biblioteca. Diagnóstico, cadernos de teste, gabarito, material do simulado, PDF/DOCX do cronograma, impressão do cronograma e exportação do Caderno beta voltam a baixar conforme a liberação configurada no admin.
+- Admin › Configurações › Avançado: o interruptor passa a se chamar "Downloads de materiais de conteúdo pelos alunos" (a chave `downloads_aluno` não mudou).
+- Helper único de download no front (`lib/aluno/baixar-arquivo.ts`): link direto, compartilhar/nova aba como alternativa, retentativa em 503 e mensagens claras para 401/403/rede; aplicado no pop-up Baixar, resultado, Meu simulado e exportação do Caderno.
+- Proxy de PDF (`/api/arquivo/pdf`): nome do arquivo em ASCII + UTF-8 e erros do storage registrados no log (antes davam 404 mudo).
+
+### Segurança — PDFs por sessão (IDOR)
+- `diagnostico-docx-pdf`, `caderno-teste-pdf` e a página de impressão do caderno passam a autorizar a sessão (aluno dono, admin do tenant com permissão, token do Chromium ou token `sat` do embed) **antes** de qualquer consulta, cache ou auditoria; negação = 404 genérico.
+- Embed/login leve: novo token `sat` (HMAC, 6 h) emitido em `identify` e `resultado` e propagado nas URLs. O ramo de transição (sem cookie e sem `sat`, só pelo host do tenant) segue ligado e registra `sessao_pdf_sem_sat` para medir antes de desligar (`PERMITIR_SESSAO_PDF_SEM_SAT_TRANSICAO`).
+- Exige `PDF_RENDER_SECRET` (caderno de teste) e `PDF_ACCESS_SECRET` (assinatura do `sat`) em produção.
+
+### Cronograma adaptativo
+- Card da revisão de essencial externa mostra só "Revisão da semana" (saiu "PDFlash de essencial não selecionada").
+- Botões "Baixar DOCX" e "Salvar em PDF" do cronograma não dependem mais do interruptor de downloads.
+
 ## 4.28.0 — 2026-11-23
 
 ### Caderno estilo OneNote (aluno) — nova área em tela cheia

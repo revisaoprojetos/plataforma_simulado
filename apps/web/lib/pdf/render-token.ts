@@ -6,13 +6,14 @@ import { createHmac, timingSafeEqual } from 'crypto'
  * recebe a URL já pronta e nunca toca no segredo.
  *
  * Formato: base64url(payloadJSON) + '.' + base64url(hmac)
- * Payload: { t: tenantId, r: recurso ('caderno'), id: recursoId, exp: epochMs }
+ * Payload: { t: tenantId, r: recurso ('caderno'), id: recursoId, s?: sessaoId, exp: epochMs }
  */
 
 export interface RenderTokenPayload {
   t: string // tenant_id
   r: string // recurso, ex.: 'caderno'
   id: string // id do recurso
+  s?: string // (opcional) id da sessão de prova a que o token se restringe
   exp: number // expira em (epoch ms)
 }
 

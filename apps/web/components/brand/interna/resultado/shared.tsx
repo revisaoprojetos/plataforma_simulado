@@ -9,6 +9,7 @@
 // Regras do handoff: nada de <text> em <svg preserveAspectRatio="none">; rótulos/valores dos gráficos
 // em HTML. Outros alunos SÓ por iniciais (privacidade §2.4). Downloads em dois grupos com tile+ícone.
 
+import { baixarDeUrl, baixarViaFetch, nomeArquivoSeguro } from '@/lib/aluno/baixar-arquivo'
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   ArrowRight,
@@ -665,30 +666,19 @@ function useBaixarPdf() {
   async function baixar(href: string, nome: string) {
     if (baixando) return
     // Arquivo direto (PDF importado) → abre sem gerar no servidor.
-    if (!/\/api\//.test(href)) { window.open(href, '_blank', 'noopener,noreferrer'); return }
+    if (!/\/api\//.test(href)) { // PDF importado: link direto SÍNCRONO (iframe/popup blocker)
+      if (baixarDeUrl(href, nomeArquivoSeguro(nome, 'pdf', 'caderno')) === 'falhou') toast.error('Não foi possível abrir o arquivo. Tente novamente.')
+      return
+    }
     setBaixando(true)
     toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
     try {
-      let res: Response | null = null
-      for (let tentativa = 0; tentativa < 3; tentativa++) {
-        res = await fetch(href)
-        if (res.status !== 503) break
-        toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' })
-        await new Promise((r) => setTimeout(r, 2000 * (tentativa + 1)))
-      }
-      if (!res || !res.ok) {
-        let msg = 'Não foi possível gerar o PDF agora. Tente novamente em instantes.'
-        try { const j = await res?.json(); if (j?.message) msg = j.message } catch { /* corpo não-JSON */ }
-        throw new Error(msg)
-      }
-      const blob = await res.blob()
-      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
-      const url = URL.createObjectURL(blob)
-      const fnome = new URLSearchParams(href.split('?')[1] ?? '').get('nome') || nome.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'caderno'
-      const a = document.createElement('a')
-      a.href = url; a.download = `${fnome}.pdf`
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      const fnome = new URLSearchParams(href.split('?')[1] ?? '').get('nome') || nome
+      await baixarViaFetch(href, {
+        nome: nomeArquivoSeguro(fnome, 'pdf', 'caderno'),
+        validar: (blob) => (/pdf/i.test(blob.type) ? null : 'O PDF gerado veio vazio. Tente novamente em instantes.'),
+        aoTentarDeNovo: () => toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' }),
+      })
       toast.success('Download concluído', { id: 'cadpdf', description: nome })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })

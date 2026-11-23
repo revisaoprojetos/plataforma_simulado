@@ -3,6 +3,7 @@
 // ONDA 1: casca + navegação/estrutura. Orquestra o estado (árvore, seção/página ativas, painéis) e registra os comandos
 // de navegação no barramento (contexto-cmd.tsx). Formatação/inserção/desenho: onda 2 registra handlers com useRegistrarComandos.
 // Só fala com /api/aluno/notebook/** via cliente-caderno.ts (rotas existentes + lib/aluno/notebook-cliente.ts).
+import { baixarViaFetch, nomeArquivoSeguro } from '@/lib/aluno/baixar-arquivo'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FilePlus2, FolderPlus, Pencil, Trash2, Palette, Copy, Link2, ChevronsUpDown, IndentIncrease, IndentDecrease, Move, FileDown } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
@@ -437,12 +438,8 @@ function Casca({ voltarHref, paginaInicialId, marca }: { voltarHref: string; pag
     if (!paginaSel) { toast('Abra uma página para exportar.'); return }
     if (paginaSel.tipo_pagina === 'folha_livre' && formato === 'docx') { toast('A folha livre só pode ser exportada em PDF.'); return }
     try {
-      const r = await fetch(api.urlExportar(paginaSel.id, formato), { credentials: 'same-origin' })
-      if (!r.ok) { const j = await r.json().catch(() => null); toast(j?.message ?? 'Não foi possível exportar.'); return }
-      const url = URL.createObjectURL(await r.blob())
-      const a = document.createElement('a'); a.href = url; a.download = `${(paginaSel.titulo || 'pagina').replace(/[^\w\- ]+/g, '').trim() || 'pagina'}.${formato}`
-      document.body.appendChild(a); a.click(); a.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 2000)
-    } catch { toast('Não foi possível exportar.') }
+      await baixarViaFetch(api.urlExportar(paginaSel.id, formato), { nome: nomeArquivoSeguro(paginaSel.titulo, formato, 'pagina') })
+    } catch (e) { toast(e instanceof Error ? e.message : 'Não foi possível exportar.') }
   }
   const alternarFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})

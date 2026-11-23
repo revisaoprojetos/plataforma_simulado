@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
-import { bloqueioDownloadsAluno } from '@/lib/conteudo/politica-download'
-import { MENSAGEM_DOWNLOAD_INDISPONIVEL } from '@/lib/conteudo/downloads-aluno-pura'
 import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
 import type { Page } from 'puppeteer-core'
 import { obterBrowserPdf, agendarFecharBrowserPdf } from '@/lib/pdf/browser'
+import { autorizarSessao } from '@/lib/aluno/autorizar-sessao'
+import { assinarRenderToken } from '@/lib/pdf/render-token'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -52,9 +52,12 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const { data: sess } = await svc.from('simulado_sessoes_prova').select('id, tenant_id, simulado_id, estudante_id').eq('id', sessao).maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  // SEGURANÇA (IDOR): dono (cookie) | admin | token `sat` do embed — ANTES da auditoria e de gerar o PDF.
+  const auth = await autorizarSessao(sess as any, { sat: searchParams.get('sat'), rota: 'caderno-teste-pdf' })
+  if (!auth.ok) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!process.env.PDF_RENDER_SECRET) return NextResponse.json({ message: 'Geração de PDF indisponível (PDF_RENDER_SECRET ausente).' }, { status: 503 })
 
-  // INTERRUPTOR CENTRAL de downloads do aluno (tema.downloads_aluno; ausente = bloqueado): o caderno do simulado em PDF também fica sob ele.
-  if ((sess as any).tenant_id && await bloqueioDownloadsAluno(svc, (sess as any).tenant_id, (sess as any).estudante_id ?? null)) return NextResponse.json({ message: MENSAGEM_DOWNLOAD_INDISPONIVEL }, { status: 403 })
+  // Caderno de teste/diagnóstico/gabarito NÃO está sob o interruptor central (vale só p/ materiais de conteúdo).
 
   // Auditoria: o aluno baixou o caderno (PDF). Best-effort.
   if ((sess as any).tenant_id) {
@@ -72,7 +75,9 @@ export async function GET(request: NextRequest) {
 
   // URL interna da página de impressão (acesso pelo ?sessao, sem cookie). embed=1 esconde os controles.
   // gabarito → deixa o gabarito liberado (default); senão semgab=1 (só as marcações do aluno — "como fez").
-  const qs = new URLSearchParams(comGabarito ? { grupo, sessao, embed: '1' } : { grupo, sessao, semgab: '1', embed: '1' })
+  // pdftoken (HMAC, 5 min) restrito a ESTA sessão+caderno: a página só aceita `sessao` com esse token (ou cookie/admin).
+  const pdftoken = assinarRenderToken({ t: (sess as any).tenant_id, r: 'caderno-teste', id: cadernoId, s: (sess as any).id })
+  const qs = new URLSearchParams(comGabarito ? { grupo, sessao, embed: '1', pdftoken } : { grupo, sessao, semgab: '1', embed: '1', pdftoken })
   const url = `${WEB_INTERNAL}/imprimir/caderno-teste/${cadernoId}?${qs.toString()}`
 
   // Limita o Chromium concorrente por réplica (protege a CPU do web contra "PDF storm" que
@@ -140,7 +145,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (e) {
     // Loga o motivo real no container (Portainer) — a UI só mostra a mensagem genérica.
-    console.error('[caderno-teste-pdf] falha ao gerar:', url, '→', (e as Error).message)
+    console.error('[caderno-teste-pdf] falha ao gerar:', url.replace(/pdftoken=[^&]+/, 'pdftoken=***'), '→', (e as Error).message)
     return NextResponse.json({ message: 'Falha ao gerar o PDF.', detalhe: (e as Error).message }, { status: 500 })
   } finally {
     try { await page?.close() } catch { /* noop */ }
