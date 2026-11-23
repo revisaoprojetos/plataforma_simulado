@@ -1,6 +1,7 @@
 'use server'
 import type { NivelAgregado, ResultadoDemo } from './actions-tipos'
 
+import { isSuperAdmin } from '@/lib/auth/permissions'
 import { rateLimit } from '@/lib/rate-limit'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
@@ -11,6 +12,7 @@ import { rodarRevisaoDemo } from '@/lib/ia/agentes/demo-revisao'
 
 /** Diz se há IA configurada (env ANTHROPIC_API_KEY ou chave do tenant) + os modelos de cada nível. */
 export async function statusIA(): Promise<{ configurada: boolean; provider?: string; modelos: Record<Nivel, string> }> {
+  if (!(await isSuperAdmin())) return { configurada: false, modelos: MODELO_POR_NIVEL.anthropic }
   const svc = createAdminClient()
   const tenantId = await getCurrentTenantId()
   const cfg = await resolverConfigIA(svc, tenantId)
@@ -20,6 +22,7 @@ export async function statusIA(): Promise<{ configurada: boolean; provider?: str
 
 /** Roda o pipeline de 3 níveis sobre os itens (texto) e devolve resultado + agregados por nível. */
 export async function rodarPipelineDemo(itens: string[]): Promise<ResultadoDemo> {
+  if (!(await isSuperAdmin())) return { ok: false, erro: 'Sem permissão.' }
   const lista = (itens || []).map((s) => String(s).trim()).filter(Boolean)
   if (!lista.length) return { ok: false, erro: 'Cole ao menos um item (separe por uma linha com "---").' }
   if (lista.length > 20) return { ok: false, erro: 'Máximo de 20 itens por rodada (demo).' }

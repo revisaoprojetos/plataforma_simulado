@@ -4,6 +4,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { listarNovidadesAdmin } from '@/lib/novidades/novidades'
 import { Newspaper } from 'lucide-react'
 import { NovidadesClient, type NovidadeAdmin } from './novidades-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // NOVIDADES ("O que mudou") — gestão do changelog/anúncios por tenant (admin). Consome a lib pronta
 // (listarNovidadesAdmin). Tolerante à migração 20261028000000 ainda não aplicada: lista vazia + aviso
@@ -48,6 +49,7 @@ export default async function NovidadesPage() {
           <p className="text-muted-foreground">Changelog &quot;O que mudou&quot; exibido no início do aluno. Categoria, destaque com capa e até 2 botões (CTAs).</p>
         </div>
       </div>
+      <BarraSetorSlot />
       <NovidadesClient itens={itens} aviso={aviso} podeEditar={podeEditar} />
     </div>
   )

@@ -14,6 +14,7 @@ import { carregarCarimbosModulo, carregarConquistasModulo, listarAulasDoModulo }
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           tabs={<ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />}
         />
       ) : (
+        <>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
             {pasta && (
@@ -75,6 +77,8 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
             )}
           </div>
         </div>
+        <BarraSetorSlot />
+        </>
       )}
 
       {!data.ok ? (

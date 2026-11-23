@@ -6,6 +6,7 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioDisciplinaView, type DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 import { DisciplinasLista, type ResumoDisciplina } from './disciplinas-lista'
 import { montarRelatorioDisciplina } from './_dados'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function RelatorioDisciplinaPage({ searchParams }: { searchParams: Promise<{ disciplina?: string }> }) {
   const { disciplina: discId } = await searchParams
@@ -44,6 +45,7 @@ export default async function RelatorioDisciplinaPage({ searchParams }: { search
         <p className="text-muted-foreground">{discId ? 'Desempenho da turma na disciplina.' : 'Todas as disciplinas — clique numa para ver o desempenho da turma.'}</p>
       </div>
 
+      <BarraSetorSlot />
       {!discId ? (
         <DisciplinasLista itens={resumos} />
       ) : dados ? (

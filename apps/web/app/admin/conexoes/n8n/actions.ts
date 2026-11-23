@@ -2,7 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { checkPermission } from '@/lib/auth/permissions'
+import { checkPermissionSuper as checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 

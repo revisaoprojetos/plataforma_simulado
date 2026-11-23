@@ -7,6 +7,7 @@ import {
   acertoTema, saudePlano, minPdf, VID_MIN,
 } from './engine'
 import { type Estado, type ProgMeta, indexar, info, feito, estadoMeta, atrasadas, semAtual, hojeISO } from './estado'
+import type { RegrasMotor } from './regras'
 import { type Conteudo, TIPOS, COR, DIAS, DIAS3, tipoBase, ehMetaRev } from './conteudo'
 
 export interface MetaVM {
@@ -97,8 +98,9 @@ function metaVM(st: Estado, conteudo: Conteudo, id: string, data: DataISO, horas
   }
 }
 
-export function construirSnapshot(st: Estado, conteudo: Conteudo, hoje: DataISO = hojeISO()): AdaptativoSnapshot {
-  const { IDX, RV } = indexar(st, conteudo, hoje)
+/** `regras` = regras do motor do tenant (faixas/ciclos próprios definem quais semanas são de revisão); ausente = padrão. */
+export function construirSnapshot(st: Estado, conteudo: Conteudo, hoje: DataISO = hojeISO(), regras?: RegrasMotor): AdaptativoSnapshot {
+  const { IDX, RV } = indexar(st, conteudo, hoje, regras)
   const pos = (id: string): [DataISO, number] | undefined => st.plano[id] || RV[id]
 
   // --- Semanas (grade) ---
@@ -108,7 +110,7 @@ export function construirSnapshot(st: Estado, conteudo: Conteudo, hoje: DataISO 
     const fim = dAdd(ini, 6)
     const diasData = [0, 1, 2, 3, 4, 5, 6].map((k) => dAdd(ini, k))
     const nRecesso = diasData.filter((d) => recessoEm(st.cfg, d)).length
-    const kind: SemanaVM['kind'] = ehRev(st.cfg, n) ? 'revisao' : nRecesso >= 4 ? 'recesso' : 'conteudo'
+    const kind: SemanaVM['kind'] = ehRev(st.cfg, n, regras) ? 'revisao' : nRecesso >= 4 ? 'recesso' : 'conteudo'
     const dias: DiaVM[] = diasData.map((d) => {
       const ids = (IDX[d] || [])
       const metas = ids.map((id) => { const p = pos(id); return metaVM(st, conteudo, id, d, p ? p[1] : 0, hoje) })

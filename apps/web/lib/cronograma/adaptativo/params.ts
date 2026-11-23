@@ -10,6 +10,8 @@
  * a camada server e o admin. O motor usa um subconjunto estrutural em `Contexto.params`.
  */
 
+import { duracaoPadrao, TIPOS_META } from './tipos-meta'
+
 export interface ParamsAdaptativo {
   // ── Tempo & ritmo ──
   /** Ritmo de leitura padrão (páginas/hora) quando o aluno não fez o teste. */
@@ -85,13 +87,13 @@ export interface ParamsAdaptativo {
 export const PARAMS_PADRAO: ParamsAdaptativo = {
   velPadrao: 17,
   diaCurtoMin: 120,
-  durFl: 60,
-  durQu: 30,
-  durLp: 30,
-  durRf: 60,
-  durRq: 30,
-  offsetRevisao: 1,
-  offsetQuestoes: 2,
+  durFl: duracaoPadrao('fl'),
+  durQu: duracaoPadrao('qu'),
+  durLp: duracaoPadrao('lp'),
+  durRf: duracaoPadrao('rf'),
+  durRq: duracaoPadrao('rq'),
+  offsetRevisao: TIPOS_META.fl.deslocamentoPadraoSem as number,
+  offsetQuestoes: TIPOS_META.qu.deslocamentoPadraoSem as number,
   semFlash: ['Direito Eleitoral', 'Direito Internacional', 'Direito Internacional Privado', 'Legislação de Ensino', 'Legislação da AGU'],
   tetoPdfDia: 2,
   lpMetasDia: 4,
@@ -107,7 +109,7 @@ export const PARAMS_PADRAO: ParamsAdaptativo = {
   pdfInteiro218: false,
   revisaoPorResultado218: false,
   jurisprudencia219: false,
-  jurisprudenciaMin: 60,
+  jurisprudenciaMin: duracaoPadrao('jp'),
   jurisTagsImagem: true,
   jurisTitulosExpansivos: true,
   historicoDiagnostico219: false,

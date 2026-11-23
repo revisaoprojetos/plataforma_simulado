@@ -2,6 +2,7 @@ import { HelpCircle } from 'lucide-react'
 import { getCurrentTenant } from '@/lib/tenant'
 import { lerAjudaFaq } from '@/lib/ajuda/faq'
 import { AjudaFaqForm } from '@/components/admin/ajuda-faq-form'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // AJUDA / FAQ — gestão do FAQ exibido na Ajuda do aluno, por tenant. Guardado em
 // simulado_tenants.tema.ajuda_faq (sem migração). Gate por `configuracoes:manage` na action.
@@ -24,6 +25,7 @@ export default async function AjudaFaqPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       <AjudaFaqForm faqInicial={faq} />
     </div>
   )

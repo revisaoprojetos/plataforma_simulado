@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { LayoutTemplate, Loader2 } from 'lucide-react'
 import { carregarModelosArea, obterPaletaPadroes } from './actions'
 import { ModelosGrid } from '@/components/admin/modelos-caderno/modelos-grid'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function ModelosCadernoPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -16,6 +17,7 @@ export default async function ModelosCadernoPage({ searchParams }: { searchParam
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* Streaming: o cabeçalho aparece na hora e o grid entra quando os dados chegam (cache Redis por tenant). */}
       <Suspense fallback={<GridCarregando />}>
         <GridStream pasta={pasta ?? null} />

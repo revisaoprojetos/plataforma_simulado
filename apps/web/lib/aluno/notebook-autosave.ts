@@ -26,6 +26,8 @@ export type Evento =
   | { t: 'usar_servidor'; versao: number }
   | { t: 'manter_minha'; versaoAtual: number }
   | { t: 'tentar_de_novo' }
+  /** Outra operação (PATCH de nível/aparência) avançou a versão no servidor: atualiza a base sem remontar o editor. */
+  | { t: 'versao_base'; versao: number }
 
 export const estadoInicial = (versao: number): Estado => ({ versao, pendente: null, emVoo: null, tentativas: 0, fase: 'ocioso', conflito: null })
 
@@ -87,6 +89,9 @@ export function reduzir(s: Estado, e: Evento): Estado {
       const meu = coalescer(s.emVoo?.alt ?? null, s.pendente)
       return { versao: e.versaoAtual, pendente: meu, emVoo: null, tentativas: 0, fase: vazia(meu) ? 'ocioso' : 'sujo', conflito: null }
     }
+    case 'versao_base':
+      // só avança (nunca recua); um envio em voo mantém a base com que foi enviado (se der 409, o conflito resolve)
+      return e.versao > s.versao ? { ...s, versao: e.versao } : s
     case 'tentar_de_novo':
       return { ...s, fase: s.emVoo || !vazia(s.pendente) ? 'sujo' : 'ocioso' }
   }

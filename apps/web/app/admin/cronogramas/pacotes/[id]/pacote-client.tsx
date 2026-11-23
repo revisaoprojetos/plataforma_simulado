@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CalendarDays, Check, Download, FileText, Gift, Loader2, Pencil, Search, Upload, UserPlus, Users } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Check, Download, FileText, Gift, Globe, Loader2, Pencil, Search, Upload, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -16,9 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
 import { alternarLiberacao, alternarLiberacaoEmLote } from '../../actions'
 import type { PacoteDetalhe } from '../actions-tipos'
-import { adicionarEstudantesPorEmails, alternarCronogramaNoPacote, alternarEstudanteNoPacote, buscarEstudantes, desvincularGrupo, previaDesvincularGrupo, vincularGrupo } from '../actions'
+import { alternarAcessoGratuitoPacote, adicionarEstudantesPorEmails, alternarCronogramaNoPacote, alternarEstudanteNoPacote, buscarEstudantes, desvincularGrupo, previaDesvincularGrupo, vincularGrupo } from '../actions'
 
 const normalizar = (s: string) =>
   s
@@ -28,8 +29,30 @@ const normalizar = (s: string) =>
 
 type Modal = 'cronogramas' | 'grupos' | 'alunos'
 
-export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
+export function PacoteClient({ dados, podeLiberar = false }: { dados: PacoteDetalhe; podeLiberar?: boolean }) {
   const [d, setD] = useState(dados)
+  const gratuito = !!d.pacote.acesso_gratuito
+
+  async function alternarGeral(valor: boolean) {
+    if (!(await confirmar({
+      titulo: valor ? 'Liberar para todos os alunos' : 'Tirar acesso geral',
+      mensagem: valor
+        ? `Liberar "${d.pacote.nome}" para TODOS os alunos da plataforma? Todos passam a receber os cronogramas deste grupo de acesso.`
+        : `Tirar o acesso geral de "${d.pacote.nome}"? Só quem estiver nos grupos ou avulsos vinculados continua recebendo.`,
+      confirmar: valor ? 'Liberar' : 'Tirar',
+    }))) return
+    executar('geral', async () => {
+      const marca = (v: boolean) => setD((x) => ({ ...x, pacote: { ...x.pacote, acesso_gratuito: v } }))
+      marca(valor) // otimista
+      try {
+        const r = await alternarAcessoGratuitoPacote(d.pacote.id, valor)
+        if (!r.ok) { marca(!valor); toast.error(r.error ?? 'Não foi possível alterar.'); return }
+        toast.success(valor ? 'Liberado para todos os alunos' : 'Acesso geral removido')
+      } catch {
+        marca(!valor); toast.error('Não foi possível alterar.')
+      }
+    })
+  }
   /**
    * "Ocupado" por CHAVE, não da página inteira: cada linha (e cada seção) tem a sua chave,
    * então o resto continua clicável enquanto uma ação corre.
@@ -281,6 +304,26 @@ export function PacoteClient({ dados }: { dados: PacoteDetalhe }) {
 
   return (
     <>
+      {/* Liberar para TODOS os alunos (acesso gratuito do grupo) — mesmo visual do card de Simulados > Estudantes. */}
+      <div className={cn('rounded-2xl border p-4 shadow-sm transition-colors', gratuito ? 'border-primary/40 bg-primary/5' : 'bg-card')}>
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Globe className="h-5 w-5" /></span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="acesso-gratuito-pacote" className="cursor-pointer text-sm font-semibold">Liberado para todos os alunos</label>
+              <span className="flex items-center gap-2">
+                {ocupado('geral') && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                <Switch id="acesso-gratuito-pacote" checked={gratuito} disabled={!podeLiberar || ocupado('geral')} onCheckedChange={(v) => void alternarGeral(!!v)} />
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Quando ligado, <strong>todos os alunos têm acesso aos cronogramas deste grupo</strong>. Grupos e alunos avulsos continuam gravados, mas ficam dispensados.
+              {!podeLiberar && ' Você não tem permissão para alterar.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Resumo: 3 cards clicáveis (abrem o pop-up de seleção) + alcance */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map((c) => (

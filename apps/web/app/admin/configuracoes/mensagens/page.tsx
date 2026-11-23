@@ -1,5 +1,6 @@
 import { getAllTenantMensagens, getTenantContato } from '@/lib/tenant-messages'
 import { MensagensEditor } from '@/components/admin/mensagens-editor'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function MensagensPage() {
   const [mensagens, contato] = await Promise.all([
@@ -16,6 +17,7 @@ export default async function MensagensPage() {
         </p>
       </div>
 
+      <BarraSetorSlot />
       <MensagensEditor mensagens={mensagens} contato={contato} />
     </div>
   )

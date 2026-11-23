@@ -7,6 +7,7 @@ import {
   gerarPlano, planoUsaMotorAtual, descrever, semInicio, semDe, horasDia, ehRev, dAdd, dISO,
   planoRevisao, rankingRevisao, rankingRevisao218, resolverParams, DUR_REVISAO, ORDEM, diaConcentrado,
 } from './engine'
+import type { RegrasMotor } from './regras'
 import type { Conteudo as _C } from './conteudo'
 
 export interface ProgMeta {
@@ -64,14 +65,14 @@ export interface Indexado {
 }
 
 /** Índice data→ids + semanas de revisão materializadas. Puro: devolve revs atualizado (p/ o caller persistir). */
-export function indexar(st: Estado, conteudo: _C, hoje: DataISO = hojeISO()): Indexado {
+export function indexar(st: Estado, conteudo: _C, hoje: DataISO = hojeISO(), regras?: RegrasMotor): Indexado {
   const IDX: Record<string, string[]> = {}
   const RV: Record<string, [DataISO, number]> = {}
   const RVORD: Record<string, number> = {}
   const revs: Record<number, Array<[string, DataISO]>> = { ...(st.revs || {}) }
   let congelou = false
   for (let sem = 1; sem <= (st.fim || 1); sem++) {
-    if (!ehRev(st.cfg, sem)) continue
+    if (!ehRev(st.cfg, sem, regras)) continue
     let lista = revs[sem]
     if (!lista && planoUsaMotorAtual((st.cfg as { motor?: unknown }).motor)) continue // plano novo: as metas da semana de revisão já estão no próprio plano
     if (!lista) {

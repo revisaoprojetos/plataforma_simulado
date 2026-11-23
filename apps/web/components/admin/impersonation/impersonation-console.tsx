@@ -5,6 +5,7 @@ import { Search, Loader2, Eye, ExternalLink, SlidersHorizontal } from 'lucide-re
 import { cn } from '@/lib/utils'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { useImpersonationDock, Barra, BannerAviso, Corpo, TabStrip } from '@/components/admin/impersonation/impersonation-dock'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 /** Página do console (consome o provider global). Picker + abas das visualizações abertas + a
  *  área da ativa. As janelas e a divisão são globais (no layout), por isso persistem ao navegar. */
@@ -37,6 +38,7 @@ export function ImpersonationConsole() {
         {d.isAdmin && <Link href="/admin/impersonation/config" className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-muted"><SlidersHorizontal className="h-4 w-4" /> Configurar</Link>}
       </div>
 
+      <BarraSetorSlot />
       {!d.podeAbrir && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300">Seu papel não pode visualizar alunos. Peça a um administrador para habilitar em <b>Configurar</b>.</div>
       )}

@@ -5,6 +5,7 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { resumosSimulados } from '../_resumos'
 import { RelatorioSimuladoView } from './relatorio-simulado-view'
 import { montarRelatorioSimulado } from './_dados'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // Sempre renderiza com dados frescos (reflete matrículas/sessões recém-criadas).
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,7 @@ export default async function RelatorioSimuladoPage({ searchParams }: { searchPa
         <p className="text-muted-foreground">{simId ? 'Análise completa do simulado.' : 'Todos os simulados — clique num para ver a análise completa.'}</p>
       </div>
 
+      <BarraSetorSlot />
       {!simId ? (
         <SimuladosLista itens={resumos} />
       ) : dados ? (

@@ -383,7 +383,7 @@ export async function duplicarConjunto(id: string): Promise<{ ok: boolean; id?: 
   for (const a of aulas) {
     const { data: na } = await svc
       .from('simulado_cronograma_conjunto_aulas')
-      .insert({ tenant_id: g.tenantId, conjunto_id: novoId, tipo: a.tipo, aula: a.aula, conteudo: a.conteudo, duracao: a.duracao, video_url: a.video_url, tema: a.tema, ordem: a.ordem })
+      .insert({ tenant_id: g.tenantId, conjunto_id: novoId, tipo: a.tipo, aula: a.aula, conteudo: a.conteudo, duracao: a.duracao, video_url: a.video_url, tema: a.tema, ordem: a.ordem, ...(a.titulo_aula ? { titulo_aula: a.titulo_aula } : {}) })
       .select('id')
       .single()
     if (!na) continue
@@ -458,9 +458,18 @@ export async function carregarConjunto(id: string): Promise<{ ok: boolean; dados
     .maybeSingle()
   if (!c) return { ok: false, error: 'Conjunto não encontrado.' }
 
-  const aulasRaw = await fetchAll<any>(() =>
-    svc.from('simulado_cronograma_conjunto_aulas').select('id, tipo, aula, conteudo, duracao, video_url, tema, ordem').eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
-  )
+  // `titulo_aula` vem de migração posterior: sem ela, cai no select antigo (editor segue funcionando).
+  const colsAula = 'id, tipo, aula, conteudo, duracao, video_url, tema, ordem'
+  let aulasRaw: any[]
+  try {
+    aulasRaw = await fetchAll<any>(() =>
+      svc.from('simulado_cronograma_conjunto_aulas').select(`${colsAula}, titulo_aula`).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
+    )
+  } catch {
+    aulasRaw = await fetchAll<any>(() =>
+      svc.from('simulado_cronograma_conjunto_aulas').select(colsAula).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
+    )
+  }
   const aulaIds = aulasRaw.map((a) => a.id)
 
   const urlsPorAula = new Map<string, { plataforma_id: string; url: string }[]>()
@@ -506,6 +515,7 @@ export async function carregarConjunto(id: string): Promise<{ ok: boolean; dados
     duracao: a.duracao ?? null,
     video_url: a.video_url ?? null,
     tema: a.tema ?? null,
+    titulo_aula: a.titulo_aula ?? null,
     ordem: a.ordem ?? 0,
     urls: urlsPorAula.get(a.id) ?? [],
     questoes: questoesPorAula.get(a.id) ?? [],
@@ -564,6 +574,29 @@ export async function atualizarAula(aulaId: string, e: EntradaAula): Promise<{ o
     .eq('id', aulaId)
     .eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/cronogramas/conteudos')
+  return { ok: true }
+}
+
+/** Define o nome de exibição de uma aula (grupo): grava o mesmo título em todas as linhas do grupo. Vazio = volta a "Aula {chave}". */
+export async function renomearGrupoAula(conjuntoId: string, aulaIds: string[], titulo: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!aulaIds.length) return { ok: false, error: 'Aula não encontrada.' }
+  const svc = createAdminClient()
+  if (!(await conjuntoDoTenant(svc, g.tenantId, conjuntoId))) return { ok: false, error: 'Conjunto não encontrado.' }
+  const novo = titulo.trim().slice(0, 160) || null
+  const { error } = await svc
+    .from('simulado_cronograma_conjunto_aulas')
+    .update({ titulo_aula: novo, atualizado_em: new Date().toISOString() })
+    .eq('tenant_id', g.tenantId)
+    .eq('conjunto_id', conjuntoId)
+    .in('id', aulaIds)
+  if (error) {
+    if (/titulo_aula/i.test(error.message)) return { ok: false, error: 'Aplique a migração 20261123000000_conjunto_aula_titulo.sql para nomear aulas.' }
+    return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cronograma_conjunto_aulas', entidadeId: conjuntoId, depois: { titulo_aula: novo, aulas: aulaIds.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/cronogramas/conteudos')
   return { ok: true }
 }

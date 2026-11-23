@@ -15,6 +15,7 @@ import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { createAdminClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
             <p className="text-muted-foreground">Jogo arcade de teses e súmulas — cada desafio tem 15 dias de perguntas.</p>
           </div>
         </div>
+        <BarraSetorSlot />
         <JurisDesafioLista desafios={desafios} cardView={cardView} />
       </div>
     )
@@ -87,6 +89,7 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
         </div>
       </div>
 
+      <BarraSetorSlot />
       <JurisTabsBar desafioId={desafio} abaAtual={abaAtual} />
 
       <div className={cn('pt-1')}>

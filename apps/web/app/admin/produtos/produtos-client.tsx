@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PRODUTO_TIPOS, type Produto, type ProdutoTipo } from '@/lib/produtos/tipos'
 import { salvarProdutoAction } from './actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 type Row = Produto & { membros: number; fontes: number; itens: number }
 const labelTipo = (t: string) => PRODUTO_TIPOS.find((x) => x.v === t)?.label ?? t
@@ -57,6 +58,7 @@ export function ProdutosClient({ produtosIniciais, podeEditar }: { produtosInici
         )}
       </div>
 
+      <BarraSetorSlot />
       {criando && (
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <label className="mb-2 block text-sm font-semibold">Nome do novo produto</label>

@@ -40,8 +40,10 @@ export async function carregarCursosReais(svc: SupabaseClient, tenantId: string,
 
 async function cursoLeiSeca(estId: string, tenantId: string): Promise<CursoReal | null> {
   try {
-    const trilhas = await carregarTrilhaLeituraAluno(estId, tenantId)
-    if (!trilhas?.length) return null
+    // Só entram módulos COM CONTEÚDO (≥1 aula) e CAPA configurada: módulo de teste/rascunho não vira "curso" no portal.
+    const todas = await carregarTrilhaLeituraAluno(estId, tenantId)
+    const trilhas = (todas ?? []).filter((t: any) => (t.total || 0) > 0 && !!(t.capaCard ?? t.capa))
+    if (!trilhas.length) return null
     const total = trilhas.reduce((s, t) => s + (t.total || 0), 0)
     const feitos = trilhas.reduce((s, t) => s + (t.done || 0), 0)
     const pct = total ? Math.round((feitos / total) * 100) : 0
@@ -58,8 +60,9 @@ async function cursoLeiSeca(estId: string, tenantId: string): Promise<CursoReal 
 
 async function cursoJuris(svc: SupabaseClient, estId: string, tenantId: string): Promise<CursoReal | null> {
   try {
-    const desafios = await desafiosDoAluno(estId, tenantId)
-    if (!desafios?.length) return null
+    // Só desafios com CAPA configurada (sem capa = rascunho/teste, não aparece como curso).
+    const desafios = ((await desafiosDoAluno(estId, tenantId)) ?? []).filter((d) => !!d.imagemTicket)
+    if (!desafios.length) return null
     const ids = desafios.map((d) => d.id)
     let feitos = 0, total = 0
     let continuarId = ids[0] // desafio a abrir direto (1º em andamento, senão o 1º)
@@ -101,6 +104,7 @@ async function cursoMaratona(svc: SupabaseClient, tenantId: string, estId: strin
     if (!d.lancada || !d.pastaId) return null
     const cur = await carregarProgressoMaratona(svc, tenantId, estId, d.pastaId).catch(() => 0)
     const cfg = d.config as any
+    if (!cfg?.capaUrl) return null // sem capa configurada = ainda não é um curso publicável
     const pct = Math.round((cur / AREAS_MARATONA) * 100)
     // Encerrada = a data fim do evento (config.fim) já passou.
     const fimMs = cfg?.fim ? new Date(cfg.fim).getTime() : NaN

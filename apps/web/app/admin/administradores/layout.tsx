@@ -1,6 +1,7 @@
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { AdministradoresTabs } from '@/components/admin/administradores-tabs'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,7 @@ export default async function AdministradoresLayout({ children }: { children: Re
         <h1 className="text-2xl font-bold tracking-tight">Administradores</h1>
         <p className="text-muted-foreground">Equipe da plataforma e cargos com suas liberações. Cada cargo é configurado na aba <b>Permissões</b>.</p>
       </div>
+      <BarraSetorSlot />
       <AdministradoresTabs podeGerir={podeGerir} />
       {children}
     </div>

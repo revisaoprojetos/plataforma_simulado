@@ -6,6 +6,7 @@ import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-c
 import { formatBrt } from '@/lib/brt'
 import { NpsExport } from './nps-export'
 import { Star, TrendingUp, Minus, TrendingDown } from 'lucide-react'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,7 @@ export default async function NpsPage() {
         {total > 0 && <NpsExport resumo={{ nps, media, total, promotores, neutros, detratores }} comentarios={comentarios} />}
       </div>
 
+      <BarraSetorSlot />
       {semTabela ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-50/50 p-6 text-sm text-amber-800 dark:bg-amber-900/15 dark:text-amber-300">
           A tabela de avaliações ainda não foi criada. Rode <code className="rounded bg-black/10 px-1">scripts/sql/nps-avaliacoes.sql</code> no SQL Editor do Supabase.

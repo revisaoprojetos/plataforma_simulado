@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderInput, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderInput, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -26,8 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { CronogramaAcessoSecao, type ResumoAcesso } from '@/components/admin/cronograma-acesso-secao'
 import type { CategoriaRow, CronogramaLista, EntradaCronograma } from './actions-tipos'
 import { alternarLiberacao, alternarLiberacaoEmLote, atualizarCategoria, atualizarCronograma, criarCategoria, criarCronograma, excluirCategoria, excluirCronograma } from './actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // Feedback de interação padrão do catálogo. O `Button` base já tem `active:scale-[0.97]`
 // (press) + transição; aqui reforçamos o HOVER com um "pop" (escala) + fundo tintado da marca,
@@ -109,11 +111,17 @@ function Sparkline({ c }: { c: CronogramaLista }) {
 export function CronogramasClient({
   inicial,
   categoriasIniciais,
+  resumoInicial = {},
+  podeLiberar = false,
 }: {
   inicial: CronogramaLista[]
   categoriasIniciais: CategoriaRow[]
+  resumoInicial?: Record<string, ResumoAcesso>
+  podeLiberar?: boolean
 }) {
   const [alertaFechado, setAlertaFechado] = useState(false)
+  // Acesso DIRETO (todos / grupos / estudantes) por cronograma — vem do servidor em UMA chamada.
+  const [resumo, setResumo] = useState<Record<string, ResumoAcesso>>(resumoInicial)
   const [itens, setItens] = useState(inicial)
   const [categorias, setCategorias] = useState(categoriasIniciais)
   const [categoriasAberto, setCategoriasAberto] = useState(false)
@@ -162,7 +170,11 @@ export function CronogramasClient({
    * tela diz "Liberado" e mesmo assim ninguém recebe, porque quem entrega o cronograma
    * ao aluno é o pacote.
    */
-  const ehInvisivel = (c: CronogramaLista) => c.status === 'liberado' && c.pacotes === 0
+  const temAcessoDireto = (c: CronogramaLista) => {
+    const r = resumo[c.id]
+    return !!r && (r.gratuito || r.grupos > 0 || r.estudantes > 0)
+  }
+  const ehInvisivel = (c: CronogramaLista) => c.status === 'liberado' && c.pacotes === 0 && !c.acessoGeral && !temAcessoDireto(c)
 
   const contagens = useMemo(
     () => ({
@@ -508,6 +520,7 @@ export function CronogramasClient({
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* ABAS da seção Cronograma (componente único, idêntico às subpáginas). */}
       <CronogramaTabs catalogoCount={itens.length} />
 
@@ -659,12 +672,12 @@ export function CronogramasClient({
           <div className="min-w-0 flex-1">
             <p className="font-semibold">
               {contagens.invisiveis === 1
-                ? '1 cronograma liberado que ninguém recebe'
-                : `${contagens.invisiveis} cronogramas liberados que ninguém recebe`}
+                ? '1 cronograma liberado sem destinatário'
+                : `${contagens.invisiveis} cronogramas liberados sem destinatário`}
             </p>
             <p className="text-sm opacity-90">
-              {contagens.invisiveis === 1 ? 'Está liberado' : 'Estão liberados'}, mas fora de qualquer pacote e sem
-              acesso gratuito — não {contagens.invisiveis === 1 ? 'chega' : 'chegam'} a aluno nenhum.
+              {contagens.invisiveis === 1 ? 'Está liberado' : 'Estão liberados'}, mas fora de qualquer grupo de acesso e sem
+              acesso direto (todos, grupos ou estudantes) — não {contagens.invisiveis === 1 ? 'chega' : 'chegam'} a aluno nenhum.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 self-center">
@@ -843,6 +856,22 @@ export function CronogramasClient({
                               {c.pacotes} pacote(s)
                             </span>
                           )}
+                          {(() => {
+                            const r = resumo[c.id]
+                            if (!r || !(r.gratuito || r.grupos > 0 || r.estudantes > 0)) return null
+                            const txt = r.gratuito
+                              ? 'Todos'
+                              : [r.grupos > 0 && `${r.grupos} grupo${r.grupos > 1 ? 's' : ''}`, r.estudantes > 0 && `${r.estudantes} aluno${r.estudantes > 1 ? 's' : ''}`].filter(Boolean).join(' · ')
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 font-medium text-primary"
+                                title={r.gratuito ? 'Liberado para todos os alunos' : 'Acesso direto: grupos e estudantes específicos'}
+                              >
+                                <Users className="h-3 w-3" />
+                                {txt}
+                              </span>
+                            )
+                          })()}
                         </div>
                       </div>
 
@@ -961,7 +990,7 @@ export function CronogramasClient({
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{editando ? 'Editar cronograma' : 'Novo cronograma'}</DialogTitle>
             <DialogDescription>
@@ -1078,6 +1107,16 @@ export function CronogramasClient({
                 </SelectContent>
               </Select>
             </div>
+
+            {editando && (
+              <CronogramaAcessoSecao
+                cronogramaId={editando}
+                nome={form.nome}
+                liberado={itens.find((x) => x.id === editando)?.status === 'liberado'}
+                podeLiberar={podeLiberar}
+                onResumo={(id, r) => setResumo((m) => ({ ...m, [id]: r }))}
+              />
+            )}
           </div>
 
           <DialogFooter>

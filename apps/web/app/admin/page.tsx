@@ -10,6 +10,7 @@ import { SecaoHeader } from '@/components/admin/secao-header'
 import { montarDashboardSerie } from '@/lib/admin/dashboard-serie'
 import { DashboardCharts } from '@/components/admin/dashboard-charts'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 async function getDados(tenantId: string) {
   const svc = await createServiceClient()
@@ -102,6 +103,7 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* Stats Cards (clicáveis) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (

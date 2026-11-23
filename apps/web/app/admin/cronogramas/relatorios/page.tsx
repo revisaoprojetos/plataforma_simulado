@@ -2,6 +2,7 @@ import { BarChart3 } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { carregarRelatorio } from './actions'
 import { RelatoriosClient } from './relatorios-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export default async function RelatoriosCronogramaPage() {
           O que foi emitido, por quem, e quanto de cada plano os alunos já marcaram como concluído.
         </p>
       </div>
+      <BarraSetorSlot />
 
       {!r.ok || !r.dados ? (
         <SemPermissao>{r.error ?? 'Não foi possível carregar os relatórios.'}</SemPermissao>

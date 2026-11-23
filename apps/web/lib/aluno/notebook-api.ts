@@ -6,6 +6,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { cadernoBetaLiberado } from '@/lib/aluno/caderno-beta-acesso'
 import { createAdminClient } from '@/lib/supabase/server'
 import { tabelaAusente } from '@/lib/aluno/notebook-server'
+import { LIMITES } from '@/lib/aluno/notebook-tipos'
 
 export interface CtxNotebook { svc: any; tenantId: string; estudanteId: string; notebookId: string }
 
@@ -24,19 +25,57 @@ export const respJson = (corpo: Record<string, unknown>, status = 200) => NextRe
 export const resp400 = (message: string, extra: Record<string, unknown> = {}) => NextResponse.json({ ok: false, code: 'requisicao_invalida', message, ...extra }, { status: 400 })
 export const resp404 = () => NextResponse.json({ ok: false, code: 'nao_encontrado', message: 'Não encontrado.' }, { status: 404 })
 
-export async function lerJson(request: Request): Promise<{ ok: true; corpo: unknown } | { ok: false; resposta: NextResponse }> {
-  try { return { ok: true, corpo: await request.json() } } catch { return { ok: false, resposta: resp400('Corpo JSON inválido.') } }
+/** Teto do corpo JSON das rotas do caderno (a folha livre vai até 1 MB; doc de texto até 2 MB). */
+export const CORPO_JSON_MAX_BYTES = 3 * 1024 * 1024
+export const resp413 = (message = 'Requisição grande demais.') => NextResponse.json({ ok: false, code: 'corpo_grande', message }, { status: 413 })
+
+/**
+ * Lê o corpo JSON COM TETO: rejeita 413 por content-length > máx. e, quando ausente/mentiroso (chunked), lê o stream
+ * contando bytes e aborta ao passar do limite (nunca bufferiza mais que `max`+1 chunk).
+ */
+export async function lerJson(request: Request, max: number = CORPO_JSON_MAX_BYTES): Promise<{ ok: true; corpo: unknown } | { ok: false; resposta: NextResponse }> {
+  const cl = request.headers.get('content-length')
+  if (cl !== null) {
+    const n = Number(cl)
+    if (!Number.isFinite(n) || n < 0) return { ok: false, resposta: resp400('Content-Length inválido.') }
+    if (n > max) return { ok: false, resposta: resp413() }
+  }
+  try {
+    const reader = request.body?.getReader()
+    if (!reader) return { ok: false, resposta: resp400('Corpo JSON inválido.') }
+    const partes: Uint8Array[] = []
+    let total = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > max) { try { await reader.cancel() } catch { /* ignore */ } return { ok: false, resposta: resp413() } }
+      partes.push(value)
+    }
+    const buf = new Uint8Array(total)
+    let o = 0
+    for (const p of partes) { buf.set(p, o); o += p.byteLength }
+    return { ok: true, corpo: JSON.parse(new TextDecoder().decode(buf)) }
+  } catch { return { ok: false, resposta: resp400('Corpo JSON inválido.') } }
 }
 
 /** 401 sem sessão; 403 `beta_nao_liberado` sem acesso. Devolve a sessão + service client. */
 export async function autenticarBeta(): Promise<
-  { ok: true; svc: any; tenantId: string; estudanteId: string } | { ok: false; resposta: NextResponse }
+  { ok: true; svc: any; tenantId: string; estudanteId: string; somenteLeitura: boolean } | { ok: false; resposta: NextResponse }
 > {
   const sessao = await getSessaoAluno()
   if (!sessao) return { ok: false, resposta: NextResponse.json({ ok: false, code: 'nao_autenticado', message: 'Não autenticado.' }, { status: 401 }) }
   const liberado = await cadernoBetaLiberado({ tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, email: sessao.email })
   if (!liberado) return { ok: false, resposta: NextResponse.json({ ok: false, code: 'beta_nao_liberado', message: 'Recurso não liberado para sua conta.' }, { status: 403 }) }
-  return { ok: true, svc: createAdminClient(), tenantId: sessao.tenantId, estudanteId: sessao.estudanteId }
+  // admin visualizando a conta em modo read_only (impersonation): rotas de leitura NÃO podem criar notebook/seções
+  return { ok: true, svc: createAdminClient(), tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, somenteLeitura: sessao.impersonation?.actionLevel === 'read_only' }
+}
+
+/** Lê o notebook SEM criar (impersonation read_only). null = ainda não existe. */
+export async function lerNotebookSemCriar(svc: any, tenantId: string, estudanteId: string): Promise<{ notebook: { id: string; titulo: string } | null } | { error: unknown }> {
+  const r = await svc.from('simulado_aluno_notebook').select('id, titulo').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).maybeSingle()
+  if (r.error) return { error: r.error }
+  return { notebook: r.data ?? null }
 }
 
 /** Garante o notebook (1 por tenant+estudante). Retorna id/titulo ou o erro de banco. */
@@ -56,7 +95,24 @@ export async function garantirNotebook(svc: any, tenantId: string, estudanteId: 
  * Estrutura mínima: seções automáticas (1 de cada) e, se o notebook nunca teve seção, a semente 'Geral' + 'Sem título'.
  * Idempotente (índices únicos de origem/auto; 23505 é ignorado). Só a rota da árvore chama.
  */
+// Estrutura já garantida (por notebook, em memória da réplica, 10 min): evita 1 select de seções a cada carga da árvore.
+// Seguro: seções automáticas nunca são excluídas pela API e a semente só nasce com ZERO seções (que contam as apagadas).
+const estruturaOk = new Map<string, number>()
+const ESTRUTURA_OK_MS = 10 * 60_000
+export function limparCacheEstrutura() { estruturaOk.clear() }
+
 export async function garantirEstrutura(svc: any, tenantId: string, estudanteId: string, notebookId: string): Promise<{ error: unknown } | null> {
+  const agora = Date.now()
+  if ((estruturaOk.get(notebookId) ?? 0) > agora) return null
+  const r = await garantirEstruturaBanco(svc, tenantId, estudanteId, notebookId)
+  if (!r) {
+    if (estruturaOk.size > 2000) estruturaOk.clear()
+    estruturaOk.set(notebookId, agora + ESTRUTURA_OK_MS)
+  }
+  return r
+}
+
+async function garantirEstruturaBanco(svc: any, tenantId: string, estudanteId: string, notebookId: string): Promise<{ error: unknown } | null> {
   const { data: existentes, error } = await svc.from('simulado_aluno_notebook_secoes').select('id, tipo')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('notebook_id', notebookId).limit(500)
   if (error) return { error }
@@ -69,7 +125,7 @@ export async function garantirEstrutura(svc: any, tenantId: string, estudanteId:
     if (!ignorar(g.error)) return { error: g.error }
     let secaoId: string | undefined = g.data?.id
     if (!secaoId) {
-      const r = await svc.from('simulado_aluno_notebook_secoes').select('id').eq('notebook_id', notebookId).eq('origem_tipo', 'seed').maybeSingle()
+      const r = await svc.from('simulado_aluno_notebook_secoes').select('id').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('notebook_id', notebookId).eq('origem_tipo', 'seed').maybeSingle()
       secaoId = r.data?.id
     }
     if (secaoId) {
@@ -88,7 +144,22 @@ export async function garantirEstrutura(svc: any, tenantId: string, estudanteId:
   return null
 }
 
-// ---------------------------------------------------------------- rate limit de escrita (~10/s por estudante, memória do processo)
+/** Pura: a soma passa do teto de páginas por notebook? */
+export const passaTetoPaginas = (vivas: number, adicionar = 1): boolean => vivas + adicionar > LIMITES.paginasPorNotebookMax
+
+/** Teto de páginas VIVAS por notebook (2000). Devolve true se `adicionar` novas páginas ultrapassariam o teto. */
+export async function excedeTetoPaginas(svc: any, tenantId: string, estudanteId: string, notebookId: string, adicionar = 1): Promise<{ excede: boolean } | { error: unknown }> {
+  const { count, error } = await svc.from('simulado_aluno_notebook_paginas').select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('notebook_id', notebookId).is('deletado_em', null)
+  if (error) return { error }
+  return { excede: passaTetoPaginas(count ?? 0, adicionar) }
+}
+export const respTetoPaginas = () => NextResponse.json({ ok: false, code: 'limite_paginas', message: `Limite de ${LIMITES.paginasPorNotebookMax} páginas atingido.` }, { status: 422 })
+
+// ---------------------------------------------------------------- rate limit (~10/s por estudante, memória do processo)
+// ATENÇÃO: o contador vive na MEMÓRIA de cada réplica do `web`; com N réplicas o teto efetivo é ~N× o configurado.
+// É um freio contra rajada/abuso por aba, não uma cota global (cota global exigiria Redis/tabela). Chaves de GETs caros usam prefixo
+// próprio (ex.: `busca:<estudante>`), assim cada rota tem a sua janela sem competir com as escritas.
 const janela = new Map<string, number[]>()
 export function limiteEscrita(estudanteId: string, max = 10, ms = 1000): boolean {
   const agora = Date.now()

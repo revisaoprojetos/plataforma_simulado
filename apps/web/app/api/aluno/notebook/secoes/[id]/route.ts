@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   const upd: Record<string, unknown> = {}
   if (b.nome !== undefined) upd.nome = b.nome
   if (b.cor !== undefined) upd.cor = b.cor
+  if (b.ordenar_por !== undefined) upd.ordenar_por = b.ordenar_por // fase 2: sem a migração => 503 migracao_pendente
   if (b.ordem !== undefined) upd.ordem = b.ordem
   else if (b.entre) {
     const r = await ordemEntre(a.svc, 'simulado_aluno_notebook_secoes', a, { notebook_id: s.data.notebook_id }, b.entre, id, calcularOrdem)
@@ -40,7 +41,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     upd.ordem = r.ordem
   }
   if (Object.keys(upd).length === 0) return resp400('Nada para alterar.')
-  const u = await a.svc.from('simulado_aluno_notebook_secoes').update(upd).eq('id', id).eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).is('deletado_em', null).select(COLS).maybeSingle()
+  const u = await a.svc.from('simulado_aluno_notebook_secoes').update(upd).eq('id', id).eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).is('deletado_em', null).select(b.ordenar_por !== undefined ? `${COLS}, ordenar_por` : COLS).maybeSingle()
   if (u.error) return respErroDb(u.error, 'secao.patch')
   if (!u.data) return resp404()
   return respJson({ secao: publico(u.data) })

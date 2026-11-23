@@ -96,6 +96,8 @@ services:
       - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
       - STORAGE_CONTENT_BUCKET=${STORAGE_CONTENT_BUCKET:-pdfs}
       - STORAGE_IMAGE_BUCKET=${STORAGE_IMAGE_BUCKET:-imagens}
+      # Caderno (beta): arquivos do aluno (imagens/anexos). Bucket PRIVADO OBRIGATÓRIO em produção (sem ele a rota responde 503 storage_indisponivel; NUNCA use o bucket público de conteúdo).
+      - STORAGE_CADERNO_BUCKET=${STORAGE_CADERNO_BUCKET:-}
       # Migração S3: com s3, o que ainda não foi copiado p/ o Hetzner é lido do Supabase (off = desliga).
       - STORAGE_FALLBACK_SUPABASE=${STORAGE_FALLBACK_SUPABASE:-on}
       - PDF_PUBLIC_BASE=${PDF_PUBLIC_BASE}
@@ -136,6 +138,15 @@ services:
       - ONLYOFFICE_INTERNAL_URL=${ONLYOFFICE_INTERNAL_URL:-http://onlyoffice}
       # Segredo HMAC dos access_token das rotas /api/teste/* (OnlyOffice/WOPI/plugin). Opcional: sem ele deriva de APP_ENCRYPTION_KEY.
       - ONLYOFFICE_ACCESS_SECRET=${ONLYOFFICE_ACCESS_SECRET:-}
+      # Cadernos externos (TESTE "OneNote": BookStack + AFFiNE em iframe) — docs/cadernos-externos-teste.md.
+      # NEXT_PUBLIC_*_URL derivados dos HOSTs (uma fonte so). Vazio/ausente na aba = "servico nao configurado".
+      - NEXT_PUBLIC_BOOKSTACK_URL=https://${BOOKSTACK_HOST:-cadernos-bs.revisaopge.com.br}
+      - NEXT_PUBLIC_AFFINE_URL=https://${AFFINE_HOST:-cadernos-affine.revisaopge.com.br}
+      # Provisionamento por aluno via API REST do BookStack (SO servidor; nunca no cliente).
+      - BOOKSTACK_INTERNAL_URL=${BOOKSTACK_INTERNAL_URL:-http://bookstack}
+      - BOOKSTACK_API_TOKEN_ID=${BOOKSTACK_API_TOKEN_ID:-}
+      - BOOKSTACK_API_TOKEN_SECRET=${BOOKSTACK_API_TOKEN_SECRET:-}
+      - BOOKSTACK_ROLE_ALUNO_ID=${BOOKSTACK_ROLE_ALUNO_ID:-}
       # --- Segurança (varredura de 13/11/2026). Todas opcionais; o padrão NÃO derruba nada em produção. ---
       # CSRF por Origin nos POST do aluno (cookie SameSite=None p/ iframe da Curseduca): report = só loga
       # [csrf-origin] (observar 1 dia nos logs) · enforce = bloqueia origem não permitida · off = desliga.
@@ -652,6 +663,176 @@ services:
         # o cert do sslip.io falha → aí o caminho é o DNS mesmo (registro A na conta Cloudflare do domínio).
         - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
 
+  # =====================================================================
+  # CADERNOS EXTERNOS (TESTE) — BookStack e AFFiNE como servicos proprios, em iframe na aba "OneNote (teste)".
+  # Guia completo: docs/cadernos-externos-teste.md. Login unico via OIDC (a plataforma e o IdP: CADERNOS_OIDC_ISSUER).
+  #  1) DNS: BOOKSTACK_HOST e AFFINE_HOST (A -> IP da VPS), no MESMO dominio registravel da plataforma
+  #     (cookies first-party no iframe). Cert por HOST via certresolver (mesmo padrao do onlyoffice).
+  #  2) Traefik: middleware `cadernos-frame` remove X-Frame-Options e define frame-ancestors = CADERNOS_FRAME_ANCESTORS.
+  # ---------------------------------------------------------------------
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:${BOOKSTACK_VERSION:-latest}
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - APP_URL=https://${BOOKSTACK_HOST:-cadernos-bs.revisaopge.com.br}
+      # Gerar: docker run --rm lscr.io/linuxserver/bookstack php /app/www/artisan key:generate --show
+      - APP_KEY=${BOOKSTACK_APP_KEY}
+      - DB_HOST=bookstack_db
+      - DB_PORT=3306
+      - DB_DATABASE=bookstack
+      - DB_USER=bookstack
+      - DB_USERNAME=bookstack
+      - DB_PASS=${BOOKSTACK_DB_PASSWORD}
+      - DB_PASSWORD=${BOOKSTACK_DB_PASSWORD}
+      # Hosts autorizados a embedar o BookStack (vira CSP frame-ancestors do proprio BookStack).
+      - ALLOWED_IFRAME_HOSTS=${CADERNOS_FRAME_ANCESTORS:-https://simulado.revisaopge.com.br https://*.revisaopge.com.br}
+      - SESSION_SECURE_COOKIE=true
+      - APP_PROXIES=*
+      - QUEUE_CONNECTION=database
+      - AUTH_METHOD=oidc
+      - AUTH_AUTO_INITIATE=true
+      - OIDC_NAME=Revisao
+      - OIDC_DISPLAY_NAME_CLAIMS=name
+      - OIDC_CLIENT_ID=bookstack
+      - OIDC_CLIENT_SECRET=${BOOKSTACK_OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER=${CADERNOS_OIDC_ISSUER}
+      - OIDC_ISSUER_DISCOVER=true
+      - OIDC_END_SESSION_ENDPOINT=true
+      # external_auth_id = claim `sub` (a plataforma emite sub = <tenantId>:<estudanteId>, o mesmo do provisionamento).
+      - OIDC_EXTERNAL_ID_CLAIM=sub
+    volumes:
+      - bookstack_config:/config
+    networks:
+      - default
+      - traefik
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
+        - "traefik.http.routers.bookstack.rule=Host(`${BOOKSTACK_HOST:-cadernos-bs.revisaopge.com.br}`)"
+        - "traefik.http.routers.bookstack.priority=20"
+        - "traefik.http.routers.bookstack.entrypoints=websecure"
+        - "traefik.http.routers.bookstack.tls=true"
+        - "traefik.http.routers.bookstack.middlewares=cadernos-frame"
+        - "traefik.http.middlewares.cadernos-frame.headers.customResponseHeaders.X-Frame-Options="
+        - "traefik.http.middlewares.cadernos-frame.headers.contentSecurityPolicy=frame-ancestors ${CADERNOS_FRAME_ANCESTORS:-https://simulado.revisaopge.com.br https://*.revisaopge.com.br}"
+        - "traefik.http.services.bookstack.loadbalancer.server.port=80"
+
+  bookstack_db:
+    image: mariadb:11
+    environment:
+      - MARIADB_DATABASE=bookstack
+      - MARIADB_USER=bookstack
+      - MARIADB_PASSWORD=${BOOKSTACK_DB_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=${BOOKSTACK_DB_ROOT_PASSWORD}
+    volumes:
+      - bookstack_db_data:/var/lib/mysql
+    networks:
+      - default
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+
+  # AFFiNE (backend sob licenca EE: ok p/ TESTE; producao exige confirmacao por escrito — ver docs).
+  # O provider OIDC do AFFiNE e configurado no Admin Panel (nao por env). Cookie SameSite=Lax => AFFINE_HOST same-site da plataforma.
+  affine:
+    image: ghcr.io/toeverything/affine:${AFFINE_VERSION:-stable}
+    environment:
+      - AFFINE_SERVER_EXTERNAL_URL=https://${AFFINE_HOST:-cadernos-affine.revisaopge.com.br}
+      - AFFINE_SERVER_HTTPS=true
+      - AFFINE_SERVER_PORT=3010
+      - DATABASE_URL=postgresql://affine:${AFFINE_DB_PASSWORD}@affine_postgres:5432/affine
+      - REDIS_SERVER_HOST=affine_redis
+      - AFFINE_INDEXER_ENABLED=false
+    volumes:
+      - affine_storage:/root/.affine/storage
+      - affine_config:/root/.affine/config
+    networks:
+      - default
+      - traefik
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
+        - "traefik.http.routers.affine.rule=Host(`${AFFINE_HOST:-cadernos-affine.revisaopge.com.br}`)"
+        - "traefik.http.routers.affine.priority=20"
+        - "traefik.http.routers.affine.entrypoints=websecure"
+        - "traefik.http.routers.affine.tls=true"
+        - "traefik.http.routers.affine.middlewares=cadernos-frame"
+        - "traefik.http.services.affine.loadbalancer.server.port=3010"
+
+  # One-shot: migracoes do AFFiNE. Swarm nao tem depends_on: se rodar antes do postgres, falha e NAO repete —
+  # reinicie o servico (docker service update --force) apos o affine_postgres ficar saudavel; depois suba/reinicie o `affine`.
+  affine_migration:
+    image: ghcr.io/toeverything/affine:${AFFINE_VERSION:-stable}
+    command: ["sh", "-c", "node ./scripts/self-host-predeploy.js"]
+    environment:
+      - AFFINE_SERVER_EXTERNAL_URL=https://${AFFINE_HOST:-cadernos-affine.revisaopge.com.br}
+      - DATABASE_URL=postgresql://affine:${AFFINE_DB_PASSWORD}@affine_postgres:5432/affine
+      - REDIS_SERVER_HOST=affine_redis
+      - AFFINE_INDEXER_ENABLED=false
+    volumes:
+      - affine_storage:/root/.affine/storage
+      - affine_config:/root/.affine/config
+    networks:
+      - default
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.role == worker
+
+  affine_postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=affine
+      - POSTGRES_PASSWORD=${AFFINE_DB_PASSWORD}
+      - POSTGRES_DB=affine
+      - POSTGRES_INITDB_ARGS=--data-checksums
+    volumes:
+      - affine_pgdata:/var/lib/postgresql/data
+    networks:
+      - default
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+
+  affine_redis:
+    image: redis:7-alpine
+    networks:
+      - default
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+
 networks:
   default:
   traefik:
@@ -673,3 +854,8 @@ volumes:
   onlyoffice_log:
   onlyoffice_lib:
   onlyoffice_db:
+  bookstack_config:
+  bookstack_db_data:
+  affine_storage:
+  affine_config:
+  affine_pgdata:

@@ -21,6 +21,7 @@ import { listarUnificacoesRecentes } from './disciplinas-actions'
 import { EtiquetasClient } from '../etiquetas/etiquetas-client'
 import { listarEtiquetas } from '../etiquetas/actions'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 const PER_PAGE_OPTIONS = [10, 12, 15, 20]
 const PER_PAGE_DEFAULT = 12
@@ -171,6 +172,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         )}
       </div>
 
+      <BarraSetorSlot />
       {/* Abas: Questões · Unificação · Etiquetas */}
       <div className="flex gap-4 border-b text-sm">
         <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>

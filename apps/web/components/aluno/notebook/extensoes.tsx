@@ -4,29 +4,12 @@
 // `html_legado` passa por htmlParaTexto (só texto) aqui.
 import { createContext, useContext } from 'react'
 import { R } from '@/lib/nova/rotas'
+import { htmlParaTexto } from '@/lib/aluno/notebook-texto-html'
+import { linkSeguro } from '@/lib/aluno/notebook-texto'
 import { Node, mergeAttributes, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react'
 
-export type RefsNotebook = { questoes: Record<string, { id: string; enunciado?: string; titulo?: string; [k: string]: unknown }> }
+export type RefsNotebook = { questoes: Record<string, { id: string; enunciado?: string; titulo?: string; gabarito_oculto?: boolean; [k: string]: unknown }> }
 export const RefsCtx = createContext<RefsNotebook>({ questoes: {} })
-
-/** Só https/http/mailto ou caminho relativo /aluno/...; resto = sem link. */
-export function linkSeguro(l: unknown): string | null {
-  if (typeof l !== 'string') return null
-  const s = l.trim()
-  if (s.startsWith('/aluno/')) return s
-  try { const u = new URL(s); return ['https:', 'http:', 'mailto:'].includes(u.protocol) ? s : null } catch { return null }
-}
-
-/** HTML legado -> texto puro (sem executar nada). */
-export function htmlParaTexto(html: unknown): string {
-  if (typeof html !== 'string') return ''
-  return html
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
-    .replace(/\n{3,}/g, '\n\n').trim()
-}
 
 const cartao: React.CSSProperties = { border: '1px solid var(--line)', borderRadius: 14, background: 'var(--surface2)', padding: '12px 14px', margin: '10px 0', color: 'var(--ink)', userSelect: 'none' }
 const rotulo: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--brand)' }

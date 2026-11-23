@@ -5,6 +5,7 @@ import { BannersManager, type Banner } from '@/components/admin/banners-manager'
 import { dedupePorLabel } from '@/lib/banner-destinos'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { Megaphone } from 'lucide-react'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,7 @@ export default async function BannersPage() {
           <p className="text-muted-foreground">Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez.</p>
         </div>
       </div>
+      <BarraSetorSlot />
       <BannersManager banners={banners} destinos={destinosBanner} desempenhoAtivo={desempenhoAtivo} destaques={destaques} bannerAspect={bannerAspect} />
     </div>
   )

@@ -2,6 +2,7 @@ import { Upload } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { carregarEstadoAtual } from './actions'
 import { ImportarClient } from './importar-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default async function ImportarPage() {
           intocados, e reimportar o mesmo arquivo duas vezes dá o mesmo resultado.
         </p>
       </div>
+      <BarraSetorSlot />
 
       {!r.ok || !r.estado ? (
         <SemPermissao>{r.error ?? 'Não foi possível carregar o catálogo atual.'}</SemPermissao>

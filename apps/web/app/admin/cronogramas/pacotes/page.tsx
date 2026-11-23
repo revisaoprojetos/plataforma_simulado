@@ -1,13 +1,14 @@
 import { Package } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
+import { checkPermission } from '@/lib/auth/permissions'
 import { listarPacotes } from './actions'
 import { PacotesClient } from './pacotes-client'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PacotesPage() {
-  const r = await listarPacotes()
+  const [r, podeLiberar] = await Promise.all([listarPacotes(), checkPermission('cronogramas:liberar')])
 
   return (
     <div className="animate-page space-y-6">
@@ -24,7 +25,7 @@ export default async function PacotesPage() {
 
       <CronogramaTabs />
 
-      {!r.ok ? <SemPermissao>{r.error ?? 'Não foi possível carregar os pacotes.'}</SemPermissao> : <PacotesClient inicial={r.itens ?? []} />}
+      {!r.ok ? <SemPermissao>{r.error ?? 'Não foi possível carregar os pacotes.'}</SemPermissao> : <PacotesClient inicial={r.itens ?? []} podeLiberar={podeLiberar} />}
     </div>
   )
 }

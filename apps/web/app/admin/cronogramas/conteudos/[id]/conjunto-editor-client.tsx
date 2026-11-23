@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BookOpen, ChevronDown, Link2, Loader2, Pencil, Plus, Save, Search, Send, Trash2, Video } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, Link2, Loader2, Pencil, Plus, Save, Search, Send, Trash2, Video } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 import { criarDisciplina } from '../../[id]/metas-actions'
 import type { AulaBanco, ConjuntoDetalhe, PropagacaoAlvo } from '../actions-tipos'
-import { anexarQuestoes, atualizarAula, atualizarConjunto, contarPropagacao, criarAula, excluirAula, propagarConteudoAula, removerQuestao, salvarPdfAula, salvarUrlsAula } from '../actions'
+import { anexarQuestoes, atualizarAula, atualizarConjunto, contarPropagacao, criarAula, excluirAula, propagarConteudoAula, removerQuestao, renomearGrupoAula, salvarPdfAula, salvarUrlsAula } from '../actions'
 
 // Rascunho editável de uma aula: tudo que o botão "Salvar" único do topo persiste de uma vez.
 // `urls` = links de questões por plataforma (QC/TEC), SEM o PDF/Vídeo (que têm campo próprio).
@@ -112,11 +112,27 @@ export function ConjuntoEditorClient({
     return /^\d+$/.test(t) ? String(Number(t)) : t.toLowerCase()
   }
   const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  // Nome de exibição do grupo: título personalizado (de qualquer linha do grupo) ou "Aula {chave}".
+  const tituloDe = (entries: AulaBanco[]) => entries.find((a) => a.titulo_aula?.trim())?.titulo_aula?.trim() ?? ''
+  const rotuloGrupo = (g: { key: string; entries: AulaBanco[] }) => tituloDe(g.entries) || (g.key ? `Aula ${g.key}` : 'Sem número de aula')
+  const [editandoTitulo, setEditandoTitulo] = useState<{ key: string; valor: string } | null>(null)
+
+  async function salvarTitulo(g: { key: string; entries: AulaBanco[] }) {
+    if (!editandoTitulo || editandoTitulo.key !== g.key) return
+    const novo = editandoTitulo.valor.trim()
+    setEditandoTitulo(null)
+    if (novo === tituloDe(g.entries)) return
+    const ids = g.entries.map((a) => a.id)
+    const r = await renomearGrupoAula(conjunto.id, ids, novo)
+    if (!r.ok) return toast.error(r.error ?? 'Não foi possível renomear a aula.')
+    const set = new Set(ids)
+    setAulas((xs) => xs.map((a) => (set.has(a.id) ? { ...a, titulo_aula: novo || null } : a)))
+  }
 
   const grupos = useMemo(() => {
     const t = norm(busca.trim())
     const filtradas = aulas.filter(
-      (a) => (filtroTipo === 'todos' || a.tipo === filtroTipo) && (!t || norm(`${a.aula ?? ''} ${a.conteudo ?? ''} ${rotuloTipo(a.tipo)}`).includes(t)),
+      (a) => (filtroTipo === 'todos' || a.tipo === filtroTipo) && (!t || norm(`${a.aula ?? ''} ${a.titulo_aula ?? ''} ${a.conteudo ?? ''} ${rotuloTipo(a.tipo)}`).includes(t)),
     )
     const mapa = new Map<string, { key: string; num: number; entries: AulaBanco[] }>()
     for (const a of filtradas) {
@@ -251,7 +267,7 @@ export function ConjuntoEditorClient({
   async function removerGrupo(g: { key: string; entries: AulaBanco[] }) {
     const sim = await confirmar({
       titulo: 'Excluir aula inteira',
-      mensagem: `Remover a ${g.key ? `Aula ${g.key}` : 'aula sem número'} e TODOS os ${g.entries.length} conteúdo(s) dela? Esta ação não pode ser desfeita.`,
+      mensagem: `Remover "${rotuloGrupo(g)}" e TODOS os ${g.entries.length} conteúdo(s) dela? Esta ação não pode ser desfeita.`,
       destrutivo: true,
     })
     if (!sim) return
@@ -354,9 +370,27 @@ export function ConjuntoEditorClient({
             return (
               <div key={g.key} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div className="flex items-center gap-2 pr-2">
+                  {editandoTitulo?.key === g.key ? (
+                    <div className="flex min-w-0 flex-1 items-center gap-2 px-4 py-2">
+                      <Input
+                        autoFocus
+                        value={editandoTitulo.valor}
+                        onChange={(e) => setEditandoTitulo({ key: g.key, valor: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); void salvarTitulo(g) }
+                          if (e.key === 'Escape') setEditandoTitulo(null)
+                        }}
+                        placeholder={g.key ? `Aula ${g.key}` : 'Nome da aula'}
+                        maxLength={160}
+                        className="h-8 max-w-md"
+                      />
+                      <Button size="sm" variant="ghost" className="h-7 w-7 shrink-0 p-0" onClick={() => void salvarTitulo(g)} title="Salvar nome (Enter)"><Check className="h-4 w-4 text-primary" /></Button>
+                    </div>
+                  ) : (
                   <button onClick={() => toggleGrupo(g.key)} className="flex min-w-0 flex-1 items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/30">
                     <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${aberto ? '' : '-rotate-90'}`} />
-                    <span className="font-semibold">{g.key ? `Aula ${g.key}` : 'Sem número de aula'}</span>
+                    <span className="font-semibold">{rotuloGrupo(g)}</span>
+                    {tituloDe(g.entries) && g.key && <span className="text-xs text-muted-foreground">Aula {g.key}</span>}
                     <Badge variant="secondary" className="shrink-0">{g.entries.length} conteúdo(s)</Badge>
                     <span className="ml-auto flex shrink-0 items-center gap-1.5">
                       {[...new Set(g.entries.map((a) => a.tipo))].map((tp) => (
@@ -366,6 +400,12 @@ export function ConjuntoEditorClient({
                       {totalQ > 0 && <Badge variant="outline" className="text-[10px]">{totalQ} q</Badge>}
                     </span>
                   </button>
+                  )}
+                  {editandoTitulo?.key !== g.key && (
+                    <Button size="sm" variant="ghost" className="h-7 w-7 shrink-0 p-0" onClick={() => setEditandoTitulo({ key: g.key, valor: tituloDe(g.entries) })} title="Renomear aula (nome de exibição)">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   {/* Ações da aula: adicionar mais um conteúdo (bloqueando os já criados) e excluir a aula toda. */}
                   <Button
                     size="sm"

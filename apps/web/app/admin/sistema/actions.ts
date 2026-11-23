@@ -3,7 +3,7 @@ import type { PessoaLiberada, WorkspaceGrupo } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccessSuper as getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { normalizarManutencao, type ManutencaoSistema } from '@/lib/sistema/manutencao'
 import {

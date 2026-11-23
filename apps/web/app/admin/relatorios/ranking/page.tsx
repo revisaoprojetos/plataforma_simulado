@@ -5,6 +5,7 @@ import { RankingView } from './ranking-view'
 import { RankingLista } from './ranking-lista'
 import { resumosSimulados } from '../_resumos'
 import { montarRankingSimulado } from './_dados'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function RankingPage({ searchParams }: { searchParams: Promise<{ simulado?: string }> }) {
   const { simulado: simId } = await searchParams
@@ -22,6 +23,7 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
         <p className="text-muted-foreground">{simId ? 'Classificação e critérios de desempate.' : 'Todos os simulados — clique num para ver a classificação e configurar os critérios.'}</p>
       </div>
 
+      <BarraSetorSlot />
       {!simId ? (
         <RankingLista itens={resumos} />
       ) : dados ? (

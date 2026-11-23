@@ -7,6 +7,8 @@
 //   qu:i:hist:s                       → questões do diagnóstico histórico (semana s)
 //   jp:s                              → jurisprudência semanal (semana s)
 
+import { ROTULO_VARIANTE } from './tipos-meta'
+
 export type SubtipoMeta = 'revisao' | 'reforco' | 'historico' | null
 
 const RE_ADAPT = /^(pf|fl):(\d+):(revisao|reforco):(\d+)$/
@@ -45,11 +47,8 @@ export function semanaOrigemDaMeta(id: string, detalhe?: { semanaOrigemRevisao?:
 /** Rótulo da meta quando ela NÃO é a regular do tipo (null = usar o rótulo padrão do tipo). */
 export function rotuloMeta(id: string): string | null {
   const m = RE_ADAPT.exec(id)
-  if (m) {
-    const base = m[1] === 'pf' ? 'PDFull' : 'PDFlash'
-    return m[3] === 'revisao' ? `Revisão adaptativa (${base})` : `Reforço (${base})`
-  }
-  if (RE_HIST.test(id)) return 'Questões (diagnóstico)'
+  if (m) return (m[3] === 'revisao' ? ROTULO_VARIANTE.revisao : ROTULO_VARIANTE.reforco)(m[1])
+  if (RE_HIST.test(id)) return ROTULO_VARIANTE.historico('qu')
   return null
 }
 

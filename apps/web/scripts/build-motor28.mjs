@@ -17,6 +17,21 @@ const saida = `/* GERADO por scripts/build-motor28.mjs a partir de lib/cronogram
 (function () {
   var defs = {}, cache = {};
   function req(n) { n = String(n).split('/').pop(); if (cache[n]) return cache[n].exports; var m = { exports: {} }; cache[n] = m; defs[n](m, m.exports, req); return m.exports; }
+  defs['tipos-meta'] = function (module, exports, require) {
+${compilar('tipos-meta')}
+  };
+  defs['regras'] = function (module, exports, require) {
+${compilar('regras')}
+  };
+  defs['faixas-carga'] = function (module, exports, require) {
+${compilar('faixas-carga')}
+  };
+  defs['restricoes'] = function (module, exports, require) {
+${compilar('restricoes')}
+  };
+  defs['rastro'] = function (module, exports, require) {
+${compilar('rastro')}
+  };
   defs['motor28'] = function (module, exports, require) {
 ${compilar('motor28')}
   };

@@ -1,9 +1,13 @@
 // Caderno (beta) — lógica de servidor do notebook do aluno. SEM 'server-only' e sem imports estáticos de módulos server-only
 // (o supabase client entra por parâmetro; loaders pesados por import dinâmico) para ser testável com vitest (node).
 import {
-  ANOTACAO_ORIGENS, DOC_VAZIO, LIMITES, MARKS_PERMITIDOS, NOS_ATOMICOS, NOS_PERMITIDOS, type DocJson,
+  ALINHAMENTOS, ANOTACAO_ORIGENS, DOC_VAZIO, ESTILOS_PARAGRAFO, LIMITES, MARCAS_PARAGRAFO, RECUO_MAX, MARKS_PERMITIDOS, NOS_ATOMICOS, NOS_PERMITIDOS, ORDENAR_POR,
+  type DocJson, type Lixeira, type OrdenarPor, type PaginaArvore, type SecaoArvore,
 } from '@/lib/aluno/notebook-tipos'
-import { criarFolhaVazia, serializarFolha, validarFolha, type Folha } from '@/lib/aluno/notebook-folha'
+import { normalizarNiveis, ordenarArvore } from '@/lib/aluno/notebook-arvore'
+import { criarFolhaVazia, serializarFolha, tamanhoBytes, LIMITES_FOLHA, validarFolha, type Folha } from '@/lib/aluno/notebook-folha'
+import { htmlParaTexto } from './notebook-texto-html'
+import { arquivoAnexoValido, corValida, familiaValida, larguraImagemValida, srcImagemValido, tamanhoFonteValido } from './notebook-texto'
 
 // ================================================================ erros de banco
 /** Tabela/coluna ausente (migração não aplicada): Postgres 42P01 ou PostgREST PGRST205/PGRST204. */
@@ -13,6 +17,22 @@ export function tabelaAusente(error: unknown): boolean {
   if (e.code === '42P01' || e.code === 'PGRST205' || e.code === 'PGRST204' || e.code === '42703') return true
   const m = String(e.message ?? '')
   return /relation .*simulado_aluno_notebook.* does not exist|could not find the table .*simulado_aluno_notebook/i.test(m)
+}
+
+/** RPC ausente (migração 20261129020000 não aplicada): PostgREST PGRST202 (não está no schema cache) ou Postgres 42883 (undefined_function). */
+export function rpcAusente(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null | undefined
+  if (!e) return false
+  if (e.code === 'PGRST202' || e.code === '42883') return true
+  return /could not find the function|function .* does not exist/i.test(String(e.message ?? ''))
+}
+
+/** Coluna ausente (migração fase 2 não aplicada): Postgres 42703 / PostgREST PGRST204 / mensagem "column ... does not exist". */
+export function colunaAusente(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null | undefined
+  if (!e) return false
+  if (e.code === '42703' || e.code === 'PGRST204') return true
+  return /column .* does not exist|could not find the .* column/i.test(String(e.message ?? ''))
 }
 
 // ================================================================ sanitização do doc (lista branca)
@@ -59,8 +79,16 @@ function sanitMarks(marks: unknown): any[] | undefined {
       if (!href) continue // link perigoso/ inválido: descarta a mark, mantém o texto
       out.push({ type: 'link', attrs: { href } })
     } else if (m.type === 'highlight') {
-      const cor = isObj(m.attrs) && typeof m.attrs.color === 'string' && TOKEN_RE.test(m.attrs.color) ? m.attrs.color : null
+      const cor = isObj(m.attrs) ? corValida(m.attrs.color) : null
       out.push(cor ? { type: 'highlight', attrs: { color: cor } } : { type: 'highlight' })
+    } else if (m.type === 'textStyle') {
+      const at = isObj(m.attrs) ? m.attrs : {}
+      const ts: Record<string, string> = {}
+      const cor = corValida(at.color); if (cor) ts.color = cor
+      const fam = familiaValida(at.fontFamily); if (fam) ts.fontFamily = fam
+      const tam = tamanhoFonteValido(at.fontSize); if (tam) ts.fontSize = tam
+      if (!Object.keys(ts).length) continue // sem estilo válido: descarta a mark, mantém o texto
+      out.push({ type: 'textStyle', attrs: ts })
     } else {
       out.push({ type: m.type })
     }
@@ -83,14 +111,40 @@ function sanitRects(v: unknown): { x0: number; y0: number; x1: number; y1: numbe
   return out
 }
 
+/** Atributos de bloco (parágrafo/título): alinhamento, recuo, marca na margem e estilo especial. */
+function bloco(at: Record<string, unknown>, out: Record<string, unknown>) {
+  if (typeof at.textAlign === 'string' && (ALINHAMENTOS as readonly string[]).includes(at.textAlign) && at.textAlign !== 'left') out.textAlign = at.textAlign
+  const rec = inteiro(at.indent, 1, RECUO_MAX); if (rec) out.indent = rec
+  if (typeof at.marca === 'string' && (MARCAS_PARAGRAFO as readonly string[]).includes(at.marca)) out.marca = at.marca
+  if (typeof at.estilo === 'string' && (ESTILOS_PARAGRAFO as readonly string[]).includes(at.estilo)) out.estilo = at.estilo
+}
+
 function sanitAttrs(tipo: string, a: unknown): Record<string, unknown> | undefined {
   const at = isObj(a) ? a : {}
   const out: Record<string, unknown> = {}
   switch (tipo) {
+    case 'paragraph': bloco(at, out); break
     case 'heading': {
-      const level = inteiro(at.level, 1, 3)
-      if (!level) rej('heading: level deve ser 1-3')
+      const level = inteiro(at.level, 1, 6)
+      if (!level) rej('heading: level deve ser 1-6')
       out.level = level
+      bloco(at, out)
+      break
+    }
+    case 'image': {
+      const src = srcImagemValido(at.src)
+      if (!src) rej('image: src deve apontar para a rota de arquivos do caderno')
+      out.src = src
+      const alt = texto(at.alt, 300); if (alt) out.alt = alt
+      const w = larguraImagemValida(at.width); if (w) out.width = w
+      break
+    }
+    case 'anexo': {
+      const arq = arquivoAnexoValido(at.arquivo)
+      if (!arq) rej('anexo: arquivo inválido')
+      out.arquivo = arq
+      out.nome = (texto(at.nome, LIMITES.anexoNomeMax) ?? '').replace(/[\u0000-\u001f\u007f]/g, '') || 'arquivo'
+      const t = inteiro(at.tamanho, 0, LIMITES.anexoBytesMax); if (t !== undefined) out.tamanho = t
       break
     }
     case 'orderedList': { const s = inteiro(at.start, 1, 100000); if (s) out.start = s; break }
@@ -110,12 +164,18 @@ function sanitAttrs(tipo: string, a: unknown): Record<string, unknown> | undefin
       break
     }
     case 'grifoSnapshot': {
-      const doc = uuid(at.documento_id)
-      if (!doc) rej('grifoSnapshot: documento_id inválido')
-      out.documento_id = doc
-      const pagina = inteiro(at.pagina, 0, 1_000_000)
-      if (pagina === undefined) rej('grifoSnapshot: pagina inválida')
-      out.pagina = pagina
+      // documento_id/pagina são OPCIONAIS: o front declara `pagina: null` por padrão e a importação (20261127010000) cria notas
+      // sem eles. Ausente/null => omitido; presente porém inválido => rejeita. Attrs desconhecidos (origem_item_id etc.) são descartados.
+      if (at.documento_id !== undefined && at.documento_id !== null) {
+        const doc = uuid(at.documento_id)
+        if (!doc) rej('grifoSnapshot: documento_id inválido')
+        out.documento_id = doc
+      }
+      if (at.pagina !== undefined && at.pagina !== null) {
+        const pagina = inteiro(at.pagina, 0, 1_000_000)
+        if (pagina === undefined) rej('grifoSnapshot: pagina inválida')
+        out.pagina = pagina
+      }
       out.texto = texto(at.texto, LIMITES.grifoTextoMax) ?? ''
       const ver = inteiro(at.documento_versao, 0, 1_000_000); if (ver !== undefined) out.documento_versao = ver
       const tit = texto(at.documento_titulo, 300); if (tit !== undefined) out.documento_titulo = tit
@@ -209,11 +269,29 @@ export function extrairTexto(doc: unknown): string {
 // ================================================================ folha livre (tinta)
 export type TintaResultado = { ok: true; folha: Folha; bytes: number } | { ok: false; erro: string }
 
-/** Valida a tinta (folha livre) no servidor: schema + limites + 1 MB. Devolve a folha COMPACTADA/normalizada. */
+/**
+ * Valida a tinta (folha livre) no servidor: schema + limites + 1 MB. Devolve a folha COMPACTADA/normalizada (v3).
+ * O `doc` de cada caixa passa pela MESMA lista branca das páginas de texto (sanitizarDoc: nós/marks/attrs, links, imagens, anexos,
+ * profundidade, nº de nós e bytes); doc inválido => recusa a folha inteira (a rota responde 422).
+ */
 export function sanitizarTinta(entrada: unknown): TintaResultado {
   const r = validarFolha(entrada)
   if (!r.ok) return { ok: false, erro: r.erro }
-  return { ok: true, folha: JSON.parse(serializarFolha(r.folha)) as Folha, bytes: r.bytes }
+  let folha: Folha = r.folha
+  if (folha.caixas.some((c) => c.doc)) {
+    const caixas: Folha['caixas'] = []
+    for (const c of folha.caixas) {
+      if (!c.doc) { caixas.push(c); continue }
+      const d = sanitizarDoc(c.doc)
+      if (!d.ok) return { ok: false, erro: `Caixa de texto inválida: ${d.erro}` }
+      caixas.push({ ...c, doc: d.doc as unknown as Record<string, unknown> })
+    }
+    folha = { ...folha, caixas }
+  }
+  const serial = serializarFolha(folha)
+  const bytes = tamanhoBytes(serial)
+  if (bytes > LIMITES_FOLHA.bytes) return { ok: false, erro: 'Folha maior que 1 MB.' }
+  return { ok: true, folha: JSON.parse(serial) as Folha, bytes }
 }
 
 export const tintaVazia = (): Folha => criarFolhaVazia()
@@ -222,10 +300,14 @@ export const tintaVazia = (): Folha => criarFolhaVazia()
 export function extrairTextoFolha(folha: unknown): string {
   const caixas = (folha as { caixas?: unknown } | null)?.caixas
   if (!Array.isArray(caixas)) return ''
+  // v3: o texto sai do `doc` (mesma extração das páginas de texto); caixa legada (v1/v2) usa `texto`.
+  const textoCaixa = (c: any): string => (c?.doc && typeof c.doc === 'object' ? extrairTexto(c.doc) : typeof c?.texto === 'string' ? c.texto.trim() : '')
   return caixas
-    .filter((c: any) => c && typeof c.texto === 'string' && c.texto.trim())
-    .sort((a: any, b: any) => (a.y ?? 0) - (b.y ?? 0) || (a.x ?? 0) - (b.x ?? 0))
-    .map((c: any) => (c.texto as string).trim())
+    .filter((c: any) => c && typeof c === 'object')
+    .map((c: any) => ({ x: c.x ?? 0, y: c.y ?? 0, t: textoCaixa(c) }))
+    .filter((c) => c.t)
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+    .map((c) => c.t)
     .join('\n')
     .slice(0, LIMITES.textoBuscaMax)
 }
@@ -280,6 +362,31 @@ export function trechoBusca(texto: string, q: string, tam = 180): string {
   return (ini > 0 ? '…' : '') + t.slice(ini, ini + tam) + (ini + tam < t.length ? '…' : '')
 }
 
+/** Todas as ocorrências (trechos) dos termos de `q` em `texto`, sem sobreposição, até `max`. Usado na busca com escopo 'pagina'. */
+export function ocorrenciasBusca(texto: string, q: string, max: number = LIMITES.ocorrenciasMax, tam = 140): string[] {
+  const t = (texto ?? '').replace(/\s+/g, ' ').trim()
+  const termos = [...new Set(q.toLowerCase().split(/\s+/).filter((x) => x.length >= 2))]
+  if (!t || termos.length === 0) return []
+  const baixo = t.toLowerCase()
+  const posicoes: number[] = []
+  for (const termo of termos) {
+    let i = baixo.indexOf(termo)
+    while (i >= 0 && posicoes.length < max * 4) { posicoes.push(i); i = baixo.indexOf(termo, i + termo.length) }
+  }
+  posicoes.sort((a, b) => a - b)
+  const out: string[] = []
+  let fimAnterior = -1
+  for (const pos of posicoes) {
+    if (pos < fimAnterior) continue // já coberta pelo trecho anterior
+    const ini = Math.max(0, pos - 50)
+    const fim = Math.min(t.length, ini + tam)
+    out.push((ini > 0 ? '…' : '') + t.slice(ini, fim) + (fim < t.length ? '…' : ''))
+    fimAnterior = fim
+    if (out.length >= max) break
+  }
+  return out
+}
+
 // ================================================================ seções automáticas (somente leitura)
 const CACHE_ERROS_MS = 60_000
 const cacheErros = new Map<string, { ids: string[]; ate: number }>()
@@ -297,11 +404,53 @@ export async function idsErrosAluno(svc: any, tenantId: string, estudanteId: str
   return ids
 }
 
+const CACHE_CONTAGEM_ERROS_MS = 60_000
+const cacheContagemErros = new Map<string, { n: number; ate: number }>()
+
+/** Rpc ausente OU função quebrada por coluna ausente => segue no caminho antigo (migração 20261129030000 pendente). */
+/**
+ * Quantidade de questões em "Meus erros". Preferência: RPC `notebook_contar_erros` (migração 20261129030000; count no banco, sem baixar
+ * respostas). Sem a RPC (ou erro) cai no caminho antigo (`idsErrosAluno`: baixa as respostas). Cache de 60 s por tenant+estudante.
+ */
+export async function contarErrosAluno(svc: any, tenantId: string, estudanteId: string): Promise<number> {
+  const k = `${tenantId}:${estudanteId}`
+  const agora = Date.now()
+  const c = cacheContagemErros.get(k)
+  if (c && c.ate > agora) return c.n
+  const r = await svc.rpc('notebook_contar_erros', { p_tenant: tenantId, p_estudante: estudanteId })
+  let n: number
+  if (!r.error && r.data !== null && r.data !== undefined && Number.isFinite(Number(r.data))) n = Number(r.data)
+  else n = (await idsErrosAluno(svc, tenantId, estudanteId)).length
+  if (cacheContagemErros.size > 500) { for (const [key, v] of cacheContagemErros) if (v.ate <= agora) cacheContagemErros.delete(key); if (cacheContagemErros.size > 500) cacheContagemErros.clear() }
+  cacheContagemErros.set(k, { n, ate: agora + CACHE_CONTAGEM_ERROS_MS })
+  return n
+}
+
+/** Limpa os caches de erros (testes). */
+export function limparCacheErros() { cacheErros.clear(); cacheContagemErros.clear() }
+
+/** `enunciado` (pode ser HTML legado) -> texto limpo, espaços colapsados, até 400 caracteres. */
+export function enunciadoTexto(enunciado: unknown): string {
+  return htmlParaTexto(enunciado).replace(/\s+/g, ' ').trim().slice(0, 400)
+}
+/** Acrescenta `enunciado_texto` (compatível: o campo `enunciado` original continua no item). */
+export function comEnunciadoTexto<T extends { enunciado?: unknown }>(itens: T[]): (T & { enunciado_texto: string })[] {
+  return itens.map((q) => ({ ...q, enunciado_texto: enunciadoTexto(q.enunciado) }))
+}
+
 export async function listarAutoErros(svc: any, tenantId: string, estudanteId: string, offset: number, limit: number) {
+  const { questoesParaAluno } = await import('@/lib/aluno/cadernos-aluno')
+  // RPC paginada (ids + total no banco); sem ela, caminho antigo (todas as respostas em memória, cache 60 s)
+  const r = await svc.rpc('notebook_listar_erros', { p_tenant: tenantId, p_estudante: estudanteId, p_offset: offset, p_limit: limit })
+  if (!r.error && Array.isArray(r.data)) {
+    const rows = r.data as { questao_id: string; total: number | string }[]
+    const total = rows.length ? Number(rows[0].total) : (offset > 0 ? await contarErrosAluno(svc, tenantId, estudanteId) : 0)
+    const itens = await questoesParaAluno(svc, tenantId, estudanteId, rows.map((x) => x.questao_id))
+    return { total, itens: comEnunciadoTexto(itens) }
+  }
   const ids = await idsErrosAluno(svc, tenantId, estudanteId)
   const fatia = ids.slice(offset, offset + limit)
-  const { questoesParaAluno } = await import('@/lib/aluno/cadernos-aluno')
-  return { total: ids.length, itens: await questoesParaAluno(svc, tenantId, estudanteId, fatia) }
+  return { total: ids.length, itens: comEnunciadoTexto(await questoesParaAluno(svc, tenantId, estudanteId, fatia)) }
 }
 
 export async function contarFavoritos(svc: any, estudanteId: string): Promise<number> {
@@ -315,47 +464,183 @@ export async function listarAutoFavoritos(svc: any, tenantId: string, estudanteI
     .eq('estudante_id', estudanteId).order('criado_em', { ascending: false }).order('id', { ascending: true }).range(offset, offset + limit - 1)
   const ids: string[] = (data ?? []).map((f: any) => f.questao_id)
   const { questoesParaAluno } = await import('@/lib/aluno/cadernos-aluno')
-  return { total: count ?? 0, itens: await questoesParaAluno(svc, tenantId, estudanteId, ids) }
+  return { total: count ?? 0, itens: comEnunciadoTexto(await questoesParaAluno(svc, tenantId, estudanteId, ids, { ocultarGabaritoNaoRespondidas: true })) }
 }
 
 // ================================================================ árvore leve (SEM doc)
 export interface ArvoreArgs { tenantId: string; estudanteId: string; notebookId: string; secaoId?: string; offset?: number; limit?: number }
 
+const COLS_SEC_BASE = 'id, nome, cor, ordem, tipo'
+const COLS_PAG_BASE = 'id, secao_id, titulo, tipo_pagina, ordem, criado_em, atualizado_em'
+const COLS_PAG_F2 = `${COLS_PAG_BASE}, nivel, fundo, regua`
+
+/** Garante os campos fase 2 com defaults (linha vinda de select legado ou coluna nula). */
+export function completarPagina(p: any): PaginaArvore {
+  return {
+    ...p,
+    nivel: typeof p.nivel === 'number' ? p.nivel : 0,
+    criado_em: p.criado_em ?? null,
+    fundo: p.fundo ?? null,
+    regua: p.regua ?? null,
+  }
+}
+const ordenarPorValido = (v: unknown): OrdenarPor => ((ORDENAR_POR as readonly string[]).includes(v as string) ? (v as OrdenarPor) : 'manual')
+
+/** Páginas vivas e não arquivadas por seção em UMA consulta (RPC `notebook_contar_paginas`, migração 20261129030000). null = RPC ausente/erro. */
+async function contarPaginasPorSecao(svc: any, tenantId: string, estudanteId: string): Promise<Map<string, number> | null> {
+  try {
+    const r = await svc.rpc('notebook_contar_paginas', { p_tenant: tenantId, p_estudante: estudanteId })
+    if (r.error || !Array.isArray(r.data)) return null
+    return new Map((r.data as { secao_id: string; qtd: number | string }[]).map((x) => [x.secao_id, Number(x.qtd)]))
+  } catch { return null }
+}
+
 export async function montarArvore(svc: any, a: ArvoreArgs) {
-  const { data: secs, error: eS } = await svc.from('simulado_aluno_notebook_secoes')
-    .select('id, nome, cor, ordem, tipo').eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('notebook_id', a.notebookId)
+  // Tolerância à migração fase 2: tenta com `ordenar_por`; se a coluna não existe, refaz sem ela e segue em modo legado.
+  let fase2 = true
+  const lerSecoes = (cols: string) => svc.from('simulado_aluno_notebook_secoes')
+    .select(cols).eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('notebook_id', a.notebookId)
     .is('deletado_em', null).order('ordem', { ascending: true }).order('id', { ascending: true }).limit(500)
-  if (eS) return { error: eS as unknown }
-  const secoes: { id: string; nome: string; cor: string | null; ordem: number; tipo: string; qtd_paginas: number }[] =
-    (secs ?? []).map((s: any) => ({ ...s, qtd_paginas: 0 }))
+  // seções e contagem agregada por seção em paralelo (a contagem não depende das seções)
+  const [rs0, contagens] = await Promise.all([lerSecoes(`${COLS_SEC_BASE}, ordenar_por`), contarPaginasPorSecao(svc, a.tenantId, a.estudanteId)])
+  let rs = rs0
+  if (rs.error && colunaAusente(rs.error)) { fase2 = false; rs = await lerSecoes(COLS_SEC_BASE) }
+  if (rs.error) return { error: rs.error as unknown }
+  const secoes: SecaoArvore[] = (rs.data ?? []).map((s: any) => ({ ...s, ordenar_por: ordenarPorValido(s.ordenar_por), qtd_paginas: 0 }))
 
   const limit = Math.min(Math.max(a.limit ?? LIMITES.paginasPorSecaoArvore, 1), LIMITES.paginasPorSecaoArvore)
   const offset = Math.max(a.offset ?? 0, 0)
   const alvo = a.secaoId ? secoes.filter((s) => s.id === a.secaoId) : secoes
-  const paginas: { id: string; secao_id: string; titulo: string; tipo_pagina: string; ordem: number; atualizado_em: string }[] = []
+  const porSecao = new Map<string, PaginaArvore[]>()
   let erro: unknown = null
+
+  // contagem das automáticas (somente leitura) corre EM PARALELO com a leitura das páginas
+  const autos = Promise.all(alvo.map(async (s) => {
+    if (s.tipo === 'auto_erros') s.qtd_paginas = await contarErrosAluno(svc, a.tenantId, a.estudanteId)
+    else if (s.tipo === 'auto_favoritos') s.qtd_paginas = await contarFavoritos(svc, a.estudanteId)
+  }))
 
   const manuais = alvo.filter((s) => !s.tipo.startsWith('auto_'))
   for (let i = 0; i < manuais.length && !erro; i += 10) {
     await Promise.all(manuais.slice(i, i + 10).map(async (s) => {
-      const { data, count, error } = await svc.from('simulado_aluno_notebook_paginas')
-        .select('id, secao_id, titulo, tipo_pagina, ordem, atualizado_em', { count: 'exact' })
+      // ordenação não-manual precisa ver a seção inteira (até ordenarMax) para ordenar; a fatia offset/limit sai DEPOIS.
+      const emMemoria = fase2 && s.ordenar_por !== 'manual'
+      // com a contagem agregada (RPC) não precisa de `count: exact` por seção
+      const ler = (cols: string) => svc.from('simulado_aluno_notebook_paginas')
+        .select(cols, contagens ? undefined : { count: 'exact' })
         .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('secao_id', s.id)
         .is('deletado_em', null).eq('arquivada', false)
-        .order('ordem', { ascending: true }).order('id', { ascending: true }).range(offset, offset + limit - 1)
-      if (error) { erro = error; return }
-      s.qtd_paginas = count ?? 0
-      for (const p of data ?? []) paginas.push(p)
+        .order('ordem', { ascending: true }).order('id', { ascending: true })
+        .range(emMemoria ? 0 : offset, emMemoria ? LIMITES.ordenarMax - 1 : offset + limit - 1)
+      let r = await ler(fase2 ? COLS_PAG_F2 : COLS_PAG_BASE)
+      if (r.error && fase2 && colunaAusente(r.error)) r = await ler(COLS_PAG_BASE)
+      if (r.error) { erro = r.error; return }
+      s.qtd_paginas = contagens ? (contagens.get(s.id) ?? 0) : (r.count ?? 0)
+      let lista = (r.data ?? []).map(completarPagina)
+      if (emMemoria) lista = ordenarArvore(lista, s.ordenar_por).slice(offset, offset + limit)
+      porSecao.set(s.id, lista)
     }))
   }
+  await autos.catch(() => { /* contagem das automáticas é best-effort: mantém 0 */ })
   if (erro) return { error: erro }
 
-  // contagem das automáticas (somente leitura)
-  for (const s of alvo) {
-    if (s.tipo === 'auto_erros') s.qtd_paginas = (await idsErrosAluno(svc, a.tenantId, a.estudanteId)).length
-    else if (s.tipo === 'auto_favoritos') s.qtd_paginas = await contarFavoritos(svc, a.estudanteId)
-  }
-  const idx = new Map(secoes.map((s, i) => [s.id, i]))
-  paginas.sort((x, y) => ((idx.get(x.secao_id) ?? 0) - (idx.get(y.secao_id) ?? 0)) || x.ordem - y.ordem)
+  // saída: seções na ordem das seções; páginas já na ordem final de cada seção (manual = ordem; demais = ordenarArvore)
+  const paginas: PaginaArvore[] = secoes.flatMap((s) => porSecao.get(s.id) ?? [])
   return { secoes, paginas, pagina_limite: LIMITES.paginasPorSecaoArvore }
+}
+
+// ================================================================ normalização de níveis (efeito colateral de nível/mover/copiar)
+/**
+ * Relê a sequência (ordem, id) das páginas vivas da seção e corrige os níveis para respeitar nivel[i] <= nivel[i-1]+1.
+ * Só atualiza as linhas que mudam (e incrementa `versao` delas). Preferência: RPC atômica `notebook_normalizar_niveis`
+ * (migração 20261129020000, filtra tenant+estudante dentro da função, trava a seção); sem a RPC cai no caminho por linha.
+ * Tolera ausência da coluna (migração fase 2 pendente => não faz nada).
+ */
+export async function normalizarNiveisSecao(svc: any, ctx: { tenantId: string; estudanteId: string }, secaoId: string): Promise<{ error: unknown } | null> {
+  const rpc = await svc.rpc('notebook_normalizar_niveis', { p_tenant: ctx.tenantId, p_estudante: ctx.estudanteId, p_secao: secaoId })
+  if (!rpc.error) return null
+  if (colunaAusente(rpc.error)) return null
+  if (!rpcAusente(rpc.error)) return { error: rpc.error }
+  // fallback (RPC não aplicada): UPDATE por linha, com guarda de versão
+  const { data, error } = await svc.from('simulado_aluno_notebook_paginas').select('id, nivel, versao')
+    .eq('tenant_id', ctx.tenantId).eq('estudante_id', ctx.estudanteId).eq('secao_id', secaoId).is('deletado_em', null)
+    .order('ordem', { ascending: true }).order('id', { ascending: true }).limit(2000)
+  if (error) return colunaAusente(error) ? null : { error }
+  const linhas: { id: string; nivel: number; versao: number }[] = data ?? []
+  const novos = normalizarNiveis(linhas.map((l) => l.nivel ?? 0))
+  for (let i = 0; i < linhas.length; i++) {
+    if (novos[i] === linhas[i].nivel) continue
+    const u = await svc.from('simulado_aluno_notebook_paginas').update({ nivel: novos[i], versao: (linhas[i].versao ?? 1) + 1 }).eq('id', linhas[i].id)
+      .eq('tenant_id', ctx.tenantId).eq('estudante_id', ctx.estudanteId).eq('versao', linhas[i].versao ?? 1)
+    if (u.error) return { error: u.error }
+  }
+  return null
+}
+
+// ================================================================ lixeira (60 dias)
+export function limiteLixeiraISO(agora = Date.now()): string {
+  return new Date(agora - LIMITES.lixeiraDias * 86_400_000).toISOString()
+}
+
+/** Páginas e seções apagadas nos últimos 60 dias (cada lista paginada com .range()+count). Seção de origem resolvida com .in() em chunks de 80. */
+export async function montarLixeira(svc: any, a: { tenantId: string; estudanteId: string; offset: number; limit: number }): Promise<{ lixeira: Lixeira } | { error: unknown }> {
+  const desde = limiteLixeiraISO()
+  const [rp, rsec] = await Promise.all([
+    svc.from('simulado_aluno_notebook_paginas').select('id, titulo, secao_id, deletado_em', { count: 'exact' })
+      .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).not('deletado_em', 'is', null).gte('deletado_em', desde)
+      .order('deletado_em', { ascending: false }).order('id', { ascending: true }).range(a.offset, a.offset + a.limit - 1),
+    svc.from('simulado_aluno_notebook_secoes').select('id, nome, cor, deletado_em', { count: 'exact' })
+      .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).not('deletado_em', 'is', null).gte('deletado_em', desde)
+      .order('deletado_em', { ascending: false }).order('id', { ascending: true }).range(a.offset, a.offset + a.limit - 1),
+  ])
+  if (rp.error) return { error: rp.error }
+  if (rsec.error) return { error: rsec.error }
+
+  const idsSecao = [...new Set((rp.data ?? []).map((p: any) => p.secao_id as string))]
+  const nomes = new Map<string, { nome: string; deletada: boolean }>()
+  const buscarNomes = async (): Promise<unknown> => {
+    for (let i = 0; i < idsSecao.length; i += 80) {
+      const r = await svc.from('simulado_aluno_notebook_secoes').select('id, nome, deletado_em')
+        .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).in('id', idsSecao.slice(i, i + 80))
+      if (r.error) return r.error
+      for (const s of r.data ?? []) nomes.set(s.id, { nome: s.nome, deletada: !!s.deletado_em })
+    }
+    return null
+  }
+  // quantas páginas foram apagadas junto de cada seção da lista (mesmo instante exato de deletado_em; a exclusão grava o MESMO instante).
+  // UMA consulta estreita (secao_id, deletado_em) por chunk de 80 seções; se bater o teto, cai na contagem por seção.
+  const qtd = new Map<string, number>()
+  const CONTAR_TETO = 5000
+  const contarJuntas = async () => {
+    const secoesLixo: { id: string; deletado_em: string }[] = rsec.data ?? []
+    for (let i = 0; i < secoesLixo.length; i += 80) {
+      const chunk = secoesLixo.slice(i, i + 80)
+      const r = await svc.from('simulado_aluno_notebook_paginas').select('secao_id, deletado_em')
+        .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).in('secao_id', chunk.map((s) => s.id)).not('deletado_em', 'is', null).limit(CONTAR_TETO)
+      const linhas: { secao_id: string; deletado_em: string }[] = r.data ?? []
+      if (r.error || linhas.length >= CONTAR_TETO) {
+        await Promise.all(chunk.map(async (s) => {
+          const c = await svc.from('simulado_aluno_notebook_paginas').select('id', { count: 'exact', head: true })
+            .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('secao_id', s.id).eq('deletado_em', s.deletado_em)
+          qtd.set(s.id, c.count ?? 0)
+        }))
+        continue
+      }
+      for (const s of chunk) qtd.set(s.id, linhas.filter((l) => l.secao_id === s.id && l.deletado_em === s.deletado_em).length)
+    }
+  }
+  const [erroNomes] = await Promise.all([buscarNomes(), contarJuntas()])
+  if (erroNomes) return { error: erroNomes }
+  return {
+    lixeira: {
+      dias: LIMITES.lixeiraDias,
+      total_paginas: rp.count ?? 0,
+      total_secoes: rsec.count ?? 0,
+      paginas: (rp.data ?? []).map((p: any) => ({
+        id: p.id, titulo: p.titulo, secao_id: p.secao_id, deletado_em: p.deletado_em,
+        secao_nome: nomes.get(p.secao_id)?.nome ?? null, secao_deletada: nomes.get(p.secao_id)?.deletada ?? true,
+      })),
+      secoes: (rsec.data ?? []).map((s: any) => ({ id: s.id, nome: s.nome, cor: s.cor ?? null, deletado_em: s.deletado_em, qtd_paginas: qtd.get(s.id) ?? 0 })),
+    },
+  }
 }

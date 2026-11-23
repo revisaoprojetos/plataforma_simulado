@@ -4,9 +4,9 @@ import {
   AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType,
 } from 'docx'
 import { LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
-import type { Folha } from '@/lib/aluno/notebook-folha'
+import { rgbDeHex, textoDeCaixa, type CorFolha, type Folha } from '@/lib/aluno/notebook-folha'
 import {
-  LIMITES_EXPORT, RGB_FOLHA, caixasComTexto, escalaFolha, layoutLinhas, tokenizar, tracoParaSvgPath, tracosVisiveis,
+  LIMITES_EXPORT, RGB_FOLHA, caixasComTexto, cortarLinha, escalaFolha, layoutLinhas, tokenizar, tracoParaSvgPath, tracosVisiveis,
   type BlocoExp, type Run, type Token,
 } from '@/lib/aluno/notebook-exportar'
 
@@ -30,8 +30,14 @@ const fonteDe = (f: Fontes, r: Run, negritoBase = false): PDFFont =>
   r.code ? f.mono : (r.b || negritoBase) && r.i ? f.bi : r.b || negritoBase ? f.b : r.i ? f.i : f.reg
 
 /** Troca o que a fonte padrão (WinAnsi) não codifica por '?' (acentos do português são preservados). */
+const CONJUNTOS = new WeakMap<PDFFont, Set<number>>()
+function conjunto(font: PDFFont): Set<number> {
+  let s = CONJUNTOS.get(font)
+  if (!s) { s = new Set(font.getCharacterSet()); CONJUNTOS.set(font, s) } // 1 Set por fonte (antes: recriado a cada medição)
+  return s
+}
 function limpar(font: PDFFont, s: string): string {
-  const set = new Set(font.getCharacterSet())
+  const set = conjunto(font)
   let out = ''
   for (const ch of s) {
     const cp = ch.codePointAt(0) as number
@@ -111,8 +117,12 @@ export async function gerarPdfDoc(titulo: string, blocos: BlocoExp[]): Promise<U
           garante(13)
           y -= 13
           page.drawRectangle({ x: A4.m, y: y - 3, width: largTotal, height: 13, color: FUNDO_CODE })
-          let txt = limpar(f.mono, ln.replace(/\t/g, '    '))
-          while (txt.length > 1 && f.mono.widthOfTextAtSize(txt, 9) > largTotal - 8) txt = txt.slice(0, -1) // linha longa é cortada
+          let txt = limpar(f.mono, cortarLinha(ln.replace(/\t/g, '    ')))
+          if (txt.length > 1 && f.mono.widthOfTextAtSize(txt, 9) > largTotal - 8) { // linha longa é cortada (busca binária, sem laço O(n²))
+            let lo = 1, hi = txt.length - 1
+            while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (f.mono.widthOfTextAtSize(txt.slice(0, mid), 9) <= largTotal - 8) lo = mid; else hi = mid - 1 }
+            txt = txt.slice(0, lo)
+          }
           page.drawText(txt, { x: A4.m + 4, y, size: 9, font: f.mono, color: TEXTO })
         }
         y -= 6
@@ -161,14 +171,14 @@ export async function gerarPdfFolha(titulo: string, folha: Folha): Promise<Uint8
     const x = c.x * s, w = c.w * s, h = c.h * s, topo = H - c.y * s
     page.drawRectangle({ x, y: topo - h, width: w, height: h, borderColor: CINZA, borderWidth: 0.4 })
     const tam = Math.max(6, 14 * s)
-    const linhas = layoutLinhas(tokenizar([{ t: c.texto ?? '' }]), Math.max(10, w - 6), (t) => f.reg.widthOfTextAtSize(limpar(f.reg, t.texto), tam))
+    const linhas = layoutLinhas(tokenizar([{ t: textoDeCaixa(c) }]), Math.max(10, w - 6), (t) => f.reg.widthOfTextAtSize(limpar(f.reg, t.texto), tam))
     const max = Math.max(1, Math.floor((h - 4) / (tam * 1.3)))
     linhas.slice(0, max).forEach((ln, i) => page.drawText(limpar(f.reg, ln.map((t) => t.texto).join('')), { x: x + 3, y: topo - tam - i * tam * 1.3 - 1, size: tam, font: f.reg, color: TEXTO }))
   }
   for (const t of tracosVisiveis(folha)) {
     const d = tracoParaSvgPath(t.pontos)
     if (!d) continue
-    const [r, g, b] = RGB_FOLHA[t.cor]
+    const [r, g, b] = rgbDeHex(t.cor) ?? RGB_FOLHA[t.cor as CorFolha] ?? RGB_FOLHA.tinta
     const marca = t.ferramenta === 'marca-texto'
     page.drawSvgPath(d, {
       x: 0, y: H, scale: s, borderColor: rgb(r, g, b), borderWidth: Math.max(0.3, t.largura * s),
@@ -179,10 +189,14 @@ export async function gerarPdfFolha(titulo: string, folha: Folha): Promise<Uint8
 }
 
 // ================================================================ DOCX
+/** Remove o que o XML 1.0 proíbe (controles C0 exceto \t \n \r, U+FFFE/FFFF e substitutos soltos) — senão o Word acusa arquivo corrompido. */
+const XML_ILEGAL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
+export const xmlSeguro = (s: string): string => String(s ?? '').replace(XML_ILEGAL, '')
+
 function runsDocx(runs: Run[], extra: { bold?: boolean; size?: number } = {}) {
   const out: (TextRun | ExternalHyperlink)[] = []
   for (const r of runs) {
-    const partes = r.t.replace(/\r/g, '').split('\n')
+    const partes = xmlSeguro(r.t).replace(/\r/g, '').split('\n')
     partes.forEach((p, idx) => {
       const tr = new TextRun({
         text: p, bold: r.b || extra.bold, italics: r.i, underline: r.u || r.link ? {} : undefined, strike: r.s,
@@ -195,6 +209,7 @@ function runsDocx(runs: Run[], extra: { bold?: boolean; size?: number } = {}) {
 }
 
 export async function gerarDocx(titulo: string, blocos: BlocoExp[]): Promise<Buffer> {
+  titulo = xmlSeguro(titulo)
   const filhos: (Paragraph | Table)[] = [new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: titulo || 'Sem título' })] })]
   const NIVEL = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 } as const
   for (const b of blocos) {
@@ -210,13 +225,13 @@ export async function gerarDocx(titulo: string, blocos: BlocoExp[]): Promise<Buf
         filhos.push(new Paragraph({ indent: { left: 360 }, border: { left: { style: BorderStyle.SINGLE, size: 12, color: '9CA3AF', space: 8 } }, children: runsDocx(b.runs.map((r) => ({ ...r, i: true }))) }))
         break
       case 'code':
-        for (const ln of b.linhas) filhos.push(new Paragraph({ shading: { type: ShadingType.CLEAR, fill: 'F3F4F6', color: 'auto' }, children: [new TextRun({ text: ln.replace(/\t/g, '    '), font: 'Courier New', size: 19 })] }))
+        for (const ln of b.linhas) filhos.push(new Paragraph({ shading: { type: ShadingType.CLEAR, fill: 'F3F4F6', color: 'auto' }, children: [new TextRun({ text: xmlSeguro(cortarLinha(ln)).replace(/\t/g, '    '), font: 'Courier New', size: 19 })] }))
         break
       case 'hr': filhos.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF', space: 1 } }, children: [] })); break
       case 'custom':
         filhos.push(new Paragraph({
           indent: { left: 240 }, border: { left: { style: BorderStyle.SINGLE, size: 12, color: '7C3AED', space: 8 } },
-          children: [new TextRun({ text: `${b.rotulo}: `, bold: true }), new TextRun({ text: b.texto, italics: true }), ...(b.fonte ? [new TextRun({ text: `  (${b.fonte})`, color: '6B7280', size: 18 })] : [])],
+          children: [new TextRun({ text: `${xmlSeguro(b.rotulo)}: `, bold: true }), new TextRun({ text: xmlSeguro(b.texto), italics: true }), ...(b.fonte ? [new TextRun({ text: `  (${xmlSeguro(b.fonte)})`, color: '6B7280', size: 18 })] : [])],
         }))
         break
       case 'tabela': {
@@ -227,7 +242,7 @@ export async function gerarDocx(titulo: string, blocos: BlocoExp[]): Promise<Buf
             tableHeader: l.cabecalho,
             children: Array.from({ length: cols }, (_, c) => new TableCell({
               shading: l.cabecalho ? { type: ShadingType.CLEAR, fill: 'F3F4F6', color: 'auto' } : undefined,
-              children: (l.celulas[c] ?? '').split('\n').map((t) => new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: t, bold: l.cabecalho })] })),
+              children: xmlSeguro(l.celulas[c] ?? '').split('\n').map((t) => new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: t, bold: l.cabecalho })] })),
             })),
           })),
         }))

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { autenticarBeta, garantirNotebook, lerJson, limiteEscrita, resp400, resp404, resp429, respErroDb, respJson } from '@/lib/aluno/notebook-api'
+import { autenticarBeta, excedeTetoPaginas, garantirNotebook, lerJson, limiteEscrita, resp400, resp404, resp429, respErroDb, respJson, respTetoPaginas } from '@/lib/aluno/notebook-api'
 import {
   NOME_SECAO_PADRAO, TENTATIVAS_CONFLITO, TITULO_PAGINA_LEITOR, anexarEValidar, blocoCriarSchema, validarBloco,
 } from '@/lib/aluno/notebook-blocos'
@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
     else {
       const novo = anexarEValidar(null, v.no)
       if (!novo.ok) return doc422(novo.erro)
+      const teto = await excedeTetoPaginas(a.svc, a.tenantId, a.estudanteId, nb.notebook.id)
+      if ('error' in teto) return respErroDb(teto.error, 'blocos.teto')
+      if (teto.excede) return respTetoPaginas()
       const mx = await esc(a.svc.from('simulado_aluno_notebook_paginas').select('ordem').eq('secao_id', secaoId)).is('deletado_em', null).order('ordem', { ascending: false }).limit(1)
       if (mx.error) return respErroDb(mx.error, 'blocos.ordem')
       const ins = await a.svc.from('simulado_aluno_notebook_paginas').insert({

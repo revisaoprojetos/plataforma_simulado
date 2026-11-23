@@ -5,6 +5,7 @@ import { FeedbackItem } from '@/components/admin/feedback-item'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { Inbox } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function FeedbacksPage() {
   const access = await getCurrentAccess()
@@ -66,6 +67,7 @@ export default async function FeedbacksPage() {
         </p>
       </div>
 
+      <BarraSetorSlot />
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader icon={Inbox} titulo="Fila de moderação" subtitulo={`${pendentes} pendente(s) de ${feedbacks.length}`} />
         <CardContent className="space-y-3 px-4 py-4">

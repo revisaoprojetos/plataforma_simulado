@@ -3,7 +3,7 @@ import type { StatusIA } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccessSuper as getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { cifrar, detectarProvedor, mascarar, carregarConfigIA, MODELOS_PADRAO, PROVEDOR_LABEL, type Provedor } from '@/lib/ia/config'
 

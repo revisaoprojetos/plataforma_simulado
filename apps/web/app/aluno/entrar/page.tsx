@@ -10,7 +10,7 @@ import { resolverLoginConfig } from '@/lib/login-config'
 export default async function AlunoEntrarPage({ searchParams }: { searchParams: Promise<{ redirectTo?: string }> }) {
   // Destino original (ex.: pasta de simulados enviada ao estudante) — validado p/ caminho do aluno.
   const sp = await searchParams
-  const rt = sp.redirectTo && /^\/(aluno|simulado)(\/|$|\?)/.test(sp.redirectTo) ? sp.redirectTo : null
+  const rt = sp.redirectTo && /^\/(aluno|simulado|oidc\/authorize)(\/|$|\?)/.test(sp.redirectTo) ? sp.redirectTo : null
   // Já logado → vai direto pro destino (ou portal).
   if (await getSessaoAluno()) redirect(rt ?? '/aluno')
 

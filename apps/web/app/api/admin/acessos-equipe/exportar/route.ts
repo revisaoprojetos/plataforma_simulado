@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { membroParaCsv, ROTULO_TIPO_ADMIN, MSG_NAO_ATIVADO_ADMIN } from '@/lib/admin-rastreio/leitura'
 
@@ -18,7 +18,7 @@ function cel(v: unknown): string {
  */
 export async function GET(req: NextRequest) {
   const access = await getCurrentAccess()
-  if (!access.userId || !access.tenantId || !accessCan(access, 'acessos:export')) {
+  if (!access.userId || !(await isSuperAdmin()) || !access.tenantId || !accessCan(access, 'acessos:export')) {
     return NextResponse.json({ message: 'Sem permissão.' }, { status: 403 })
   }
   const alvo = req.nextUrl.searchParams.get('user') ?? ''

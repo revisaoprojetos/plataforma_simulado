@@ -41,6 +41,7 @@ import { SeloCronograma, MenuPasta, MenuDoc, MoverConteudoDialog, Overlay, Drive
 import { formatBrt } from '@/lib/brt'
 import type { PastaConteudo, Categoria, NoAcesso } from './actions-tipos'
 import { listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento, importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx, renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento, definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta, carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from './actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 declare global { interface Window { DocsAPI?: any } }
 
@@ -631,6 +632,7 @@ export function BibliotecaClient() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* Abas da coleção (sublinhado): Conteúdos | JurisClub — logo abaixo do título. Modelos tem entrada própria no menu. */}
       {!ehModelo && (
         <div role="tablist" aria-label="Coleção da biblioteca" className="flex gap-1 border-b">

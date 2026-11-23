@@ -138,7 +138,7 @@ export function AlunoEntrarForm({
       try { sessionStorage.setItem('popup-login', '1') } catch {}
       // Se veio de um link do aluno (ex.: /aluno/... ou /simulado/...), volta pra lá; senão, home.
       const rt = destinoRedirect()
-      const destino = rt && /^\/(aluno|simulado)(\/|$|\?)/.test(rt) ? rt : '/aluno'
+      const destino = rt && /^\/(aluno|simulado|oidc\/authorize)(\/|$|\?)/.test(rt) ? rt : '/aluno'
       // Navegação de PÁGINA INTEIRA (não router.push): um documento novo SEMPRE envia o cookie de
       // sessão recém-gravado e o gate renderiza do zero — elimina a corrida que fazia o rebote pro login.
       setEntrando(true); window.location.assign(destino)

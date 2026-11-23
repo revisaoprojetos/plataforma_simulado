@@ -90,7 +90,7 @@ export function useLoginCore({
         sessionStorage.setItem('popup-login', '1')
       } catch {}
       const rt = destinoRedirect()
-      const destino = rt && /^\/(aluno|simulado)(\/|$|\?)/.test(rt) ? rt : '/aluno'
+      const destino = rt && /^\/(aluno|simulado|oidc\/authorize)(\/|$|\?)/.test(rt) ? rt : '/aluno'
       setEntrando(true)
       await segurarMin(Date.now()) // deixa a animação de carregamento completar antes de navegar
       // Página inteira (não router.push): o próximo request já leva o cookie de sessão fresco e o

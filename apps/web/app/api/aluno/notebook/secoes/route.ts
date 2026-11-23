@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { autenticarBeta, garantirNotebook, lerJson, limiteEscrita, resp400, resp429, respErroDb, respJson } from '@/lib/aluno/notebook-api'
 import { ordemAoFinal } from '@/lib/aluno/notebook-server'
 import { LIMITES, secaoCriarSchema } from '@/lib/aluno/notebook-tipos'
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   // idempotência: client_op_id gravado em origem_id (origem_tipo='client_op')
   if (b.client_op_id) {
     const ex = await a.svc.from('simulado_aluno_notebook_secoes').select(COLS).eq('notebook_id', nb.notebook.id)
-      .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('origem_tipo', 'client_op').eq('origem_id', b.client_op_id).maybeSingle()
+      .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('origem_tipo', 'client_op').eq('origem_id', b.client_op_id).is('deletado_em', null).maybeSingle()
     if (ex.error) return respErroDb(ex.error, 'secoes.idem')
     if (ex.data) return respJson({ secao: { ...ex.data, qtd_paginas: 0 } })
   }
@@ -44,6 +44,15 @@ export async function POST(request: NextRequest) {
     tenant_id: a.tenantId, estudante_id: a.estudanteId, notebook_id: nb.notebook.id, nome: b.nome, cor: b.cor ?? null, ordem, tipo: 'manual',
     ...(b.client_op_id ? { origem_tipo: 'client_op', origem_id: b.client_op_id } : {}),
   }).select(COLS).single()
-  if (ins.error) return respErroDb(ins.error, 'secoes.insert')
+  if (ins.error) {
+    // corrida/replay: mesmo client_op_id já gravou a seção (índice único de origem) => devolve a existente em vez de 500
+    if ((ins.error as { code?: string }).code === '23505' && b.client_op_id) {
+      const r = await a.svc.from('simulado_aluno_notebook_secoes').select(COLS).eq('notebook_id', nb.notebook.id)
+        .eq('tenant_id', a.tenantId).eq('estudante_id', a.estudanteId).eq('origem_tipo', 'client_op').eq('origem_id', b.client_op_id).is('deletado_em', null).maybeSingle()
+      if (r.data) return respJson({ secao: { ...r.data, qtd_paginas: 0 }, replay: true })
+      if (!r.error) return NextResponse.json({ ok: false, code: 'secao_excluida', message: 'Esta seção já foi criada e excluída.' }, { status: 409 })
+    }
+    return respErroDb(ins.error, 'secoes.insert')
+  }
   return respJson({ secao: { ...ins.data, qtd_paginas: 0 } }, 201)
 }

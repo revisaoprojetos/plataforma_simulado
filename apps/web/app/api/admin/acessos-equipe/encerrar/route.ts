@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { T_SESSOES, tabelaAusente } from '@/lib/admin-rastreio/registro'
 import { MSG_NAO_ATIVADO_ADMIN } from '@/lib/admin-rastreio/leitura'
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(req: NextRequest) {
   const access = await getCurrentAccess()
-  if (!access.userId || !access.tenantId || !accessCan(access, 'acessos:manage')) {
+  if (!access.userId || !(await isSuperAdmin()) || !access.tenantId || !accessCan(access, 'acessos:manage')) {
     return NextResponse.json({ message: 'Sem permissão.' }, { status: 403 })
   }
   let body: { user_id?: string }

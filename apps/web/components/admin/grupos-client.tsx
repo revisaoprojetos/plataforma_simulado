@@ -16,6 +16,7 @@ import {
   Folder, FolderOpen, FolderPlus, FolderInput, X, Check, GripVertical, FolderMinus,
   Search, ArrowUpDown, ChevronsUpDown, Hash, Download, FolderTree,
 } from 'lucide-react'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 type Origem = 'guru' | 'curseduca' | null
 type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null; codigo?: string | null; origem?: Origem }
@@ -265,6 +266,7 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Grupos" valor={nf(comuns.length)} hint="grupos comuns" />

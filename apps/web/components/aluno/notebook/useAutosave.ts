@@ -4,6 +4,8 @@ import {
   estadoInicial, reduzir, proximoEnvio, backoffMs, classificarResposta,
   type Alteracao, type Estado, type Evento, type ItemFila,
 } from '@/lib/aluno/notebook-autosave'
+import { novoUuid } from '@/lib/aluno/notebook-uuid'
+import { aguardarCriacao } from './fila-criacao-aguardar'
 import { gravarItem, removerItem, lerItem, semPersistencia, aoMudarPersistencia } from './fila-offline'
 
 const DEBOUNCE = 1000
@@ -12,12 +14,15 @@ const MAX_WAIT = 5000
 type Opts = {
   paginaId: string
   versaoInicial: number
-  /** Materializa a edição atual (doc/título) — chamado só na hora de enviar (evita getJSON a cada tecla). */
-  obter: () => Alteracao | null
+  /** Materializa a edição atual — chamado só na hora de enviar (evita getJSON a cada tecla). Recebe QUAIS campos estão sujos:
+   *  devolva só esses (título isolado => PATCH só com título; corpo isolado => sem título). */
+  obter: (sujo: Sujo) => Alteracao | null
   onSalvo?: (versao: number, alt: Alteracao) => void
 }
 
-const novoId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`)
+export type Sujo = { titulo: boolean; corpo: boolean }
+export type CampoSujo = 'titulo' | 'corpo' | 'tudo'
+const novoId = novoUuid
 
 export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
   const ref = useRef<Estado>(estadoInicial(versaoInicial))
@@ -26,7 +31,7 @@ export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
   const [sempers, setSempers] = useState(false)
   const [paginaServidor, setPaginaServidor] = useState<any>(null)
   const [migracaoPendente, setMigracao] = useState(false)
-  const sujoRef = useRef(false)
+  const sujoRef = useRef<Sujo>({ titulo: false, corpo: false })
   const ativoRef = useRef(false) // requisição ativa agora
   const tDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tMax = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -40,9 +45,10 @@ export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
   const limparTimers = () => { for (const t of [tDebounce, tMax]) { if (t.current) clearTimeout(t.current); t.current = null } }
 
   const materializar = useCallback(() => {
-    if (!sujoRef.current) return
-    sujoRef.current = false
-    const alt = obterRef.current()
+    const sujo = sujoRef.current
+    if (!sujo.titulo && !sujo.corpo) return
+    sujoRef.current = { titulo: false, corpo: false }
+    const alt = obterRef.current(sujo)
     if (alt) despachar({ t: 'editar', alt })
   }, [despachar])
 
@@ -62,6 +68,10 @@ export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
     const s0 = ref.current
     if (s0.fase === 'conflito') return
     if (!s0.emVoo && !proximoEnvio(s0)) return
+    // página recém-criada de forma otimista: o 1º PATCH espera o POST de criação (senão 404) e usa a versão que o servidor devolveu
+    const criacao = await aguardarCriacao(paginaId, () => { ativoRef.current = true }, () => { ativoRef.current = false })
+    if (criacao === null) { despachar({ t: 'erro' }); return }
+    if (typeof criacao === 'number') despachar({ t: 'versao_base', versao: criacao })
     despachar({ t: 'iniciar', opId: novoId() })
     const voo = ref.current.emVoo
     if (!voo) return
@@ -105,8 +115,9 @@ export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
 
   enviarRef.current = enviar
 
-  const marcarSujo = useCallback(() => {
-    sujoRef.current = true
+  const marcarSujo = useCallback((campo: CampoSujo = 'tudo') => {
+    const s = sujoRef.current
+    sujoRef.current = { titulo: s.titulo || campo !== 'corpo', corpo: s.corpo || campo !== 'titulo' }
     if (ref.current.fase === 'ocioso') { ref.current = { ...ref.current, fase: 'sujo' }; forcar() }
     agendar()
   }, [agendar])
@@ -146,6 +157,8 @@ export function useAutosave({ paginaId, versaoInicial, obter, onSalvo }: Opts) {
     online, semPersistencia: sempers, migracaoPendente, paginaServidor,
     marcarSujo,
     flush: () => enviar(),
+    /** Atualiza a versão-base (ex.: após PATCH de aparência/nível que avançou a versão) sem remontar o editor. */
+    setVersaoBase: (versao: number) => despachar({ t: 'versao_base', versao }),
     tentarDeNovo: () => { despachar({ t: 'tentar_de_novo' }); void enviar() },
     usarServidor: (versao: number) => { void removerItem(paginaId); setPaginaServidor(null); despachar({ t: 'usar_servidor', versao }) },
     manterMinha: () => {

@@ -25,6 +25,8 @@ export type AulaBanco = {
   duracao: string | null
   video_url: string | null
   tema: string | null
+  /** Nome de exibição da aula (grupo). Só rótulo — a chave de casamento continua sendo `aula`. */
+  titulo_aula?: string | null
   ordem: number
   urls: { plataforma_id: string; url: string }[]
   questoes: { id: string; external_id: string | null; enunciado: string }[]

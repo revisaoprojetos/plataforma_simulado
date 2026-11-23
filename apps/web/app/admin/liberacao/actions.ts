@@ -3,7 +3,7 @@ import type { SalvarRegraInput } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccessSuper as getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { validarRegra, normalizarStatus } from '@/lib/integracoes/liberacao/motor'
 import {

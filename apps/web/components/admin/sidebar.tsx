@@ -3,64 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { toast } from 'sonner'
-import {
-  LayoutDashboard,
-  BookOpen,
-  ClipboardList,
-  Users,
-  UsersRound,
-  BarChart3,
-  ClipboardCheck,
-  MessageSquare,
-  KeyRound,
-  GraduationCap,
-  Boxes,
-  SlidersHorizontal,
-  Flag,
-  PenLine,
-  MessagesSquare,
-  LogIn,
-  FilePen,
-  FlaskConical,
-  ChevronDown,
-  Trash2,
-  PieChart,
-  Trophy,
-  Star,
-  HelpCircle,
-  Webhook,
-  Share2,
-  Plug,
-  Zap,
-  ServerCog,
-  UserCog,
-  ShieldCheck,
-  ShieldAlert,
-  Megaphone,
-  LogOut,
-  Building2,
-  Library,
-  CalendarDays,
-  Upload,
-  LayoutTemplate,
-  Eye,
-  Scale,
-  CreditCard,
-  MessageCircle,
-  FileText,
-  Newspaper,
-  FolderTree,
-  PlayCircle,
-  Layers,
-  Route,
-  Tag,
-  Tags,
-  Lock,
-  History,
-  Send,
-  Gavel,
-} from 'lucide-react'
+import { BookOpen, LogOut, Building2, ChevronDown } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -84,7 +27,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { APP_VERSION } from '@/lib/version'
-import { OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { FontScaleControl } from '@/components/font-scale-control'
@@ -94,28 +36,8 @@ import { logoutAction } from '@/app/login/actions'
 import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
-import { LEITURA_ATIVA, JURISPRUDENCIA_ATIVA, MODELOS_CADERNO_ATIVO, LIBERACAO_REGRAS_ATIVO } from '@/lib/flags'
-import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAdmin } from '@/lib/sidebar-rotulos'
-
-type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-
-interface NavItem {
-  label: string
-  href: string
-  icon: IconType
-  exact?: boolean
-  matchPrefix?: string // acende para qualquer rota sob este prefixo (ex.: Estúdio = /admin/conteudos)
-  perm?: string // permissão necessária para ver o item
-  superOnly?: boolean // só aparece para super-admin GLOBAL (não por-tenant)
-  oculto?: boolean // escondido por flag (ex.: feature em construção)
-}
-
-interface NavGroup {
-  label: string
-  divisor?: string // título de uma DIVISÃO desenhada acima deste grupo (separa blocos da sidebar)
-  icon: IconType
-  items: NavItem[]
-}
+import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAdmin, type RotuloOverride } from '@/lib/sidebar-rotulos'
+import { SETORES, resolverRota, setoresVisiveis, hrefInicialAba, iconeDaAba, chaveRotuloAba, type Setor } from '@/lib/admin/setores'
 
 // Cores por estado do item da sidebar. O HOVER usa a MESMA cor do ATIVO (assim,
 // ao passar o mouse, já aparece a cor de destaque — sem precisar clicar/pressionar).
@@ -127,267 +49,8 @@ const NAV_STATES =
 // Cores dos "pontos" dos itens no flyout em leque (giram por posição).
 const FAN_CORES = ['#7c3aed', '#f59e0b', '#10b981', '#f97316', '#0ea5e9', '#e11d48', '#db2777']
 
-// Item solto no topo (sem filhos).
-const dashboard: NavItem = { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true }
-
-// Seções recolhíveis — cada uma abre mostrando todas as suas áreas.
-const navGroups: NavGroup[] = [
-  {
-    label: 'Simulado',
-    icon: BookOpen,
-    items: [
-      { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
-      { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
-      { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
-      // "Banco de Simulado" foi consolidado DENTRO da Aplicação de Simulado (abas do detalhe do
-      // simulado). A área deixou de ser um item de menu; /admin/banco-questoes redireciona p/ lá.
-      { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
-      // "Modelos de Caderno (OnlyOffice)" fica logo abaixo do item acima (pedido do produto): os dois tipos de
-      // modelo de caderno juntos na área do Simulado. A rota é a mesma da Biblioteca (?tab=modelos), então
-      // permissão e gate de manutenção por área ('biblioteca') seguem valendo (filtro por href, não por grupo).
-      { label: 'Modelos de Caderno (OnlyOffice)', href: '/admin/biblioteca?tab=modelos', icon: LayoutTemplate, perm: 'configuracoes:view' },
-    ],
-  },
-  {
-    label: 'Cronograma',
-    icon: CalendarDays,
-    // Pacotes/Links/Tipos/Auditoria viraram ABAS dentro da área (CronogramaTabs). Relatórios e
-    // Importar NÃO são abas → seguem na sidebar.
-    items: [
-      { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
-      { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
-      { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
-      { label: 'Adaptativo · Liberação', href: '/admin/cronogramas/adaptativo', icon: Lock, perm: 'cronogramas:update' },
-      { label: 'Lei seca (adaptativo)', href: '/admin/cronogramas/lei-seca', icon: FileText, perm: 'cronogramas:update' },
-    ],
-  },
-  {
-    // DESAFIOS — área única do motor de desafios, contendo Lei Seca e Jurisprudência como sub-itens.
-    // (Antes eram 2 grupos separados.) Cada desafio continua gated pela sua flag.
-    label: 'Desafios',
-    icon: Library,
-    items: [
-      { label: 'Lei Seca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
-      { label: 'Lei Seca · Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
-      { label: 'Jurisprudência', href: '/admin/jurisprudencia', icon: Scale, perm: 'leitura:view', oculto: !JURISPRUDENCIA_ATIVA },
-      { label: 'Biblioteca', href: '/admin/leitura/biblioteca', icon: LayoutTemplate, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
-      // 'Análise' da Jurisprudência volta na F4 (rota /admin/jurisprudencia/analise ainda não existe).
-    ],
-  },
-  {
-    label: 'Alunos',
-    icon: GraduationCap,
-    items: [
-      { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
-      { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
-      { label: 'Produtos / Extensivos', href: '/admin/produtos', icon: Boxes, perm: 'produtos:view' },
-      { label: 'Visualizações de aluno', href: '/admin/impersonation', icon: Eye, perm: 'estudantes:view' },
-    ],
-  },
-  {
-    label: 'Conexões',
-    icon: Share2,
-    items: [
-      { label: 'Integrações', href: '/admin/integracoes', icon: Plug, perm: 'integracoes:view' },
-      { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'integracoes:view' },
-      { label: 'Regras de liberação', href: '/admin/liberacao', icon: ShieldCheck, perm: 'liberacao:view', oculto: !LIBERACAO_REGRAS_ATIVO },
-    ],
-  },
-  {
-    label: 'Análise',
-    icon: BarChart3,
-    items: [
-      { label: 'Relatório Gráfico', href: '/admin/relatorios/graficos', icon: PieChart, perm: 'relatorios:view' },
-      { label: 'Relatório Simulado', href: '/admin/relatorios/simulados', icon: ClipboardList, perm: 'relatorios:view' },
-      { label: 'Relatório Disciplina', href: '/admin/relatorios/disciplinas', icon: BookOpen, perm: 'relatorios:view' },
-      { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
-      { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
-      { label: 'Assinaturas & Engajamento', href: '/admin/relatorios/engajamento', icon: CreditCard, perm: 'relatorios:view' },
-      { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
-      { label: 'Grupos por aluno', href: '/admin/relatorios/grupos', icon: Users, perm: 'relatorios:view' },
-    ],
-  },
-  {
-    label: 'Auditoria',
-    icon: ClipboardCheck,
-    items: [
-      { label: 'Acessos', href: '/admin/auditoria?tipo=acessos', icon: LogIn, perm: 'auditoria:view' },
-      { label: 'Modificações', href: '/admin/auditoria?tipo=modificacoes', icon: FilePen, perm: 'auditoria:view' },
-      { label: 'Automações', href: '/admin/auditoria?tipo=automacoes', icon: Zap, perm: 'auditoria:view' },
-      { label: 'Visualizações', href: '/admin/auditoria?tipo=visualizacoes', icon: Eye, perm: 'auditoria:view' },
-      { label: 'Acessos de alunos', href: '/admin/acessos', icon: ShieldCheck, perm: 'acessos:view' },
-      { label: 'Equipe online', href: '/admin/acessos-equipe', icon: Users, perm: 'acessos:view', matchPrefix: '/admin/acessos-equipe' },
-      { label: 'Segurança', href: '/admin/seguranca', icon: ShieldAlert, perm: 'seguranca:view', matchPrefix: '/admin/seguranca' },
-    ],
-  },
-  {
-    label: 'Engajamento',
-    icon: Trophy,
-    items: [
-      { label: 'Gamificação', href: '/admin/gamificacao', icon: Trophy, perm: 'gamificacao:view' },
-    ],
-  },
-  {
-    label: 'Feedback',
-    icon: MessagesSquare,
-    items: [
-      { label: 'Comentários', href: '/admin/comentarios', icon: MessageSquare, perm: 'questoes:view' },
-      { label: 'Reports de Questões', href: '/admin/feedbacks', icon: Flag, perm: 'questoes:view' },
-    ],
-  },
-  {
-    // ATENDIMENTO — responder dúvidas (conversa 1:1 aluno↔professor) e processar requerimentos.
-    // Gate por `estudantes:view` (suporte/gestão do aluno; mesmo resource de LGPD e Visualizações).
-    label: 'Atendimento',
-    icon: MessageCircle,
-    items: [
-      { label: 'Dúvidas', href: '/admin/atendimento?tab=duvidas', icon: MessageCircle, perm: 'estudantes:view' },
-      { label: 'Requerimentos', href: '/admin/atendimento?tab=requerimentos', icon: FileText, perm: 'estudantes:view' },
-    ],
-  },
-  {
-    label: 'Configuração',
-    icon: SlidersHorizontal,
-    items: [
-      // Plataformas / Entrada / Compartilhar migraram para o CONSOLE isolado do super-admin
-      // (/super) — gestão cross-tenant fica fora de qualquer plataforma.
-      { label: 'Administradores', href: '/admin/administradores', icon: UserCog, perm: 'rbac:view' },
-      { label: 'Chaves de API', href: '/admin/transcricao', icon: KeyRound, perm: 'configuracoes:view' },
-      // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
-      { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
-      { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
-      { label: 'Ajuda / FAQ', href: '/admin/configuracoes/ajuda', icon: HelpCircle, perm: 'configuracoes:view' },
-      { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },
-      { label: 'Novidades', href: '/admin/configuracoes/novidades', icon: Newspaper, perm: 'configuracoes:view' },
-      { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },
-      { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
-      { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
-    ],
-  },
-  {
-    // ESTÚDIO DE CONTEÚDO — UMA entrada só (spec do designer: "menu lateral = só o item Conteúdos").
-    // A navegação interna é pelas ABAS do topo (Produtos · Materiais · Flashcards · Trilhas · Oferta ·
-    // Classificação) + sub-abas de Materiais — nunca por sub-itens na sidebar. Convive com as áreas de
-    // produção (cutover depois). /admin/conteudos redireciona para o início da área (Produtos).
-    label: 'Conteúdo',
-    icon: FolderTree,
-    items: [
-      { label: 'Produtos', href: '/admin/conteudos/produtos', icon: FolderTree, perm: 'produtos:view', matchPrefix: '/admin/conteudos' },
-    ],
-  },
-  {
-    // Biblioteca de Conteúdos (Drive jurídico + Modelos de caderno). Área REAL por tenant, mas nasce
-    // BLOQUEADA via MANUTENÇÃO POR ÁREA (key 'biblioteca', padraoBloqueado) — libere por allowlist em
-    // Sistema → Páginas em manutenção → Admin. Multi-tenant: cada plataforma vê só o seu conteúdo.
-    label: 'Biblioteca',
-    icon: BookOpen,
-    items: [
-      { label: 'Conteúdos', href: '/admin/biblioteca', icon: BookOpen, perm: 'configuracoes:view' },
-      // "Modelos de Caderno (OnlyOffice)" foi movido para o grupo Simulado (logo abaixo de "Modelos de Caderno").
-    ],
-  },
-  {
-    // ===== PLATAFORMA REVISÃO (áreas novas) — protótipo admin-plataforma-revisao =====
-    // Tudo acima segue como era. Daqui para baixo: Pedagógico · CS · Montagem de curso · Análise · Configurar,
-    // com os nomes do protótipo. Cada item abre a tela nova em /admin/revisao/*.
-    label: 'Dashboard (Revisão)',
-    divisor: 'Plataforma Revisão',
-    icon: LayoutDashboard,
-    items: [
-      { label: 'Dashboard', href: '/admin/revisao/inicio', icon: LayoutDashboard, perm: 'relatorios:view' },
-    ],
-  },
-  {
-    label: 'Pedagógico',
-    icon: GraduationCap,
-    items: [
-      { label: 'Biblioteca', href: '/admin/revisao/biblioteca', icon: BookOpen, perm: 'configuracoes:view' },
-      { label: 'JurisClub', href: '/admin/revisao/jurisclub', icon: Gavel, perm: 'configuracoes:view' },
-      { label: 'Cronograma Adaptativo', href: '/admin/revisao/cronograma', icon: Route, perm: 'cronogramas:update' },
-      { label: 'Videoteca', href: '/admin/revisao/videoteca', icon: PlayCircle, perm: 'configuracoes:view' },
-      { label: 'Central de Dúvidas', href: '/admin/revisao/duvidas', icon: MessageCircle, perm: 'estudantes:view' },
-      { label: 'Central de Atualizações', href: '/admin/revisao/atualizacoes', icon: History, perm: 'configuracoes:view' },
-    ],
-  },
-  {
-    label: 'CS',
-    icon: UsersRound,
-    items: [
-      { label: 'Membros', href: '/admin/revisao/membros', icon: Users, perm: 'estudantes:view' },
-      { label: 'Grupos de acesso', href: '/admin/revisao/grupos', icon: KeyRound, perm: 'grupos:view' },
-      { label: 'Calendário de eventos', href: '/admin/revisao/calendario', icon: CalendarDays, perm: 'estudantes:view' },
-      { label: 'Disparo de Campanha', href: '/admin/revisao/campanhas', icon: Send, perm: 'estudantes:view' },
-      { label: 'Avisos e pop-ups', href: '/admin/revisao/avisos', icon: Megaphone, perm: 'configuracoes:view' },
-    ],
-  },
-  {
-    label: 'Montagem de curso',
-    icon: Layers,
-    items: [
-      { label: 'Cursos', href: '/admin/revisao/cursos', icon: BookOpen, perm: 'produtos:view' },
-      { label: 'Simulados', href: '/admin/revisao/simulados', icon: ClipboardList, perm: 'simulados:view' },
-    ],
-  },
-  {
-    label: 'Análise (Revisão)',
-    icon: BarChart3,
-    items: [
-      { label: 'Relatórios', href: '/admin/revisao/relatorios', icon: PieChart, perm: 'relatorios:view' },
-    ],
-  },
-  {
-    label: 'Configurar',
-    icon: SlidersHorizontal,
-    items: [
-      { label: 'Aparência da plataforma', href: '/admin/revisao/aparencia', icon: SlidersHorizontal, perm: 'configuracoes:view' },
-      { label: 'Permissões da equipe', href: '/admin/revisao/equipe', icon: UserCog, perm: 'rbac:view' },
-    ],
-  },
-  {
-    // SPIKE: teste dos editores Office reais (Collabora / OnlyOffice) — avaliar migração do construtor
-    // de caderno de blocos HTML para docx nativo. Área isolada, não afeta o resto. Visibilidade/acesso
-    // é controlada pela MANUTENÇÃO POR ÁREA (nasce bloqueada; libere por allowlist em Sistema → Páginas
-    // em manutenção → Admin). Por isso NÃO usa `superOnly` — o allowlist (por pessoa) é quem rege.
-    label: 'Teste',
-    icon: FlaskConical,
-    items: [
-      { label: 'Editores Office', href: '/admin/teste', icon: FlaskConical, perm: 'configuracoes:view' },
-    ],
-  },
-]
-
-/** O item casa com a rota atual? (pode casar mais de um — ver `itemAtivo`) */
-function itemCasa(item: NavItem, pathname: string, search: URLSearchParams) {
-  const [path, qs] = item.href.split('?')
-  if (item.exact) return pathname === path
-  if (item.matchPrefix) return pathname === item.matchPrefix || pathname.startsWith(item.matchPrefix + '/')
-  if (qs) {
-    // Itens que compartilham a mesma rota e diferem só pela query (ex.: Auditoria).
-    if (pathname !== path) return false
-    const want = new URLSearchParams(qs)
-    for (const [k, v] of want) if (search.get(k) !== v) return false
-    return true
-  }
-  return pathname === path || pathname.startsWith(path + '/')
-}
-
-/** Todos os itens navegáveis, para decidir qual é o mais específico. */
-const TODOS_ITENS: NavItem[] = [dashboard, ...navGroups.flatMap((g) => g.items)]
-
-/**
- * Qual item fica aceso — o MAIS ESPECÍFICO entre os que casam.
- *
- * Com `startsWith` puro, uma sub-rota acendia dois itens ao mesmo tempo:
- * /admin/cronogramas/pacotes casa com "Catálogo" (/admin/cronogramas) e com
- * "Pacotes e acesso". Ganha o href mais longo — assim o detalhe de um cronograma
- * (/admin/cronogramas/<id>) continua acendendo o Catálogo, que é o que se espera.
- */
-function itemAtivo(item: NavItem, pathname: string, search: URLSearchParams) {
-  if (!itemCasa(item, pathname, search)) return false
-  const candidatos = TODOS_ITENS.filter((i) => itemCasa(i, pathname, search))
-  const maisEspecifico = candidatos.reduce((a, b) => (b.href.length > a.href.length ? b : a))
-  return maisEspecifico.href === item.href
-}
+// A navegação (setores › abas › itens) mora em lib/admin/setores.ts — FONTE ÚNICA, compartilhada com a
+// barra de abas internas (components/admin/barra-setor.tsx) e o editor de rótulos. Aqui: setor (acordeão) › 1 linha por ABA/cluster.
 
 function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
@@ -403,38 +66,32 @@ function filtroLogo(f?: string): string | undefined {
 }
 
 export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, podeTrocarPlataforma = true, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [], rotulos }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; podeTrocarPlataforma?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[]; rotulos?: SidebarRotulosAdmin }) {
-  // Rótulos/ícones personalizados por tenant (menu lateral): texto por chave estável, ícone via IconeMenu.
-  const lblGrupo = (g: NavGroup) => rotuloDe(rotulos?.grupos, g.label, g.label)
-  const lblItem = (i: NavItem) => rotuloDe(rotulos?.itens, i.href, i.label)
+  // Rótulos/ícones por tenant. SETOR: chave = label do setor, aproveitando overrides antigos de GRUPO com o mesmo
+  // nome (Alunos, Análise, Engajamento, Atendimento, Pedagógico) e o override antigo do item "Dashboard" (/admin)
+  // p/ o setor Início. ITENS: chave = href (inalterada).
+  const mapaSetores: Record<string, RotuloOverride> = { ...(rotulos?.itens?.['/admin'] ? { 'Início': rotulos.itens['/admin'] } : {}), ...(rotulos?.grupos ?? {}) }
+  const lblSetor = (s: Setor) => rotuloDe(mapaSetores, s.label, s.label)
   const pathname = usePathname()
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
   const can = useCan()
   const { state, isMobile } = useSidebar()
-  // Recolhida (rail de ícones, fora do mobile): grupos com sub-itens abrem em flyout ao lado.
+  // Recolhida (rail de ícones, fora do mobile): setores abrem em flyout ao lado, listando as ABAS.
   const recolhida = state === 'collapsed' && !isMobile
   const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
   // Hover do "Sair" usa a cor da MARCA (--primary), não --sidebar-text-active (que em sidebar clara
   // pode ser branco e sumir). O !important vence a regra de hover-svg do rodapé (que pinta o ícone).
   const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white'
 
-  // Filtra itens/grupos por permissão do usuário (super-admin gate + áreas em manutenção).
+  // Setores visíveis: permissão (can), flags `oculto`, super-admin (superOnly) e áreas em manutenção por tenant.
   // `areasBloqueadas` já inclui /admin/correcao quando a discursiva está oculta (env ou manutenção).
-  const emManutencao = (href: string) => areasBloqueadas.some((h) => href === h || href.startsWith(h + '/'))
-  const gruposVisiveis = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm) && !i.oculto && !(i.superOnly && !isSuperAdmin) && !emManutencao(i.href) && !(OCULTAR_CRONOGRAMA && i.href.startsWith('/admin/cronogramas'))) }))
-    .filter((g) => g.items.length > 0)
-
-  const grupoAtivo = (group: NavGroup) => group.items.some((i) => itemAtivo(i, pathname, search))
-
-  // Abre por padrão a seção que contém a rota atual.
-  const [abertos, setAbertos] = useState<string[]>(() =>
-    gruposVisiveis.filter((g) => g.items.some((i) => itemAtivo(i, pathname, search))).map((g) => g.label),
-  )
-
-  function toggle(label: string) {
-    setAbertos((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]))
-  }
+  const setores = setoresVisiveis({ can, isSuperAdmin, areasBloqueadas }, SETORES)
+  // Setor aceso = o do item mais específico da rota atual (mesma regra de "href mais longo" de antes).
+  const rota = resolverRota(pathname, search)
+  const setorAtivoId = rota?.setor.id
+  // Acordeão: abre por padrão o setor da rota atual; clicar no setor abre/recolhe a lista de áreas dele.
+  const [abertos, setAbertos] = useState<string[]>(() => (setorAtivoId ? [setorAtivoId] : []))
+  const alternar = (id: string) => setAbertos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   return (
     <>
@@ -466,29 +123,34 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
         <SidebarGroup className="px-3 group-data-[collapsible=icon]:px-2">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              {/* Dashboard (item solto) */}
-              <SidebarMenuItem>
-                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)} tooltip={lblItem(dashboard)}>
-                  <IconeMenu override={rotulos?.itens?.[dashboard.href]?.icone} fallback={dashboard.icon} className="h-4 w-4" ativo={itemAtivo(dashboard, pathname, search)} />
-                  <RotuloMenu map={rotulos?.itens} chave={dashboard.href} fallback={dashboard.label} ativo={itemAtivo(dashboard, pathname, search)} />
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {setores.map((setor) => {
+                const ativo = setor.id === setorAtivoId
+                const aberto = abertos.includes(setor.id)
+                const ovIcone = mapaSetores[setor.label]?.icone
+                // Setor com UMA entrada só (Início, Engajamento): link direto, sem acordeão/flyout.
+                const direto = setor.abas.length === 1
 
-              {/* Seções recolhíveis */}
-              {gruposVisiveis.map((group) => {
-                const aberto = abertos.includes(group.label)
-                const ativo = grupoAtivo(group)
+                if (direto) {
+                  return (
+                    <SidebarMenuItem key={setor.id}>
+                      <SidebarMenuButton className={NAV_STATES} render={<Link href={hrefInicialAba(setor.abas[0])} />} isActive={ativo} tooltip={lblSetor(setor)}>
+                        <IconeMenu override={ovIcone} fallback={setor.icone} className="h-4 w-4" ativo={ativo} />
+                        <RotuloMenu map={mapaSetores} chave={setor.label} fallback={setor.label} ativo={ativo} />
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                }
 
-                // Recolhida: clicar no ícone do grupo abre um flyout AO LADO (DropdownMenu, com
-                // animação de abrir/fechar); clicar num sub-item navega para a área e fecha o flyout.
+                // Recolhida: clicar no ícone do setor abre um flyout AO LADO (DropdownMenu, com animação) listando as
+                // ABAS (clusters) do setor; clicar numa aba navega para o 1º item dela e fecha o flyout.
                 if (recolhida) {
                   return (
-                    <SidebarMenuItem key={group.label}>
-                      {group.divisor && <div className="mx-auto mb-1 mt-2 h-px w-6 bg-sidebar-border" aria-hidden />}
+                    <SidebarMenuItem key={setor.id}>
+                      {setor.superOnly && <div className="mx-auto mb-1 mt-2 h-px w-6 bg-sidebar-border" aria-hidden />}
                       <DropdownMenu>
                         <DropdownMenuTrigger
-                          aria-label={lblGrupo(group)}
-                          title={lblGrupo(group)}
+                          aria-label={lblSetor(setor)}
+                          title={lblSetor(setor)}
                           data-active={ativo ? 'true' : undefined}
                           className={cn(
                             'mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
@@ -501,28 +163,31 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                             ativo && 'bg-[color:var(--sidebar-accent)]',
                           )}
                         >
-                          <IconeMenu override={rotulos?.grupos?.[group.label]?.icone} fallback={group.icon} className="h-4 w-4" ativo={ativo} />
+                          <IconeMenu override={ovIcone} fallback={setor.icone} className="h-4 w-4" ativo={ativo} />
                         </DropdownMenuTrigger>
                         {/* Flyout em LEQUE que ENVOLVE o ícone: align=center põe o leque na altura
                             do ícone; o recuo em ARCO (meio mais à direita, pontas recuadas para junto
-                            do ícone) faz os comprimidos abraçarem o ícone. Fundo dourado = cor do ícone. */}
+                            do ícone) faz os comprimidos abraçarem o ícone. */}
                         <DropdownMenuContent
                           side="right" align="center" sideOffset={6}
                           className="w-auto min-w-0 overflow-visible border-0 bg-transparent p-0 shadow-none ring-0"
                         >
                           <div className="flex flex-col gap-2 py-1 pl-1 pr-8">
-                            {group.items.map((item, i) => {
+                            {setor.abas.map((aba, i) => {
                               const cor = FAN_CORES[i % FAN_CORES.length]
-                              const nSub = group.items.length
+                              const nSub = setor.abas.length
                               const mid = (nSub - 1) / 2
                               // Arco: meio = recuo máximo (mais à direita), pontas = 0 (juntas ao ícone).
                               const recuo = Math.round(46 * (1 - Math.abs(i - mid) / (mid || 1)))
-                              const itemOn = itemAtivo(item, pathname, search)
-                              const cnt = counts?.[item.href]
+                              const abaOn = ativo && rota?.aba.id === aba.id
+                              // Contagem (por href) das páginas da aba — soma dos itens que têm contador.
+                              const cnts = aba.itens.map((it) => counts?.[it.href]).filter((n): n is number => n != null)
+                              const cnt = cnts.length ? cnts.reduce((a, b) => a + b, 0) : null
+                              const lbl = rotuloDe(rotulos?.itens, chaveRotuloAba(aba), aba.label)
                               return (
                                 <DropdownMenuItem
-                                  key={item.href}
-                                  render={<Link href={item.href} />}
+                                  key={aba.id}
+                                  render={<Link href={hrefInicialAba(aba)} />}
                                   style={{ marginLeft: recuo, animationDelay: `${i * 45}ms`, animationFillMode: 'both' }}
                                   className={cn(
                                     'w-56 cursor-pointer gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-semibold shadow-md ring-1',
@@ -530,11 +195,11 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                                     'bg-white text-neutral-900 ring-black/10 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-white/10 dark:shadow-black/40',
                                     'animate-in fade-in slide-in-from-left-3',
                                     'transition-shadow hover:shadow-lg focus:shadow-lg',
-                                    itemOn && 'ring-2 ring-primary/50',
+                                    abaOn && 'ring-2 ring-primary/50',
                                   )}
                                 >
                                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
-                                  <span className="truncate">{lblItem(item)}</span>
+                                  <span className="truncate">{lbl}</span>
                                   {cnt != null && <span className="ml-auto shrink-0 pl-2 text-xs font-semibold tabular-nums text-neutral-400 dark:text-neutral-500">{cnt.toLocaleString('pt-BR')}</span>}
                                 </DropdownMenuItem>
                               )
@@ -547,46 +212,36 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                 }
 
                 return (
-                  <SidebarMenuItem key={group.label}>
-                    {group.divisor && (
+                  <SidebarMenuItem key={setor.id}>
+                    {setor.superOnly && (
                       <div className="mb-1 mt-3 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
                         <span className="h-px flex-1 bg-sidebar-border" />
-                        <span className="shrink-0">{group.divisor}</span>
+                        <span className="shrink-0">Restrito</span>
                         <span className="h-px flex-1 bg-sidebar-border" />
                       </div>
                     )}
-                    <SidebarMenuButton
-                      className={NAV_STATES}
-                      onClick={() => toggle(group.label)}
-                      isActive={ativo}
-                      aria-expanded={aberto}
-                      tooltip={lblGrupo(group)}
-                    >
-                      <IconeMenu override={rotulos?.grupos?.[group.label]?.icone} fallback={group.icon} className="h-4 w-4" ativo={ativo} />
-                      <RotuloMenu map={rotulos?.grupos} chave={group.label} fallback={group.label} ativo={ativo} />
-                      <ChevronDown
-                        className={cn('ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden', aberto && 'rotate-180')}
-                      />
+                    <SidebarMenuButton className={NAV_STATES} onClick={() => alternar(setor.id)} isActive={ativo} aria-expanded={aberto} tooltip={lblSetor(setor)}>
+                      <IconeMenu override={ovIcone} fallback={setor.icone} className="h-4 w-4" ativo={ativo} />
+                      <RotuloMenu map={mapaSetores} chave={setor.label} fallback={setor.label} ativo={ativo} />
+                      <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden', aberto && 'rotate-180')} />
                     </SidebarMenuButton>
-
-                    {/* Acordeão: abre com animação (fade + deslize de cima). Renderiza os sub-itens
-                        SÓ quando aberto — mantê-los sempre montados (todos os grupos) fazia a barra
-                        travar ao recolher/expandir (reflow de dezenas de itens por frame). */}
+                    {/* Acordeão: UMA linha por ABA (cluster) do setor, só quando aberto. As páginas irmãs de cada cluster
+                        ficam nas abas internas da própria área (BarraSetor), não aqui. */}
                     {aberto && (
                       <div className="overflow-hidden">
                         <SidebarMenuSub className="mr-0 pr-0 duration-200 animate-in fade-in slide-in-from-top-1">
-                          {group.items.map((item) => (
-                            <SidebarMenuSubItem key={item.href}>
-                              <SidebarMenuSubButton
-                                className={NAV_STATES}
-                                render={<Link href={item.href} />}
-                                isActive={itemAtivo(item, pathname, search)}
-                              >
-                                <IconeMenu override={rotulos?.itens?.[item.href]?.icone} fallback={item.icon} className="h-4 w-4" ativo={itemAtivo(item, pathname, search)} />
-                                <RotuloMenu map={rotulos?.itens} chave={item.href} fallback={item.label} ativo={itemAtivo(item, pathname, search)} />
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
+                          {setor.abas.map((aba) => {
+                            const abaOn = ativo && rota?.aba.id === aba.id
+                            const chave = chaveRotuloAba(aba)
+                            return (
+                              <SidebarMenuSubItem key={aba.id}>
+                                <SidebarMenuSubButton className={NAV_STATES} render={<Link href={hrefInicialAba(aba)} />} isActive={abaOn}>
+                                  <IconeMenu override={rotulos?.itens?.[chave]?.icone} fallback={iconeDaAba(aba)} className="h-4 w-4" ativo={abaOn} />
+                                  <RotuloMenu map={rotulos?.itens} chave={chave} fallback={aba.label} ativo={abaOn} />
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            )
+                          })}
                         </SidebarMenuSub>
                       </div>
                     )}

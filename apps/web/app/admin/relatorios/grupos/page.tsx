@@ -4,6 +4,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { GruposView, type LinhaGrupoAluno, type GrupoOpcao } from './grupos-view'
 import { Users } from 'lucide-react'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,7 @@ export default async function GruposPorAlunoPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       {linhas.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">Nenhum aluno vinculado a grupos ainda.</div>
       ) : (

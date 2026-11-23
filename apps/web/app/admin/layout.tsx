@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { BarraSetorProvider } from '@/components/admin/barra-setor-slot'
+import { rotaSuperOnly } from '@/lib/admin/setores'
 import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
@@ -53,6 +55,7 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/conexoes', perm: 'integracoes:view' },
   { prefix: '/admin/relatorios', perm: 'relatorios:view' },
   { prefix: '/admin/gamificacao', perm: 'gamificacao:view' },
+  { prefix: '/admin/auditoria/problemas', perm: 'problemas:view' },
   { prefix: '/admin/auditoria', perm: 'auditoria:view' },
   { prefix: '/admin/acessos', perm: 'acessos:view' },
   { prefix: '/admin/acessos-equipe', perm: 'acessos:view' },
@@ -158,7 +161,10 @@ export default async function AdminLayout({
   // bloqueada na matriz veem uma MENSAGEM clara no lugar do conteúdo (não mais um redirect para a
   // dashboard — que podia renderizar em branco/preto). O menu continua visível.
   let semAcesso = false
-  if (!access.isAdmin) {
+  // Camada 2 do SUPER-ONLY: áreas reservadas ao super-admin GLOBAL (lib/admin/setores.ts → SUPER_ONLY_PREFIXOS).
+  // Roda ANTES dos demais gates e vale INCLUSIVE para cargos de acesso total (access.isAdmin NÃO dá acesso aqui).
+  if (rotaSuperOnly(pathname) && !superAdmin) semAcesso = true
+  if (!semAcesso && !access.isAdmin) {
     const area = AREA_PERM.find((a) => pathname === a.prefix || pathname.startsWith(a.prefix + '/'))
     if (area && !accessCan(access, area.perm) && !(area.ou && accessCan(access, area.ou))) {
       semAcesso = true
@@ -230,7 +236,10 @@ export default async function AdminLayout({
                   </div>
                 ) : areaEmManutencao ? (
                   <AreaEmManutencao area={areaEmManutencao} podeGerenciar={podeGerenciarManutencao} />
-                ) : children}
+                ) : (
+                  /* Abas internas do cluster (irmãos): NÃO ficam no topo — cada cabeçalho/página posiciona <BarraSetorSlot /> abaixo do título. */
+                  <BarraSetorProvider isSuperAdmin={superAdmin} areasBloqueadas={areasBloqueadas} rotulos={resolverSidebarRotulos(ti.sidebar_rotulos).admin}>{children}</BarraSetorProvider>
+                )}
               </main>
             </div>
           </TourProvider>

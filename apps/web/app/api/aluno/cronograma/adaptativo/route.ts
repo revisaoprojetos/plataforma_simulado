@@ -8,9 +8,12 @@ import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
 import { refrescarAposMudarFoco } from '@/lib/cronograma/foco-refresh'
 import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
+import { lerRegrasMotor } from '@/lib/cronograma/adaptativo/config-regras'
+import { nomesAlunoPorSlug } from '@/lib/cronograma/adaptativo/tipos-meta'
 import { catalogoIdDoTenant } from '@/lib/cronograma/adaptativo/catalogo-override-db'
 import { lerFiltros } from '@/lib/cronograma/adaptativo/qf-db'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { ErroPlanoInviavel, diagnosticarInsuficiencia, maxSemanasEfetivo } from '@/lib/cronograma/adaptativo/diagnostico-insuficiencia'
 import { registrarGeracao, type AcaoGeracao } from '@/lib/cronograma/adaptativo/log-geracao'
 import type { Cfg, DataISO } from '@/lib/cronograma/adaptativo/engine'
 import { CATALOGO_HTML, GRUPOS_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
@@ -35,10 +38,11 @@ export async function GET() {
   // (degrada p/ cálculo direto sem Redis). Edições do admin aparecem em até 2 min.
   // A MESMA promessa vai p/ carregarDocs: a assinatura de aulas do plano (remap por chave de documento) e o AS entregue ao iframe saem do mesmo objeto.
   const conteudoP = remember('crono-conteudo:' + sessao.tenantId, 120, () => carregarConteudoBanco(svc, sessao.tenantId)) // já inclui o overlay do admin (Catálogo de metas)
-  const [docs, conteudo, params, catalogoId, filtrosQf, docsBloqueados] = await Promise.all([
+  const [docs, conteudo, params, regras, catalogoId, filtrosQf, docsBloqueados] = await Promise.all([
     carregarDocs(svc, sessao.tenantId, sessao.estudanteId, { conteudo: conteudoP }),
     conteudoP,
     lerParamsMotor(svc, sessao.tenantId), // v3: parâmetros do tenant → o iframe gera o plano com os MESMOS valores do servidor
+    lerRegrasMotor(svc, sessao.tenantId), // regras do motor como dados (padrão = comportamento 3.2.0) → mesmas do servidor
     catalogoIdDoTenant(svc, sessao.tenantId),
     lerFiltros(svc, sessao.tenantId), // filtros de "questões da plataforma" por aula (tabela própria; cache 30s)
     // FONTE ÚNICA (matriz): materiais ainda bloqueados p/ este aluno (docId → data). EM PARALELO e com teto de 2 s: era a parte mais
@@ -59,7 +63,7 @@ export async function GET() {
   // ordem = distribuição das aulas do modelo; agu = grupos de disciplinas específicas (pares, ex.: Internacional).
   const nomes = new Set(conteudo.disciplinas.map((d) => d.nome))
   const agu = GRUPOS_HTML.agu.map((g) => g.filter((n) => nomes.has(n))).filter((g) => g.length)
-  return NextResponse.json({ ok: true, ...docs, estudanteId: sessao.estudanteId, docsBloqueados, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, qfAulas } })
+  return NextResponse.json({ ok: true, ...docs, estudanteId: sessao.estudanteId, docsBloqueados, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, regras, tiposMeta: nomesAlunoPorSlug(), qfAulas } })
 }
 
 export async function POST(req: NextRequest) {
@@ -85,6 +89,14 @@ export async function POST(req: NextRequest) {
       if (r.ok) after(async () => { try { await refrescarAposMudarFoco(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
       if (!r.ok && r.error === 'plano_divergente') return NextResponse.json({ ok: false, code: 'plano_divergente', message: 'O catálogo de aulas mudou desde que esta tela foi aberta. Recarregamos o estado do servidor.' }, { status: 409 })
       return r.ok ? NextResponse.json({ ok: true, planoId: r.planoId, fixado: r.fixado ?? true, jaTinhaFixado: r.jaTinhaFixado ?? false }) : NextResponse.json({ ok: false, message: r.error }, { status: 500 })
+    }
+    if (acao === 'diagnosticar') {
+      // SOMENTE LEITURA: o iframe roda o motor no navegador e, ao receber ErroInsuficiencia, pede aqui a causa provável (estimativa pura; não grava nada).
+      const cfg = body.cfg as Cfg | undefined
+      if (!cfg || !Array.isArray(cfg.horas) || !Array.isArray(cfg.discs)) return NextResponse.json({ ok: false, message: 'Configuração inválida.' }, { status: 400 })
+      const [conteudo, params, regras] = await Promise.all([remember('crono-conteudo:' + tenantId, 120, () => carregarConteudoBanco(svc, tenantId)), lerParamsMotor(svc, tenantId), lerRegrasMotor(svc, tenantId)])
+      const d = diagnosticarInsuficiencia({ cfg: cfg as never, AS: conteudo.AS as never, maxSemanas: maxSemanasEfetivo(params, regras), velPadrao: params.velPadrao, regras })
+      return NextResponse.json({ ok: true, codigo: 'plano_inviavel', causa: d.causa, mensagem: d.mensagem, detalhes: d.detalhes })
     }
     if (acao === 'listar') {
       const planos = await listarPlanosAdaptativo(svc, tenantId, estudanteId)
@@ -174,6 +186,8 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: false, message: 'Ação desconhecida.' }, { status: 400 })
   } catch (e) {
+    // Plano inviável (motor não fecha o plano): 422 com causa e mensagem acionável; `message` = `erro` p/ o iframe exibir como está. Já logado em gerarAdaptativo.
+    if (e instanceof ErroPlanoInviavel) return NextResponse.json({ ok: false, erro: e.message, message: e.message, codigo: 'plano_inviavel', causa: e.causa, detalhes: e.detalhes }, { status: 422 })
     // Falha com motivo no log de gerações (best-effort, em after). 'gerar' já é registrado dentro de gerarAdaptativo.
     const ACOES: Record<string, AcaoGeracao> = { fixar: 'fixar', arquivar: 'arquivar', apagar: 'apagar', pausar: 'pausar', sync: 'sync' }
     if (ACOES[acao]) registrarGeracao(svc, { tenantId, estudanteId, acao: ACOES[acao], origem: acao === 'sync' ? 'iframe' : 'aluno', planoId: typeof body.planoId === 'string' ? body.planoId : null, ok: false, erro: (e as Error)?.message || 'Erro inesperado.' })

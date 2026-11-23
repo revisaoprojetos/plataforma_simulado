@@ -13,7 +13,8 @@ describe('validarBloco', () => {
   })
   it('rejeita attrs inválidos e descarta attrs desconhecidos', () => {
     expect(validarBloco({ tipo: 'questaoRef', attrs: { questao_id: 'nao-uuid' } }).ok).toBe(false)
-    expect(validarBloco({ tipo: 'grifoSnapshot', attrs: { documento_id: U } }).ok).toBe(false) // sem pagina
+    expect(validarBloco({ tipo: 'grifoSnapshot', attrs: { documento_id: U } }).ok).toBe(true) // pagina/documento_id são opcionais (notas importadas)
+    expect(validarBloco({ tipo: 'grifoSnapshot', attrs: { documento_id: 'x', pagina: 1 } }).ok).toBe(false) // presente porém inválido
     const r = validarBloco({ tipo: 'questaoRef', attrs: { questao_id: U, extra: '<script>' } })
     expect(r.ok && r.no.attrs).toEqual({ questao_id: U })
   })

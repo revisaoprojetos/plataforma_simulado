@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft, Package } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { checkPermission } from '@/lib/auth/permissions'
 import { carregarPacote } from '../actions'
 import { PacoteClient } from './pacote-client'
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function PacoteDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const r = await carregarPacote(id)
+  const [r, podeLiberar] = await Promise.all([carregarPacote(id), checkPermission('cronogramas:liberar')])
 
   return (
     <div className="animate-page space-y-6">
@@ -31,7 +32,7 @@ export default async function PacoteDetalhePage({ params }: { params: Promise<{ 
             </h1>
             {r.dados.pacote.descricao && <p className="text-muted-foreground">{r.dados.pacote.descricao}</p>}
           </div>
-          <PacoteClient dados={r.dados} />
+          <PacoteClient dados={r.dados} podeLiberar={podeLiberar} />
         </>
       )}
     </div>

@@ -1,53 +1,32 @@
 'use client'
 // Editor de página do Caderno (beta). Carregado via next/dynamic (ssr:false) pelo shell — o chunk do TipTap
 // só baixa quando o aluno abre a aba. Autosave: ver useAutosave.ts + lib/aluno/notebook-autosave.ts.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 import { Bold, Italic, Underline as UnderlineIcon, Heading1, Heading2, Heading3, List, ListOrdered, ListTodo, Table2, Link2, Quote, Code } from 'lucide-react'
 import { pedirTexto } from '@/components/ui/confirm-dialog'
-import { QuestaoRef, GrifoSnapshot, AnotacaoRef, RefsCtx, type RefsNotebook } from './extensoes'
+import { RefsCtx, type RefsNotebook } from './extensoes'
+import { CSS_TEXTO } from './extensoes-texto'
+import { CSS_EDITOR, criarExtensoesEditor } from './extensoes-editor'
+import { urlOk } from '@/lib/aluno/notebook-texto'
+import { prepararDocEditor } from '@/lib/aluno/notebook-doc-tolerante'
+import { esquemaEditor } from './esquema-editor'
 import { useAutosave } from './useAutosave'
+import { garantirCss } from './css-global'
+import { useTituloPropagado } from './use-titulo-propagado'
+import { carregarPagina } from './onenote/cliente-caderno'
+import { filaCriacao } from './fila-criacao'
 import { IndicadorSalvo } from './indicador-salvo'
+import { TituloOneNote } from './onenote/titulo-pagina'
+import type { OpcoesOneNote } from './onenote/tipos'
 
 const CorpoFolha = dynamic(() => import('./corpo-folha'), { ssr: false, loading: () => <Esqueleto /> })
 
 type Pagina = { id: string; secao_id: string; titulo: string; tipo_pagina?: string; doc: any; tinta?: unknown; versao: number; atualizado_em?: string }
-type Props = { paginaId: string; onTitulo: (id: string, titulo: string) => void; onSalvo?: (id: string, quando: string) => void }
+type Props = { paginaId: string; onTitulo: (id: string, titulo: string) => void; onSalvo?: (id: string, quando: string) => void } & OpcoesOneNote
 
-const CSS = [
-  '.nb-editor .ProseMirror{outline:none;min-height:50vh;padding:6px 2px 80px;font-size:16px;line-height:1.7;color:var(--ink);overflow-wrap:anywhere}',
-  '.nb-editor .ProseMirror h1{font-size:1.7em;font-weight:800;margin:1em 0 .4em}',
-  '.nb-editor .ProseMirror h2{font-size:1.4em;font-weight:800;margin:1em 0 .4em}',
-  '.nb-editor .ProseMirror h3{font-size:1.15em;font-weight:800;margin:1em 0 .4em}',
-  '.nb-editor .ProseMirror p{margin:.4em 0}',
-  '.nb-editor .ProseMirror ul{list-style:disc;padding-left:1.5em}',
-  '.nb-editor .ProseMirror ol{list-style:decimal;padding-left:1.5em}',
-  '.nb-editor .ProseMirror ul[data-type=taskList]{list-style:none;padding-left:.2em}',
-  '.nb-editor .ProseMirror ul[data-type=taskList] li{display:flex;gap:10px;align-items:flex-start}',
-  '.nb-editor .ProseMirror ul[data-type=taskList] li>label{margin-top:.35em}',
-  '.nb-editor .ProseMirror ul[data-type=taskList] li>label input{width:18px;height:18px;accent-color:var(--brand)}',
-  '.nb-editor .ProseMirror ul[data-type=taskList] li>div{flex:1}',
-  '.nb-editor .ProseMirror blockquote{border-left:3px solid var(--gold);padding-left:12px;color:var(--muted);margin:.8em 0}',
-  '.nb-editor .ProseMirror pre{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto;font-size:13.5px}',
-  '.nb-editor .ProseMirror code{background:var(--surface2);border-radius:5px;padding:1px 5px;font-size:.92em}',
-  '.nb-editor .ProseMirror a{color:var(--brand);text-decoration:underline}',
-  '.nb-editor .ProseMirror table{border-collapse:collapse;width:100%;table-layout:fixed;margin:.8em 0}',
-  '.nb-editor .ProseMirror td,.nb-editor .ProseMirror th{border:1px solid var(--line);padding:6px 8px;vertical-align:top;min-width:60px}',
-  '.nb-editor .ProseMirror th{background:var(--surface2);font-weight:800;text-align:left}',
-  '.nb-editor .ProseMirror .selectedCell{background:var(--chip)}',
-  '.nb-editor .ProseMirror p.is-editor-empty:first-child::before{content:attr(data-placeholder);color:var(--muted);float:left;height:0;pointer-events:none}',
-  '.nb-editor .ProseMirror .ProseMirror-selectednode{outline:2px solid var(--brand);border-radius:14px}',
-].join('')
-
-const urlOk = (u: string) => { try { return ['https:', 'http:', 'mailto:'].includes(new URL(u).protocol) } catch { return false } }
-
-export default function EditorPagina({ paginaId, onTitulo, onSalvo }: Props) {
+function EditorPagina({ paginaId, onTitulo, onSalvo, ...op }: Props) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro' | 'migracao'>('carregando')
   const [dados, setDados] = useState<{ pagina: Pagina; refs: RefsNotebook } | null>(null)
   const [tentativa, setTentativa] = useState(0)
@@ -55,24 +34,32 @@ export default function EditorPagina({ paginaId, onTitulo, onSalvo }: Props) {
   useEffect(() => {
     let vivo = true
     setEstado('carregando'); setDados(null)
-    fetch(`/api/aluno/notebook/paginas/${paginaId}`, { credentials: 'same-origin' })
-      .then(async (r) => {
-        const j = await r.json().catch(() => null)
-        if (!vivo) return
-        if (!r.ok) { setEstado(j?.code === 'migracao_pendente' ? 'migracao' : 'erro'); return }
-        setDados({ pagina: j.pagina, refs: { questoes: Object.fromEntries(((j.refs?.questoes ?? []) as any[]).map((q) => [q.id, q])) } })
-        setEstado('ok')
-      })
-      .catch(() => { if (vivo) setEstado('erro') })
+    // página recém-criada (POST ainda em andamento): abre em BRANCO localmente, sem GET (daria 404); o autosave espera a criação.
+    const criando = filaCriacao.meta(paginaId)
+    if (criando && filaCriacao.pendente(paginaId)) {
+      setDados({ pagina: { id: paginaId, secao_id: criando.secaoId, titulo: 'Sem título', tipo_pagina: criando.tipo, doc: {}, tinta: null, versao: 1 }, refs: { questoes: {} } })
+      setEstado('ok')
+      return () => { vivo = false }
+    }
+    carregarPagina(paginaId).then((r) => {
+      if (!vivo) return
+      const j = r.dados
+      if (!r.ok || !j?.pagina) { setEstado(r.code === 'migracao_pendente' ? 'migracao' : 'erro'); return }
+      setDados({ pagina: j.pagina, refs: { questoes: Object.fromEntries(((j.refs?.questoes ?? []) as any[]).map((q) => [q.id, q])) } })
+      setEstado('ok')
+    })
     return () => { vivo = false }
   }, [paginaId, tentativa])
 
   if (estado === 'carregando') return <Esqueleto />
   if (estado === 'migracao') return <Msg>Recurso em preparação, volte em breve.</Msg>
   if (estado === 'erro' || !dados) return <Msg>Não foi possível abrir a página. <button type="button" onClick={() => setTentativa((n) => n + 1)} style={btnTxt}>Tentar de novo</button></Msg>
-  if (dados.pagina.tipo_pagina === 'folha_livre') return <CorpoFolha key={paginaId} pagina={{ id: dados.pagina.id, titulo: dados.pagina.titulo, tinta: dados.pagina.tinta, versao: dados.pagina.versao }} onTitulo={onTitulo} onSalvo={onSalvo} />
-  return <Corpo key={paginaId} pagina={dados.pagina} refs={dados.refs} onTitulo={onTitulo} onSalvo={onSalvo} />
+  if (dados.pagina.tipo_pagina === 'folha_livre') return <CorpoFolha key={paginaId} pagina={{ id: dados.pagina.id, titulo: dados.pagina.titulo, tinta: dados.pagina.tinta, versao: dados.pagina.versao }} onTitulo={onTitulo} onSalvo={onSalvo} {...op} />
+  return <Corpo key={paginaId} pagina={dados.pagina} refs={dados.refs} onTitulo={onTitulo} onSalvo={onSalvo} {...op} />
 }
+
+// memo: a casca re-renderiza a cada mudança de estado (salvo/título/árvore); o editor só quando suas props mudam (todas estáveis).
+export default memo(EditorPagina)
 
 const btnTxt: React.CSSProperties = { minHeight: 40, padding: '0 14px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontWeight: 800, cursor: 'pointer' }
 function Msg({ children }: { children: React.ReactNode }) { return <div role="status" style={{ padding: 24, color: 'var(--muted)', fontSize: 14 }}>{children}</div> }
@@ -84,7 +71,8 @@ export function Esqueleto() {
   )
 }
 
-function Corpo({ pagina, refs, onTitulo, onSalvo }: { pagina: Pagina; refs: RefsNotebook; onTitulo: Props['onTitulo']; onSalvo: Props['onSalvo'] }) {
+function Corpo({ pagina, refs, onTitulo, onSalvo, variante, criadoEm, onEstado, onEditor, onAutosave }: { pagina: Pagina; refs: RefsNotebook; onTitulo: Props['onTitulo']; onSalvo: Props['onSalvo'] } & OpcoesOneNote) {
+  const onenote = variante === 'onenote'
   const [titulo, setTitulo] = useState(pagina.titulo ?? '')
   const tituloRef = useRef(titulo); tituloRef.current = titulo
   const editorRef = useRef<Editor | null>(null)
@@ -92,47 +80,57 @@ function Corpo({ pagina, refs, onTitulo, onSalvo }: { pagina: Pagina; refs: Refs
   const auto = useAutosave({
     paginaId: pagina.id,
     versaoInicial: pagina.versao,
-    obter: () => (editorRef.current ? { doc: editorRef.current.getJSON() as Record<string, unknown>, titulo: tituloRef.current } : null),
+    // só os campos SUJOS: título isolado => PATCH só com título; corpo isolado => sem título
+    obter: (sujo) => (editorRef.current
+      ? { ...(sujo.corpo ? { doc: editorRef.current.getJSON() as Record<string, unknown> } : {}), ...(sujo.titulo ? { titulo: tituloRef.current } : {}) }
+      : null),
     onSalvo: (_v, alt) => { onSalvo?.(pagina.id, new Date().toISOString()); if (alt.titulo !== undefined) onTitulo(pagina.id, alt.titulo) },
   })
 
-  const extensions = useMemo(() => [
-    StarterKit.configure({
-      heading: { levels: [1, 2, 3] },
-      link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' }, isAllowedUri: (u: string) => urlOk(u) },
-    }),
-    Placeholder.configure({ placeholder: 'Escreva aqui…' }),
-    TaskList, TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
-    QuestaoRef, GrifoSnapshot, AnotacaoRef,
-  ], [])
+  const extensions = useMemo(() => criarExtensoesEditor('Escreva aqui…'), [])
 
+  // O TipTap abre EM BRANCO (só loga "Invalid content") quando o doc do servidor não bate com o schema; o 1º autosave então apagaria o
+  // conteúdo real. `prepararDocEditor` limpa o que for limpável e, se não der, abre SOMENTE LEITURA com aviso (nunca grava por cima).
+  const prep = useMemo(() => prepararDocEditor(pagina.doc, esquemaEditor()), [pagina.doc])
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content: pagina.doc && typeof pagina.doc === 'object' && Object.keys(pagina.doc).length ? pagina.doc : '',
+    content: prep.doc,
+    editable: prep.ok,
     editorProps: { attributes: { 'aria-label': 'Conteúdo da página', role: 'textbox', 'aria-multiline': 'true' } },
-    onUpdate: () => auto.marcarSujo(),
+    onUpdate: () => auto.marcarSujo('corpo'),
   })
   editorRef.current = editor
+  useEffect(() => { onEditor?.(editor); return () => onEditor?.(null) }, [editor, onEditor])
+  useEffect(() => {
+    onEstado?.({ fase: auto.fase, online: auto.online, semPersistencia: auto.semPersistencia, retry: auto.tentarDeNovo })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto.fase, auto.online, auto.semPersistencia])
 
-  const aoTitulo = (v: string) => { setTitulo(v.slice(0, 200)); onTitulo(pagina.id, v.slice(0, 200)); auto.marcarSujo() }
+  const autoRef = useRef(auto); autoRef.current = auto
+  useEffect(() => {
+    onAutosave?.({ flush: () => autoRef.current.flush(), setVersaoBase: (v) => autoRef.current.setVersaoBase(v) })
+    return () => onAutosave?.(null)
+  }, [onAutosave])
+  useInsertionEffect(() => { garantirCss('editor', CSS_EDITOR + CSS_TEXTO) }, [])
+  const { propagar } = useTituloPropagado(pagina.id, onTitulo)
+  const aoTitulo = (v: string) => { const t = v.slice(0, 200); setTitulo(t); propagar(t); auto.marcarSujo('titulo') }
 
   const usarServidor = useCallback(async () => {
     let p = auto.paginaServidor as Pagina | null
     if (!p || !p.doc) {
-      try { const r = await fetch(`/api/aluno/notebook/paginas/${pagina.id}`, { credentials: 'same-origin' }); p = (await r.json()).pagina } catch { return }
+      p = (await carregarPagina(pagina.id)).dados?.pagina ?? null
     }
     if (!p) return
-    editor?.commands.setContent(p.doc && Object.keys(p.doc).length ? p.doc : '', { emitUpdate: false })
+    editor?.commands.setContent(prepararDocEditor(p.doc, esquemaEditor()).doc, { emitUpdate: false })
     setTitulo(p.titulo ?? ''); onTitulo(pagina.id, p.titulo ?? '')
     auto.usarServidor(p.versao)
   }, [auto, editor, pagina.id, onTitulo])
 
   return (
     <div className="nb-editor" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' }}>
-      <style>{CSS}</style>
       {auto.migracaoPendente ? <Msg>Recurso em preparação, volte em breve.</Msg> : null}
+      {!prep.ok ? <div role="alert" style={{ padding: '10px 14px', margin: '0 0 10px', borderRadius: 12, background: 'var(--dangerBg)', color: 'var(--danger)', fontSize: 13.5, fontWeight: 700 }}>Não foi possível exibir o conteúdo desta página. Ela foi aberta somente para leitura para não perder o que está salvo.</div> : null}
       {auto.fase === 'conflito' ? (
         <div role="alert" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '10px 14px', margin: '0 0 10px', borderRadius: 12, background: 'var(--dangerBg)', color: 'var(--danger)', fontSize: 13.5, fontWeight: 700 }}>
           <span style={{ flex: 1, minWidth: 180 }}>Esta página mudou em outro lugar.</span>
@@ -142,13 +140,13 @@ function Corpo({ pagina, refs, onTitulo, onSalvo }: { pagina: Pagina; refs: Refs
       ) : null}
       {auto.semPersistencia ? <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px' }}>O armazenamento do navegador está bloqueado aqui: se você ficar offline e recarregar, as últimas edições podem se perder.</p> : null}
 
-      <Barra editor={editor} />
+      {onenote ? null : <Barra editor={editor} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '14px 2px 6px' }}>
+      {onenote ? <TituloOneNote id="nb-titulo" valor={titulo} onChange={aoTitulo} criadoEm={criadoEm} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '14px 2px 6px' }}>
         <input id="nb-titulo" value={titulo} onChange={(e) => aoTitulo(e.target.value)} placeholder="Título da página" aria-label="Título da página" maxLength={200}
           style={{ flex: 1, minWidth: 200, background: 'transparent', border: 0, outline: 'none', fontSize: 24, fontWeight: 800, color: 'var(--ink)', minHeight: 44 }} />
         <IndicadorSalvo fase={auto.fase} online={auto.online} semPersistencia={auto.semPersistencia} onRetry={auto.tentarDeNovo} />
-      </div>
+      </div>}
 
       <RefsCtx.Provider value={refs}><EditorContent editor={editor} /></RefsCtx.Provider>
     </div>

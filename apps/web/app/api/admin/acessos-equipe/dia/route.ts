@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
 import { detalheDiaMembro } from '@/lib/admin-rastreio/dias'
 import { MSG_NAO_ATIVADO_ADMIN } from '@/lib/admin-rastreio/leitura'
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(req: NextRequest) {
   const access = await getCurrentAccess()
-  if (!access.userId || !access.tenantId || !accessCan(access, 'acessos:view')) {
+  if (!access.userId || !(await isSuperAdmin()) || !access.tenantId || !accessCan(access, 'acessos:view')) {
     return NextResponse.json({ message: 'Sem permissão.' }, { status: 403 })
   }
   const user = req.nextUrl.searchParams.get('user') ?? ''

@@ -25,6 +25,8 @@ export type CronogramaLista = {
   metas: number
   /** Em quantos pacotes está — zero significa invisível para o aluno. */
   pacotes: number
+  /** Está em algum grupo de acesso ativo com "Liberar para todos" — chega a todos os alunos. */
+  acessoGeral?: boolean
 }
 
 export type EntradaCronograma = {

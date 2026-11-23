@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // Primitivas compartilhadas das telas "Plataforma Revisão" (protótipo admin-plataforma-revisao).
 // Cabeçalho = caminho + título + subtítulo + ações (como `head()` do protótipo); abas = sublinhado (border-b-2).
@@ -17,6 +18,7 @@ export function RevisaoHead({
   acoes?: React.ReactNode
 }) {
   return (
+    <>
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         {secao && (
@@ -31,10 +33,13 @@ export function RevisaoHead({
       </div>
       {acoes && <div className="flex flex-wrap items-center gap-2">{acoes}</div>}
     </div>
+    {/* Barra de abas do setor: abaixo do título/descrição, acima das abas próprias/conteúdo. */}
+    <BarraSetorSlot />
+    </>
   )
 }
 
-export type AbaRevisao = { id: string; titulo: string; contagem?: number }
+export type AbaRevisao = { id: string; titulo: string; contagem?: number; /** Aba que NAVEGA para outra tela (link direto, nunca fica ativa). */ href?: string }
 
 /** Abas de LINHA (sublinhado), navegação por `?<param>=<id>` — estado na URL, página renderiza no servidor. */
 export function RevisaoAbas({
@@ -57,13 +62,16 @@ export function RevisaoAbas({
     return `${base}?${q.toString()}`
   }
   return (
+    <>
+    {/* Sem RevisaoHead na página, a barra do setor entra aqui, acima destas abas (dedup: aparece 1x). */}
+    <BarraSetorSlot />
     <div className="mb-4 flex gap-1 overflow-x-auto border-b" role="tablist">
       {abas.map((a) => {
         const on = a.id === atual
         return (
           <Link
             key={a.id}
-            href={href(a.id)}
+            href={a.href ?? href(a.id)}
             role="tab"
             aria-selected={on}
             className={cn(
@@ -79,6 +87,7 @@ export function RevisaoAbas({
         )
       })}
     </div>
+    </>
   )
 }
 

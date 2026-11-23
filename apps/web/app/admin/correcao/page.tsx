@@ -6,6 +6,7 @@ import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { CorrecaoCards } from '@/components/admin/correcao-cards'
 import { Inbox } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,7 @@ export default async function CorrecaoPage() {
         <p className="text-muted-foreground">{cards.length} simulado(s) discursivo(s) · {totalPend} resposta(s) pendente(s).</p>
       </div>
 
+      <BarraSetorSlot />
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
           <Inbox className="h-8 w-8" />

@@ -3,6 +3,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
 import { EstudantesLista } from '@/components/admin/estudantes-lista'
 import { carregarLoteEstudantes, kpisEstudantes } from './actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,7 @@ export default async function EstudantesPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       <EstudantesLista
         inicial={inicial}
         total={total}

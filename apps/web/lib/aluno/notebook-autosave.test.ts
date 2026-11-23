@@ -109,3 +109,24 @@ describe('payload tinta (folha livre)', () => {
     expect(s.emVoo?.alt).toEqual({ tinta: t(1) })
   })
 })
+
+describe('versao_base (PATCH de aparência/nível sem remontar o editor)', () => {
+  it('avança a base; nunca recua; preserva pendente', () => {
+    let s = estadoInicial(3)
+    s = reduzir(s, { t: 'editar', alt: { titulo: 'x' } })
+    s = reduzir(s, { t: 'versao_base', versao: 5 })
+    expect(s.versao).toBe(5)
+    expect(s.pendente).toEqual({ titulo: 'x' })
+    expect(reduzir(s, { t: 'versao_base', versao: 4 }).versao).toBe(5)
+  })
+  it('o próximo envio usa a nova base', () => {
+    let s = reduzir(estadoInicial(1), { t: 'versao_base', versao: 7 })
+    s = reduzir(s, { t: 'editar', alt: { doc: { type: 'doc' } } })
+    s = reduzir(s, { t: 'iniciar', opId: 'a' })
+    expect(s.emVoo?.versao).toBe(7)
+  })
+  it('campos independentes coalescem sem misturar (só título / só corpo)', () => {
+    expect(coalescer({ titulo: 'a' }, { doc: { type: 'doc' } })).toEqual({ titulo: 'a', doc: { type: 'doc' } })
+    expect(coalescer({ titulo: 'a' }, { titulo: 'b' })).toEqual({ titulo: 'b' })
+  })
+})

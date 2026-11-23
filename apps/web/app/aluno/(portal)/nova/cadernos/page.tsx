@@ -20,13 +20,12 @@ import { cadernoDeErros, progressoCadernos } from '@/lib/aluno/cadernos-aluno'
 import { CriarCadernoCard } from './criar-caderno'
 import { bibliotecaLiberada } from '@/lib/nova/area-aluno-acesso'
 import { cadernoBetaLiberado } from '@/lib/aluno/caderno-beta-acesso'
-import { NotebookShell } from '@/components/aluno/notebook/notebook-shell'
 
 export const dynamic = 'force-dynamic'
 
 const ABAS = ['cadernos', 'anotacoes', 'grifos', 'salvos', 'beta'] as const
 type Aba = (typeof ABAS)[number]
-const ROTULOS = ['Cadernos', 'Anotações', 'Grifos', 'Salvos', 'Caderno (beta)']
+const ROTULOS = ['Cadernos', 'Anotações', 'Grifos', 'Salvos', 'Caderno']
 const hrefAba = (a: Aba) => (a === 'cadernos' ? R.cadernos : `${R.cadernos}?aba=${a}`)
 
 // Grifos por material antes do "ver todos" (um aluno pode ter centenas num PDF só).
@@ -116,7 +115,17 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
         links={abasVisiveis.map(hrefAba)}
       />
 
-      {aba === 'beta' && betaOk && <NotebookShell />}
+      {aba === 'beta' && betaOk && (
+        <Card pad={22}>
+          <Row style={{ justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <Col gap={6} style={{ minWidth: 0, flex: 1 }}>
+              <H3>Caderno</H3>
+              <Muted size={13.5}>Seu caderno com seções e páginas, no estilo do OneNote: texto, folha livre com caneta, busca e lixeira. Abre em tela cheia.</Muted>
+            </Col>
+            <Btn kind="primary" icon="book" href={`${R.cadernos}/onenote`}>Abrir caderno</Btn>
+          </Row>
+        </Card>
+      )}
 
       {aba === 'cadernos' && (
         <>

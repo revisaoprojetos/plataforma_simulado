@@ -102,6 +102,22 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
   for (const v of ((contagemPacotes ?? []) as any[])) pacotesPorCron.set(v.cronograma_id, Number(v.total))
   const nomeCategoria = new Map(((cats ?? []) as any[]).map((c) => [c.id, c.nome as string]))
 
+  // Acesso geral: pacote ATIVO com acesso_gratuito entrega seus cronogramas a todos os alunos,
+  // então o cronograma dele não é "invisível" mesmo sem grupo/avulso. A RPC só conta vínculos.
+  const gratuitos = await fetchAll<{ id: string }>(() =>
+    svc.from('simulado_cronograma_pacotes').select('id').eq('tenant_id', g.tenantId).eq('ativo', true).eq('acesso_gratuito', true).order('id') as any,
+  )
+  const cronsComAcessoGeral = new Set<string>()
+  if (gratuitos.length) {
+    const idsGrat = gratuitos.map((p) => p.id)
+    for (let i = 0; i < idsGrat.length; i += 80) {
+      const itensGrat = await fetchAll<{ cronograma_id: string }>(() =>
+        svc.from('simulado_cronograma_pacote_itens').select('cronograma_id').eq('tenant_id', g.tenantId).in('pacote_id', idsGrat.slice(i, i + 80)).order('id') as any,
+      )
+      for (const it of itensGrat) cronsComAcessoGeral.add(it.cronograma_id)
+    }
+  }
+
   const itens = (data ?? []).map((c: any) => ({
     ...c,
     categoria_nome: c.categoria_id ? (nomeCategoria.get(c.categoria_id) ?? null) : null,
@@ -112,6 +128,7 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
     faixa: faixaSemanal(c.dias_curso ?? []), // R19 — lida de dias_curso, não do nome
     metas: totais.get(c.id) ?? 0,
     pacotes: pacotesPorCron.get(c.id) ?? 0,
+    acessoGeral: cronsComAcessoGeral.has(c.id),
   })) as CronogramaLista[]
 
   return { ok: true, itens }

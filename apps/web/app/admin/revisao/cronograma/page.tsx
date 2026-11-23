@@ -151,6 +151,9 @@ export default async function CronogramaRevisaoPage({ searchParams }: { searchPa
           { id: 'ver', titulo: 'Versões e exportação', contagem: nVersoes },
           { id: 'faixas', titulo: 'Faixas de horas' },
           { id: 'especial', titulo: 'Semana especial' },
+          // Telas do Adaptativo que vivem em /admin/cronogramas/adaptativo/* (links diretos, não reimplementados aqui).
+          { id: 'liberacao-config', titulo: 'Liberação e configurações', href: '/admin/cronogramas/adaptativo' },
+          { id: 'lei-seca', titulo: 'Lei seca', href: '/admin/cronogramas/lei-seca' },
         ]} />
       ) : null}
 

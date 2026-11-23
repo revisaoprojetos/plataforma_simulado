@@ -43,14 +43,39 @@ export async function progressoCadernos(svc: any, tenantId: string, estudanteId:
   return out
 }
 
-/** ids → questões resolvíveis (publicadas), NA ORDEM dos ids, com o ⭐ real do aluno. */
-export async function questoesParaAluno(svc: any, tenantId: string, estudanteId: string, ids: string[]): Promise<QuestaoAluno[]> {
+/** Questão do Caderno (beta): `gabarito_oculto` = o aluno ainda não respondeu → `correta` vem false e o comentário vem null. */
+export type QuestaoCaderno = QuestaoAluno & { gabarito_oculto?: boolean }
+
+/**
+ * Esconde gabarito (`correta`) e `comentario_professor` das questões que o aluno AINDA NÃO respondeu.
+ * Regra: o gabarito só sai do servidor depois de uma resposta (simulado_respostas_avulsas) — o card revela via /api/aluno/questao-resposta.
+ * Pura (testável).
+ */
+export function ocultarGabaritoNaoRespondidas(questoes: QuestaoAluno[], respondidas: Set<string>): QuestaoCaderno[] {
+  return questoes.map((q) => (respondidas.has(q.id) ? q : {
+    ...q,
+    comentario_professor: null,
+    alternativas: q.alternativas.map((a) => ({ ...a, correta: false })),
+    gabarito_oculto: true,
+  }))
+}
+
+/**
+ * ids → questões resolvíveis (publicadas DO TENANT), NA ORDEM dos ids, com o ⭐ real do aluno.
+ * `ocultarGabaritoNaoRespondidas` (Caderno beta): só devolve gabarito/comentário das questões que o aluno já respondeu.
+ */
+export async function questoesParaAluno(
+  svc: any, tenantId: string, estudanteId: string, ids: string[], opts: { ocultarGabaritoNaoRespondidas?: boolean } = {},
+): Promise<QuestaoCaderno[]> {
   if (!ids.length) return []
-  const [questoes, alts, favs, etiquetasMap] = await Promise.all([
-    fetchAllByIn<any>(ids, (c) => svc.from('simulado_questoes').select('id, tipo, enunciado, disciplina_id, ano, comentario_professor').in('id', c).eq('status', 'publicada').order('id', { ascending: true }) as any),
-    fetchAllByIn<any>(ids, (c) => svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', c).order('id', { ascending: true }) as any),
+  const [questoes, alts, favs, etiquetasMap, respondidas] = await Promise.all([
+    fetchAllByIn<any>(ids, (c) => svc.from('simulado_questoes').select('id, tipo, enunciado, disciplina_id, ano, comentario_professor').eq('tenant_id', tenantId).in('id', c).eq('status', 'publicada').order('id', { ascending: true }) as any),
+    fetchAllByIn<any>(ids, (c) => svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').eq('tenant_id', tenantId).in('questao_id', c).order('id', { ascending: true }) as any),
     fetchAllByIn<any>(ids, (c) => svc.from('simulado_favoritos').select('questao_id').eq('estudante_id', estudanteId).in('questao_id', c).order('questao_id', { ascending: true }) as any),
     etiquetasPorQuestao(svc, tenantId, ids),
+    opts.ocultarGabaritoNaoRespondidas
+      ? fetchAllByIn<any>(ids, (c) => svc.from('simulado_respostas_avulsas').select('questao_id').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).in('questao_id', c).order('id', { ascending: true }) as any)
+      : Promise.resolve([] as any[]),
   ])
   const discIds = [...new Set(questoes.map((x: any) => x.disciplina_id).filter(Boolean))] as string[]
   const discNomes = discIds.length ? await fetchAllByIn<any>(discIds, (c) => svc.from('simulado_disciplinas').select('id, nome').in('id', c).order('id', { ascending: true }) as any) : []
@@ -59,7 +84,7 @@ export async function questoesParaAluno(svc: any, tenantId: string, estudanteId:
   const altMap = new Map<string, any[]>()
   for (const a of alts) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
   const qById = new Map(questoes.map((x: any) => [x.id, x]))
-  return ids.map((id) => qById.get(id)).filter(Boolean).map((x: any) => ({
+  const lista: QuestaoAluno[] = ids.map((id) => qById.get(id)).filter(Boolean).map((x: any) => ({
     id: x.id,
     tipo: x.tipo,
     enunciado: x.enunciado ?? '',
@@ -70,4 +95,5 @@ export async function questoesParaAluno(svc: any, tenantId: string, estudanteId:
     etiquetas: etiquetasMap.get(x.id) ?? [],
     alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
   }))
+  return opts.ocultarGabaritoNaoRespondidas ? ocultarGabaritoNaoRespondidas(lista, new Set(respondidas.map((r: any) => r.questao_id as string))) : lista
 }

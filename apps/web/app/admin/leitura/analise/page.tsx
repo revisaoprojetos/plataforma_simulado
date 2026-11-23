@@ -8,6 +8,7 @@ import { KpiCard, BarrasH, Painel } from '@/components/admin/relatorios/viz'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { formatBrt } from '@/lib/brt'
 import { cn } from '@/lib/utils'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,7 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
         <p className="text-muted-foreground">Progresso por documento e sequências do Desafio.</p>
       </div>
 
+      <BarraSetorSlot />
       {/* Abas */}
       <div className="flex gap-1 border-b">
         <AbaLink ativa={aba === 'documentos'} href="/admin/leitura/analise" icon={FileText}>Documentos</AbaLink>

@@ -5,7 +5,7 @@ import type { Categoria, PastaConteudo, EstudanteAcessoLinha, GrupoAtribuido, No
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getStorage } from '@/lib/storage'
-import { getCurrentAccess, checkPermission, getAuthUser } from '@/lib/auth/permissions'
+import { getCurrentAccess, checkPermission, getAuthUser, isSuperAdmin } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
@@ -33,7 +33,10 @@ import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 const folderArea = (c: Categoria) => (c === 'modelo_caderno' ? 'conteudo_modelo' : c === 'jurisclub' ? 'conteudo_jurisclub' : 'conteudo')
 const PASTAS = 'simulado_pastas'
 
-async function guard(acao: 'view' | 'update') {
+// `categoria`: a coleção 'modelo_caderno' (menu "Modelos de Caderno (OnlyOffice)", ?tab=modelos) é SUPER-ONLY —
+// quem não é super-admin global é recusado mesmo chamando a action direto (a página também recusa o ?tab=modelos).
+async function guard(acao: 'view' | 'update', categoria?: Categoria) {
+  if (categoria === 'modelo_caderno' && !(await isSuperAdmin())) return { ok: false as const, error: 'Sem permissão.' }
   const perm = acao === 'view' ? 'configuracoes:view' : 'configuracoes:update'
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
@@ -63,7 +66,7 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   resumo: { nGrupos: number; nAlunos: number } // entrega agregada da pasta atual (grupos/alunos distintos)
   metadados: Record<string, Metadados>     // colunas da lista (disciplina, assunto, tribunal…) por documento
 }> {
-  const g = await guard('view')
+  const g = await guard('view', categoria)
   if (!g.ok) return { ok: false, error: g.error, pastas: [], documentos: [], breadcrumb: [], previas: {}, thumbs: {}, contagens: {}, restritasPasta: {}, restritoDoc: {}, resumo: { nGrupos: 0, nAlunos: 0 }, metadados: {} }
   const svc = createAdminClient()
   const area = folderArea(categoria)
@@ -264,7 +267,7 @@ export async function thumbDocumento(documentoId: string, opts?: { latest?: bool
 }
 
 export async function criarPasta(nome: string, paiId?: string | null, categoria: Categoria = 'conteudo'): Promise<{ ok: boolean; error?: string; id?: string }> {
-  const g = await guard('update')
+  const g = await guard('update', categoria)
   if (!g.ok) return g
   if (!nome?.trim()) return { ok: false, error: 'Nome obrigatório.' }
   const svc = createAdminClient()
@@ -447,7 +450,7 @@ export async function urlDownloadDocumento(documentoId: string): Promise<{ ok: b
 
 /** Todas as pastas da categoria (para o menu "Mover para…"). */
 export async function listarPastasConteudo(categoria: Categoria = 'conteudo'): Promise<{ id: string; nome: string; pai_id: string | null }[]> {
-  const g = await guard('view')
+  const g = await guard('view', categoria)
   if (!g.ok) return []
   const svc = createAdminClient()
   const rows = await fetchAll<any>(() => svc.from(PASTAS)
@@ -541,7 +544,7 @@ export async function importarDocumento(input: {
   titulo: string; pastaId?: string | null
   nomeArquivo: string; mime?: string; dataBase64: string; categoria?: Categoria
 }): Promise<{ ok: boolean; error?: string; documentoId?: string; trechos?: number }> {
-  const g = await guard('update')
+  const g = await guard('update', input.categoria)
   if (!g.ok) return g
   const data = bytesDeBase64(input.dataBase64)
   return ingerirBytes(data, { titulo: input.titulo, pastaId: input.pastaId, nomeArquivo: input.nomeArquivo, mime: input.mime, categoria: input.categoria, tenantId: g.tenantId, atorId: g.atorId })
@@ -567,7 +570,7 @@ export async function prepararUploadConteudo(nomeArquivo: string): Promise<{ ok:
 export async function importarDeStorage(input: {
   path: string; titulo: string; nomeArquivo: string; mime?: string; pastaId?: string | null; categoria?: Categoria
 }): Promise<{ ok: boolean; error?: string; documentoId?: string; trechos?: number }> {
-  const g = await guard('update'); if (!g.ok) return g
+  const g = await guard('update', input.categoria); if (!g.ok) return g
   // Só paths temporários do próprio tenant.
   if (!input.path.startsWith(`tmp/${g.tenantId}/`)) return { ok: false, error: 'Caminho de upload inválido.' }
   const bucket = await resolverBucketConteudo()
@@ -588,7 +591,7 @@ export async function criarDocumentoBranco(input: {
   titulo: string; pastaId?: string | null; categoria?: Categoria
 }): Promise<{ ok: boolean; error?: string; documentoId?: string }> {
   try {
-    const g = await guard('update')
+    const g = await guard('update', input.categoria)
     if (!g.ok) return g
     const titulo = (input.titulo || '').trim()
     if (!titulo) return { ok: false, error: 'Informe um título.' }
@@ -633,7 +636,7 @@ export async function criarConteudoQuestoes(input: {
   titulo: string; pastaId?: string | null; categoria?: Categoria
 }): Promise<{ ok: boolean; error?: string; documentoId?: string }> {
   try {
-    const g = await guard('update')
+    const g = await guard('update', input.categoria)
     if (!g.ok) return g
     const titulo = (input.titulo || '').trim()
     if (!titulo) return { ok: false, error: 'Informe um título.' }
@@ -881,7 +884,7 @@ export async function definirEstudantesDoc(documentoId: string, estudanteIds: st
 // status de acesso (restrito = tem alguma atribuição; senão = liberado a todos). ──
 
 export async function carregarArvoreAcesso(raizId: string | null, categoria: Categoria): Promise<{ ok: boolean; nodes?: NoAcesso[]; error?: string }> {
-  const g = await guard('view'); if (!g.ok) return g
+  const g = await guard('view', categoria); if (!g.ok) return g
   const svc = createAdminClient()
   const fa = folderArea(categoria)
   // Pastas são poucas (dezenas) → carregar todas (2 colunas) é barato e necessário p/ montar a árvore.
@@ -971,7 +974,7 @@ async function selTolByIn<T>(ids: string[], primario: (c: string[]) => any, lega
 }
 
 export async function montarArvoreAcessoDrive(raizId: string, categoria: Categoria = 'conteudo'): Promise<{ ok: boolean; root?: DriveNodeDTO; error?: string }> {
-  const g = await guard('view'); if (!g.ok) return g
+  const g = await guard('view', categoria); if (!g.ok) return g
   const svc = createAdminClient()
   const fa = folderArea(categoria)
   const gruposP = selecionarGrupos(svc, g.tenantId).catch(() => [] as any[]) // em paralelo (independe das pastas)

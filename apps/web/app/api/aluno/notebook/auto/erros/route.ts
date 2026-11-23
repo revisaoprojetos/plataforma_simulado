@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { autenticarBeta, resp400, respErroDb, respJson } from '@/lib/aluno/notebook-api'
+import { autenticarBeta, limiteEscrita, resp400, resp429, respErroDb, respJson } from '@/lib/aluno/notebook-api'
 import { listarAutoErros } from '@/lib/aluno/notebook-server'
 import { paginacaoSchema } from '@/lib/aluno/notebook-tipos'
 
@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const a = await autenticarBeta()
   if (!a.ok) return a.resposta
+  if (!limiteEscrita(`auto:${a.estudanteId}`, 5, 1000)) return resp429()
   const sp = request.nextUrl.searchParams
   const p = paginacaoSchema.safeParse({ offset: sp.get('offset') ?? undefined, limit: sp.get('limit') ?? undefined })
   if (!p.success) return resp400('Paginação inválida.')

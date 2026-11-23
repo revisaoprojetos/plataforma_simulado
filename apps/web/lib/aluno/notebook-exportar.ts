@@ -1,6 +1,6 @@
 // Caderno (beta) — EXPORTAR página (fase 4): conversão PURA doc TipTap -> estrutura simples de blocos, layout de linhas,
 // geometria da folha livre e nome de arquivo. Sem I/O, sem pdf-lib/docx (os geradores ficam em notebook-exportar-arquivos.ts).
-import type { CorFolha, Folha } from '@/lib/aluno/notebook-folha'
+import { caixaTemConteudo, type CorFolha, type Folha } from '@/lib/aluno/notebook-folha'
 
 export const LIMITES_EXPORT = {
   blocosMax: 5000,
@@ -9,7 +9,28 @@ export const LIMITES_EXPORT = {
   nomeMax: 80,
   pontosPorTracoPdf: 2000,
   pdfPontoMax: 14000, // pdf-lib/Acrobat: página até 14400 pt
+  tokenMax: 500,      // palavra/linha de código maior que isso é QUEBRADA em pedaços/cortada ANTES do layout (anti-DoS)
+  linhaCodeMax: 500,
+  linhasMax: 20000,   // teto de linhas por layout (300 páginas × ~60 linhas já é o limite do PDF)
+  celulaMax: 5000,    // caracteres por célula de tabela
 } as const
+
+/** Parte `s` em pedaços de até `n` caracteres (por code points, nunca no meio de um par substituto). */
+export function partirTexto(s: string, n: number): string[] {
+  if (s.length <= n) return [s]
+  const out: string[] = []
+  let i = 0
+  while (i < s.length) {
+    let j = Math.min(i + n, s.length)
+    if (j < s.length && s.charCodeAt(j - 1) >= 0xd800 && s.charCodeAt(j - 1) <= 0xdbff) j--
+    out.push(s.slice(i, j))
+    i = j
+  }
+  return out
+}
+
+/** Corta a linha em `max` caracteres com reticências. */
+export const cortarLinha = (s: string, max: number = LIMITES_EXPORT.linhaCodeMax): string => (s.length > max ? `${s.slice(0, max - 1)}…` : s)
 
 export type FormatoExport = 'pdf' | 'docx'
 export const parseFormato = (v: string | null): FormatoExport | null => (v === 'pdf' || v === 'docx' ? v : null)
@@ -100,7 +121,7 @@ export function docParaBlocos(doc: unknown): BlocoExp[] {
           else bloco(c, prof + 1, recuo)
         }
         return
-      case 'codeBlock': out.push({ k: 'code', linhas: textoDeRuns(runsDe(no)).replace(/\r/g, '').split('\n') }); return
+      case 'codeBlock': out.push({ k: 'code', linhas: textoDeRuns(runsDe(no)).replace(/\r/g, '').split('\n', LIMITES_EXPORT.linhasMax).map((l) => cortarLinha(l)) }); return
       case 'horizontalRule': out.push({ k: 'hr' }); return
       case 'table': {
         const linhas: { cabecalho: boolean; celulas: string[] }[] = []
@@ -109,7 +130,7 @@ export function docParaBlocos(doc: unknown): BlocoExp[] {
           const cels = Array.isArray(tr.content) ? tr.content : []
           linhas.push({
             cabecalho: cels.length > 0 && cels.every((c: any) => c.type === 'tableHeader'),
-            celulas: cels.map((c: any) => (Array.isArray(c.content) ? c.content : []).map((p: any) => textoDeRuns(runsDe(p))).join('\n')),
+            celulas: cels.slice(0, 50).map((c: any) => (Array.isArray(c.content) ? c.content : []).map((p: any) => textoDeRuns(runsDe(p))).join('\n').slice(0, LIMITES_EXPORT.celulaMax)),
           })
         }
         if (linhas.length) out.push({ k: 'tabela', linhas })
@@ -151,33 +172,54 @@ export function tokenizar(runs: Run[]): Token[] {
   const out: Token[] = []
   for (const r of runs) {
     const partes = r.t.replace(/\r/g, '').replace(/\t/g, '    ').split(/(\n|[ ]+)/).filter((x) => x !== '')
-    for (const p of partes) out.push({ texto: p, run: r })
+    for (const p of partes) for (const pedaco of partirTexto(p, LIMITES_EXPORT.tokenMax)) out.push({ texto: pedaco, run: r })
   }
   return out
 }
 
-/** Distribui tokens em linhas de até `largura`; palavra maior que a linha é cortada em pedaços. */
-export function layoutLinhas(tokens: Token[], largura: number, medir: (t: Token) => number): Token[][] {
+/** Maior prefixo de `t` (>=1 char) que cabe em `largura`, por BUSCA BINÁRIA (O(log n) medições; assume largura monotônica no prefixo). */
+export function maiorPrefixo(t: Token, largura: number, medir: (t: Token) => number): number {
+  let lo = 1
+  let hi = Math.max(1, t.texto.length - 1)
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (medir({ ...t, texto: t.texto.slice(0, mid) }) <= largura) lo = mid
+    else hi = mid - 1
+  }
+  return lo
+}
+
+/**
+ * Distribui tokens em linhas de até `largura`; palavra maior que a linha é cortada em pedaços (busca binária).
+ * Anti-DoS: token > tokenMax é partido ANTES de medir e o total de linhas é limitado a `maxLinhas`.
+ */
+export function layoutLinhas(tokens: Token[], largura: number, medir: (t: Token) => number, maxLinhas: number = LIMITES_EXPORT.linhasMax): Token[][] {
   const linhas: Token[][] = []
   let atual: Token[] = []
   let w = 0
+  const cheio = () => linhas.length >= maxLinhas
   const fecha = () => { while (atual.length && /^ +$/.test(atual[atual.length - 1].texto)) atual.pop(); linhas.push(atual); atual = []; w = 0 }
   for (const tk of tokens) {
+    if (cheio()) break
     if (tk.texto === '\n') { fecha(); continue }
-    let t = tk
-    let tw = medir(t)
-    if (/^ +$/.test(t.texto) && atual.length === 0) continue // sem espaço no início da linha
-    while (tw > largura && t.texto.length > 1) { // palavra gigante: corta
-      let n = t.texto.length - 1
-      while (n > 1 && medir({ ...t, texto: t.texto.slice(0, n) }) > largura) n--
-      if (atual.length) fecha()
-      atual.push({ ...t, texto: t.texto.slice(0, n) }); fecha()
-      t = { ...t, texto: t.texto.slice(n) }; tw = medir(t)
+    const pedacos = tk.texto.length > LIMITES_EXPORT.tokenMax ? partirTexto(tk.texto, LIMITES_EXPORT.tokenMax).map((x) => ({ ...tk, texto: x })) : [tk]
+    for (const p0 of pedacos) {
+      if (cheio()) break
+      let t = p0
+      let tw = medir(t)
+      if (/^ +$/.test(t.texto) && atual.length === 0) continue // sem espaço no início da linha
+      while (tw > largura && t.texto.length > 1 && !cheio()) { // palavra gigante: corta
+        const n = maiorPrefixo(t, largura, medir)
+        if (atual.length) fecha()
+        atual.push({ ...t, texto: t.texto.slice(0, n) }); fecha()
+        t = { ...t, texto: t.texto.slice(n) }; tw = medir(t)
+      }
+      if (cheio()) break
+      if (w + tw > largura && atual.length) { fecha(); if (/^ +$/.test(t.texto)) continue }
+      atual.push(t); w += tw
     }
-    if (w + tw > largura && atual.length) { fecha(); if (/^ +$/.test(t.texto)) continue }
-    atual.push(t); w += tw
   }
-  if (atual.length || linhas.length === 0) fecha()
+  if (!cheio() && (atual.length || linhas.length === 0)) fecha()
   return linhas
 }
 
@@ -207,4 +249,4 @@ export function tracoParaSvgPath(pontos: [number, number, number][], max: number
 /** Traços exportáveis (borracha não desenha). */
 export const tracosVisiveis = (f: Folha) => f.tracos.filter((t) => t.ferramenta !== 'borracha')
 /** Caixas com texto, na ordem de z. */
-export const caixasComTexto = (f: Folha) => [...f.caixas].sort((a, b) => a.z - b.z).filter((c) => (c.texto ?? '').trim().length > 0)
+export const caixasComTexto = (f: Folha) => [...f.caixas].sort((a, b) => a.z - b.z).filter((c) => caixaTemConteudo(c))

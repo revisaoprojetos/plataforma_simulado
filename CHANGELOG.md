@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.28.0 — 2026-11-23
+
+### Caderno estilo OneNote (aluno) — nova área em tela cheia
+- Nova rota `/aluno/nova/cadernos/onenote` (a aba "Caderno" de Meus Cadernos abre ela; só para o grupo de acesso do beta e a equipe do Workspace): interface do Microsoft OneNote reproduzida, com o tema do tenant. Barra de cima no padrão do leitor (logo, "Meus Cadernos", status "Salvo"), ribbon compacto (Arquivo, Página Inicial, Inserir, Desenhar, Histórico, Revisão, Exibir, Ajuda), navegação à esquerda, abas de seção coloridas e lista de páginas à direita.
+- Páginas: **tela livre** (caixas de texto formatado que se movem e redimensionam, tinta com caneta, marca-texto, borracha e laço), subpáginas em 2 níveis, ordenação, mover/copiar, cor da página, linhas de régua/grade, lixeira (60 dias) e excluir página/seção (botão, menu, tecla Delete, Desfazer).
+- Texto e inserir: estilos, marcas (A Fazer, Importante…), tabela, link, `[[` entre páginas, data/hora, símbolo, imagem e anexo (upload com validação de tipo e conteúdo, bucket privado), pesquisa por escopo, atalhos do OneNote e exportação PDF/Word.
+- Celular e tablet: topo enxuto no padrão do leitor, gaveta "Ferramentas", painéis laterais fechados por padrão, rolagem do ribbon com indicador, dock do portal coberto.
+- Desempenho: páginas novas aparecem na hora (criação otimista), "Meus erros" contado por SQL, cache do acesso (30 s), índice novo, autosave só do campo alterado, editor só na caixa focada em folhas com mais de 40 caixas, listas virtualizadas.
+- Segurança e integridade: gabarito oculto até o aluno responder, questões só do próprio tenant, limites de corpo/upload e cota por aluno, exportação à prova de texto gigante, operações atômicas (RPC), modo somente leitura da visualização do admin sem criar dados, conteúdo inválido abre só leitura em vez de sobrescrever. Suíte de testes de integridade e E2E em navegador (`.claude/skills/run-plataforma-simulado/e2e`, harness só em dev).
+- ⚠️ Migrações (aplicar nesta ordem no SQL editor): `20261129000000_caderno_onenote_paginas_nivel`, `20261129020000_caderno_onenote_rpc_mover`, `20261129030000_caderno_onenote_perf`. Sem elas tudo continua funcionando pelos caminhos antigos, mas sem subpáginas/cor/régua salvas, cota, limpeza de arquivos e operações atômicas.
+- ⚠️ Env: `STORAGE_CADERNO_BUCKET` (bucket PRIVADO) — sem ela o upload de imagem/anexo responde 503 em produção.
+
+### Login único (OIDC) e editores externos de teste
+- A plataforma agora é um provedor OpenID Connect (`/oidc/*`, RS256, PKCE) para o BookStack e o AFFiNE. Env: `CADERNOS_OIDC_ISSUER`, `CADERNOS_OIDC_PRIVATE_KEY`, `CADERNOS_OIDC_CLIENTS` (docs/cadernos-externos-oidc.md).
+- Admin → Teste e editores → Editores: áreas dedicadas em tela cheia do BookStack e do AFFiNE (só super-admin). Serviços no `docker-compose.portainer.yml` e `docker-compose.cadernos-teste.yml` (docs/cadernos-externos-teste.md). Não usados no caderno do aluno.
+
 ## 4.27.0 — 2026-11-19
 
 ### Meus Cadernos — aba "Caderno (beta)" (OneNote do aluno)

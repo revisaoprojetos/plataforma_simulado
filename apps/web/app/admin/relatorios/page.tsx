@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { PieChart, ClipboardList, BookOpen, GraduationCap, Trophy, Users, ArrowRight, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 type Tom = 'primary' | 'amber'
 
@@ -31,6 +32,7 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {areas.map((card) => {
           const tom = TOM[card.tom]

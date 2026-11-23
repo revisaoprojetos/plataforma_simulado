@@ -1,7 +1,8 @@
 'use client'
 
+import { lerXlsx, ErroLeituraXlsx } from '@/lib/cronograma/ler-xlsx'
 import { useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Info, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Info, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ import {
   type MetaImportada,
   type Previa,
 } from '@/lib/cronograma/importar'
-import { abasXlsxParaListas, lerCsv, planilhaAchatadaParaListas, type AbasXlsx } from '@/lib/cronograma/importar-planilha'
+import { abasXlsxParaListas, lerCsv, planilhaAchatadaParaListas } from '@/lib/cronograma/importar-planilha'
 import type { EstadoAtual } from './actions-tipos'
 import {finalizarImportacao, importarCronograma, importarLinks} from './actions'
 
@@ -38,6 +39,7 @@ export function ImportarClient({ estado }: { estado: EstadoAtual }) {
   const [previa, setPrevia] = useState<Previa | null>(null)
   const [lendo, setLendo] = useState(false)
   const [importando, setImportando] = useState(false)
+  const [baixandoModelo, setBaixandoModelo] = useState(false)
   const [progresso, setProgresso] = useState({ feitos: 0, total: 0, atual: '' })
   const [resultado, setResultado] = useState<{ criados: number; atualizados: number; metas: number; links: number; falhas: string[] } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,29 +64,13 @@ export function ImportarClient({ estado }: { estado: EstadoAtual }) {
         // exceljs é pesado (~1 MB) e só é preciso aqui — carregado sob demanda, como o
         // resto do admin já faz para exportar planilha.
         const ExcelJS = (await import('exceljs')).default
-        const wb = new ExcelJS.Workbook()
-        await wb.xlsx.load(await arquivo.arrayBuffer())
-
-        const abas: AbasXlsx = {}
-        for (const ws of wb.worksheets) {
-          const cabecalho = ((ws.getRow(1).values as unknown[]) ?? []).slice(1).map((c) => String(c ?? '').trim())
-          const linhas: Record<string, unknown>[] = []
-          for (let i = 2; i <= ws.rowCount; i++) {
-            const valores = ((ws.getRow(i).values as unknown[]) ?? []).slice(1)
-            const linha: Record<string, unknown> = {}
-            cabecalho.forEach((c, j) => {
-              if (c) linha[c] = valores[j]
-            })
-            if (Object.values(linha).some((v) => v !== null && v !== undefined && String(v).trim())) linhas.push(linha)
-          }
-          abas[ws.name] = linhas
-        }
+        const abas = await lerXlsx(await arquivo.arrayBuffer(), ExcelJS)
         listas = abasXlsxParaListas(abas)
       } else if (nome.endsWith('.csv')) {
         const { cabecalho, linhas } = lerCsv(await arquivo.text())
         listas = planilhaAchatadaParaListas(cabecalho, linhas)
       } else {
-        toast.error('Formato não reconhecido. Envie a planilha .xlsx ou o CSV achatado.')
+        toast.error(nome.endsWith('.xls') ? 'Formato .xls antigo não é suportado. Abra no Excel e salve como .xlsx.' : 'Formato não reconhecido. Envie a planilha .xlsx ou o CSV achatado.')
         setLendo(false)
         return
       }
@@ -109,9 +95,93 @@ export function ImportarClient({ estado }: { estado: EstadoAtual }) {
       if (todosErros.length) toast.warning(`${todosErros.length} problema(s) encontrado(s) — confira antes de importar.`)
       else toast.success('Planilha validada. Confira a prévia e confirme.')
     } catch (e) {
-      toast.error(`Não foi possível ler o arquivo: ${(e as Error).message}`)
+      toast.error(e instanceof ErroLeituraXlsx ? e.message : `Não foi possível ler o arquivo: ${(e as Error).message}`)
     } finally {
       setLendo(false)
+    }
+  }
+
+  /** Gera o modelo no navegador (mesmo exceljs da leitura): abas e colunas exatamente como o importador espera. */
+  async function baixarModelo() {
+    setBaixandoModelo(true)
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      const tipos = estado.tiposMeta.length ? estado.tiposMeta : ['pdfull']
+      const tipo = (i: number) => tipos[i % tipos.length]
+
+      const aba = (nome: string, colunas: { h: string; w: number; texto?: boolean }[], linhas: (string | number)[][]) => {
+        const ws = wb.addWorksheet(nome)
+        ws.columns = colunas.map((c) => ({ header: c.h, width: c.w, style: c.texto ? { numFmt: '@' } : {} }))
+        ws.getRow(1).font = { bold: true }
+        ws.views = [{ state: 'frozen', ySplit: 1 }]
+        linhas.forEach((l) => ws.addRow(l))
+        return ws
+      }
+
+      aba(
+        'Cronogramas',
+        [
+          { h: 'slug', w: 28 }, { h: 'nome', w: 34 }, { h: 'subtitulo', w: 28 }, { h: 'total_semanas', w: 14 },
+          { h: 'dias_curso', w: 14 }, { h: 'dias_nome', w: 30 }, { h: 'semanas_revisao', w: 16 },
+          { h: 'carga_horaria', w: 14 }, { h: 'categoria', w: 18 }, { h: 'ordem', w: 8 },
+        ],
+        [['exemplo-apagar', 'Exemplo — Direito Constitucional', 'Modelo de planilha', 4, '1,3,5', 'Segunda, Quarta, Sexta', '4', 40, 'Exemplo', 1]],
+      )
+      aba(
+        'Atividades',
+        [
+          { h: 'cronograma_slug', w: 22 }, { h: 'semana', w: 9 }, { h: 'dia', w: 6 }, { h: 'tipo', w: 14 },
+          { h: 'disciplina', w: 28 }, { h: 'aula', w: 8, texto: true }, { h: 'conteudo', w: 40 },
+          { h: 'duracao', w: 10 }, { h: 'ordem', w: 8 },
+        ],
+        [
+          ['exemplo-apagar', 1, 0, tipo(0), 'Direito Constitucional', '01', 'Constitucionalismo e Poder Constituinte', '02:00', 1],
+          ['exemplo-apagar', 1, 1, tipo(0), 'Direito Constitucional', '02', 'Princípios fundamentais', '02:00', 2],
+          ['exemplo-apagar', 1, 2, tipo(1), 'Direito Constitucional', '02', 'Revisão da aula 02', '01:00', 3],
+        ],
+      )
+      aba(
+        'Links',
+        [{ h: 'disciplina', w: 28 }, { h: 'aula', w: 8, texto: true }, { h: 'tema', w: 36 }, { h: 'url_qc', w: 40 }, { h: 'url_tec', w: 40 }],
+        [['Direito Constitucional', '01', 'Constitucionalismo e Poder Constituinte', 'https://exemplo.com/qc/01', 'https://exemplo.com/tec/01']],
+      )
+
+      const ins = wb.addWorksheet('Instruções')
+      ins.getColumn(1).width = 120
+      ;[
+        'COMO PREENCHER (esta aba não é importada)',
+        '1. Apague a linha de exemplo ("exemplo-apagar") nas três abas antes de importar.',
+        '2. Mantenha os nomes das abas: Cronogramas, Atividades e Links.',
+        '3. slug: identificador único do cronograma, sem espaços (ex.: revisao-pge-2027). Reimportar o mesmo slug substitui as metas dele.',
+        '4. dias_curso: dias da semana em número, separados por vírgula (0=domingo, 1=segunda … 6=sábado). dias_nome: os mesmos dias por extenso, na mesma ordem e quantidade.',
+        '5. Atividades › dia: NÃO é o dia da semana, é a POSIÇÃO dentro de dias_curso (começa em 0). Com dias_curso "1,3,5": 0=segunda, 1=quarta, 2=sexta.',
+        '6. Atividades › semana: de 1 até total_semanas.',
+        '7. Atividades › tipo: use exatamente um dos tipos cadastrados (veja a aba "Tipos válidos").',
+        '8. Atividades › aula e Links › aula: são TEXTO. "01", "1" e "1.1" são aulas diferentes. Não deixe o Excel transformar "01" em 1.',
+        '9. A disciplina deve ter a mesma grafia nas abas Atividades e Links; é ela que liga a meta ao link.',
+        '10. duracao: formato hh:mm (ex.: 02:00). semanas_revisao: números separados por vírgula, dentro de 1 a total_semanas (pode ficar vazio).',
+        '11. carga_horaria: obrigatória e maior que zero.',
+      ].forEach((t, i) => {
+        const r = ins.addRow([t])
+        if (i === 0) r.font = { bold: true }
+      })
+      const tv = wb.addWorksheet('Tipos válidos')
+      tv.getColumn(1).width = 30
+      tv.addRow(['tipo (use exatamente assim)']).font = { bold: true }
+      tipos.forEach((t) => tv.addRow([t]))
+
+      const buf = await wb.xlsx.writeBuffer()
+      const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'modelo-importar-cronogramas.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(`Não foi possível gerar o modelo: ${(e as Error).message}`)
+    } finally {
+      setBaixandoModelo(false)
     }
   }
 
@@ -186,6 +256,14 @@ export function ImportarClient({ estado }: { estado: EstadoAtual }) {
             className="hidden"
             onChange={(e) => carregar(e.target.files?.[0])}
           />
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+            <p className="text-sm text-muted-foreground">Primeira vez? Baixe o modelo já com as abas, colunas, exemplo e instruções.</p>
+            <Button type="button" variant="outline" size="sm" onClick={baixarModelo} disabled={baixandoModelo}>
+              {baixandoModelo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Baixar modelo (.xlsx)
+            </Button>
+          </div>
 
           <button
             onClick={() => inputRef.current?.click()}

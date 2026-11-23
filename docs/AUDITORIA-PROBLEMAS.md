@@ -1,77 +1,126 @@
 # Auditoria de Problemas da Plataforma
 
-Registro simples de tudo que deu errado, o que causou e como foi resolvido.
-**Regra:** todo problema novo entra aqui na hora, com **data** e **assunto**. Entradas mais novas ficam no topo de cada seção.
+Registro simples de tudo que deu errado (histórico de **02/11/2026 em diante**): o que acontecia, por quê e como foi resolvido.
+**Regra fixa:** todo problema novo entra aqui na hora, com **data**, **assunto**, **versão** e **status**. Os mais novos ficam no topo de cada tabela.
 
-**Versão da plataforma no momento desta auditoria:** v4.22.0 (último commit em 16/11/2026).
-Em cada problema novo, anote também a **versão em que foi encontrado** e a **versão em que foi corrigido** (veja a seção "Versões" no fim).
+- **Versão da plataforma (último commit):** v4.22.1, em 16/11/2026.
+- **Última conferência desta auditoria:** 17/11/2026.
 
-**Legenda de status**
-- ✅ Resolvido e no ar
-- 🛠️ Corrigido no código, falta publicar (deploy) ou rodar o SQL
-- ⏳ Em aberto
+## Legenda
 
-> Datas antigas ainda não estavam anotadas. Ficam como "a confirmar" e serão preenchidas conforme formos revisando.
+| Marca | Significa |
+|---|---|
+| ✅ | Resolvido. Saiu em uma versão lançada (conforme o CHANGELOG) ou foi conferido no banco. |
+| ⏳ | **Em aberto.** Precisa de uma ação. |
+
+> **Atenção:** "✅" significa lançado em versão. Eu não consigo ver qual versão está rodando em produção. Confira o SHA no Portainer antes de afirmar que algo está no ar.
+> **Prazos:** os prazos dos itens ⏳ são propostos em 17/11/2026 e podem ser ajustados por você. Nos itens ✅ a coluna mostra quando foi concluído.
+> Itens marcados "a confirmar" ainda não têm data ou versão registrada.
 
 ---
 
-## 1. Problemas relatados por alunos
+## 1. O que ainda está em aberto (prioridade)
 
-| Data | Assunto | O que acontecia | Status | Como foi resolvido |
+| # | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem resolve |
+|---|---|---|---|---|---|
+| 4 | Duas migrações com o mesmo número `20261119060000` e duas com `20261120010000` | Arquivos criados com o mesmo timestamp em sessões diferentes. | Renomear um arquivo de cada par (só os ainda não registrados) e atualizar o registro. | 19/11/2026 | Renomear |
+| 6 | E-mail duplicado de aluno | O bloqueio existe só no sistema (duplo clique ainda pode passar). Falta o índice único no banco. | Limpar os 2 casos duplicados e criar o índice único em migração nova. | 25/11/2026 | Migração nova |
+| 7 | Gabarito da questão `af828df6` (AGU) | A alternativa certa foi trocada sem querer em 06/08. A nota está correta. **Não rodar re-correção.** | Reverter a alternativa quando você decidir. | Sem prazo, aguarda sua decisão | Decisão sua |
+| 8 | Chave de criptografia (`APP_ENCRYPTION_KEY`) | Se a chave mudar, as integrações da Curseduca "somem". | Fixar a chave no ambiente do stack e nunca trocar. | 20/11/2026 | Infra |
+| 9 | Storage S3 (Hetzner) | A migração do storage ficou pela metade. | Fazer o deploy, copiar o que mudou e fazer a troca final. | A definir (Infra) | Infra |
+| 11 | Arquivos `fix-c2*.mjs` | Foram commitados por engano junto da v4.19.0. | Remover do repositório no próximo "cpi". | Próximo "cpi" | Limpeza |
+| 12 | Teste automático do aluno | O login de teste parou de funcionar. Sem isso não dá para conferir telas reais. | Investigar o fluxo e as credenciais de teste. | 24/11/2026 | Investigar |
+| 13 | Não testados ainda | Entregues sem teste manual: aviso ao sair do leitor, salvamento automático da folha, visual em celular e modo escuro. | Testar cada item e registrar o resultado. | 20/11/2026 | Testar |
+| 14 | `.limit(2000)` suspeitos | Em `banco-estudantes.tsx` e `adicionar-estudantes/page.tsx`. O PostgREST corta em 1.000 linhas. | Trocar por `fetchAll` com ordenação por `id`. | 24/11/2026 | Revisar |
+| 15 | 10 aulas da planilha de julho sem vínculo | Aulas de Direito Empresarial (9) e Processo Civil – Execução I não existem no Extensivo da Advocacia Pública, então ficam sem data na matriz. | Criar as aulas no produto e reimportar a planilha. | 20/11/2026 | Conteúdo |
+| 16 | Importar cronogramas: erro "reading 'sheets'" | O leitor de .xlsx quebrava com arquivo de outro programa. O novo leitor (`ler-xlsx.ts`) existe, mas falta testar com o arquivo real "PE 2027". | Testar com o arquivo real e fazer o "cpi". | 18/11/2026 | Testar e subir |
+| 17 | Aviso "cronogramas liberados que ninguém recebe" | O aviso ignorava o acesso geral do grupo. A correção ("Liberar para todos") está feita e a migração foi aplicada, mas ainda não subiu. | Fazer o "cpi". | 18/11/2026 | Subir versão |
+
+---
+
+## 2. Migrações que ainda faltam
+
+Só aparece aqui o que **não foi feito**. Quando uma migração for aplicada e conferida no banco, ela sai desta lista.
+Última conferência no banco real: 17/11/2026.
+
+| Status | Migração | Razão do problema | Ação para correção | Prazo de correção |
 |---|---|---|---|---|
-| 16/11/2026 | Cronograma adaptativo | O aluno já tinha cronograma criado e fixado, mas via a tela de "criar novo cronograma" ao clicar em continuar. | 🛠️ | A tela fica em "carregando" até o plano chegar, em vez de mostrar a tela de primeiro acesso. |
-| 16/11/2026 | Cronograma: materiais não abriam | Ao iniciar a meta ou abrir o material, nada abria (principalmente LegProc). O documento aparecia com "NaN" e o carregamento era muito longo. | 🛠️ | A lista de documentos bloqueados passou a carregar em paralelo, com limite de 2 segundos e cache maior. A tela espera os dados completos antes de mostrar. |
-| 16/11/2026 | Botão "Voltar" do leitor | Ao voltar do leitor, o aluno caía no início do painel de estudo, e não no cronograma que estava estudando. | 🛠️ | O "Voltar" agora retorna ao cronograma aberto. |
-| 16/11/2026 | Atualizações do material | A aba mostrava "Invalid Date" no lugar da data. | 🛠️ | O leitor foi ajustado para o novo formato de dados do servidor, com o rótulo e a data já montados. |
-| a confirmar | Login travado | O aluno não conseguia entrar por causa de um cookie duplicado. | 🛠️ | Correção em 3 camadas. Ainda não publicada. |
-| a confirmar | Aluno na Curseduca sem acesso | O aluno aparecia como "sem acesso" mesmo com acesso liberado. | ✅ | Corrigida a regra que sincroniza o grupo. |
-| a confirmar | Liberação de materiais por regra (Agosto/Setembro) | Regras não chegavam ao aluno porque a busca cortava em 1000 registros. | 🛠️ | A busca passou a paginar e a ordenar corretamente. |
-| a confirmar | Missão "1 simulado" | A missão ficava em 0/1 mesmo depois de o aluno fazer o simulado. | 🛠️ | Corrigida a reconciliação da missão. |
-| a confirmar | Sequência (streak) de leitura | A sequência perdia dias: contava errado depois da meia-noite e deixava buracos. | ✅ / 🛠️ | Recálculo na hora e ajuste dos dias já registrados. Uma parte ainda aguarda publicação. |
-| a confirmar | Desafio Jurisprudência (jogo) | O progresso do aluno zerava. | ✅ | Adicionadas proteções e guarda local do progresso. |
-| a confirmar | Pasta com subpastas | A pasta aparecia com 0 itens para o aluno. | ✅ | Corrigida a contagem de pastas aninhadas. |
-| a confirmar | Aula agendada | Ao agendar uma aula, ela caía em "Rascunho". | 🛠️ | Faltava um campo na consulta. Corrigido. |
-| a confirmar | E-mail duplicado | Era possível ter dois alunos com o mesmo e-mail. | ⏳ | Existe bloqueio no sistema, mas falta a trava no banco de dados. |
-
-## 2. Problemas durante o desenvolvimento (nossos erros)
-
-| Data | Assunto | O que aconteceu | Status | Como foi resolvido |
-|---|---|---|---|---|
-| 16/11/2026 | Salvar em cadernos | A tela mostrava "Salvar em cadernos indisponível". A tabela no banco estava no formato antigo. | 🛠️ | Migração `20261119060000_caderno_itens_alinhar_colunas.sql`. **Confirmar se já foi aplicada.** |
-| 16/11/2026 | Visual do pop-up de caderno | O desenho saiu fraco, com azul no lugar do roxo da marca. | 🛠️ | Refeito em pop-up com a cor da marca. Faltam testes em celular e modo escuro. |
-| 16/11/2026 | Barra de ferramentas do leitor | Textos e ícones sobrepostos. | 🛠️ | Corrigido no CSS. |
-| 16/11/2026 | Versão na barra superior | Aparecia uma versão automática ("v3") que não deveria aparecer. | 🛠️ | Só aparece o rótulo criado pelo professor ou admin. |
-| 16/11/2026 | Tipo "Sem atualizações" | Faltava essa opção para avisar que a versão não teve acréscimos. | ✅ | Tipo criado e migração `20261121000000` aplicada. |
-| 16/11/2026 | Arquivos temporários no commit | Arquivos de teste `fix-c2*.mjs` de outra sessão foram commitados junto. | ⏳ | Avisado. Falta remover do repositório. |
-| 16/11/2026 | Migrações com o mesmo número | Dois arquivos com o prefixo `20261119060000` (outra sessão). | ⏳ | Falta renomear um deles. |
-| 16/11/2026 | Teste automático do aluno | O login de teste parou de funcionar e não deu para conferir a tela real. | ⏳ | Usado teste de código no lugar. A conferência no navegador continua pendente. |
-| a confirmar | Server actions em domínio próprio | Eram rejeitadas nos domínios personalizados. | ✅ | Trocadas por rotas de API. |
-| a confirmar | Busca com muitos itens | Consulta com lista grande travava. | ✅ | A busca passou a dividir a lista em blocos de 80. |
-| a confirmar | Consumo de dados (egress) do Supabase | O consumo estourava com a configuração vazia. | ✅ | Conferir a configuração no Portainer e otimizar as consultas. |
-| a confirmar | Build quebrando em produção | `'use server'` com `export type` passava nos testes e quebrava o build. | ✅ | Rodar o build local antes de publicar. |
-| a confirmar | Servidor de desenvolvimento lento ou sem memória | O Turbopack consumia memória demais. | ✅ | Usar `pnpm iniciar`. |
+| ⏳ | Numeração duplicada | Dois pares de arquivos com o mesmo número (`20261119060000` e `20261120010000`). | Renomear um de cada par. | 19/11/2026 |
+| ⏳ | Não conferidas | Migrações antigas marcadas na memória com "⚠️" que não foram verificadas no banco: `20261029010000`, `20261029020000`, `20261028040000`, `20261008*`, `20261021000000`, `20261022100000`, `20261031120000`, `20261104140000`, `20261105010000`, `20261106020000`, `20261030000000`, `20260922*`, `20261031*` (Estúdio) e `050000/060000/061000` do adaptativo. | Conferir cada uma no banco, aplicar o que faltar e apagar da lista o que já estiver feito. | 24/11/2026 |
 
 ---
 
-## Versões (encontrado → corrigido)
+## 3. Problemas relatados por alunos e pela equipe
 
-| Assunto | Encontrado na | Corrigido na |
-|---|---|---|
-| Atualizações do material: "Invalid Date" e tipo "Sem atualizações" | v4.18.x (antes da 4.19.0) | Código pronto, **ainda sem versão** (falta "cpi") |
-| Cronograma: tela de primeiro acesso, materiais não abrem, "NaN" | v4.19.0 | Código pronto, **ainda sem versão** (falta "cpi") |
-| Botão "Voltar" do leitor | v4.18.x | v4.19.0 (parte do cronograma); ajuste final sem versão |
-| Salvar em cadernos, pop-up e barra de ferramentas do leitor | v4.18.x | Código pronto, **ainda sem versão** (falta "cpi" e aplicar a migração) |
-| Versão na barra superior | v4.18.x | v4.19.0 |
-| Liberação por regra (corte de 1000 regras) | antes da v4.20.1 | v4.20.1 |
-| PDFs do bucket privado | antes da v4.19.1 | v4.19.1 |
-| Demais itens "a confirmar" | versão não registrada | versão não registrada |
+### 3.1 Cronograma e área do aluno
 
-> A versão de cada correção só fica definida quando o "cpi" for feito. Os itens "a confirmar" serão preenchidos ao revisar o histórico de versões (`CHANGELOG.md`).
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem relatou |
+|---|---|---|---|---|---|---|
+| ✅ | 16/11/2026 · 4.21.0 | Cronograma: tela de primeiro acesso | Com cronograma criado e fixado, "Continuar" mostrava a tela de criar novo. A tela aparecia antes do plano carregar. | A tela fica em "carregando" até o plano chegar. | Concluído (16/11/2026) | Dono |
+| ✅ | 16/11/2026 · 4.21.0 | Cronograma: material não abria, "NaN" | LegProc não abria e a tela mostrava dados incompletos. A checagem de documentos bloqueados era lenta e em série. | Carga em paralelo, limite de 2 s, cache maior e a tela espera os dados completos. | Concluído (16/11/2026) | Dono |
+| ✅ | 13/11/2026 · 4.21.0 | Botão "Voltar" | Caía no início do painel e não no cronograma em estudo. A rota de retorno era fixa. | Volta ao cronograma que está sendo estudado. | Concluído (13/11/2026) | Dono |
+| ✅ | 06/11/2026 · 4.9.2 | Meta de Questões abria o PDFull | A meta de Questões apontava para o PDFull da matéria. | Abre a tela de questões ou só inicia o cronômetro. O cronômetro flutuante também foi corrigido. | Concluído (06/11/2026) | Aluno |
+| ✅ | 06/11/2026 · 4.9.1 | "PR.regras218 is undefined" | Arquivo novo com o motor antigo em cache. | A versão agora vem do conteúdo do arquivo. | Concluído (06/11/2026) | Equipe |
+| ✅ | 06/11/2026 · 4.5.0 | Painel da meta | O botão "Parcial" não abria e a tela piscava. | Botão corrigido. | Concluído (06/11/2026) | Equipe |
+| ✅ | 04/11/2026 · 4.3.1 | Cronograma em branco | Colisão de nome de variável no iframe. | Variável renomeada. | Concluído (04/11/2026) | Equipe |
+| ✅ | 03/11/2026 · 4.2.3 e 4.2.5 | Menu do celular com itens faltando | A barra inferior usava lista fixa. | Passou a ler o menu configurado. | Concluído (03/11/2026) | Equipe |
+| ✅ | 03/11/2026 · 4.2.4 e 4.2.5 | Telas de protótipo | Cadernos de exemplo iguais para todos. A contagem de "Salvos" falhava por filtro em coluna inexistente. | Corrigido. | Concluído (03/11/2026) | Equipe |
+| ✅ | 03/11/2026 · 4.2.0 | Agendar aula caía em "Rascunho" | Faltava a coluna `publicacao` na consulta. | Coluna incluída. Afetava todos os tenants. | Concluído (03/11/2026) | Equipe |
+
+### 3.2 Liberação de materiais (regras por produto e segmento)
+
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem relatou |
+|---|---|---|---|---|---|---|
+| ✅ | 16/11/2026 · 4.20.1 | **Bug crítico:** regras de Agosto/Setembro | Turmas de Setembro (5 turmas, 1.295 regras) ficavam sem restrição. O limite de 5.000 era cortado em 1.000 pelo PostgREST. | Paginação com ordenação por `id`. | Concluído (16/11/2026) | Achado na auditoria |
+| ✅ | 16/11/2026 · 4.20.1 | Bloqueio de Agosto até 14/11 | A data-base do item prevalecia sobre a regra do módulo. | Regra de segmento passou a valer. | Concluído (16/11/2026) | Equipe |
+| ✅ | 16/11/2026 · 4.20.1 | 79 documentos LegProc/PDFull não abriam | Abriam só pela regra de pasta; quem tinha só o produto ficava de fora. | Acesso pelo produto. | Concluído (16/11/2026) | Equipe |
+| ✅ | 16/11/2026 · 4.20.1 | Mensagem errada | Material com data futura mostrava "Você não tem acesso". | Mostra "Ainda não liberado, será liberado em dd/mm". | Concluído (16/11/2026) | Equipe |
+| ✅ | 16/11/2026 · 4.20.1 | `concluir_meta` trancava a aula | A regra travava a liberação. | Libera na data da regra. | Concluído (16/11/2026) | Equipe |
+| ✅ | 13/11/2026 · 4.19.1 | PDFs: "Bucket not found" | O bucket virou privado. | Proxy autenticado e links assinados. Banco conferido: bucket privado. | Concluído (13/11/2026) | Equipe |
+| ✅ | 12/11/2026 · 4.18.0 | 404 mudo ao abrir documento | Sem explicação para o aluno. | Tela com o motivo e "Em preparação". | Concluído (12/11/2026) | Equipe |
+
+### 3.3 Biblioteca e leitor
+
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem relatou |
+|---|---|---|---|---|---|---|
+| ✅ | 16/11/2026 · 4.21.0 | Atualizações: "Invalid Date" | O leitor esperava o formato antigo. | O servidor monta rótulo e data. Data validada por teste; **conferir no leitor real após o deploy**. | Concluído (16/11/2026) | Professor |
+| ✅ | 16/11/2026 | Tipo "Sem atualizações" | Faltava a opção. | Tipo criado. Migração conferida no banco. | Concluído (16/11/2026) | Professor |
+| ✅ | 16/11/2026 · 4.21.0 | Salvar em cadernos | A tela dizia "indisponível". A tabela estava no formato antigo. | Migração `20261119060000_caderno_itens_alinhar_colunas`. **Conferida no banco.** | Concluído (16/11/2026) | Dono |
+| ✅ | 16/11/2026 · 4.21.0 | Design do pop-up de cadernos | Visual fraco, azul no lugar do roxo, lista gigante. | Refeito em pop-up com a cor da marca. Faltam testes em celular e modo escuro. | Concluído (16/11/2026) | Dono |
+| ✅ | 16/11/2026 · 4.19.0 | Barra de ferramentas do leitor bagunçada | A barra colorida cortava os ícones. | Corrigido no CSS. | Concluído (16/11/2026) | Dono |
+| ✅ | 13/11/2026 · 4.19.0 | Versão automática "v3" no topo | Aparecia mesmo sem o professor criar. | Só aparece o rótulo criado pelo admin. | Concluído (13/11/2026) | Dono |
+| ✅ | 06/11/2026 · 4.9.0 a 4.10.0 | Modelos JurisClub | Tipo não era salvo, folha em branco no PDF e tabelas pretas no modo escuro. | Abre sempre no leitor em texto. | Concluído (06/11/2026) | Equipe |
+| ✅ | 03/11/2026 · 4.1.3 | Conversão docx para PDF falhava no S3 | O OnlyOffice recebia uma URL não pública. | Corrigido. | Concluído (03/11/2026) | Equipe |
+
+### 3.4 Simulados, desafios e sequência (streak)
+
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem relatou |
+|---|---|---|---|---|---|---|
+
+### 3.5 Curseduca, acesso e login
+
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção | Quem relatou |
+|---|---|---|---|---|---|---|
+
+### 3.6 Infraestrutura, build e desenvolvimento
+
+| Status | Data / Versão | Assunto | Razão do problema | Ação para correção | Prazo de correção |
+|---|---|---|---|---|---|
+| ⏳ | 17/11/2026 · sem versão | Importar cronogramas: "Cannot read properties of undefined (reading 'sheets')" | O leitor de .xlsx quebrava quando o arquivo tinha o `workbook.xml` fora do formato esperado (comum em arquivos exportados de outros programas). | Novo leitor (`ler-xlsx.ts`) confere o arquivo, tenta consertar o formato e mostra mensagem clara. Falta testar com o arquivo real "PE 2027" e fazer o "cpi". | 18/11/2026 |
+| ⏳ | 17/11/2026 · sem versão | Aviso "cronogramas liberados que ninguém recebe" | O aviso ignorava o acesso geral do grupo de acesso e não existia como liberar para todos em Grupos de acessos. | Controle "Liberar para todos" nos grupos, acesso direto por cronograma e aviso corrigido. Migração aplicada e conferida no banco. Falta o "cpi". | 18/11/2026 |
+| ⏳ | 16/11/2026 | Arquivos de teste commitados | `fix-c2*.mjs` entraram na v4.19.0. | Remover (seção 1, item 11). | Próximo "cpi" |
+| ✅ | 11/11/2026 · 4.13.0 | API de vídeo reiniciava em loop | Erro do Swagger no pacote. | Swagger opcional (`API_SWAGGER=false`). | Concluído (11/11/2026) |
+| ✅ | 05/11/2026 · 4.5.1 | Build do CI quebrou | `export type` em arquivo `'use server'`. | Regra: rodar `next build` antes de push grande. | Concluído (05/11/2026) |
+| ✅ | 02/11/2026 | Desenvolvimento local com falta de memória | Turbopack usava ~20 GB. | Usar `pnpm iniciar`. | Concluído (02/11/2026) |
 
 ---
 
-## Como manter esta auditoria
+## 4. Como manter esta auditoria
 
-Para cada problema novo, adicione uma linha no topo da tabela certa com:
-**Data** (dd/mm/aaaa) · **Assunto** · **O que acontecia** · **Status** · **Como foi resolvido**.
-Quando um item pendente for resolvido, mude o status e anote a data da correção.
+A cada problema novo, adicione uma linha **no topo** da tabela certa (seção 3) com:
+**status** · **data e versão** · **assunto** · **razão do problema** · **ação para correção** · **prazo de correção** · **quem relatou**.
+
+- Se ainda não houver correção, use ⏳, defina um **prazo de correção** e registre também na seção 1.
+- Corrigido no código e ainda sem versão: marque ⏳ e registre na seção 1. Quando o "cpi" sair, troque por ✅ e anote a versão.
+- Migração: só entra na seção 2 se **faltar** aplicar. Depois de aplicar e conferir no banco, **apague a linha** (não deixe item concluído na lista).
+- Atualize "Última conferência" e "Versão da plataforma" no topo.

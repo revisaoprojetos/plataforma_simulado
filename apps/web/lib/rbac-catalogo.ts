@@ -29,6 +29,9 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'acessos', action: 'view' }, { resource: 'acessos', action: 'export' }, { resource: 'acessos', action: 'manage' },
   // Varredura de segurança: view = ver achados/relatórios; manage = executar varredura e resolver/ignorar/aceitar.
   { resource: 'seguranca', action: 'view' }, { resource: 'seguranca', action: 'manage' },
+  // Auditoria de Problemas (painel interativo + mapa mental): view = ver; create/update/delete = gerir registros; export = CSV/XLSX/imagem.
+  { resource: 'problemas', action: 'view' }, { resource: 'problemas', action: 'create' }, { resource: 'problemas', action: 'update' },
+  { resource: 'problemas', action: 'delete' }, { resource: 'problemas', action: 'export' },
   { resource: 'configuracoes', action: 'view' }, { resource: 'configuracoes', action: 'manage' },
   { resource: 'api_keys', action: 'manage' },
   { resource: 'rbac', action: 'view' }, { resource: 'rbac', action: 'manage' },
@@ -64,6 +67,7 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   armazenamento: 'Armazenamento',
   auditoria: 'Auditoria',
   seguranca: 'Segurança (varredura)',
+  problemas: 'Auditoria de Problemas',
   acessos: 'Acessos de alunos (IP/aparelho)',
   relatorios: 'Relatórios',
   gamificacao: 'Gamificação',

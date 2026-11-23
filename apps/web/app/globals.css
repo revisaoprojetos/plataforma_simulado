@@ -1181,3 +1181,10 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   font-weight:inherit !important;
 }
 
+
+/* Barra de setor (admin): nas telas que a têm, a linha das abas PRÓPRIAS da tela é contínua (liga uma aba na outra, mesma cor e
+   espessura da barra do setor) mas só tem a largura das abas — não corre até a borda da página. */
+main:has([data-barra-setor]) :is(div, nav).border-b:has(> .-mb-px) {
+  width: fit-content;
+  max-width: 100%;
+}

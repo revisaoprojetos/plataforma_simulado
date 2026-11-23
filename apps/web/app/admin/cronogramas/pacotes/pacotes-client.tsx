@@ -10,11 +10,12 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { Search, X, Plus, Package, Users, Pencil, Trash2, Loader2, ArrowUpDown, Download, Boxes } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PacoteLista } from './actions-tipos'
-import {criarPacote, atualizarPacote, excluirPacote} from './actions'
+import { Switch } from '@/components/ui/switch'
+import {criarPacote, atualizarPacote, excluirPacote, alternarAcessoGratuitoPacote} from './actions'
 
 const nf = (n: number) => n.toLocaleString('pt-BR')
 // Grade das colunas (px + fr) — casa cabeçalho e linhas, igual à área de Grupos.
-const GRID = '32px minmax(0,1fr) 230px 104px 92px'
+const GRID = '32px minmax(0,1fr) 230px 104px 150px 92px'
 
 type Ordem = 'nome' | 'nome_desc' | 'alcance' | 'cronogramas'
 const ORDENS: { v: Ordem; label: string }[] = [
@@ -24,7 +25,7 @@ const ORDENS: { v: Ordem; label: string }[] = [
   { v: 'cronogramas', label: 'Mais cronogramas' },
 ]
 
-export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
+export function PacotesClient({ inicial, podeLiberar = false }: { inicial: PacoteLista[]; podeLiberar?: boolean }) {
   const router = useRouter()
   const [itens, setItens] = useState(inicial)
   const [pending, start] = useTransition()
@@ -61,6 +62,27 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
       if (r.ok) { toast.success('Grupo de acesso excluído'); setItens((xs) => xs.filter((x) => x.id !== p.id)); setSel((s) => { const n = new Set(s); n.delete(p.id); return n }) }
       else toast.error(r.error ?? 'Erro ao excluir')
     })
+  }
+  const [alternando, setAlternando] = useState<Set<string>>(() => new Set<string>())
+  async function alternarGeral(p: PacoteLista, valor: boolean) {
+    if (alternando.has(p.id)) return
+    const msg = valor
+      ? `Liberar "${p.nome}" para TODOS os alunos da plataforma? Todos passam a receber os cronogramas deste grupo de acesso.`
+      : `Tirar o acesso geral de "${p.nome}"? Só quem estiver nos grupos ou avulsos vinculados continua recebendo.`
+    if (!(await confirmar({ titulo: valor ? 'Liberar para todos os alunos' : 'Tirar acesso geral', mensagem: msg, confirmar: valor ? 'Liberar' : 'Tirar' }))) return
+    const marca = (v: boolean) => setItens((xs) => xs.map((x) => (x.id === p.id ? { ...x, acesso_gratuito: v } : x)))
+    setAlternando((s) => new Set(s).add(p.id))
+    marca(valor) // otimista
+    try {
+      const r = await alternarAcessoGratuitoPacote(p.id, valor)
+      if (!r.ok) { marca(!valor); toast.error(r.error ?? 'Não foi possível alterar.'); return }
+      toast.success(valor ? 'Liberado para todos os alunos' : 'Acesso geral removido')
+      router.refresh()
+    } catch {
+      marca(!valor); toast.error('Não foi possível alterar.')
+    } finally {
+      setAlternando((s) => { const n = new Set(s); n.delete(p.id); return n })
+    }
   }
   async function excluirEmLote() {
     const n = selecionados.length
@@ -122,7 +144,7 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
 
           {/* Tabela */}
           <div className="overflow-x-auto">
-            <div className="min-w-[680px]">
+            <div className="min-w-[830px]">
               <div style={{ gridTemplateColumns: GRID }} className="grid items-center gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 <div className="flex justify-center">
                   <input type="checkbox" checked={todosMarcados} onChange={() => setSel(todosMarcados ? new Set() : new Set(ids))} className="h-4 w-4 cursor-pointer accent-primary" aria-label="Selecionar todos" />
@@ -130,6 +152,7 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
                 <div>Grupo de acesso</div>
                 <div>Conteúdo</div>
                 <div>Alunos</div>
+                <div>Liberar p/ todos</div>
                 <div className="pr-1 text-right">Ações</div>
               </div>
 
@@ -140,7 +163,8 @@ export function PacotesClient({ inicial }: { inicial: PacoteLista[] }) {
                   <p className="text-xs">Ajuste a busca.</p>
                 </div>
               ) : filtrados.map((p) => (
-                <LinhaPacote key={p.id} p={p} marcado={sel.has(p.id)} onSel={() => toggleSel(p.id)} onEdit={() => setDialog({ modo: 'editar', p })} onDelete={() => excluir(p)} />
+                <LinhaPacote key={p.id} p={p} marcado={sel.has(p.id)} onSel={() => toggleSel(p.id)} onEdit={() => setDialog({ modo: 'editar', p })} onDelete={() => excluir(p)}
+                  podeLiberar={podeLiberar} alternando={alternando.has(p.id)} onGeral={(v) => alternarGeral(p, v)} />
               ))}
             </div>
           </div>
@@ -195,7 +219,7 @@ function Kpi({ label, valor, hint, destaque }: { label: string; valor: string; h
   )
 }
 
-function LinhaPacote({ p, marcado, onSel, onEdit, onDelete }: { p: PacoteLista; marcado: boolean; onSel: () => void; onEdit: () => void; onDelete: () => void }) {
+function LinhaPacote({ p, marcado, onSel, onEdit, onDelete, podeLiberar, alternando, onGeral }: { p: PacoteLista; marcado: boolean; onSel: () => void; onEdit: () => void; onDelete: () => void; podeLiberar: boolean; alternando: boolean; onGeral: (v: boolean) => void }) {
   return (
     <div style={{ gridTemplateColumns: GRID }}
       className={cn('group grid items-center gap-2 border-b border-border/60 px-3 py-2.5 transition-colors hover:bg-muted/40', marcado && 'bg-primary/5', !p.ativo && 'opacity-60')}>
@@ -220,6 +244,13 @@ function LinhaPacote({ p, marcado, onSel, onEdit, onDelete }: { p: PacoteLista; 
       <div className="flex items-center gap-1.5">
         <Users className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="font-mono text-[12.5px] font-medium text-foreground/80">{nf(p.alcance)}</span>
+      </div>
+
+      {/* Liberar para todos (acesso gratuito do grupo) */}
+      <div className="flex items-center gap-2">
+        <Switch checked={!!p.acesso_gratuito} disabled={!podeLiberar || alternando} onCheckedChange={(v) => onGeral(!!v)}
+          aria-label={`Liberar ${p.nome} para todos os alunos`} title={podeLiberar ? undefined : 'Sem permissão para liberar'} />
+        {alternando && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
       </div>
 
       {/* Ações */}

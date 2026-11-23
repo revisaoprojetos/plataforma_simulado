@@ -15,6 +15,7 @@ import { resumoRegistro } from '@/lib/auditoria/resumo'
 import { cn } from '@/lib/utils'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 const ITEMS_PER_PAGE = 12
 
@@ -108,6 +109,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Auditoria · Visualizações de aluno</h1>
           <p className="text-muted-foreground">Quando um admin abriu e operou a conta de um aluno — {logs.length} registro(s)</p>
         </div>
+        <BarraSetorSlot />
         <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
           <SecaoHeader icon={ScrollText} titulo="Visualizações de aluno" subtitulo={`${logs.length} sessão(ões) · registro imutável`} />
           <CardContent className="p-0">
@@ -313,6 +315,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
         <p className="text-muted-foreground">{subtitulo} — {count ?? 0} entradas</p>
       </div>
 
+      <BarraSetorSlot />
       {tipo === 'acessos' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">

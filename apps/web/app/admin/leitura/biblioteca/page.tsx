@@ -3,6 +3,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarBiblioteca } from './actions'
 import { BibliotecaClient } from '@/components/admin/biblioteca-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,7 @@ export default async function BibliotecaPage() {
     <div className="w-full">
       <h1 className="text-2xl font-bold tracking-tight">Biblioteca do Desafio</h1>
       <p className="mt-1 text-sm text-muted-foreground">Blocos de HTML prontos e tags (selos) em pastas — reutilize na edição do conteúdo da leitura.</p>
+      <BarraSetorSlot />
       <BibliotecaClient conteudo={conteudo} tags={tags} />
     </div>
   )

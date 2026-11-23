@@ -7,6 +7,7 @@ import { chavesUnicas } from './catalogo-override'
 import { carregarInfoDocs } from './relink-documento-server'
 import { normalizarTituloDoc } from './relink-documento'
 import { rotuloMeta, semanaOrigemDaMeta, sanearDetalhes } from './meta-ids'
+import { rotuloTipo, ordemTipo } from './tipos-meta'
 import type { Detalhe } from './motor28'
 
 /**
@@ -18,10 +19,8 @@ import type { Detalhe } from './motor28'
 
 const T_PLANO = 'simulado_cronograma_adaptativo_plano'
 const T_PM = 'simulado_cronograma_adaptativo_plano_meta'
-const TIPO_NOME: Record<string, string> = { pf: 'PDFull', pp: 'PDFull (parte)', fl: 'PDFlash', qu: 'Questões', lp: 'LegProc', rf: 'Revisão PDFlash', rq: 'Revisão Questões', jp: 'Jurisprudência' }
 /** false depois que o banco recusar as colunas de snapshot (migração 20261125020000 pendente) — evita tentar de novo a cada lote. */
 let SNAP_COLS = true
-const ORDEM_TIPO: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4, jp: 4 }
 
 export interface LinhaPlanoMeta {
   tenant_id: string; estudante_id: string; plano_id: string
@@ -69,7 +68,7 @@ const uuidOu = (v: unknown): string | null => (typeof v === 'string' && /^[0-9a-
 export function descrever(id: string, c: ConteudoDescricao) {
   const p = id.split(':')
   const tipo = p[0]
-  const base = { tipo, tipo_nome: rotuloMeta(id) ?? TIPO_NOME[tipo] ?? null, parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
+  const base = { tipo, tipo_nome: rotuloMeta(id) ?? rotuloTipo(tipo), parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
   const porAula = (i: number) => { const a = c.AS[i]; return a ? { disciplina: a[0] || null, aula: a[1] || null, titulo: a[2] || null, documento_id: uuidOu(a[3]), aula_key: a[4] } : {} }
   if (tipo === 'jp') return { ...base, titulo: 'Jurisprudência' } // 2.19: meta semanal, sem aula/documento
   if (tipo === 'pf' || tipo === 'fl' || tipo === 'qu') return { ...base, ...porAula(+p[1]) }
@@ -151,7 +150,7 @@ export function linhasDaGrade(
     itens.push({ id, data: v[0], horas: typeof v[1] === 'number' && Number.isFinite(v[1]) ? Math.round(v[1] * 100) / 100 : null })
   }
   const col = new Intl.Collator('en', { numeric: true })
-  itens.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : (ORDEM_TIPO[a.id.split(':')[0]] ?? 9) - (ORDEM_TIPO[b.id.split(':')[0]] ?? 9) || col.compare(a.id, b.id)))
+  itens.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : ordemTipo(a.id.split(':')[0]) - ordemTipo(b.id.split(':')[0]) || col.compare(a.id, b.id)))
   const ordemNoDia = new Map<string, number>()
   return itens.map((it) => {
     const n = ordemNoDia.get(it.data) ?? 0; ordemNoDia.set(it.data, n + 1)

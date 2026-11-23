@@ -8,6 +8,7 @@ import { EstudantesLista, type AgregadoEstudante } from './estudantes-lista'
 import { montarRelatorioEstudante } from './_dados'
 import type { EstudanteBase } from '@/app/admin/estudantes/actions-tipos'
 import {carregarLoteEstudantes} from '@/app/admin/estudantes/actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 const PRIMEIRA_PAGINA = 30
 
@@ -63,6 +64,7 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
         <p className="text-muted-foreground">{estId ? 'Evolução e desempenho vs. a turma.' : 'Todos os estudantes — clique num para ver a análise detalhada.'}</p>
       </div>
 
+      <BarraSetorSlot />
       {!estId ? (
         <EstudantesLista inicial={inicial} agregados={agregados} total={total} />
       ) : dados ? (

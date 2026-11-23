@@ -37,6 +37,17 @@ async function guardImpersonation(request: NextRequest): Promise<NextResponse | 
 
 // Next 16: convenção `proxy` (substitui o antigo `middleware`). Mesma lógica.
 export async function proxy(request: NextRequest) {
+  // IdP OIDC dos cadernos externos (/oidc/**): funciona em qualquer host, sem Supabase/tenant/CSP-nonce; /token e /userinfo são
+  // servidor-a-servidor (sem Origin → fora do CSRF, que só cobre PREFIXOS_API_ALUNO). Framável só pela própria plataforma
+  // (+ hosts extras de CADERNOS_OIDC_FRAME_ANCESTORS); nunca X-Frame-Options DENY nem frame-ancestors 'none'.
+  if (request.nextUrl.pathname === '/oidc' || request.nextUrl.pathname.startsWith('/oidc/')) {
+    const extras = (process.env.CADERNOS_OIDC_FRAME_ANCESTORS ?? '').split(/[\s,]+/).filter((h) => /^(https:\/\/)?(\*\.)?[a-z0-9.-]+(:\d+)?$/i.test(h))
+    const res = NextResponse.next()
+    res.headers.delete('X-Frame-Options')
+    res.headers.set('Content-Security-Policy', `frame-ancestors 'self' ${extras.join(' ')}`.trim())
+    res.headers.set('Cache-Control', 'no-store')
+    return res
+  }
   // CSRF do cookie do aluno (SameSite=None p/ iframe): valida Origin/Referer nos POST/PUT/PATCH/DELETE das APIs
   // do aluno. Regras e decisões em lib/seguranca/origem-csrf.ts. ALUNO_CSRF_ORIGIN=off|report|enforce.
   if (deveVerificarOrigem(request.method, request.nextUrl.pathname)) {

@@ -1,4 +1,5 @@
 import { ConteudosTabs } from '@/components/admin/conteudos-tabs'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // Cabeçalho padrão do Estúdio de Conteúdo (AUDITORIA 4.1): eyebrow + título + ações à direita
 // e, ABAIXO, as abas da área (Produtos/Materiais/…). Todas as telas de topo usam este header,
@@ -21,6 +22,8 @@ export function EstudioHeader({ eyebrow = 'Conteúdos', titulo, acoes, subtabs, 
         </div>
         {acoes && <div className="ml-auto flex flex-wrap items-center gap-2">{acoes}</div>}
       </div>
+      {/* Barra de abas do setor: entre o título e as abas do Estúdio/subtabs. */}
+      <BarraSetorSlot />
       {!semAbas && <ConteudosTabs />}
       {subtabs}
     </div>

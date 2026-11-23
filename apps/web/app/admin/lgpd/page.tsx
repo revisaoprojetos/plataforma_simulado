@@ -3,6 +3,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { ShieldCheck } from 'lucide-react'
 import { listarSolicitacoes } from './actions'
 import { LgpdClient } from './lgpd-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,7 @@ export default async function LgpdPage() {
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><ShieldCheck className="h-6 w-6 text-primary" /> LGPD — direitos do titular</h1>
         <p className="mt-1 text-sm text-muted-foreground">Solicitações de acesso, portabilidade e exclusão de dados dos estudantes. Exporte os dados ou anonimize o titular; tudo é auditado.</p>
       </div>
+      <BarraSetorSlot />
       <LgpdClient inicial={r.solicitacoes ?? []} tabelaAusente={!!r.tabelaAusente} />
     </div>
   )

@@ -19,6 +19,7 @@ import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { simuladosTiposSql } from '@/lib/data/simulados.repo'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 // Hash estável (djb2) do CONJUNTO de simulados → chave de cache. Muda ao criar/excluir/publicar
 // simulado (recomputa), e é invalidada por import/re-correção (invalidarRelatorios).
@@ -107,6 +108,7 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
         )}
       </div>
 
+      <BarraSetorSlot />
       {/* Abas: SIMULADOS (aplicação normal) · DESAFIOS (agrupamentos tipo maratona) — tab de linha. */}
       <div className="flex items-center gap-1 border-b">
         <SimTabLink href={`/admin/simulados${pastaParam ? `?pasta=${pastaParam}` : ''}`} ativa={!abaDesafios} label="Simulados" />

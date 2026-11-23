@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react'
 import { listarLixeira } from './actions'
 import { LixeiraClient } from '@/components/admin/lixeira-client'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export default async function LixeiraPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       <LixeiraClient itens={itens} />
     </div>
   )

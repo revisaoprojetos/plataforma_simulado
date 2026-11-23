@@ -1,7 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/server'
-import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getCurrentAccessSuper as getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { createHash, randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'

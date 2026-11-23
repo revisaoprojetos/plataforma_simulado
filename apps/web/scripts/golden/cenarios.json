@@ -1,0 +1,2526 @@
+{
+ "_doc": "Golden do motor do Cronograma Adaptativo — NÃO editar à mão. Regravar só por decisão consciente: node scripts/_golden-motor.mjs --gravar (docs/cronograma-golden.md).",
+ "versaoMotor": "3.2.0",
+ "hoje": "2026-01-05",
+ "catalogoSha1": "0bfa107093f5d0c3101bddd0d6e3af65e406a1a7",
+ "total": 125,
+ "porCategoria": {
+  "carga": 27,
+  "arranjo": 4,
+  "jp": 5,
+  "metas": 7,
+  "historico": 7,
+  "discs": 7,
+  "calendario": 10,
+  "ritmo": 9,
+  "progresso": 12,
+  "dominio": 25,
+  "erro": 12
+ },
+ "cenarios": {
+  "1 disciplina 10h (reta final)": {
+   "cat": "discs",
+   "entradaSha1": "81db2a7528106df128bac2b8436dc01a566069fb",
+   "saidaSha1": "0dd14de0303a9bd311b9ecd89617ffcb267da12d",
+   "resumo": {
+    "metas": 73,
+    "porTipo": {
+     "fl": 13,
+     "lp": 15,
+     "pf": 13,
+     "pp": 19,
+     "qu": 13
+    },
+    "fim": 8,
+    "primeira": "2026-01-05",
+    "ultima": "2026-02-25",
+    "horasTotais": 71.5,
+    "detalhes": 32
+   },
+   "invariantesQuebradas": 0
+  },
+  "2 disciplinas 15h (reta final)": {
+   "cat": "discs",
+   "entradaSha1": "2e96558550174e01e386f90be5cc979d27ea7fe8",
+   "saidaSha1": "f639de44dc43dac033c26141b371435a74a9aeef",
+   "resumo": {
+    "metas": 154,
+    "porTipo": {
+     "fl": 24,
+     "lp": 65,
+     "pf": 24,
+     "pp": 17,
+     "qu": 24
+    },
+    "fim": 12,
+    "primeira": "2026-01-05",
+    "ultima": "2026-03-27",
+    "horasTotais": 150,
+    "detalhes": 41
+   },
+   "invariantesQuebradas": 0
+  },
+  "2 disciplinas 25h": {
+   "cat": "discs",
+   "entradaSha1": "d8b214b44b874c4e1741f90d09bb6f351845a36e",
+   "saidaSha1": "3a45b444127dd53b15c91c1bb5113c26c9f72384",
+   "resumo": {
+    "metas": 178,
+    "porTipo": {
+     "fl": 37,
+     "lp": 49,
+     "pf": 37,
+     "pp": 8,
+     "qu": 37,
+     "rf": 10
+    },
+    "fim": 11,
+    "primeira": "2026-01-05",
+    "ultima": "2026-03-16",
+    "horasTotais": 223,
+    "detalhes": 55
+   },
+   "invariantesQuebradas": 0
+  },
+  "9 essenciais 10h": {
+   "cat": "discs",
+   "entradaSha1": "795e82ede87e60c919daee9afdec96a4fe4fc7c3",
+   "saidaSha1": "eff81e692c4c5d7cfcd8080a1bbe02a9ad17694b",
+   "resumo": {
+    "metas": 1104,
+    "porTipo": {
+     "fl": 191,
+     "lp": 296,
+     "pf": 191,
+     "pp": 235,
+     "qu": 191
+    },
+    "fim": 110,
+    "primeira": "2026-01-05",
+    "ultima": "2028-02-09",
+    "horasTotais": 1087.5,
+    "detalhes": 426
+   },
+   "invariantesQuebradas": 0
+  },
+  "9 essenciais 24h": {
+   "cat": "discs",
+   "entradaSha1": "6afa8fdbb99b7eab39ff2a4ad9a98470db29fd2b",
+   "saidaSha1": "f5f1a43f96e2a2406acef7cf70f6d4bbe478d8f5",
+   "resumo": {
+    "metas": 1178,
+    "porTipo": {
+     "fl": 191,
+     "lp": 496,
+     "pf": 191,
+     "pp": 109,
+     "qu": 191
+    },
+    "fim": 55,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-24",
+    "horasTotais": 1187.5,
+    "detalhes": 300
+   },
+   "invariantesQuebradas": 0
+  },
+  "LegProc complementar aceita": {
+   "cat": "metas",
+   "entradaSha1": "e57620d36204bef0f71b1f5a934c5b603c50d143",
+   "saidaSha1": "0965b8b0e953ce0d1b1c03f2005b827f77ed2acb",
+   "resumo": {
+    "metas": 47,
+    "porTipo": {
+     "fl": 6,
+     "lp": 24,
+     "pf": 6,
+     "pp": 5,
+     "qu": 6
+    },
+    "fim": 4,
+    "primeira": "2026-01-05",
+    "ultima": "2026-01-30",
+    "horasTotais": 41,
+    "detalhes": 11
+   },
+   "invariantesQuebradas": 0
+  },
+  "LegProc fim da fila (sem compl.)": {
+   "cat": "metas",
+   "entradaSha1": "2a5f31f989e4b11e267bed5b47db64b278313d7f",
+   "saidaSha1": "b2218cd23371ab63815932e9e160f32cb2a7e681",
+   "resumo": {
+    "metas": 33,
+    "porTipo": {
+     "fl": 6,
+     "lp": 10,
+     "pf": 6,
+     "pp": 5,
+     "qu": 6
+    },
+    "fim": 3,
+    "primeira": "2026-01-05",
+    "ultima": "2026-01-22",
+    "horasTotais": 34,
+    "detalhes": 11
+   },
+   "invariantesQuebradas": 0
+  },
+  "arranjo constancia 15h": {
+   "cat": "arranjo",
+   "entradaSha1": "26579fcef4b6d0f65d8732012fa56c3af69492d8",
+   "saidaSha1": "80a5d4bb3eeda87f941eef77f070f2c4f2f83492",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "arranjo equilibrado 15h": {
+   "cat": "arranjo",
+   "entradaSha1": "2f66e36953b58f880fbbbf9623556759d2cb6e8f",
+   "saidaSha1": "80a5d4bb3eeda87f941eef77f070f2c4f2f83492",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 10h rev4 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "e20c4daf7883b47e84c5c148da40bb0167ec73ca",
+   "saidaSha1": "2f5e833d9c78a4bd3f61f5879ef335857a9f0705",
+   "resumo": {
+    "metas": 666,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-12",
+    "horasTotais": 661,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 10h rev6 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "e2b64ee8386238bde91af2e086f62c8e0f3d2560",
+   "saidaSha1": "1e26795fae454b8e1dcfc03847fcc9774ec093f0",
+   "resumo": {
+    "metas": 666,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-12",
+    "horasTotais": 661,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 10h rev8 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "11ec1a4392aff5f5a1d521da15346fb72b978832",
+   "saidaSha1": "5668696cd5ee8dfbced2bbf010d1797072e82217",
+   "resumo": {
+    "metas": 666,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-12",
+    "horasTotais": 661,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 14h30 rev4 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "98a923a385697f176fad1203eb78a7a4ed2ac5de",
+   "saidaSha1": "bef6d6f46c082819eb7807a3ccde4c4756391926",
+   "resumo": {
+    "metas": 814,
+    "porTipo": {
+     "fl": 120,
+     "lp": 299,
+     "pf": 120,
+     "pp": 155,
+     "qu": 120
+    },
+    "fim": 52,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-28",
+    "horasTotais": 730.5,
+    "detalhes": 275
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 14h30 rev6 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "6bff2f0f9383e915f8bc7be09e675a763d10b33c",
+   "saidaSha1": "b020ef77810ea2fb8bb5f5cdeb3aba1afc286679",
+   "resumo": {
+    "metas": 814,
+    "porTipo": {
+     "fl": 120,
+     "lp": 299,
+     "pf": 120,
+     "pp": 155,
+     "qu": 120
+    },
+    "fim": 52,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-28",
+    "horasTotais": 730.5,
+    "detalhes": 275
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 14h30 rev8 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "72fdbe955be18bc98416891dc15e616d428c48bc",
+   "saidaSha1": "802c6473cabe00e37ab98dcd7d30f0cf0e3a9146",
+   "resumo": {
+    "metas": 814,
+    "porTipo": {
+     "fl": 120,
+     "lp": 299,
+     "pf": 120,
+     "pp": 155,
+     "qu": 120
+    },
+    "fim": 52,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-28",
+    "horasTotais": 730.5,
+    "detalhes": 275
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 15h rev4 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "8e782fa209886861ae1522e66a550a140266a066",
+   "saidaSha1": "a1083276348992dc11d86e35622864060e31426d",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 15h rev6 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "18b6855b2ed8af5e91b2521623d1e69bb54fa10e",
+   "saidaSha1": "9672a7b14f915ada0fc9210a382eac160c39a5ab",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 15h rev8 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "38e853be43c8ef488224cc5b14e4815ccbea4a40",
+   "saidaSha1": "80a5d4bb3eeda87f941eef77f070f2c4f2f83492",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h rev4 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "eb48d7224504cbc05954170ac278b3b09c976372",
+   "saidaSha1": "be1323d280e1af1a317db327a9739b5e2290c687",
+   "resumo": {
+    "metas": 720,
+    "porTipo": {
+     "fl": 120,
+     "lp": 296,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-27",
+    "horasTotais": 729,
+    "detalhes": 184
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h rev6 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "bea90fb59889f950cc593c411bd2c99a9cf816d4",
+   "saidaSha1": "3a96b0a924da1501bf1f004b1e2ab3d8b6f0f503",
+   "resumo": {
+    "metas": 720,
+    "porTipo": {
+     "fl": 120,
+     "lp": 296,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-27",
+    "horasTotais": 729,
+    "detalhes": 184
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h rev8 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "148a715751c7f96482ccaf5c0ade54e328bf5157",
+   "saidaSha1": "5e36e28cb532a0e232df74285b2073af4211d896",
+   "resumo": {
+    "metas": 720,
+    "porTipo": {
+     "fl": 120,
+     "lp": 296,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-27",
+    "horasTotais": 729,
+    "detalhes": 184
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h30 rev4 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "69a26d26a64ba7e096b2279051e9fda51a78a7bb",
+   "saidaSha1": "f559406cdda9b393b39318bdbdebbbd615516a46",
+   "resumo": {
+    "metas": 732,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 48,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-25",
+    "horasTotais": 743,
+    "detalhes": 168
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h30 rev6 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "7d01148dfc9dddb7bba58487e305c8fc085016de",
+   "saidaSha1": "c1c19a42e0253a36b71cfaeda840e638c37806f9",
+   "resumo": {
+    "metas": 732,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 48,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-25",
+    "horasTotais": 743,
+    "detalhes": 168
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 24h30 rev8 (4d)": {
+   "cat": "carga",
+   "entradaSha1": "2d87fe10a2e7b83c77bc991acc3f02946ecc45ec",
+   "saidaSha1": "d011deaa287e78bc947c9e2532a919495810b4fc",
+   "resumo": {
+    "metas": 732,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 48,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-25",
+    "horasTotais": 743,
+    "detalhes": 168
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 25h rev4 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "c31c291f45f83b57b2d71ea54aa346c974103538",
+   "saidaSha1": "727d82a19f417d1fef74b4c829310071a785b27e",
+   "resumo": {
+    "metas": 994,
+    "porTipo": {
+     "fl": 191,
+     "lp": 419,
+     "pf": 191,
+     "pp": 2,
+     "qu": 191
+    },
+    "fim": 56,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-29",
+    "horasTotais": 1149,
+    "detalhes": 193
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 25h rev6 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "216fc34db47e5314aa0ba208367c23d7bca0e9d7",
+   "saidaSha1": "fb7a873df9209e17cdce0957e8fe2edace02172e",
+   "resumo": {
+    "metas": 955,
+    "porTipo": {
+     "fl": 191,
+     "lp": 381,
+     "pf": 191,
+     "pp": 1,
+     "qu": 191
+    },
+    "fim": 54,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-12",
+    "horasTotais": 1130,
+    "detalhes": 192
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 25h rev8 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "6dab5c4130520a597c2620db033f1108a4485ce7",
+   "saidaSha1": "82a57c3b718551818598834693ee8cdbccd314c2",
+   "resumo": {
+    "metas": 855,
+    "porTipo": {
+     "fl": 191,
+     "lp": 281,
+     "pf": 191,
+     "pp": 1,
+     "qu": 191
+    },
+    "fim": 49,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-07",
+    "horasTotais": 1080,
+    "detalhes": 192
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h rev4 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "c4db61d65e6f2bdde8cd9e92f43d3e1a4dd1c99f",
+   "saidaSha1": "4e7800550a0589aa1058ca94d99630812f97ecbf",
+   "resumo": {
+    "metas": 1042,
+    "porTipo": {
+     "fl": 191,
+     "lp": 461,
+     "pf": 191,
+     "pp": 8,
+     "qu": 191
+    },
+    "fim": 41,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-17",
+    "horasTotais": 1170,
+    "detalhes": 199
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h rev6 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "a1095d1d668825294a390081329583c9ec1b8f46",
+   "saidaSha1": "33a38188f2b327bb5dca5750a8228199687de91d",
+   "resumo": {
+    "metas": 999,
+    "porTipo": {
+     "fl": 191,
+     "lp": 423,
+     "pf": 191,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 40,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-05",
+    "horasTotais": 1151,
+    "detalhes": 194
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h rev8 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "90d6256c611382e9da2a09ab13e8976b4b714ac4",
+   "saidaSha1": "1640c053336f10ea7b4e5363c2171d35514e3d0a",
+   "resumo": {
+    "metas": 927,
+    "porTipo": {
+     "fl": 191,
+     "lp": 351,
+     "pf": 191,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 36,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-13",
+    "horasTotais": 1115,
+    "detalhes": 194
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h30 rev4 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "afe8807198b76f9edd2ec06f9b39eee837294f79",
+   "saidaSha1": "7a82201be2e66acdace0ca3f83c9913009abb636",
+   "resumo": {
+    "metas": 1070,
+    "porTipo": {
+     "fl": 191,
+     "lp": 492,
+     "pf": 191,
+     "pp": 5,
+     "qu": 191
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 1185.5,
+    "detalhes": 196
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h30 rev6 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "f29409e788810ba5378b5afbd58d6a02d35d6ea0",
+   "saidaSha1": "0aa38f8f5957b1ba3e7360eed966f99d7e5d8cee",
+   "resumo": {
+    "metas": 990,
+    "porTipo": {
+     "fl": 191,
+     "lp": 415,
+     "pf": 191,
+     "pp": 2,
+     "qu": 191
+    },
+    "fim": 38,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-27",
+    "horasTotais": 1147,
+    "detalhes": 193
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 35h30 rev8 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "284b2e5f8d846dc2ad19dc9c1c4d4430a17228c3",
+   "saidaSha1": "b506108b69890889c89e80d6ad4fe037b5e0c2c1",
+   "resumo": {
+    "metas": 958,
+    "porTipo": {
+     "fl": 191,
+     "lp": 379,
+     "pf": 191,
+     "pp": 6,
+     "qu": 191
+    },
+    "fim": 37,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-19",
+    "horasTotais": 1129,
+    "detalhes": 197
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 36h rev4 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "e3d728f6bab842c4b695ec2c7fde95077ef5debd",
+   "saidaSha1": "12b7987a909dce04d155afac06d4cbac12eeb439",
+   "resumo": {
+    "metas": 1087,
+    "porTipo": {
+     "fl": 191,
+     "lp": 509,
+     "pf": 191,
+     "pp": 5,
+     "qu": 191
+    },
+    "fim": 39,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-03",
+    "horasTotais": 1194,
+    "detalhes": 196
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 36h rev6 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "8f3ebe00b0ec905999342df0291033f639280e77",
+   "saidaSha1": "8b57e743ceb89debe701d65f33e5cef9fcaf268e",
+   "resumo": {
+    "metas": 1075,
+    "porTipo": {
+     "fl": 191,
+     "lp": 499,
+     "pf": 191,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 39,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-29",
+    "horasTotais": 1189,
+    "detalhes": 194
+   },
+   "invariantesQuebradas": 0
+  },
+  "carga 36h rev8 (9d)": {
+   "cat": "carga",
+   "entradaSha1": "6114ccdabe19f0c0081b21090e213adab8929a83",
+   "saidaSha1": "cf568d9aeafedb7a2267dd100c06f37affb664d6",
+   "resumo": {
+    "metas": 1014,
+    "porTipo": {
+     "fl": 191,
+     "lp": 436,
+     "pf": 191,
+     "pp": 5,
+     "qu": 191
+    },
+    "fim": 37,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-15",
+    "horasTotais": 1157.5,
+    "detalhes": 196
+   },
+   "invariantesQuebradas": 0
+  },
+  "dois recessos (2 e 10 dias)": {
+   "cat": "calendario",
+   "entradaSha1": "afc5c4f2373902ba762287100aefbede9d08b2e9",
+   "saidaSha1": "eaf09253a2f223dffa322ae3d3659d26e0ef1f52",
+   "resumo": {
+    "metas": 685,
+    "porTipo": {
+     "fl": 120,
+     "lp": 255,
+     "pf": 120,
+     "pp": 70,
+     "qu": 120
+    },
+    "fim": 51,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-25",
+    "horasTotais": 708.5,
+    "detalhes": 190
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: 10h revisao obrigatoria + ajuste do dia": {
+   "cat": "dominio",
+   "entradaSha1": "bb0114ea9e4d1e8855d303ba87e15d98572487fd",
+   "saidaSha1": "9afc6dc6cc05a10a9ccca5dc7f9758298bd138bb",
+   "resumo": {
+    "metas": 646,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 126,
+     "qu": 120
+    },
+    "fim": 75,
+    "primeira": "2026-01-05",
+    "ultima": "2027-06-10",
+    "horasTotais": 661,
+    "detalhes": 620
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: 14h30 organizar atrasadas": {
+   "cat": "dominio",
+   "entradaSha1": "5d979ac05a47b2552a2c41ffeee0db10df088697",
+   "saidaSha1": "699e800730e509f47acc891235837eff65aba0da",
+   "resumo": {
+    "metas": 787,
+    "porTipo": {
+     "fl": 120,
+     "lp": 299,
+     "pf": 120,
+     "pp": 128,
+     "qu": 120
+    },
+    "fim": 56,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-25",
+    "horasTotais": 730.5,
+    "detalhes": 736
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: 35h ajuste do dia 24h": {
+   "cat": "dominio",
+   "entradaSha1": "468f5dbdd4abee2dceca041bc5d0d891c4c813e4",
+   "saidaSha1": "40f5266ffbc529d83baceb1bcf1740f7f9d785b1",
+   "resumo": {
+    "metas": 928,
+    "porTipo": {
+     "fl": 191,
+     "lp": 351,
+     "pf": 191,
+     "pp": 4,
+     "qu": 191
+    },
+    "fim": 43,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-28",
+    "horasTotais": 1115,
+    "detalhes": 851
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: 8h/dia reduzir para 4h": {
+   "cat": "dominio",
+   "entradaSha1": "eba45e3a0b8f0bba963a6b493f4e8939c2d9083c",
+   "saidaSha1": "a6c621af21f6d0e89bac7c49e160291156c1e629",
+   "resumo": {
+    "metas": 647,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 10,
+     "qu": 120
+    },
+    "fim": 41,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-15",
+    "horasTotais": 719.5,
+    "detalhes": 563
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: 9ess 25h organizar atrasadas (rev4)": {
+   "cat": "dominio",
+   "entradaSha1": "570882d3bcff987b9fa8778def0c793d1fe47e38",
+   "saidaSha1": "21e42e66d047e772c6fb7469088d6c9e8841948d",
+   "resumo": {
+    "metas": 995,
+    "porTipo": {
+     "fl": 191,
+     "lp": 419,
+     "pf": 191,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 56,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-26",
+    "horasTotais": 1149,
+    "detalhes": 919
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: >=25h meta movida (fl)": {
+   "cat": "dominio",
+   "entradaSha1": "3b87a02cef091d55e5b7fc7d0b1c57e17a1d5a25",
+   "saidaSha1": "941ba3d18d8173344424fd5155aac13298282c74",
+   "resumo": {
+    "metas": 696,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 17,
+     "qu": 120,
+     "rf": 42
+    },
+    "fim": 31,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-08",
+    "horasTotais": 761.5,
+    "detalhes": 632
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: >=25h organizar atrasadas": {
+   "cat": "dominio",
+   "entradaSha1": "8e70ff9f2f202c033657ef5b64124309b9ffa8b2",
+   "saidaSha1": "b53e070ba8438fc00b30669584a29b57433ee486",
+   "resumo": {
+    "metas": 696,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 17,
+     "qu": 120,
+     "rf": 42
+    },
+    "fim": 31,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-09",
+    "horasTotais": 761.5,
+    "detalhes": 618
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: >=25h reduzir para 20h": {
+   "cat": "dominio",
+   "entradaSha1": "aa6d290811e7bb75471434f02d1b951bef51ece9",
+   "saidaSha1": "30612c125ac691610d3bdafdfbcd54dcacbbae07",
+   "resumo": {
+    "metas": 649,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 12,
+     "qu": 120
+    },
+    "fim": 41,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-16",
+    "horasTotais": 719.5,
+    "detalhes": 627
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: LegProc parcial 20min (sobra)": {
+   "cat": "dominio",
+   "entradaSha1": "c4af92dae72d8ee4e01a58b5470117ac7ed024f8",
+   "saidaSha1": "9080c00dc9e0afc181a4fdd368c8e64cc420bae8",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: PDFull parcial (pag 30)": {
+   "cat": "dominio",
+   "entradaSha1": "49ac21909c012471ceaf710fc334a76874b3f898",
+   "saidaSha1": "9080c00dc9e0afc181a4fdd368c8e64cc420bae8",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: ajustar horas do dia (24h num dia)": {
+   "cat": "dominio",
+   "entradaSha1": "3b2fdf32c2917a28d31a91c5e7c88c2e81d064bc",
+   "saidaSha1": "5aaa0c34d17125c4b8c278187208515910fb2d3c",
+   "resumo": {
+    "metas": 658,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 67,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 611
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: aumentar horas 18h->24h30 (adiantar)": {
+   "cat": "dominio",
+   "entradaSha1": "c7e025fdfd9859cf79d98d1e6d8ae424bd643372",
+   "saidaSha1": "cd161aa2d5b9ab800c6a40a0e89e83d537e978ce",
+   "resumo": {
+    "metas": 608,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 17,
+     "qu": 120
+    },
+    "fim": 41,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-15",
+    "horasTotais": 696.5,
+    "detalhes": 561
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: diminuir horas do dia (0h num dia)": {
+   "cat": "dominio",
+   "entradaSha1": "4deae8bcf9f9b4672441f562511e50c814e5f2cb",
+   "saidaSha1": "cdb57b3facb3f794b58ef48b5974a26997348288",
+   "resumo": {
+    "metas": 660,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 69,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-23",
+    "horasTotais": 696.5,
+    "detalhes": 613
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: faixa alta 2o PDF (adiantar)": {
+   "cat": "dominio",
+   "entradaSha1": "6d102054c46216c8fafdab36502299cc4736a03a",
+   "saidaSha1": "2b6fd815d01ea72f78f1715a502d7c61e78ccdbb",
+   "resumo": {
+    "metas": 762,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 8,
+     "qu": 120,
+     "rf": 70
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-05",
+    "horasTotais": 813,
+    "detalhes": 662
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: jp marcada organizar atrasadas": {
+   "cat": "dominio",
+   "entradaSha1": "4b91c6c53ec03aa5ff94b65f555a665ce23843f2",
+   "saidaSha1": "9efdaf6b82024de42fb6877fbe6bcfe778801dd9",
+   "resumo": {
+    "metas": 674,
+    "porTipo": {
+     "fl": 120,
+     "jp": 45,
+     "lp": 200,
+     "pf": 120,
+     "pp": 69,
+     "qu": 120
+    },
+    "fim": 45,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-14",
+    "horasTotais": 726,
+    "detalhes": 629
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: jp marcada reduzir horas": {
+   "cat": "dominio",
+   "entradaSha1": "f1e1e966fd136918eeb7861378ee98027c7951fe",
+   "saidaSha1": "bfea6d0e6d92d1c53e87ba99a3d639326ea8fe13",
+   "resumo": {
+    "metas": 688,
+    "porTipo": {
+     "fl": 120,
+     "jp": 4,
+     "lp": 200,
+     "pf": 120,
+     "pp": 124,
+     "qu": 120
+    },
+    "fim": 55,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-18",
+    "horasTotais": 685,
+    "detalhes": 687
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: meta movida (arrastar fl)": {
+   "cat": "dominio",
+   "entradaSha1": "79357689036d64277041733c0566dcf65364ac37",
+   "saidaSha1": "9080c00dc9e0afc181a4fdd368c8e64cc420bae8",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: meta movida (pf para outro dia)": {
+   "cat": "dominio",
+   "entradaSha1": "a69d05000d022dfb29f08c5bb17f5ed1fb4796ef",
+   "saidaSha1": "cb0346536067bce1b093ef1b56964c0857a90b79",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: nao realizada (qu -> proxima)": {
+   "cat": "dominio",
+   "entradaSha1": "bc2183a1f7b5a13dacaa8b8c603e226e4a2ea64c",
+   "saidaSha1": "60d364c0e6dcc3bb8321509e0dc062ae00e13464",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-21",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: organizar atrasadas": {
+   "cat": "dominio",
+   "entradaSha1": "d43f88d06bc6e86b67644dd79d82cfbdd049ffec",
+   "saidaSha1": "fb780bb46185d5c3cb50ab92b72b6496985465e8",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 42,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-24",
+    "horasTotais": 696.5,
+    "detalhes": 604
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: pausa e retomar (recesso 3 sem.)": {
+   "cat": "dominio",
+   "entradaSha1": "8eaf5c7240aa8a1955aca69b68e187a7b3124097",
+   "saidaSha1": "2576f37f058ac335c3613052c0a9ebf3eb78c31c",
+   "resumo": {
+    "metas": 659,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 68,
+     "qu": 120
+    },
+    "fim": 46,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-18",
+    "horasTotais": 696.5,
+    "detalhes": 612
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: pausa: recesso 1 semana": {
+   "cat": "dominio",
+   "entradaSha1": "dc2a28414520aae17d57ce521d45a82e4f9b1ad6",
+   "saidaSha1": "5b2cd8fef297fbbd74bb8503b55cd02dd1ce31ca",
+   "resumo": {
+    "metas": 660,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 69,
+     "qu": 120
+    },
+    "fim": 43,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-28",
+    "horasTotais": 696.5,
+    "detalhes": 613
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: reduzir horas 18h->12h": {
+   "cat": "dominio",
+   "entradaSha1": "c416a3fa40858c111f6b8a6f5c1b0a98aaf0034d",
+   "saidaSha1": "31f7fa9a945269f77ccd51188b09067b040aee55",
+   "resumo": {
+    "metas": 711,
+    "porTipo": {
+     "fl": 120,
+     "lp": 231,
+     "pf": 120,
+     "pp": 120,
+     "qu": 120
+    },
+    "fim": 64,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-24",
+    "horasTotais": 696.5,
+    "detalhes": 664
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: reta final organizar atrasadas": {
+   "cat": "dominio",
+   "entradaSha1": "741f40c1155d78501c480daaddaa6260e1be8d34",
+   "saidaSha1": "bc32673c20b28e4f4104318f50d326a6a51a9247",
+   "resumo": {
+    "metas": 151,
+    "porTipo": {
+     "fl": 24,
+     "lp": 65,
+     "pf": 24,
+     "pp": 14,
+     "qu": 24
+    },
+    "fim": 12,
+    "primeira": "2026-01-05",
+    "ultima": "2026-03-23",
+    "horasTotais": 150,
+    "detalhes": 139
+   },
+   "invariantesQuebradas": 0
+  },
+  "dominio: semana especial + reducao": {
+   "cat": "dominio",
+   "entradaSha1": "171bf74d1aa9f21ee09269922dde6e9232e42544",
+   "saidaSha1": "00a86c1e49103bfa7f4921e75c5d7e0dbd442127",
+   "resumo": {
+    "metas": 720,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 118,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-20",
+    "horasTotais": 702,
+    "detalhes": 676
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: configuracao <10h (8h semanais)": {
+   "cat": "erro",
+   "entradaSha1": "7d19c2141f50e6596f9096db59f1ad5101bd4027",
+   "saidaSha1": "b19945ef0e30854a3bf8d009528ede37670be591",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 20 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: configuracao zerada (0h)": {
+   "cat": "erro",
+   "entradaSha1": "02173578b4ea877caacee647da3a77d03c45a4ea",
+   "saidaSha1": "b19945ef0e30854a3bf8d009528ede37670be591",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 20 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: insuficiencia 10h em 20 semanas": {
+   "cat": "erro",
+   "entradaSha1": "7d77ff978b9b1c6a82c83cdc721e7db430c2adcb",
+   "saidaSha1": "b19945ef0e30854a3bf8d009528ede37670be591",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 20 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: insuficiencia 9ess 10h em 20 semanas": {
+   "cat": "erro",
+   "entradaSha1": "de7fba72480f620cf24fd223d069cfaf125ee19a",
+   "saidaSha1": "b19945ef0e30854a3bf8d009528ede37670be591",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 20 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: insuficiencia todas disc. 15h em 20 semanas": {
+   "cat": "erro",
+   "entradaSha1": "b0001734f2969c34f83be6adf8ec78d0b5bc78ce",
+   "saidaSha1": "b19945ef0e30854a3bf8d009528ede37670be591",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 20 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  },
+  "erro: sem disciplinas": {
+   "cat": "erro",
+   "entradaSha1": "a69c8f6045544c53d661a15ee449bbc6152db323",
+   "saidaSha1": "f51766a41486935b60ae5753bd2b6142e2236528",
+   "resumo": {
+    "metas": 0,
+    "porTipo": {},
+    "fim": 1,
+    "primeira": null,
+    "ultima": null,
+    "horasTotais": 0,
+    "detalhes": 0
+   },
+   "invariantesQuebradas": 0
+  },
+  "essenciais + complementares 15h": {
+   "cat": "discs",
+   "entradaSha1": "c711306feaaac2a0f9df9ba9d26120e7e7249cd2",
+   "saidaSha1": "1658e93b2647c77ee0e6749618a57766de4de850",
+   "resumo": {
+    "metas": 1276,
+    "porTipo": {
+     "fl": 219,
+     "lp": 481,
+     "pf": 219,
+     "pp": 138,
+     "qu": 219
+    },
+    "fim": 91,
+    "primeira": "2026-01-05",
+    "ultima": "2027-09-30",
+    "horasTotais": 1330.5,
+    "detalhes": 357
+   },
+   "invariantesQuebradas": 0
+  },
+  "fds concentrado 24h+": {
+   "cat": "calendario",
+   "entradaSha1": "53f9fb7e3137d12a7c953e9e40b39e8b849a3bb6",
+   "saidaSha1": "f9148ac7802a49f73dcd5673210814fb55ba0170",
+   "resumo": {
+    "metas": 763,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 9,
+     "qu": 120,
+     "rf": 70
+    },
+    "fim": 46,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-20",
+    "horasTotais": 813,
+    "detalhes": 199
+   },
+   "invariantesQuebradas": 0
+  },
+  "fim de semana concentrado 15h": {
+   "cat": "calendario",
+   "entradaSha1": "dd2d8b8a84444869a1984b2f03c3524d2bcdb3ca",
+   "saidaSha1": "7b7df23c93ca703b6a31d07a0a679679d33e3fdf",
+   "resumo": {
+    "metas": 700,
+    "porTipo": {
+     "fl": 120,
+     "lp": 234,
+     "pf": 120,
+     "pp": 106,
+     "qu": 120
+    },
+    "fim": 39,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-30",
+    "horasTotais": 698,
+    "detalhes": 226
+   },
+   "invariantesQuebradas": 0
+  },
+  "folga sex/sab 15h": {
+   "cat": "calendario",
+   "entradaSha1": "44d1de5c792a78bf6c32467b4242c708eeeee612",
+   "saidaSha1": "dc017cd8745d96ea07f24bbc0a200b0f88c30a4c",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "historico declarado 10h": {
+   "cat": "historico",
+   "entradaSha1": "d1db4c29f02cb4d58cfa46f1fd95ccaf087c0c32",
+   "saidaSha1": "2c6b3dad947e05aca00ebadb38128120caeb1f08",
+   "resumo": {
+    "metas": 625,
+    "porTipo": {
+     "fl": 113,
+     "lp": 143,
+     "pf": 113,
+     "pp": 136,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-17",
+    "horasTotais": 621.5,
+    "detalhes": 249
+   },
+   "invariantesQuebradas": 0
+  },
+  "historico declarado 24h": {
+   "cat": "historico",
+   "entradaSha1": "998df97b1e5b43a86d0f1cd5124a53e8a27b5697",
+   "saidaSha1": "c2b5b38a4c105a5e6372965f903612808785e571",
+   "resumo": {
+    "metas": 722,
+    "porTipo": {
+     "fl": 109,
+     "lp": 324,
+     "pf": 109,
+     "pp": 60,
+     "qu": 120
+    },
+    "fim": 33,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-22",
+    "horasTotais": 694.5,
+    "detalhes": 169
+   },
+   "invariantesQuebradas": 0
+  },
+  "historico declarado 25h 9ess": {
+   "cat": "historico",
+   "entradaSha1": "95372774f259a81c2b1d882765392e2f50fac0f4",
+   "saidaSha1": "93b62ef531cfe70d91fa4534c50af567275630eb",
+   "resumo": {
+    "metas": 815,
+    "porTipo": {
+     "fl": 178,
+     "lp": 265,
+     "pf": 178,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 45,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-13",
+    "horasTotais": 1010.5,
+    "detalhes": 181
+   },
+   "invariantesQuebradas": 0
+  },
+  "historicoQuestoes 50-70 (50,60,69)": {
+   "cat": "historico",
+   "entradaSha1": "04af2f30260e43a53a99bdb893b0838776d2946f",
+   "saidaSha1": "2c6b3dad947e05aca00ebadb38128120caeb1f08",
+   "resumo": {
+    "metas": 625,
+    "porTipo": {
+     "fl": 113,
+     "lp": 143,
+     "pf": 113,
+     "pp": 136,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-17",
+    "horasTotais": 621.5,
+    "detalhes": 249
+   },
+   "invariantesQuebradas": 0
+  },
+  "historicoQuestoes <50 (30,45,49)": {
+   "cat": "historico",
+   "entradaSha1": "c7ccc21fdca09d61692df105a8a53e090f20d18b",
+   "saidaSha1": "2c6b3dad947e05aca00ebadb38128120caeb1f08",
+   "resumo": {
+    "metas": 625,
+    "porTipo": {
+     "fl": 113,
+     "lp": 143,
+     "pf": 113,
+     "pp": 136,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-17",
+    "horasTotais": 621.5,
+    "detalhes": 249
+   },
+   "invariantesQuebradas": 0
+  },
+  "historicoQuestoes =70": {
+   "cat": "historico",
+   "entradaSha1": "ae8fc714d9a39fd46973823670f0e0f123e35406",
+   "saidaSha1": "2c6b3dad947e05aca00ebadb38128120caeb1f08",
+   "resumo": {
+    "metas": 625,
+    "porTipo": {
+     "fl": 113,
+     "lp": 143,
+     "pf": 113,
+     "pp": 136,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-17",
+    "horasTotais": 621.5,
+    "detalhes": 249
+   },
+   "invariantesQuebradas": 0
+  },
+  "historicoQuestoes >70 (71,85,95)": {
+   "cat": "historico",
+   "entradaSha1": "3fd4726785d86e7d344d752cbe00354274eb4eee",
+   "saidaSha1": "2c6b3dad947e05aca00ebadb38128120caeb1f08",
+   "resumo": {
+    "metas": 625,
+    "porTipo": {
+     "fl": 113,
+     "lp": 143,
+     "pf": 113,
+     "pp": 136,
+     "qu": 120
+    },
+    "fim": 63,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-17",
+    "horasTotais": 621.5,
+    "detalhes": 249
+   },
+   "invariantesQuebradas": 0
+  },
+  "horasPontuais (+5 qua, folga sex)": {
+   "cat": "calendario",
+   "entradaSha1": "37d8fd5f156a81b3b051fccb2f132f0a7fec8a82",
+   "saidaSha1": "6a274d86e4760d9ab272cd52a016ec9abe8b45db",
+   "resumo": {
+    "metas": 712,
+    "porTipo": {
+     "fl": 120,
+     "lp": 210,
+     "pf": 120,
+     "pp": 142,
+     "qu": 120
+    },
+    "fim": 70,
+    "primeira": "2026-01-05",
+    "ultima": "2027-05-04",
+    "horasTotais": 686,
+    "detalhes": 262
+   },
+   "invariantesQuebradas": 0
+  },
+  "inicio numa quarta (start)": {
+   "cat": "calendario",
+   "entradaSha1": "cedc3866b791bc39cc72cd859d5d1fa2d0315840",
+   "saidaSha1": "355ad9d8069135c1f7cb47ce0cbb71e150894d06",
+   "resumo": {
+    "metas": 686,
+    "porTipo": {
+     "fl": 120,
+     "lp": 251,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-07",
+    "ultima": "2026-12-17",
+    "horasTotais": 706.5,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "jp desmarcada explicita 25h": {
+   "cat": "jp",
+   "entradaSha1": "e828477029e0c5ce4edadd34a9355f49faf3c7d7",
+   "saidaSha1": "82a57c3b718551818598834693ee8cdbccd314c2",
+   "resumo": {
+    "metas": 855,
+    "porTipo": {
+     "fl": 191,
+     "lp": 281,
+     "pf": 191,
+     "pp": 1,
+     "qu": 191
+    },
+    "fim": 49,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-07",
+    "horasTotais": 1080,
+    "detalhes": 192
+   },
+   "invariantesQuebradas": 0
+  },
+  "jp marcada 10h": {
+   "cat": "jp",
+   "entradaSha1": "6530c0cf2a974448eed614dc71dbf5df90dbd134",
+   "saidaSha1": "5668696cd5ee8dfbced2bbf010d1797072e82217",
+   "resumo": {
+    "metas": 666,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-12",
+    "horasTotais": 661,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "jp marcada 15h": {
+   "cat": "jp",
+   "entradaSha1": "3e73be03e1ceade5fd375f33f60316cc95f7854b",
+   "saidaSha1": "38a4a2a4c958db0b2f9e542601665093d11dac2e",
+   "resumo": {
+    "metas": 662,
+    "porTipo": {
+     "fl": 120,
+     "jp": 49,
+     "lp": 178,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 49,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-11",
+    "horasTotais": 719,
+    "detalhes": 244
+   },
+   "invariantesQuebradas": 0
+  },
+  "jp marcada 25h": {
+   "cat": "jp",
+   "entradaSha1": "fa2bc1cc56ad84544f80b10f491f2ef8ac19c2ea",
+   "saidaSha1": "25dbc76b212ff0bc8e536aae99a9f48b973bc9fe",
+   "resumo": {
+    "metas": 984,
+    "porTipo": {
+     "fl": 191,
+     "jp": 54,
+     "lp": 356,
+     "pf": 191,
+     "pp": 1,
+     "qu": 191
+    },
+    "fim": 54,
+    "primeira": "2026-01-05",
+    "ultima": "2027-01-15",
+    "horasTotais": 1171.5,
+    "detalhes": 246
+   },
+   "invariantesQuebradas": 0
+  },
+  "jp marcada 36h": {
+   "cat": "jp",
+   "entradaSha1": "8c486b258a943b699cc16b5e56bb0afce32bcb8f",
+   "saidaSha1": "c0c97a34b7846d3d96008ae0e1713353eee848b4",
+   "resumo": {
+    "metas": 986,
+    "porTipo": {
+     "fl": 191,
+     "jp": 36,
+     "lp": 373,
+     "pf": 191,
+     "pp": 4,
+     "qu": 191
+    },
+    "fim": 36,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-12",
+    "horasTotais": 1162,
+    "detalhes": 231
+   },
+   "invariantesQuebradas": 0
+  },
+  "maisPDFull=false 24h": {
+   "cat": "arranjo",
+   "entradaSha1": "5a7ca3bb171523a45263e95640496d478878df2e",
+   "saidaSha1": "5e36e28cb532a0e232df74285b2073af4211d896",
+   "resumo": {
+    "metas": 720,
+    "porTipo": {
+     "fl": 120,
+     "lp": 296,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-27",
+    "horasTotais": 729,
+    "detalhes": 184
+   },
+   "invariantesQuebradas": 0
+  },
+  "maisPDFull=true 8h/dia": {
+   "cat": "arranjo",
+   "entradaSha1": "bb4186b52679f3fb43ae475a91d13923d688a1ca",
+   "saidaSha1": "173fe2c53a9a2644762aaaea67f402aeec3cef8a",
+   "resumo": {
+    "metas": 663,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 6,
+     "qu": 120,
+     "rf": 20
+    },
+    "fim": 23,
+    "primeira": "2026-01-05",
+    "ultima": "2026-06-10",
+    "horasTotais": 739.5,
+    "detalhes": 146
+   },
+   "invariantesQuebradas": 0
+  },
+  "paginasLidas+sobras (interrompido)": {
+   "cat": "ritmo",
+   "entradaSha1": "46136962cbf6dca432e607a682948762a10d1b75",
+   "saidaSha1": "fb78cab5500076996624b37a81f574e05dde0b3e",
+   "resumo": {
+    "metas": 679,
+    "porTipo": {
+     "fl": 120,
+     "lp": 255,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 51,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-23",
+    "horasTotais": 707.75,
+    "detalhes": 679
+   },
+   "invariantesQuebradas": 0
+  },
+  "params: durLp=60 velPadrao=30": {
+   "cat": "ritmo",
+   "entradaSha1": "cf7b9b41916d27bf1dc22db156bc4a6bc32775af",
+   "saidaSha1": "76d3f9e3357b8529f891396fdf03c29cedd6d889",
+   "resumo": {
+    "metas": 631,
+    "porTipo": {
+     "fl": 120,
+     "lp": 259,
+     "pf": 120,
+     "pp": 12,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-04",
+    "horasTotais": 677,
+    "detalhes": 132
+   },
+   "invariantesQuebradas": 0
+  },
+  "params: offsetRevisao=3 lpMetasDia=2": {
+   "cat": "ritmo",
+   "entradaSha1": "800ba64208cbfaeb1a730fc91346d1909a124a25",
+   "saidaSha1": "80a5d4bb3eeda87f941eef77f070f2c4f2f83492",
+   "resumo": {
+    "metas": 677,
+    "porTipo": {
+     "fl": 120,
+     "lp": 242,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 48,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-30",
+    "horasTotais": 702,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "params: tetoPdfDia=1 (8h)": {
+   "cat": "ritmo",
+   "entradaSha1": "e0e5714b0ffc2d665aedc5f27bc2c207fd73f0fc",
+   "saidaSha1": "173fe2c53a9a2644762aaaea67f402aeec3cef8a",
+   "resumo": {
+    "metas": 663,
+    "porTipo": {
+     "fl": 120,
+     "lp": 277,
+     "pf": 120,
+     "pp": 6,
+     "qu": 120,
+     "rf": 20
+    },
+    "fim": 23,
+    "primeira": "2026-01-05",
+    "ultima": "2026-06-10",
+    "horasTotais": 739.5,
+    "detalhes": 146
+   },
+   "invariantesQuebradas": 0
+  },
+  "recesso semana inteira": {
+   "cat": "calendario",
+   "entradaSha1": "7192fa342deae2ffe974c3cb0bfcd166aa2bcd1c",
+   "saidaSha1": "3d5e41b66f36972dbc6e166ddef433a07b592dcb",
+   "resumo": {
+    "metas": 744,
+    "porTipo": {
+     "fl": 120,
+     "lp": 309,
+     "pf": 120,
+     "pp": 75,
+     "qu": 120
+    },
+    "fim": 52,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-30",
+    "horasTotais": 735.5,
+    "detalhes": 195
+   },
+   "invariantesQuebradas": 0
+  },
+  "reta final com progresso": {
+   "cat": "progresso",
+   "entradaSha1": "3a3e39812b18e3e1efabbb1966f67dd903a350f2",
+   "saidaSha1": "f639de44dc43dac033c26141b371435a74a9aeef",
+   "resumo": {
+    "metas": 154,
+    "porTipo": {
+     "fl": 24,
+     "lp": 65,
+     "pf": 24,
+     "pp": 17,
+     "qu": 24
+    },
+    "fim": 12,
+    "primeira": "2026-01-05",
+    "ultima": "2026-03-27",
+    "horasTotais": 150,
+    "detalhes": 41
+   },
+   "invariantesQuebradas": 0
+  },
+  "revisao obrigatoria 10h": {
+   "cat": "progresso",
+   "entradaSha1": "e5590a2624f8aca6d9972c839de4de296b118af7",
+   "saidaSha1": "1129ade807a7484074686415497cd2fb430b7e40",
+   "resumo": {
+    "metas": 660,
+    "porTipo": {
+     "fl": 120,
+     "lp": 148,
+     "pf": 120,
+     "pp": 152,
+     "qu": 120
+    },
+    "fim": 66,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-08",
+    "horasTotais": 655,
+    "detalhes": 272
+   },
+   "invariantesQuebradas": 0
+  },
+  "rotina reduzida no meio (10h)": {
+   "cat": "calendario",
+   "entradaSha1": "119e0c54bb0246c494cc146865c3c6946e5a64ba",
+   "saidaSha1": "d15499f77f47a4262208495849c39d0437bcc86a",
+   "resumo": {
+    "metas": 683,
+    "porTipo": {
+     "fl": 120,
+     "lp": 198,
+     "pf": 120,
+     "pp": 125,
+     "qu": 120
+    },
+    "fim": 60,
+    "primeira": "2026-01-05",
+    "ultima": "2027-02-24",
+    "horasTotais": 680,
+    "detalhes": 245
+   },
+   "invariantesQuebradas": 0
+  },
+  "rotina trocada no meio": {
+   "cat": "calendario",
+   "entradaSha1": "148837d81d8188574321ab7716f3b264af8b7f05",
+   "saidaSha1": "56414393e552a7fcc13849f66151a30c6e1e797a",
+   "resumo": {
+    "metas": 711,
+    "porTipo": {
+     "fl": 120,
+     "lp": 274,
+     "pf": 120,
+     "pp": 77,
+     "qu": 120
+    },
+    "fim": 39,
+    "primeira": "2026-01-05",
+    "ultima": "2026-10-02",
+    "horasTotais": 718,
+    "detalhes": 197
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem LegProc 10h": {
+   "cat": "metas",
+   "entradaSha1": "c16033b893d829cd55c8f2d1dde012bad3a9b559",
+   "saidaSha1": "33fd6587412cd3c5df0ee9bfad544b877ac5c7c9",
+   "resumo": {
+    "metas": 506,
+    "porTipo": {
+     "fl": 120,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 66,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-09",
+    "horasTotais": 581,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem LegProc 24h": {
+   "cat": "metas",
+   "entradaSha1": "f46a7a200657a8b9fb7f236c48bef1fc48fd92f1",
+   "saidaSha1": "109f1cb15a996422ad03a4e4226929ef11d45dc8",
+   "resumo": {
+    "metas": 424,
+    "porTipo": {
+     "fl": 120,
+     "pf": 120,
+     "pp": 64,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-26",
+    "horasTotais": 581,
+    "detalhes": 184
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem LegProc 35h": {
+   "cat": "metas",
+   "entradaSha1": "929e36634077553ab2cdea103336bb15d43bee17",
+   "saidaSha1": "af531af78acae09d90bbf18b70415b6f422f1fc9",
+   "resumo": {
+    "metas": 576,
+    "porTipo": {
+     "fl": 191,
+     "pf": 191,
+     "pp": 3,
+     "qu": 191
+    },
+    "fim": 35,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-03",
+    "horasTotais": 939.5,
+    "detalhes": 194
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem revisao ativa (normalizado)": {
+   "cat": "ritmo",
+   "entradaSha1": "fd925a9b074472bf20e5f850669f8e010eb2f178",
+   "saidaSha1": "5668696cd5ee8dfbced2bbf010d1797072e82217",
+   "resumo": {
+    "metas": 666,
+    "porTipo": {
+     "fl": 120,
+     "lp": 160,
+     "pf": 120,
+     "pp": 146,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-12",
+    "horasTotais": 661,
+    "detalhes": 266
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial 24h notas mistas": {
+   "cat": "progresso",
+   "entradaSha1": "4e641f52a5d7c37723d87ce896c5fdc13caca2e2",
+   "saidaSha1": "ebb03b83b2e5a216280d31eb80563eaa30a2fe77",
+   "resumo": {
+    "metas": 723,
+    "porTipo": {
+     "fl": 120,
+     "lp": 294,
+     "pf": 120,
+     "pp": 69,
+     "qu": 120
+    },
+    "fim": 34,
+    "primeira": "2026-01-05",
+    "ultima": "2026-08-27",
+    "horasTotais": 728,
+    "detalhes": 189
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial 25h notas mistas": {
+   "cat": "progresso",
+   "entradaSha1": "f5281e3d03a1a720f0763584528c0a89aa903645",
+   "saidaSha1": "a2b4b6b8fb83fc1230e4ff9234fcc980b1418c2d",
+   "resumo": {
+    "metas": 859,
+    "porTipo": {
+     "fl": 206,
+     "lp": 259,
+     "pf": 201,
+     "pp": 2,
+     "qu": 191
+    },
+    "fim": 49,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-07",
+    "horasTotais": 1124,
+    "detalhes": 218
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial 9ess + jp": {
+   "cat": "progresso",
+   "entradaSha1": "8d34ac52cc4b8455ca761d2cd61e6f11a0ca2c35",
+   "saidaSha1": "d2a1469aa3678d0b022bede47c0598c2764a79a7",
+   "resumo": {
+    "metas": 913,
+    "porTipo": {
+     "fl": 203,
+     "jp": 45,
+     "lp": 275,
+     "pf": 197,
+     "pp": 2,
+     "qu": 191
+    },
+    "fim": 51,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-25",
+    "horasTotais": 1161,
+    "detalhes": 256
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial notas 49/50/70/71 10h": {
+   "cat": "progresso",
+   "entradaSha1": "b1bb83cc25316e13a196ec768cabcccdb0372349",
+   "saidaSha1": "cc7dba3ef1398ea5e0c5ec58cb9bcaf2cc245bbb",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 268,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 715,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial notas 50-70 (50,60,69)": {
+   "cat": "progresso",
+   "entradaSha1": "552e2c6f3edf8aa08ecb61d69111081ee074ae49",
+   "saidaSha1": "cc7dba3ef1398ea5e0c5ec58cb9bcaf2cc245bbb",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 268,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 715,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial notas <50 (40,45,49,30)": {
+   "cat": "progresso",
+   "entradaSha1": "eb9284a26f74e069ba7bbc916f90bc1ecdccc25e",
+   "saidaSha1": "cc7dba3ef1398ea5e0c5ec58cb9bcaf2cc245bbb",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 268,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 715,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial notas =70 (70,70,70)": {
+   "cat": "progresso",
+   "entradaSha1": "f7e351d78909f8da4aec7a74d8f0a0e2e3f57497",
+   "saidaSha1": "cc7dba3ef1398ea5e0c5ec58cb9bcaf2cc245bbb",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 268,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 715,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial notas >70 (71,85,95)": {
+   "cat": "progresso",
+   "entradaSha1": "d9cd7f2a9998b822d607df9e57c21cb6fb77cf12",
+   "saidaSha1": "cc7dba3ef1398ea5e0c5ec58cb9bcaf2cc245bbb",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 268,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 715,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial rev4 (hoje 26/01)": {
+   "cat": "progresso",
+   "entradaSha1": "08f5d79db671973fbf394e0d8ee558c860c70d45",
+   "saidaSha1": "73f94af71396d4db0eab9be1324b8212700f8e85",
+   "resumo": {
+    "metas": 694,
+    "porTipo": {
+     "fl": 120,
+     "lp": 263,
+     "pf": 120,
+     "pp": 71,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-15",
+    "horasTotais": 712.5,
+    "detalhes": 191
+   },
+   "invariantesQuebradas": 0
+  },
+  "sem.especial rev6 hoje dentro da semana": {
+   "cat": "progresso",
+   "entradaSha1": "c9e03ff82074af99610e4e59b8badf27a4fa4911",
+   "saidaSha1": "5ac84ee2b101d33a05faede8e58d9399f155b4d9",
+   "resumo": {
+    "metas": 689,
+    "porTipo": {
+     "fl": 120,
+     "lp": 259,
+     "pf": 120,
+     "pp": 70,
+     "qu": 120
+    },
+    "fim": 50,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-14",
+    "horasTotais": 710.5,
+    "detalhes": 190
+   },
+   "invariantesQuebradas": 0
+  },
+  "so PDFull (sem fl/qu/lp) 10h": {
+   "cat": "metas",
+   "entradaSha1": "2929cd1486c976027828a342a6d183f1c6503c60",
+   "saidaSha1": "c5145454706085c9b98e352c59fccc221523fd0c",
+   "resumo": {
+    "metas": 265,
+    "porTipo": {
+     "pf": 120,
+     "pp": 145
+    },
+    "fim": 62,
+    "primeira": "2026-01-05",
+    "ultima": "2027-03-10",
+    "horasTotais": 401,
+    "detalhes": 265
+   },
+   "invariantesQuebradas": 0
+  },
+  "so PDFull+LegProc (sem fl/qu) 15h": {
+   "cat": "metas",
+   "entradaSha1": "44ca000c891e783dc4344970d00613b353a8c039",
+   "saidaSha1": "0997f2e18672f474bb6e228d06aa79b0162191a0",
+   "resumo": {
+    "metas": 425,
+    "porTipo": {
+     "lp": 238,
+     "pf": 120,
+     "pp": 67
+    },
+    "fim": 38,
+    "primeira": "2026-01-05",
+    "ultima": "2026-09-25",
+    "horasTotais": 520,
+    "detalhes": 187
+   },
+   "invariantesQuebradas": 0
+  },
+  "so quatro dias 10h": {
+   "cat": "calendario",
+   "entradaSha1": "8a844c2e2332cb6e7c332bc76c77bda2414b3031",
+   "saidaSha1": "e86a7e0f3a23a528586f8137d25fb5fae2a6d4ba",
+   "resumo": {
+    "metas": 609,
+    "porTipo": {
+     "fl": 120,
+     "lp": 164,
+     "pf": 120,
+     "pp": 85,
+     "qu": 120
+    },
+    "fim": 67,
+    "primeira": "2026-01-05",
+    "ultima": "2027-04-14",
+    "horasTotais": 663,
+    "detalhes": 205
+   },
+   "invariantesQuebradas": 0
+  },
+  "todas as disciplinas 36h": {
+   "cat": "discs",
+   "entradaSha1": "922d9d49f38437dcbd64abb3ea4d758ce0361239",
+   "saidaSha1": "f7de4310486a31986c59e13e4080cd08aa53b752",
+   "resumo": {
+    "metas": 1418,
+    "porTipo": {
+     "fl": 251,
+     "lp": 622,
+     "pf": 268,
+     "pp": 9,
+     "qu": 268
+    },
+    "fim": 51,
+    "primeira": "2026-01-05",
+    "ultima": "2026-12-23",
+    "horasTotais": 1621.5,
+    "detalhes": 277
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: 0h": {
+   "cat": "erro",
+   "entradaSha1": "010cc0f1a757235d68f8f2734d5f2851671c0af8",
+   "saidaSha1": "9ae732f1b2408699a4c7ab5115a5d80779832df9",
+   "resumo": {
+    "validacao": "Selecione pelo menos 10h de estudo por semana."
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: 10h valido": {
+   "cat": "erro",
+   "entradaSha1": "a52bb40168260d91c42dd3f8197f3e9028f49b11",
+   "saidaSha1": "ef88e8a60adebfdf1df82ec94e7d6e116f116baa",
+   "resumo": {
+    "validacao": ""
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: 24h30 valido": {
+   "cat": "erro",
+   "entradaSha1": "eda8d9ffa05c63d526c418ef1f9cca98a80e3f70",
+   "saidaSha1": "ef88e8a60adebfdf1df82ec94e7d6e116f116baa",
+   "resumo": {
+    "validacao": ""
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: 8h semanais": {
+   "cat": "erro",
+   "entradaSha1": "865f276317b2a49c8ef51f5c4ce6e1b99e30d7ac",
+   "saidaSha1": "9ae732f1b2408699a4c7ab5115a5d80779832df9",
+   "resumo": {
+    "validacao": "Selecione pelo menos 10h de estudo por semana."
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: passo 2h15": {
+   "cat": "erro",
+   "entradaSha1": "8daa869c78a82ae86da6b76d032da31e94ec223c",
+   "saidaSha1": "968181b6bb01ca035ba681af2d0a46ca559d4e43",
+   "resumo": {
+    "validacao": "Selecione pelo menos 2h em cada dia de estudo, em intervalos de 30min."
+   },
+   "invariantesQuebradas": 0
+  },
+  "validarHoras300: selecionar 1h": {
+   "cat": "erro",
+   "entradaSha1": "14a0fa643ed5965ee56737ebd84218737882b303",
+   "saidaSha1": "968181b6bb01ca035ba681af2d0a46ca559d4e43",
+   "resumo": {
+    "validacao": "Selecione pelo menos 2h em cada dia de estudo, em intervalos de 30min."
+   },
+   "invariantesQuebradas": 0
+  },
+  "vel 12 pag/h 15h": {
+   "cat": "ritmo",
+   "entradaSha1": "d46e09a80214200dba3e356021709d4f86eae9d3",
+   "saidaSha1": "0d5532c0c688c2ec51ab17f696f95f35def145be",
+   "resumo": {
+    "metas": 740,
+    "porTipo": {
+     "fl": 120,
+     "lp": 236,
+     "pf": 120,
+     "pp": 144,
+     "qu": 120
+    },
+    "fim": 60,
+    "primeira": "2026-01-05",
+    "ultima": "2027-02-23",
+    "horasTotais": 852,
+    "detalhes": 264
+   },
+   "invariantesQuebradas": 0
+  },
+  "vel 25 pag/h 15h": {
+   "cat": "ritmo",
+   "entradaSha1": "7c073d2c20c01b9d2d0987cf40284a7ebb0d1140",
+   "saidaSha1": "66fcaad6ff443c7e1a576ae40061f34e11fac951",
+   "resumo": {
+    "metas": 699,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 15,
+     "qu": 120
+    },
+    "fim": 46,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-18",
+    "horasTotais": 624.5,
+    "detalhes": 135
+   },
+   "invariantesQuebradas": 0
+  },
+  "vel 40 pag/h 15h": {
+   "cat": "ritmo",
+   "entradaSha1": "1d4235e0a9470b14c9b02b53f4dd0bdcd33c127a",
+   "saidaSha1": "368b245882ae31403e28e41f7342d99098f52a70",
+   "resumo": {
+    "metas": 689,
+    "porTipo": {
+     "fl": 120,
+     "lp": 324,
+     "pf": 120,
+     "pp": 5,
+     "qu": 120
+    },
+    "fim": 45,
+    "primeira": "2026-01-05",
+    "ultima": "2026-11-10",
+    "horasTotais": 530,
+    "detalhes": 125
+   },
+   "invariantesQuebradas": 0
+  },
+  "vel 8 pag/h 15h": {
+   "cat": "ritmo",
+   "entradaSha1": "9a2a42c07e00c421e325d90c7f63970ea9495e5f",
+   "saidaSha1": "cf85c982f047d8b41cb53160b5722630024d05ea",
+   "resumo": {
+    "erro": {
+     "nome": "ErroInsuficiencia",
+     "codigo": "insuficiencia",
+     "mensagem": "O plano ultrapassa 600 semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data."
+    }
+   },
+   "invariantesQuebradas": 0
+  }
+ }
+}

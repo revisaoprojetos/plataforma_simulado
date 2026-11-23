@@ -18,6 +18,7 @@
 
 import * as M28 from './motor28'
 import * as M30 from './motor30'
+import type { RegrasMotor } from './regras'
 import { subtipoMeta, rotuloMeta, semanaOrigemDaMeta } from './meta-ids'
 export type { ItemLP } from './motor28'
 
@@ -72,8 +73,8 @@ export function recessoEm(cfg: Cfg, d: DataISO): Recesso | null {
 export function horasDia(cfg: Cfg, d: DataISO): number {
   return M28.horasDia(cfg as unknown as M28.Cfg28, d)
 }
-export function ehRev(cfg: Cfg, sem: number): boolean {
-  return M28.ehRev(cfg as unknown as M28.Cfg28, sem) // fonte única: revisão obrigatória nos planos 3.x; regra antiga (ativa/cada) no legado
+export function ehRev(cfg: Cfg, sem: number, regras?: RegrasMotor): boolean {
+  return M28.ehRev(cfg as unknown as M28.Cfg28, sem, regras) // fonte única: revisão obrigatória nos planos 3.x; regra antiga (ativa/cada) no legado
 }
 
 /** Ritmo padrão de leitura (uso interno): 17 páginas por hora. */
@@ -90,8 +91,8 @@ export function dMon(s: DataISO): DataISO { return dAdd(s, -dDow(s)) }
 export function semDe(start: DataISO, s: DataISO): number { return Math.round((+dParse(dMon(s)) - +dParse(dMon(start))) / 864e5 / 7) + 1 }
 export function semInicio(start: DataISO, sem: number): DataISO { return dAdd(dMon(start), (sem - 1) * 7) }
 // mesma posição na semana, n semanas "de conteúdo" depois (pula as de revisão)
-export function proxSemConteudo(cfg: Cfg, s: DataISO, n: number): DataISO {
-  return M28.proxSemConteudo(cfg as unknown as M28.Cfg28, s, n)
+export function proxSemConteudo(cfg: Cfg, s: DataISO, n: number, regras?: RegrasMotor): DataISO {
+  return M28.proxSemConteudo(cfg as unknown as M28.Cfg28, s, n, regras)
 }
 
 /* Duração das metas, em minutos. PDFULL: páginas ÷ ritmo, em blocos de 30 min. */

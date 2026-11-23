@@ -13,6 +13,7 @@ import {
   salvarRegraAction, pausarRegraAction, retomarRegraAction, cancelarRegraAction, excluirRegraAction,
   reprocessarPendentesAction, simularPedidoAction, listarPedidosAction, salvarStatusMapAction, removerStatusMapAction,
 } from './actions'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 const ABAS = [['regras', 'Regras'], ['pedidos', 'Pedidos'], ['simulador', 'Simulador'], ['status', 'Mapa de status']] as const
 type Aba = (typeof ABAS)[number][0]
@@ -99,6 +100,7 @@ export function LiberacaoClient({ regras, produtos, statusMaps, pedidosInicial, 
         </div>
       </div>
 
+      <BarraSetorSlot />
       {/* Abas (sublinhado) */}
       <div className="flex gap-1 border-b">
         {ABAS.map(([k, label]) => (

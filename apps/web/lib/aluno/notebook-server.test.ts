@@ -13,12 +13,12 @@ describe('sanitizarDoc', () => {
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.doc.content[0].content[0].marks).toEqual([{ type: 'bold' }, { type: 'italic' }])
   })
-  it('rejeita nó desconhecido (image, script)', () => {
+  it('rejeita nó desconhecido (script) e image fora da rota do caderno', () => {
     expect(sanitizarDoc(doc({ type: 'image', attrs: { src: 'data:image/png;base64,AAA' } })).ok).toBe(false)
     expect(sanitizarDoc(doc({ type: 'iframe' })).ok).toBe(false)
   })
   it('rejeita mark desconhecida e raiz inválida', () => {
-    expect(sanitizarDoc(doc(p('x', [{ type: 'textStyle' }]))).ok).toBe(false)
+    expect(sanitizarDoc(doc(p('x', [{ type: 'fooMark' }]))).ok).toBe(false)
     expect(sanitizarDoc({ type: 'paragraph' }).ok).toBe(false)
     expect(sanitizarDoc(null).ok).toBe(false)
   })
@@ -41,7 +41,7 @@ describe('sanitizarDoc', () => {
   it('descarta attrs desconhecidos e valida heading/uuid', () => {
     const r = sanitizarDoc(doc({ type: 'heading', attrs: { level: 2, onclick: 'x' }, content: [{ type: 'text', text: 'T' }] }))
     expect(r.ok && r.doc.content[0].attrs).toEqual({ level: 2 })
-    expect(sanitizarDoc(doc({ type: 'heading', attrs: { level: 5 } })).ok).toBe(false)
+    expect(sanitizarDoc(doc({ type: 'heading', attrs: { level: 7 } })).ok).toBe(false)
     expect(sanitizarDoc(doc({ type: 'questaoRef', attrs: { questao_id: 'nao-uuid' } })).ok).toBe(false)
     expect(sanitizarDoc(doc({ type: 'questaoRef', attrs: { questao_id: U } })).ok).toBe(true)
   })

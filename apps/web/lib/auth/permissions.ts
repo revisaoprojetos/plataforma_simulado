@@ -149,3 +149,20 @@ export async function checkPermission(permission: string): Promise<boolean> {
   const access = await getCurrentAccess()
   return accessCan(access, permission)
 }
+
+/**
+ * Variante SUPER-ONLY de `getCurrentAccess` p/ server actions de áreas reservadas ao super-admin
+ * (Sistema, Chaves de API, Webhooks, Regras de liberação, Segurança…). Quem NÃO é super-admin recebe
+ * um Access vazio (sem userId/tenant/permissões) — todo `accessCan`/`isAdmin` seguinte falha. Cargo de
+ * acesso total do tenant (isAdmin) NÃO basta. Usada com alias: `getCurrentAccessSuper as getCurrentAccess`.
+ */
+export async function getCurrentAccessSuper(): Promise<Access> {
+  if (!(await isSuperAdmin())) return { ...EMPTY }
+  return getCurrentAccess()
+}
+
+/** `checkPermission` exigindo, além da permissão, ser super-admin global. */
+export async function checkPermissionSuper(permission: string): Promise<boolean> {
+  if (!(await isSuperAdmin())) return false
+  return checkPermission(permission)
+}

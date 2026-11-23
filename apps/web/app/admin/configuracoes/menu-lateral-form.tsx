@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { iconeCargo } from '@/lib/gamificacao/cargo-icones'
 import { CargoIconePicker } from '@/components/admin/cargo-icone-picker'
+import { SETORES, iconeDaAba, chaveRotuloAba } from '@/lib/admin/setores'
 import { rotuloDe, IconeMenu, LabelImg, resolverSidebarRotulos, type SidebarRotulos, type IconeOverride, type RotuloOverride } from '@/lib/sidebar-rotulos'
 
 type Ic = ComponentType<{ className?: string }>
@@ -22,19 +23,18 @@ type ItemCat = { href: string; label: string; Icon: Ic }
 
 // Catálogo = espelho das sidebars (chaves: grupo=label original, item/filho=href) + ícone padrão real.
 const ADMIN_DASH: ItemCat = { href: '/admin', label: 'Dashboard', Icon: LayoutDashboard }
-const ADMIN_CAT: { grupo: string; Icon: Ic; itens: ItemCat[] }[] = [
-  { grupo: 'Simulado', Icon: BookOpen, itens: [{ href: '/admin/simulados', label: 'Aplicação de Simulado', Icon: ClipboardList }, { href: '/admin/correcao', label: 'Correção (discursivas)', Icon: PenLine }, { href: '/admin/questoes', label: 'Questões', Icon: BookOpen }, { href: '/admin/modelos-caderno', label: 'Modelos de Caderno', Icon: LayoutTemplate }] },
-  { grupo: 'Cronograma', Icon: CalendarDays, itens: [{ href: '/admin/cronogramas', label: 'Catálogo', Icon: CalendarDays }, { href: '/admin/cronogramas/relatorios', label: 'Relatórios', Icon: BarChart3 }, { href: '/admin/cronogramas/importar', label: 'Importar', Icon: Upload }] },
-  { grupo: 'Desafio de Lei Seca', Icon: Library, itens: [{ href: '/admin/leitura', label: 'Biblioteca', Icon: Library }, { href: '/admin/leitura/analise', label: 'Análise', Icon: BarChart3 }] },
-  { grupo: 'Jurisprudência', Icon: Library, itens: [{ href: '/admin/jurisprudencia', label: 'Biblioteca', Icon: Library }] },
-  { grupo: 'Alunos', Icon: GraduationCap, itens: [{ href: '/admin/estudantes', label: 'Estudantes', Icon: Users }, { href: '/admin/grupos', label: 'Grupos', Icon: UsersRound }, { href: '/admin/impersonation', label: 'Visualizações de aluno', Icon: Eye }] },
-  { grupo: 'Conexões', Icon: Share2, itens: [{ href: '/admin/integracoes', label: 'Integrações', Icon: Plug }, { href: '/admin/conexoes/webhooks', label: 'Webhooks & n8n', Icon: Webhook }] },
-  { grupo: 'Análise', Icon: BarChart3, itens: [{ href: '/admin/relatorios/graficos', label: 'Relatório Gráfico', Icon: PieChart }, { href: '/admin/relatorios/simulados', label: 'Relatório Simulado', Icon: ClipboardList }, { href: '/admin/relatorios/disciplinas', label: 'Relatório Disciplina', Icon: BookOpen }, { href: '/admin/relatorios/estudantes', label: 'Relatório Estudantes', Icon: GraduationCap }, { href: '/admin/relatorios/ranking', label: 'Ranking', Icon: Trophy }, { href: '/admin/relatorios/nps', label: 'NPS / Satisfação', Icon: Star }, { href: '/admin/relatorios/grupos', label: 'Grupos por aluno', Icon: Users }] },
-  { grupo: 'Auditoria', Icon: ClipboardCheck, itens: [{ href: '/admin/auditoria?tipo=acessos', label: 'Acessos', Icon: LogIn }, { href: '/admin/auditoria?tipo=modificacoes', label: 'Modificações', Icon: FilePen }, { href: '/admin/auditoria?tipo=automacoes', label: 'Automações', Icon: Zap }, { href: '/admin/auditoria?tipo=visualizacoes', label: 'Visualizações', Icon: Eye }] },
-  { grupo: 'Engajamento', Icon: Trophy, itens: [{ href: '/admin/gamificacao', label: 'Gamificação', Icon: Trophy }] },
-  { grupo: 'Feedback', Icon: MessagesSquare, itens: [{ href: '/admin/comentarios', label: 'Comentários', Icon: MessageSquare }, { href: '/admin/feedbacks', label: 'Reports de Questões', Icon: Flag }] },
-  { grupo: 'Configuração', Icon: SlidersHorizontal, itens: [{ href: '/admin/administradores', label: 'Administradores', Icon: UserCog }, { href: '/admin/transcricao', label: 'Chaves de API', Icon: KeyRound }, { href: '/admin/sistema', label: 'Sistema', Icon: ServerCog }, { href: '/admin/configuracoes/mensagens', label: 'Mensagens', Icon: MessageSquare }, { href: '/admin/configuracoes/ajuda', label: 'Ajuda / FAQ', Icon: HelpCircle }, { href: '/admin/configuracoes/banners', label: 'Banners & Pop-ups', Icon: Megaphone }, { href: '/admin/lgpd', label: 'LGPD', Icon: ShieldCheck }, { href: '/admin/lixeira', label: 'Lixeira', Icon: Trash2 }, { href: '/admin/ajuda', label: 'Ajuda', Icon: HelpCircle }] },
-]
+// ESPELHO da navegação REAL: derivado de SETORES (lib/admin/setores.ts — fonte única), então nunca fica defasado.
+// Chave de SETOR = label do setor (aproveita overrides antigos de grupo com o mesmo nome); chave de ITEM = href.
+// O setor "Super Admin" fica de fora (só o super-admin o vê; não é personalizável por tenant).
+const ADMIN_CAT: { grupo: string; Icon: Ic; itens: ItemCat[] }[] = SETORES
+  .filter((s) => !s.superOnly && s.id !== 'inicio') // Início = a linha "Dashboard" (ADMIN_DASH) acima
+  .map((s) => ({
+    grupo: s.label,
+    Icon: s.icone as Ic,
+    // A sidebar lista 1 linha por ABA (cluster). Setor de 1 aba só (Engajamento) é link direto: só a linha do setor.
+    // Chave do override: aba de 1 item = href (compatível com overrides antigos); aba com vários = `aba:<id>`.
+    itens: s.abas.length === 1 ? [] : s.abas.map((a) => ({ href: chaveRotuloAba(a), label: a.label, Icon: iconeDaAba(a) as Ic })),
+  }))
 const ALUNO_CAT: (ItemCat & { filhos?: { href: string; label: string }[] })[] = [
   { href: '/aluno', label: 'Início', Icon: Home },
   { href: '/aluno/simulados', label: 'Simulados Realizados', Icon: ClipboardList },

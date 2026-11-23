@@ -1,0 +1,97 @@
+# BookStack + AFFiNE LOCAIS (so para ver/testar a interface nesta maquina). Guia: docs/cadernos-externos-teste.md
+#   docker compose -f docker-compose.cadernos-teste.yml up -d
+#   BookStack: http://localhost:6875  (login nativo: admin@admin.com / password — TROQUE)
+#   AFFiNE:    http://localhost:3010  (crie a conta admin no primeiro acesso)
+#
+# ATENCAO — OIDC NAO funciona local: o BookStack exige issuer HTTPS (RS256) e o provedor OIDC da plataforma
+# nao e alcancavel como https://localhost. Por isso aqui o BookStack usa AUTH_METHOD=standard (login nativo).
+# Para testar o OIDC de verdade, use o deploy de producao/Portainer (docker-compose.portainer.yml) ou um tunel
+# https (ex.: cloudflared) + CADERNOS_OIDC_ISSUER apontando para ele.
+# Iframe local: a plataforma em http://localhost:3000 embeda http://localhost:6875 / :3010 (mesmo site "localhost").
+# Defina NEXT_PUBLIC_BOOKSTACK_URL=http://localhost:6875 e NEXT_PUBLIC_AFFINE_URL=http://localhost:3010 no apps/web/.env.local.
+# Senhas abaixo sao de EXEMPLO local; nunca reutilize em producao.
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:${BOOKSTACK_VERSION:-latest}
+    ports: ["6875:80"]
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: America/Sao_Paulo
+      APP_URL: http://localhost:6875
+      # APP_KEY de exemplo (so local). Gerar outro: docker run --rm lscr.io/linuxserver/bookstack php /app/www/artisan key:generate --show
+      APP_KEY: base64:Zm9yLWxvY2FsLXRlc3Qtb25seS0zMmJ5dGVzLWtleSE=
+      DB_HOST: bookstack_db
+      DB_PORT: 3306
+      DB_DATABASE: bookstack
+      DB_USER: bookstack
+      DB_USERNAME: bookstack
+      DB_PASS: bookstack_local
+      DB_PASSWORD: bookstack_local
+      ALLOWED_IFRAME_HOSTS: http://localhost:3000 http://localhost:3001
+      AUTH_METHOD: standard
+      # Para testar o OIDC (precisa issuer https): AUTH_METHOD=oidc + OIDC_* (ver compose do Portainer);
+      # se o auto-login te trancar fora, acesse /login?prevent_auto_init=true
+    volumes: ["bookstack_config:/config"]
+    depends_on: [bookstack_db]
+
+  bookstack_db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: bookstack
+      MARIADB_USER: bookstack
+      MARIADB_PASSWORD: bookstack_local
+      MARIADB_ROOT_PASSWORD: root_local
+    volumes: ["bookstack_db_data:/var/lib/mysql"]
+
+  affine:
+    image: ghcr.io/toeverything/affine:${AFFINE_VERSION:-stable}
+    ports: ["3010:3010"]
+    environment:
+      AFFINE_SERVER_EXTERNAL_URL: http://localhost:3010
+      AFFINE_SERVER_PORT: 3010
+      DATABASE_URL: postgresql://affine:affine_local@affine_postgres:5432/affine
+      REDIS_SERVER_HOST: affine_redis
+      AFFINE_INDEXER_ENABLED: "false"
+    volumes: ["affine_storage:/root/.affine/storage", "affine_config:/root/.affine/config"]
+    depends_on:
+      affine_migration: { condition: service_completed_successfully }
+      affine_redis: { condition: service_started }
+
+  affine_migration:
+    image: ghcr.io/toeverything/affine:${AFFINE_VERSION:-stable}
+    command: ["sh", "-c", "node ./scripts/self-host-predeploy.js"]
+    environment:
+      AFFINE_SERVER_EXTERNAL_URL: http://localhost:3010
+      DATABASE_URL: postgresql://affine:affine_local@affine_postgres:5432/affine
+      REDIS_SERVER_HOST: affine_redis
+      AFFINE_INDEXER_ENABLED: "false"
+    volumes: ["affine_storage:/root/.affine/storage", "affine_config:/root/.affine/config"]
+    depends_on:
+      affine_postgres: { condition: service_healthy }
+      affine_redis: { condition: service_started }
+    restart: "no"
+
+  affine_postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: affine
+      POSTGRES_PASSWORD: affine_local
+      POSTGRES_DB: affine
+    volumes: ["affine_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "affine", "-d", "affine"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  affine_redis:
+    image: redis:7-alpine
+
+volumes:
+  bookstack_config:
+  bookstack_db_data:
+  affine_storage:
+  affine_config:
+  affine_pgdata:

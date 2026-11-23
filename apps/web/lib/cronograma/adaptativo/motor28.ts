@@ -89,12 +89,17 @@ export interface Contexto {
   notas?: Record<string, NotaTema> | null
 }
 
+import { REGRAS_PADRAO, type RegrasMotor } from './regras'
+import { faixaPorMinutos, cicloDaFaixa, opcoesDaFaixa, padraoDaFaixa, type FaixaCarga } from './faixas-carga'
+import { TIPOS_META, duracaoPadrao } from './tipos-meta'
+
 export const VERSAO_MOTOR = '2.8.1'
 export const SEM_FLASH = new Set(['Direito Eleitoral', 'Direito Internacional', 'Direito Internacional Privado', 'Legislação de Ensino', 'Legislação da AGU'])
 export const MAX_SEM = 200
 export const VEL_PADRAO = 17
-export const DUR: Record<string, number> = { fl: 60, qu: 30, lp: 30 }
-export const DUR_REVISAO: Record<string, number> = { rf: 60, rq: 30 }
+// durações padrão vêm do REGISTRO ÚNICO de tipos de meta (tipos-meta.ts)
+export const DUR: Record<string, number> = { fl: duracaoPadrao('fl'), qu: duracaoPadrao('qu'), lp: duracaoPadrao('lp') }
+export const DUR_REVISAO: Record<string, number> = { rf: duracaoPadrao('rf'), rq: duracaoPadrao('rq') }
 
 // ── Parâmetros configuráveis (v3) — defaults = 2.8 ───────────────────────────────────────────────
 // Entram por `ctx.params` (flat/opcional). `resolverParams` monta o objeto `P` usado na geração; sem
@@ -137,8 +142,8 @@ export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
   const num = (v: number | undefined, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
   return {
     velPadrao: q.velPadrao && q.velPadrao > 0 ? q.velPadrao : VEL_PADRAO,
-    offsetRevisao: num(q.offsetRevisao, 1),
-    offsetQuestoes: num(q.offsetQuestoes, 2),
+    offsetRevisao: num(q.offsetRevisao, TIPOS_META.fl.deslocamentoPadraoSem as number),
+    offsetQuestoes: num(q.offsetQuestoes, TIPOS_META.qu.deslocamentoPadraoSem as number),
     semFlash: Array.isArray(q.semFlash) ? new Set(q.semFlash) : SEM_FLASH,
     tetoPdfDia: num(q.tetoPdfDia, 2),
     lpJanelaRodizio: num(q.lpJanelaRodizio, 6),
@@ -244,44 +249,51 @@ export function horasDia(cfg: Cfg28, d: DataISO): number {
 // ── semana de revisão OBRIGATÓRIA (modelo 3.0, regraRotina300 = 15) ─────────────────────────────────
 // Só vale para planos do motor 3.x (cfg.motor = '3.…'); o legado 2.8.1 mantém a regra antiga (revisao.ativa/cada).
 export const motorRevObrigatoria = (cfg: Cfg28): boolean => typeof (cfg as { motor?: unknown }).motor === 'string' && ((cfg as { motor?: string }).motor as string).startsWith('3.')
-/** Rotina até 24h30 semanais (somadas pelas horas da ROTINA vigente em cada dia da semana): revisão obrigatória a cada 4 semanas. */
-export function revisaoObrigatoria300(cfg: Cfg28, sem: number): boolean {
+/** Carga semanal (min) da ROTINA vigente na semana `sem` (soma das horas de cada dia da semana). */
+export function cargaSemanaMin(cfg: Cfg28, sem: number): number {
   const inicio = semInicio(cfg.start, sem)
   let horas = 0
   for (let k = 0; k < 7; k++) horas += +(horasEm(cfg, dAdd(inicio, k))[k] || 0)
-  return horas <= 24.5
+  return horas * 60
+}
+/** Faixa de carga da semana `sem` (pela rotina vigente). */
+export const faixaDaSemana = (cfg: Cfg28, sem: number, R: RegrasMotor = REGRAS_PADRAO): FaixaCarga => faixaPorMinutos(R.faixas, cargaSemanaMin(cfg, sem))
+/** Faixa com revisão em CICLO (padrão: rotina até 24h30 semanais): revisão obrigatória a cada N semanas (N da faixa). */
+export function revisaoObrigatoria300(cfg: Cfg28, sem: number, R: RegrasMotor = REGRAS_PADRAO): boolean {
+  return faixaDaSemana(cfg, sem, R).revisaoModo === 'ciclo'
 }
 /** Capacidade (min) de uma semana de revisão obrigatória, descontada a reserva semanal de Jurisprudência (só se marcada e ≥14h30). */
-export function capacidadeRevisao300(cfg: Cfg28, sem: number): number {
+export function capacidadeRevisao300(cfg: Cfg28, sem: number, R: RegrasMotor = REGRAS_PADRAO): number {
   const inicio = semInicio(cfg.start, sem)
   let horas = 0
   for (let k = 0; k < 7; k++) horas += horasDia(cfg, dAdd(inicio, k))
-  return Math.round(horas * 60) - (((cfg.metas as Record<string, boolean | undefined>)?.jp ? horas >= 14.5 : false) ? 60 : 0)
+  return Math.round(horas * 60) - (((cfg.metas as Record<string, boolean | undefined>)?.jp ? horas >= R.juris.minSemanalMin / 60 : false) ? R.juris.reservaCapacidadeRevisaoMin : 0)
 }
 /** Semana (nº) do próximo ciclo de revisão obrigatória com capacidade para a data; 0 quando a data não está sujeita ao ciclo. */
-export function cicloRevisao300(cfg: Cfg28, data: DataISO): number {
-  const sem = semDe(cfg.start, data)
-  if (!revisaoObrigatoria300(cfg, sem)) return 0
-  const proxima = (Math.floor(sem / 4) + 1) * 4
-  for (let ciclo = proxima; ciclo < proxima + 600; ciclo += 4) {
-    if (!revisaoObrigatoria300(cfg, ciclo)) return 0
-    if (capacidadeRevisao300(cfg, ciclo) > 0) return ciclo
+export function cicloRevisao300(cfg: Cfg28, data: DataISO, R: RegrasMotor = REGRAS_PADRAO): number {
+  const sem = semDe(cfg.start, data), C = cicloDaFaixa(faixaDaSemana(cfg, semDe(cfg.start, data), R), R)
+  if (!revisaoObrigatoria300(cfg, sem, R)) return 0
+  const proxima = (Math.floor(sem / C) + 1) * C
+  for (let ciclo = proxima; ciclo < proxima + 600; ciclo += C) {
+    if (!revisaoObrigatoria300(cfg, ciclo, R)) return 0
+    if (capacidadeRevisao300(cfg, ciclo, R) > 0) return ciclo
   }
   return proxima
 }
-export function ehRev(cfg: Cfg28, sem: number): boolean {
+export function ehRev(cfg: Cfg28, sem: number, R: RegrasMotor = REGRAS_PADRAO): boolean {
   const r = cfg.revisao
   if (motorRevObrigatoria(cfg)) {
-    if (revisaoObrigatoria300(cfg, sem)) return sem > 0 && sem % 4 === 0
+    const fx = faixaDaSemana(cfg, sem, R)
+    if (fx.revisaoModo === 'ciclo') return sem > 0 && sem % cicloDaFaixa(fx, R) === 0
     const c = Number(r?.cada) // 10/12: só planos legados que já os tinham (a interface nova oferece 4/6/8)
-    return sem > 0 && sem % ([4, 6, 8, 10, 12].includes(c) ? c : 8) === 0
+    return sem > 0 && sem % ([...opcoesDaFaixa(fx, R), ...R.revisao.opcoesLegado].includes(c) ? c : padraoDaFaixa(fx, R)) === 0
   }
   return !!(r && r.ativa && r.cada && r.cada > 0 && sem > 0 && sem % r.cada === 0)
 }
-export function proxSemConteudo(cfg: Cfg28, s: DataISO, n: number): DataISO {
-  if (motorRevObrigatoria(cfg)) { const ciclo = cicloRevisao300(cfg, s); if (ciclo) return semInicio(cfg.start, ciclo) }
+export function proxSemConteudo(cfg: Cfg28, s: DataISO, n: number, R: RegrasMotor = REGRAS_PADRAO): DataISO {
+  if (motorRevObrigatoria(cfg)) { const ciclo = cicloRevisao300(cfg, s, R); if (ciclo) return semInicio(cfg.start, ciclo) }
   let sem = semDe(cfg.start, s), k = 0
-  while (k < n) { sem++; if (!ehRev(cfg, sem)) k++ }
+  while (k < n) { sem++; if (!ehRev(cfg, sem, R)) k++ }
   return dAdd(semInicio(cfg.start, sem), dDow(s))
 }
 export function minPdf(p: number, vel?: number, velPadrao = VEL_PADRAO): number { const v = vel && vel > 0 ? vel : (velPadrao > 0 ? velPadrao : VEL_PADRAO); return Math.max(30, Math.ceil((p || 60) / v * 2 - 1e-9) * 30) }
@@ -878,9 +890,9 @@ function reservarJuris219(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano,
 }
 
 /** Alvo global semanal de diagnósticos do histórico: 2 metas abaixo de 24h na semana, 3 a partir de 24h. */
-export function metaSemanalHistorico(cfg: Cfg28, sem: number): number {
+export function metaSemanalHistorico(cfg: Cfg28, sem: number, R: RegrasMotor = REGRAS_PADRAO): number {
   const ini = semInicio(cfg.start, sem)
-  return Array.from({ length: 7 }, (_, k) => horasDia(cfg, dAdd(ini, k)) * 60).reduce((a, b) => a + b, 0) >= 24 * 60 ? 3 : 2
+  return Array.from({ length: 7 }, (_, k) => horasDia(cfg, dAdd(ini, k)) * 60).reduce((a, b) => a + b, 0) >= R.historico.corteAltaMin ? R.historico.metaSemanalAlta : R.historico.metaSemanalBase
 }
 
 function reservarDiagnostico(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano, feitas: Set<string>, fila: number[], usados: Record<DataISO, number>): Reserva[] {

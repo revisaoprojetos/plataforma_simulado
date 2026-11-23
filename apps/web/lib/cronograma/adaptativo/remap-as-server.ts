@@ -7,7 +7,7 @@ import { chavesUnicas } from './catalogo-override'
 import { lerDetalhesMetas, gravarDetalhesMetas, espelharEmSegundoPlano } from './plano-metas'
 import { registrarGeracao } from './log-geracao'
 import type { PlanoRow } from './dados'
-import { assinaturaDoCfg, assinaturaPorEvidencia, camposAssinatura, hashAS, docIdDaChave, type AssinaturaAS } from './remap-as'
+import { assinaturaDoCfg, assinaturaPorEvidencia, camposAssinatura, hashAS, docIdDaChave, parteAula, type AssinaturaAS } from './remap-as'
 import { remapearEstadoComRelink } from './relink-documento'
 import { resolverRelinks, titulosDeOrfas } from './relink-documento-server'
 
@@ -46,6 +46,7 @@ const COLS_META = 'tenant_id,estudante_id,plano_id,meta_id,estado,parcial_v,parc
 async function lerLinhas(svc: SupabaseClient, tenantId: string, planoId: string): Promise<LinhaMeta[]> {
   const ler = (cols: string) => fetchAll<any>(() => svc.from(T_META).select(cols).eq('tenant_id', tenantId).eq('plano_id', planoId).order('meta_id', { ascending: true }), 1000, 'remap_as:metas')
   // concluido_em NUNCA pode ficar de fora: sem ele a linha movida perde a data de conclusão (incidente 18/11: a coluna `cert` não existe → o fallback antigo descartava as duas).
+  try { return await ler(COLS_META + ',concluido_em,cert,aula_key') } catch { /* aula_key ausente (migração 20261129000000 pendente) */ }
   try { return await ler(COLS_META + ',concluido_em,cert') } catch { /* `cert` ausente */ }
   try { return await ler(COLS_META + ',concluido_em') } catch { return await ler(COLS_META) } // migração de concluido_em pendente
 }
@@ -168,7 +169,12 @@ async function garantirASInterno(svc: SupabaseClient, tenantId: string, row: Pla
   // 2) linhas de progresso: grava os destinos (upsert) e só então apaga os ids que ficaram sem dono (nunca "apaga e recria")
   const porId = new Map(linhas.map((x) => [x.meta_id, x]))
   const alteradas = r.mudancas.map((m) => ({ de: m.de, para: m.para, linha: porId.get(m.de)! })).filter((x) => x.linha)
-  const novasLinhas = alteradas.map((x) => ({ ...x.linha, meta_id: x.para }))
+  // aula_key acompanha a linha (preserva o que já tinha; linha legada ganha a chave da posição NOVA — o AS atual já está provado alinhado)
+  const novasLinhas = alteradas.map((x) => {
+    const base = { ...x.linha, meta_id: x.para }
+    if ('aula_key' in x.linha) { const p = parteAula(x.para); const k = p ? atual.chaves[p.idx] : null; return { ...base, aula_key: (x.linha.aula_key as string | null) ?? k ?? null } }
+    return base
+  })
   const destinos = new Set(alteradas.map((x) => x.para))
   const sobraram = alteradas.map((x) => x.de).filter((id) => !destinos.has(id))
   const desfazer = async () => { // devolve as linhas originais e limpa a marca

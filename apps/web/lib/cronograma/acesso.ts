@@ -11,7 +11,12 @@ import 'server-only'
  *   1. testador  — atravessa tudo, inclusive rascunho (marca a emissão como teste)
  *   2. pacote    — o caminho normal. O cronograma está num pacote ao qual o aluno chega
  *                  por três vias, todas resolvidas pela mesma função no banco: vínculo
- *                  direto, grupo, ou o pacote estar liberado para TODOS
+ *                  direto, grupo, ou o pacote estar liberado para TODOS. A MESMA função
+ *                  também resolve o ACESSO DIRETO por cronograma (migração 20261122000000):
+ *                  `simulado_cronogramas.acesso_gratuito` (todos), `simulado_cronograma_grupos`
+ *                  (grupo do aluno) e `simulado_cronograma_estudantes` (aluno) — sempre via 'pacote'.
+ *                  Todos os leitores (gate, catálogo, meus, nova-dados, CTA) passam por aqui/RPC,
+ *                  e o dedupe é o `Map` por cronograma_id.
  *   3. matrícula — exceção individual, fora do que os pacotes dizem
  *   4. avulso    — concessão com prazo, enquanto não expirar
  *

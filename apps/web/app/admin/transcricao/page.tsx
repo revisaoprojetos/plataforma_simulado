@@ -4,6 +4,7 @@ import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { statusConfigIA } from './actions'
 import { TranscricaoTabs } from './transcricao-tabs'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -40,6 +41,7 @@ export default async function TranscricaoIAPage() {
           <p className="text-muted-foreground">Duas direções: a <b>IA que o sistema usa</b> para transcrever (chave de saída) e as <b>APIs de fora</b> — chaves de acesso para sistemas externos (entrada).</p>
         </div>
       </div>
+      <BarraSetorSlot />
       <TranscricaoTabs inicial={inicial} apiKeys={apiKeys} podeApiKeys={podeApiKeys} />
     </div>
   )

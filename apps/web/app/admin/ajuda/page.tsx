@@ -1,5 +1,6 @@
 import { HelpCircle } from 'lucide-react'
 import { AjudaTutoriais } from '@/components/admin/ajuda-tutoriais'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const metadata = { title: 'Ajuda' }
 
@@ -14,6 +15,7 @@ export default function AjudaPage() {
         </div>
       </div>
 
+      <BarraSetorSlot />
       <div className="min-h-0 lg:flex-1">
         <AjudaTutoriais />
       </div>

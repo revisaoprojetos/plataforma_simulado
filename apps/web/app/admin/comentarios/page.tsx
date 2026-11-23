@@ -5,6 +5,7 @@ import { ComentarioModerar } from '@/components/admin/comentario-moderar'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { MessageSquare } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export default async function ComentariosModeracaoPage() {
   const access = await getCurrentAccess()
@@ -58,6 +59,7 @@ export default async function ComentariosModeracaoPage() {
         </p>
       </div>
 
+      <BarraSetorSlot />
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader icon={MessageSquare} titulo="Fila de moderação" subtitulo={`${pendentes} pendente(s) de ${comentarios.length}`} />
         <CardContent className="space-y-3 px-4 py-4">

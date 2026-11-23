@@ -100,10 +100,13 @@ describe('validação e limites', () => {
     expect(v.ok).toBe(true)
     if (v.ok) expect(v.folha.tracos[0].pontos[0]).toEqual([1.2, 2.3, 0.57])
   })
-  it('rejeita cor fora da paleta, versão errada e NaN', () => {
+  it('rejeita cor fora da paleta/hex, versão errada e NaN', () => {
     const base = adicionarTraco(criarFolhaVazia(), traco('a', [[1, 1, 1]]))
-    expect(validarFolha({ ...base, tracos: [{ ...base.tracos[0], cor: '#ff0000' }] }).ok).toBe(false)
-    expect(validarFolha({ ...base, versao: 2 }).ok).toBe(false)
+    expect(validarFolha({ ...base, tracos: [{ ...base.tracos[0], cor: 'vermelhoo' }] }).ok).toBe(false)
+    expect(validarFolha({ ...base, tracos: [{ ...base.tracos[0], cor: '#ff00' }] }).ok).toBe(false)
+    expect(validarFolha({ ...base, tracos: [{ ...base.tracos[0], cor: 'red; background:url(x)' }] }).ok).toBe(false)
+    expect(validarFolha({ ...base, versao: 4 }).ok).toBe(false)
+    expect(validarFolha({ ...base, versao: 0 }).ok).toBe(false)
     expect(validarFolha({ ...base, tracos: [{ ...base.tracos[0], pontos: [[NaN, 0, 1]] }] }).ok).toBe(false)
   })
   it('rejeita >5000 traços e >20000 pontos', () => {
