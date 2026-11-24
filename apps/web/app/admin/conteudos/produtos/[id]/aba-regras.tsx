@@ -11,6 +11,7 @@
 // DataTable server-driven (URL: q, page, pp, sort, dir + filtros r*). LAZY: só busca quando a aba está ativa.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -109,14 +110,7 @@ export function AbaRegras({ produtoId, produtoNome, ativa, podeEditar = false }:
         </>
       )}
 
-      <div role="tablist" aria-label="Visões das regras" className="flex gap-4 overflow-x-auto border-b">
-        {VISTAS.map(([v, label]) => (
-          <button key={v} type="button" role="tab" aria-selected={vista === v} onClick={() => setVista(v)}
-            className={cn('-mb-px shrink-0 border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors', vista === v ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <AbasLinha aria-label="Visões das regras" ativo={vista} itens={VISTAS.map(([v, label]) => ({ key: v, label, onClick: () => setVista(v) }))} />
 
       {precisaMapa && erro && <Nota tipo="aviso">{erro}</Nota>}
 

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Search } from 'lucide-react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkPermission } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
@@ -51,16 +52,18 @@ export default async function GeradorLiberacaoAulas({ sp, tenantId, basePath }: 
   }
 
   const vis: VisLiberacao = VIS_LIBERACAO.some((v) => v.id === qs.vis) ? (qs.vis as VisLiberacao) : 'aulas'
-  const manter = ['aba', 'sub', 'produto', 'pps']
+  const manter = ['aba', 'sub', 'v', 'produto', 'pps']
   const abas = (
-    <nav role="tablist" aria-label="Liberação de aulas" className="mb-4 flex flex-wrap gap-x-5 border-b">
-      {VIS_LIBERACAO.map((v) => (
-        <Link key={v.id} role="tab" aria-selected={vis === v.id} href={hrefCom(pathname, Object.fromEntries(manter.map((k) => [k, qs[k]])), { vis: v.id === 'aulas' ? undefined : v.id })}
-          className={`-mb-px border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors ${vis === v.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-          {v.titulo}
-        </Link>
-      ))}
-    </nav>
+    <AbasLinha
+      aria-label="Liberação de aulas"
+      className="mb-4"
+      ativo={vis}
+      itens={VIS_LIBERACAO.map((v) => ({
+        key: v.id,
+        label: v.titulo,
+        href: hrefCom(pathname, Object.fromEntries(manter.map((k) => [k, qs[k]])), { vis: v.id === 'aulas' ? undefined : v.id }),
+      }))}
+    />
   )
   if (vis === 'cronogramas') return <div className="w-full">{seletor}{abas}<AbaCronogramas svc={svc} tenantId={tenantId} produtoId={produtoId} qs={qs} pathname={pathname} podeEditar={podeEditar} /></div>
   if (vis === 'regras') return <div className="w-full">{seletor}{abas}<AbaRegras svc={svc} tenantId={tenantId} produtoId={produtoId} podeEditar={podeEditar} /></div>
@@ -84,7 +87,7 @@ export default async function GeradorLiberacaoAulas({ sp, tenantId, basePath }: 
   const tabelasOk = migrado && lista.migrado && resumo !== null
   const editavel = podeEditar && tabelasOk
 
-  const preservar = ['aba', 'sub', 'produto', 'pps']
+  const preservar = ['aba', 'sub', 'v', 'produto', 'pps']
   const limpar = hrefCom(pathname, Object.fromEntries(preservar.map((k) => [k, qs[k]])))
   const temFiltro = !!(qs.q || qs.disc || qs.vinc || qs.ativo || qs.de || qs.ate)
 

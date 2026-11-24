@@ -6,7 +6,7 @@ import { metricasGamificacao } from '@/lib/gamificacao/metricas'
 import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { GamificacaoTabs } from './gamificacao-tabs'
-import { Trophy } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Gamificação' }
@@ -17,7 +17,7 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
   if (!(access.isAdmin || access.permissions.includes('gamificacao:view'))) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Gamificação</h1>
+        <CabecalhoArea titulo="Gamificação" />
         <SemPermissao>Sem permissão para acessar a gamificação.</SemPermissao>
       </div>
     )
@@ -25,35 +25,37 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
 
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
-  const config = await getGamConfig(svc, tenantId)
   const podeGerenciar = access.isAdmin || access.permissions.includes('gamificacao:manage')
-  const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
-  // Conquistas criadas DENTRO dos módulos de Leitura — exibidas na aba Conquistas com etiqueta de origem.
-  const conquistasModulos = tenantId ? await listarConquistasModuloTenant(svc, tenantId) : []
-  // Nível mais alto que algum aluno tem HOJE — orienta o "ponto de virada" (colocá-lo acima disso
-  // não mexe em ninguém). Query barata (max de coluna denormalizada).
-  let nivelMaisAlto = 1
-  if (tenantId) {
-    try {
-      const { data } = await svc.from('simulado_gamificacao_estudante').select('nivel').eq('tenant_id', tenantId).order('nivel', { ascending: false }).limit(1).maybeSingle()
-      nivelMaisAlto = Math.max(1, Number((data as any)?.nivel ?? 1))
-    } catch { /* tolerante */ }
-  }
+  // Independentes entre si → em paralelo (métricas dependem só da config, encadeadas dentro do mesmo ramo).
+  // Conquistas dos módulos de Leitura: exibidas na aba Conquistas com etiqueta de origem.
+  // Nível mais alto que algum aluno tem HOJE (ponto de virada) — query barata (max de coluna denormalizada).
+  const [{ config, metricas }, conquistasModulos, nivelMaisAlto] = await Promise.all([
+    (async () => {
+      const config = await getGamConfig(svc, tenantId)
+      const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
+      return { config, metricas }
+    })(),
+    tenantId ? listarConquistasModuloTenant(svc, tenantId) : Promise.resolve([] as Awaited<ReturnType<typeof listarConquistasModuloTenant>>),
+    (async () => {
+      if (!tenantId) return 1
+      try {
+        const { data } = await svc.from('simulado_gamificacao_estudante').select('nivel').eq('tenant_id', tenantId).order('nivel', { ascending: false }).limit(1).maybeSingle()
+        return Math.max(1, Number((data as any)?.nivel ?? 1))
+      } catch { return 1 }
+    })(),
+  ])
 
   return (
     <div className="tema-gam space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></span>
-            <h1 className="text-2xl font-bold tracking-tight">Gamificação</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Configure XP, níveis, ligas, missões e conquistas do portal do aluno.</p>
-        </div>
-        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${config?.ativo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
-          {config?.ativo ? '● Ativa' : '○ Inativa'}
-        </span>
-      </div>
+      <CabecalhoArea
+        titulo="Gamificação"
+        descricao="Configure XP, níveis, ligas, missões e conquistas do portal do aluno."
+        acoes={
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${config?.ativo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+            {config?.ativo ? '● Ativa' : '○ Inativa'}
+          </span>
+        }
+      />
 
       {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} conquistasModulos={conquistasModulos} nivelMaisAlto={nivelMaisAlto} />}
     </div>

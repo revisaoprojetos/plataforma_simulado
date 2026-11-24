@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { createAdminClient } from '@/lib/supabase/server'
 import { RevisaoAbas, RevisaoCard } from '@/components/admin/revisao/ui'
 import { formatBrt } from '@/lib/brt'
@@ -6,7 +7,7 @@ import { dirDe, inteiro, lerQs, porPaginaDe, type QSn, type SP } from '@/lib/rev
 import {
   lerGeral, lerPorCronograma, lerSerieDias, listarAlunosRelatorio, listarDownloads, listarEmissoes, paginarPorCronograma, pct,
 } from '@/lib/revisao/gerador/relatorios'
-import { BarraBusca, KpiCard, KpiGrid, Nota, Pilula, ThFixo, ThOrd } from '../../../_comp/lista'
+import { BarraBusca, KpiCard, KpiGrid, Nota, Pilula, ThFixo, ThOrd, hrefCom } from '../../../_comp/lista'
 import { TabelaCron } from '../../tabela-cron'
 
 // Sub-aba "Relatórios" (Gerador): mesmos números do admin/cronogramas/relatorios (RPCs agregadas), agora em
@@ -54,7 +55,7 @@ export default async function RelatoriosGerador({ sp, tenantId, basePath }: { sp
         </p>
       </RevisaoCard>
 
-      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub }} abas={[
+      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub, v: qs.v }} abas={[
         { id: 'alunos', titulo: 'Por aluno', contagem: geral.alunos },
         { id: 'emissoes', titulo: 'Emissões', contagem: geral.emissoes },
         { id: 'downloads', titulo: 'Downloads' },
@@ -93,7 +94,7 @@ async function Alunos({ svc, tenantId, base, qs, por, pagina, dir }: P) {
   return (
     <>
       {!r.v2 && <Nota tipo="aviso">Ordenação por coluna e filtro de andamento dependem da migração 20261113041500_cron_relatorio_alunos_ordenavel.sql, ainda não aplicada. Até lá a lista vem ordenada pela última emissão.</Nota>}
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar por nome ou e-mail" filtros={r.v2 ? [{ nome: 'situ', rotulo: 'Todo andamento', opcoes: [{ v: 'sem_progresso', l: 'Sem nenhuma meta concluída' }, { v: 'andamento', l: 'Em andamento' }, { v: 'completo', l: 'Plano concluído' }] }] : []} />
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar por nome ou e-mail" filtros={r.v2 ? [{ nome: 'situ', rotulo: 'Todo andamento', opcoes: [{ v: 'sem_progresso', l: 'Sem nenhuma meta concluída' }, { v: 'andamento', l: 'Em andamento' }, { v: 'completo', l: 'Plano concluído' }] }] : []} />
       <TabelaCron tipo="leitura" podeEditar={false} colunas={4} total={r.total} page={pagina} pp={por}
         vazio={qs.q || qs.situ ? 'Nenhum aluno encontrado com esses filtros.' : 'Nenhum aluno emitiu cronograma ainda.'}
         head={r.v2
@@ -119,7 +120,7 @@ async function Emissoes({ svc, tenantId, base, qs, por, pagina, dir }: P) {
   } catch (e) { return <Nota tipo="aviso">Não foi possível listar as emissões: {(e as Error)?.message}.</Nota> }
   return (
     <>
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar por aluno, cronograma ou título" filtros={[
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar por aluno, cronograma ou título" filtros={[
         { nome: 'cron', rotulo: 'Todos os cronogramas', opcoes: cron.map((c) => ({ v: c.cronograma_id, l: c.nome })) },
         { nome: 'via', rotulo: 'Toda origem de acesso', opcoes: Object.entries(ROTULO_VIA).filter(([k]) => k !== 'testador').map(([v, l]) => ({ v, l })) },
         { nome: 'arq', rotulo: 'Ativas e arquivadas', opcoes: [{ v: 'nao', l: 'Só ativas' }, { v: 'sim', l: 'Só arquivadas' }] },
@@ -130,7 +131,7 @@ async function Emissoes({ svc, tenantId, base, qs, por, pagina, dir }: P) {
         rows={r.itens.map((e) => ({ id: e.id, fraca: e.arquivada, cells: [
           <span key="q" className="whitespace-nowrap tabular-nums text-muted-foreground">{formatBrt(e.criadoEm) ?? '—'}</span>,
           <Link key="a" href={`/admin/estudantes/${e.estudanteId}`} className="font-medium hover:underline">{e.aluno}</Link>,
-          <span key="c" className="block min-w-[12rem]"><Link href={`/admin/cronogramas/${e.cronogramaId}`} className="hover:underline">{e.cronograma}</Link>{e.titulo && <small className="block text-muted-foreground">{e.titulo}</small>}{e.arquivada && <Pilula tipo="mut" className="ml-1">arquivada</Pilula>}</span>,
+          <span key="c" className="block min-w-[12rem]"><Link href={comVoltar(`/admin/cronogramas/${e.cronogramaId}`, hrefCom(base, qs))} className="hover:underline">{e.cronograma}</Link>{e.titulo && <small className="block text-muted-foreground">{e.titulo}</small>}{e.arquivada && <Pilula tipo="mut" className="ml-1">arquivada</Pilula>}</span>,
           <span key="v">{e.via ? <Pilula tipo="vio">{ROTULO_VIA[e.via] ?? e.via}</Pilula> : <span className="text-muted-foreground">—</span>}</span>,
           <span key="t" className="text-muted-foreground">{e.atorTipo === 'usuario' ? 'Equipe' : 'Aluno'}</span>,
           <span key="d" className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">Word {e.downloads.docx} · Ficha {e.downloads.ficha} · CSV {e.downloads.csv}</span>,
@@ -145,7 +146,7 @@ async function Downloads({ svc, tenantId, base, qs, por, pagina, dir }: P) {
   catch (e) { return <Nota tipo="aviso">Não foi possível listar os downloads: {(e as Error)?.message}.</Nota> }
   return (
     <>
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar por aluno ou cronograma" filtros={[{ nome: 'botao', rotulo: 'Todos os formatos', opcoes: Object.entries(ROTULO_BOTAO).map(([v, l]) => ({ v, l })) }]} />
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar por aluno ou cronograma" filtros={[{ nome: 'botao', rotulo: 'Todos os formatos', opcoes: Object.entries(ROTULO_BOTAO).map(([v, l]) => ({ v, l })) }]} />
       <TabelaCron tipo="leitura" podeEditar={false} colunas={4} total={r.total} page={r.pagina} pp={por}
         vazio={qs.q || qs.botao ? 'Nenhum download com esses filtros.' : 'Nenhum download registrado ainda.'}
         head={<><ThOrd rotulo="Quando" col="quando" base={base} qs={qs} /><ThFixo>Aluno</ThFixo><ThFixo>Cronograma</ThFixo><ThOrd rotulo="Formato" col="botao" base={base} qs={qs} /></>}
@@ -166,12 +167,12 @@ async function PorCronograma({ svc, tenantId, base, qs, por, pagina, dir }: P) {
   const pg = paginarPorCronograma(todos, { q: qs.q, ordem: qs.ord, dir, pagina, porPagina: por })
   return (
     <>
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar cronograma" />
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar cronograma" />
       <TabelaCron tipo="leitura" podeEditar={false} colunas={5} total={pg.total} page={pg.pagina} pp={por}
         vazio={qs.q ? 'Nenhum cronograma com esse nome.' : 'Nenhuma emissão ainda. Assim que um aluno gerar, os números aparecem aqui.'}
         head={<><ThOrd rotulo="Cronograma" col="nome" base={base} qs={qs} /><ThOrd rotulo="Carga" col="carga" base={base} qs={qs} /><ThOrd rotulo="Emissões" col="emissoes" base={base} qs={qs} /><ThOrd rotulo="Alunos" col="alunos" base={base} qs={qs} /><ThOrd rotulo="Progresso" col="progresso" base={base} qs={qs} /></>}
         rows={pg.itens.map((c) => ({ id: c.cronograma_id, cells: [
-          <Link key="n" href={`/admin/cronogramas/${c.cronograma_id}`} className="font-medium hover:underline">{c.nome}</Link>,
+          <Link key="n" href={comVoltar(`/admin/cronogramas/${c.cronograma_id}`, hrefCom(base, qs))} className="font-medium hover:underline">{c.nome}</Link>,
           <span key="h" className="tabular-nums">{c.carga_horaria != null ? `${c.carga_horaria}h` : '—'}</span>,
           <span key="e" className="tabular-nums">{c.emissoes.toLocaleString('pt-BR')}</span>,
           <span key="a" className="tabular-nums">{c.alunos.toLocaleString('pt-BR')}</span>,

@@ -11,23 +11,11 @@
 import { resolverFaixaCarga, resolverIndiceFaixa, resolverTetoPdf, type RegrasMotor } from './regras'
 import { classeDaFaixa, cicloDaFaixa, opcoesDaFaixa, padraoDaFaixa, textoIntervalo, ROTULO_MODO_QUESTOES } from './faixas-carga'
 import { descreverRestricao } from './restricoes'
+import type { TipoNo, NoFluxo, ArestaFluxo, DiagramaFluxo } from '../../admin/fluxo/adaptador'
 
-export type TipoNo = 'inicio' | 'etapa' | 'decisao' | 'resultado' | 'rejeicao' | 'aberto'
-export interface NoFluxo {
-  id: string
-  tipo: TipoNo
-  titulo: string
-  descricao: string
-  /** valor vigente da regra editável que governa o nó. */
-  valor?: string
-  link?: { href: string; rotulo: string }
-  /** true = texto inferido (não vem do motor nem do mapa). */
-  inferido?: boolean
-  col: number
-  row: number
-}
-export interface ArestaFluxo { de: string; para: string; rotulo?: string }
-export interface DiagramaFluxo { id: string; titulo: string; resumo: string; nos: NoFluxo[]; arestas: ArestaFluxo[] }
+// Tipos genéricos vivem no framework de fluxo (re-exportados aqui para compatibilidade).
+export type { TipoNo, NoFluxo, ArestaFluxo, DiagramaFluxo }
+
 
 const HREF_FAIXAS = '/admin/cronogramas/adaptativo/faixas'
 const HREF_RESTR = '/admin/cronogramas/adaptativo/restricoes'
@@ -56,7 +44,7 @@ export function montarFluxo(R: RegrasMotor): DiagramaFluxo[] {
     id: 'cadastro', titulo: 'Do cadastro ao plano gravado',
     resumo: 'Caminho de uma geração. Etapas fora do motor (cadastro, liberação, questionário) são inferidas do mapa.',
     nos: [
-      no('c.inicio', 'inicio', 'Cadastro e liberação', 0, 0, { inferido: true, descricao: 'O aluno é cadastrado na plataforma e recebe acesso ao Cronograma Adaptativo (regras de liberação por produto/grupo). Sem acesso, o iframe não abre.' }),
+      no('c.inicio', 'inicio', 'Cadastro e liberação', 0, 0, { inferido: true, link: { href: '/admin/cronogramas/adaptativo', rotulo: 'Editar em Liberação' }, descricao: 'O aluno é cadastrado na plataforma e recebe acesso ao Cronograma Adaptativo (regras de liberação por produto/grupo). Sem acesso, o iframe não abre.' }),
       no('c.quest', 'etapa', 'Questionário', 1, 0, { inferido: true, descricao: 'O aluno informa horas de cada dia da semana, data de início, disciplinas, metas ligadas, Jurisprudência (opt-in) e se já estuda pelo Revisão (diagnóstico dos temas anteriores).' }),
       no('c.rotina', 'etapa', 'Rotina e faixa', 2, 0, { valor: FX.map((f, k) => `${f.nome} (${textoIntervalo(f, k, FX)})`).join(' · '), link: L_FAIXAS, descricao: 'A soma das horas da semana define a faixa de carga, o teto de PDFulls novos, o tipo de revisão e o modo de questões. Veja a árvore Faixa e teto.' }),
       no('c.menos', 'aberto', 'Rotina muito curta', 2, 1, { valor: 'Sem regra no motor vigente', inferido: true, descricao: 'O mapa (spec 3.0) diz que rotinas abaixo de 10h são "configuração rejeitada". O motor só rejeita se a constante "carga semanal mínima" (aba Faixas › Constantes) for maior que 0; no padrão (0) a primeira faixa começa em 0 e nada é rejeitado.' }),

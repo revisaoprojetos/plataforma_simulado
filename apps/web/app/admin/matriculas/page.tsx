@@ -15,6 +15,7 @@ import { MatriculaActions } from '@/components/admin/matricula-actions'
 import { PaginationControls } from '@/components/admin/pagination-controls'
 import { ExportMatriculasButton } from '@/components/admin/export-matriculas-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 const ITEMS_PER_PAGE = 30
 
@@ -49,21 +50,19 @@ export default async function MatriculasPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Matrículas</h1>
-          <p className="text-muted-foreground">
-            {count ?? 0} matrículas registradas
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportMatriculasButton filtros={{ liberado: params.liberado, estudante_id: params.estudante_id }} />
-          <Link href="/admin/matriculas/nova" className={buttonVariants()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Matrícula
-          </Link>
-        </div>
-      </div>
+      <CabecalhoArea
+        titulo="Matrículas"
+        descricao={`${count ?? 0} matrículas registradas`}
+        acoes={
+          <>
+            <ExportMatriculasButton filtros={{ liberado: params.liberado, estudante_id: params.estudante_id }} />
+            <Link href="/admin/matriculas/nova" className={buttonVariants()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Matrícula
+            </Link>
+          </>
+        }
+      />
 
       <MatriculasFilters />
 

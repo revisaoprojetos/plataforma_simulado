@@ -1,6 +1,7 @@
 import type { GamConfig } from './config'
 import { nivelParaXp, xpAcumuladoParaNivel } from './niveis'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 
 export interface MetricasGam {
   simulados: { qtd: number; questoes: number; xp: number }
@@ -24,27 +25,41 @@ export interface MetricasGam {
 export async function metricasGamificacao(svc: any, tenantId: string, config: GamConfig): Promise<MetricasGam> {
   const xr = config.xp_regras
 
-  // ── Simulados publicados + questões válidas ──
-  let simQtd = 0
-  let simQuestoes = 0
-  try {
-    const sims = await fetchAll<any>(() =>
-      svc.from('simulado_simulados').select('id').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).order('id'))
-    simQtd = sims.length
-    if (sims.length) {
-      const pq = await fetchAllByIn<any>(sims.map((s) => s.id), (chunk) =>
-        svc.from('simulado_prova_questoes').select('simulado_id, anulada').in('simulado_id', chunk).order('simulado_id'))
-      for (const r of pq) if (!r.anulada) simQuestoes++
-    }
-  } catch { /* tolerante */ }
+  // ── Contagens (simulados publicados, questões válidas, banco) — cache 10 min por tenant ──
+  // Só os CONTADORES são cacheados (a config entra no cálculo abaixo, sempre fresca).
+  const cont = await remember(chaveRelatorio(tenantId, 'gam-metricas-contagens'), 600, async () => {
+    let simQtd = 0
+    let simQuestoes = 0
+    let bancoQuestoes = 0
+    const sims = (async () => {
+      try {
+        const ids = await fetchAll<any>(() =>
+          svc.from('simulado_simulados').select('id').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).order('id'))
+        simQtd = ids.length
+        const lista = ids.map((s) => s.id)
+        // Contagem em SQL (head+count) por chunk de 80 — em vez de baixar todas as linhas.
+        const chunks: string[][] = []
+        for (let i = 0; i < lista.length; i += 80) chunks.push(lista.slice(i, i + 80))
+        const cs = await Promise.all(chunks.map(async (chunk) => {
+          const { count } = await svc.from('simulado_prova_questoes').select('simulado_id', { count: 'exact', head: true })
+            .in('simulado_id', chunk).or('anulada.is.null,anulada.eq.false')
+          return count ?? 0
+        }))
+        simQuestoes = cs.reduce((a: number, n: number) => a + n, 0)
+      } catch { /* tolerante */ }
+    })()
+    const banco = (async () => {
+      try {
+        const { count } = await svc.from('simulado_questoes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'publicada')
+        bancoQuestoes = count ?? 0
+      } catch { /* tolerante */ }
+    })()
+    await Promise.all([sims, banco])
+    return { simQtd, simQuestoes, bancoQuestoes }
+  })
+  const { simQtd, simQuestoes, bancoQuestoes } = cont
   const xpSimulados = xr.simulado.base * simQtd + xr.simulado.por_acerto * simQuestoes + xr.simulado.bonus_nota_max * simQtd
 
-  // ── Banco de questões publicadas ──
-  let bancoQuestoes = 0
-  try {
-    const { count } = await svc.from('simulado_questoes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'publicada')
-    bancoQuestoes = count ?? 0
-  } catch { /* tolerante */ }
   const xpBanco = xr.pratica.por_acerto * bancoQuestoes
 
   // ── Conquistas (uma vez) ──

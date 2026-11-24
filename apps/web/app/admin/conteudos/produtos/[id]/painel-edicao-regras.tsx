@@ -6,6 +6,7 @@
 // -> "Confirmar e aplicar" -> relatório por público/operação (ok/erro). Tudo no servidor (regras-edicao-actions.ts).
 
 import { useEffect, useMemo, useState } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import Link from 'next/link'
 import { AlertTriangle, CircleCheck, CircleX, ClipboardPaste, Copy, ExternalLink, Info, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -166,12 +167,7 @@ export function PainelEdicaoRegras({ produtoId, podeEditar, pedido, copiada, nom
           {lote && <p className="truncate text-xs text-muted-foreground" title={pedido.pares.map((p) => nomes[p.publico] ?? p.publico).join(', ')}>Públicos: {pedido.pares.slice(0, 4).map((p) => nomes[p.publico] ?? p.publico).join(', ')}{pedido.pares.length > 4 ? ` +${pedido.pares.length - 4}` : ''}</p>}
         </SheetHeader>
 
-        <div role="tablist" aria-label="Edição" className="flex gap-4 overflow-x-auto border-b px-4">
-          {abas.map(([k, rot]) => (
-            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setRelatorio(null) }}
-              className={cn('-mb-px shrink-0 border-b-2 px-1 pb-2.5 pt-2 text-sm font-medium transition-colors', tab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>{rot}</button>
-          ))}
-        </div>
+        <AbasLinha aria-label="Edição" ativo={tab} className="px-4" itens={abas.map(([k, rot]) => ({ key: k, label: rot, onClick: () => { setTab(k); setRelatorio(null) } }))} />
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {relatorio ? <Relatorio r={relatorio} /> : (

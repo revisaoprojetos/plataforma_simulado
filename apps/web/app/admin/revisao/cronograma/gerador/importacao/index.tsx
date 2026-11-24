@@ -36,7 +36,7 @@ export default async function ImportacaoGerador({ sp, tenantId, basePath }: { sp
         <KpiCard rotulo="Aulas com link" valor={estado.linksChaves.length.toLocaleString('pt-BR')} />
         <KpiCard rotulo="Plataformas de vídeo" valor={estado.plataformas.length.toLocaleString('pt-BR')} />
       </KpiGrid>
-      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub }} abas={[
+      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub, v: qs.v }} abas={[
         { id: 'importar', titulo: 'Importar planilha' },
         { id: 'historico', titulo: 'Histórico de importações' },
         { id: 'catalogo', titulo: 'Catálogo atual', contagem: estado.cronogramas.length },
@@ -67,7 +67,7 @@ async function Historico({ tenantId, base, qs, por, pagina, dir }: { tenantId: s
   return (
     <RevisaoCard>
       <p className="mb-3 text-sm text-muted-foreground">Cada importação grava um evento na auditoria (um por cronograma e um para os links de aula). Somente leitura.</p>
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar por nome do cronograma" filtros={[
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar por nome do cronograma" filtros={[
         { nome: 'tipo', rotulo: 'Metas e links', opcoes: [{ v: 'metas', l: 'Metas de cronograma' }, { v: 'links', l: 'Links de aula' }] },
         { nome: 'op', rotulo: 'Criado e atualizado', opcoes: [{ v: 'INSERT', l: 'Cronograma criado' }, { v: 'UPDATE', l: 'Atualizado' }] },
       ]} />
@@ -91,7 +91,7 @@ function Catalogo({ estado, base, qs, por, pagina, dir }: { estado: EstadoAtual;
   return (
     <RevisaoCard>
       <p className="mb-3 text-sm text-muted-foreground">O que já existe no catálogo antes de importar. O editor de metas de cada cronograma continua em Cronogramas.</p>
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder="Buscar por nome ou slug" filtros={[{ nome: 'status', rotulo: 'Todas as situações', opcoes: status.map((s) => ({ v: s, l: s })) }]} />
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder="Buscar por nome ou slug" filtros={[{ nome: 'status', rotulo: 'Todas as situações', opcoes: status.map((s) => ({ v: s, l: s })) }]} />
       <TabelaCron tipo="leitura" podeEditar={false} colunas={4} total={pg.total} page={pg.pagina} pp={por}
         vazio="Nenhum cronograma encontrado."
         head={<><ThOrd rotulo="Cronograma" col="nome" base={base} qs={qs} /><ThOrd rotulo="Slug" col="slug" base={base} qs={qs} /><ThOrd rotulo="Situação" col="status" base={base} qs={qs} /><ThOrd rotulo="Metas" col="metas" base={base} qs={qs} /></>}

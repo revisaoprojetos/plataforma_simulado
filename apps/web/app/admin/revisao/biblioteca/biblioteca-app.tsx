@@ -1,12 +1,15 @@
 'use client'
 
+import { AbasSublinhado } from './gestao-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { AlertTriangle, ChevronRight, CircleDot, Download, Eye, EyeOff, FolderInput, History, Settings2, Users2, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Replace, CircleDot, Download, Eye, EyeOff, FolderInput, History, Settings2, Users2, Layers, Loader2, Merge, Plus, Search, SquarePen, Tags, Trash2, X } from 'lucide-react'
 import { LoteDialog, type InicialLote, type SecaoLote } from '@/components/biblioteca/lote-dialogs'
 import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
+import { MetadadosLoteDialog } from '@/components/biblioteca/metadados-lote-dialog'
+import { SubstituirLoteDialog } from '@/components/biblioteca/substituir-lote-dialog'
 import type { AlvoLote, AcaoLote, ResultadoLote } from '@/app/admin/biblioteca/lote-actions-tipos'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -110,6 +113,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
   // Ações em lote unificadas (mesmo LoteDialog/lote-actions da Biblioteca do Drive): status, acesso, configurar, registrar atualização
   const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: SecaoLote[]; config?: boolean; inicial?: InicialLote } | null>(null)
   const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
+  const [substituirLote, setSubstituirLote] = useState(false)
+  // título/versão dos documentos já vistos (a seleção atravessa páginas; o diálogo precisa dos nomes)
+  const docsVistos = useRef(new Map<string, { titulo: string; versao: number | null }>())
+  for (const r of dados.rows) docsVistos.current.set(r.id, { titulo: r.titulo, versao: r.versao ?? null })
   const ancora = useRef<string | null>(null)
   const [subQ, setSubQ] = useState<SubAbaQ>(subQInicial)
   const [totalBancoQ, setTotalBancoQ] = useState<number | null>(inicial.resumo.bancoQuestoes ?? null)
@@ -217,10 +224,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
   }
   useEffect(() => {
     if (sel.size === 0) return
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loteDlg && !regAtualizacao && !moverLote && !metaLote) setSel(new Set()) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loteDlg && !regAtualizacao && !moverLote && !metaLote && !substituirLote) setSel(new Set()) }
     document.addEventListener('keydown', esc)
     return () => document.removeEventListener('keydown', esc)
-  }, [sel.size, loteDlg, regAtualizacao, moverLote, metaLote])
+  }, [sel.size, loteDlg, regAtualizacao, moverLote, metaLote, substituirLote])
   const onSelPagina = (v: boolean) => setSel((s) => { const n = new Set(s); for (const r of dados.rows) { if (v) n.add(r.id); else n.delete(r.id) } return n })
 
   // ── ações em massa (REUSAM as actions do legado; 5 em paralelo) ──
@@ -310,26 +317,17 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
       {!resumo.temOculto && <Nota destaque>Aplique a migration 20261026000000 (acesso v2) para controlar a visibilidade dos materiais.</Nota>}
       {dados.degradado && <Nota>Consulta SQL indisponível: lista no modo reduzido (sem ordenação por coluna, filtros de pasta e de metadados). Verifique DATABASE_URL.</Nota>}
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Tipo de material">
-        {TIPOS_BIB.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={st.aba === t.id} onClick={() => mudarAba(t.id)} onPointerEnter={() => (t.id === 'questoes' ? prefetchQuestoesBanco() : prefetch({ ...st, ...SEM_FILTRO, aba: t.id, pasta: null, page: 1, sort: 'titulo', dir: 'asc' }))}
-            className={cn('-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', st.aba === t.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {t.nome}{contagemAba(t.id) > 0 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{contagemAba(t.id).toLocaleString('pt-BR')}</span>}
-          </button>
-        ))}
+      <div className="mb-4">
+        <AbasSublinhado rotulo="Tipo de material" valor={st.aba} onChange={mudarAba}
+          abas={TIPOS_BIB.map((t) => ({ id: t.id, nome: t.nome, n: contagemAba(t.id) }))}
+          onHover={(id) => (id === 'questoes' ? prefetchQuestoesBanco() : prefetch({ ...st, ...SEM_FILTRO, aba: id, pasta: null, page: 1, sort: 'titulo', dir: 'asc' }))} />
       </div>
 
       {st.aba === 'questoes' && (
-        <div className="mb-3 flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Conteúdo da aba Questões">
-          {SUBABAS_Q.map((a) => {
-            const n = a.id === 'banco' ? contagemAba('questoes') : 0
-            return (
-              <button key={a.id} type="button" role="tab" aria-selected={subQ === a.id} onClick={() => setSubQ(a.id)} onPointerEnter={() => { if (a.id === 'banco') prefetchQuestoesBanco() }}
-                className={cn('-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', subQ === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-                {a.nome}{n > 0 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{n.toLocaleString('pt-BR')}</span>}
-              </button>
-            )
-          })}
+        <div className="mb-3">
+          <AbasSublinhado rotulo="Conteúdo da aba Questões" valor={subQ} onChange={setSubQ}
+            abas={SUBABAS_Q.map((a) => ({ id: a.id, nome: a.nome, n: a.id === 'banco' ? contagemAba('questoes') : 0 }))}
+            onHover={(id) => { if (id === 'banco') prefetchQuestoesBanco() }} />
         </div>
       )}
 
@@ -376,7 +374,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
         </div>
       )}
 
-      {podeEditar && sel.size > 0 && !loteDlg && !regAtualizacao && createPortal(
+      {podeEditar && sel.size > 0 && !loteDlg && !regAtualizacao && !substituirLote && createPortal(
         <div className="fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-card px-3 py-2 shadow-xl" role="toolbar" aria-label="Ações em massa">
           <b className="mr-1 text-sm">{sel.size} {sel.size === 1 ? 'selecionado' : 'selecionados'}</b>
           <Button size="sm" variant="outline" disabled={!!emLote || !resumo.temOculto} onClick={() => void lote('Mostrando ao aluno', ids, (id) => definirVisibilidadeConteudo(id, true), 'Visíveis ao aluno')}><Eye />Mostrar ao aluno</Button>
@@ -388,6 +386,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void lote('Marcando como LegProc', ids, (id) => salvarLeituraLegproc(id, true), 'Marcados como LegProc')}><Layers />Leitura LegProc</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Alterar status', ['status'])}><CircleDot />Status</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar acesso', ['acesso'])}><Users2 />Acesso</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote || !ehDoc || ehQ} onClick={() => setSubstituirLote(true)}><Replace />Substituir arquivos</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setRegAtualizacao(alvoSel())}><History />Registrar atualização</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar em lote', ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], { config: true })}><Settings2 />Configurar em lote…</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void arquivarLote()}>Arquivar</Button>
@@ -467,6 +466,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           onCapa={loteDlg.alvo.pastaIds.length === 1 ? () => setCapa({ tipo: 'pasta', id: loteDlg.alvo.pastaIds[0] }) : undefined}
           onAtualizacao={(alvo) => setRegAtualizacao(alvo)} />
       )}
+      {substituirLote && (
+        <SubstituirLoteDialog docs={ids.map((id) => ({ id, titulo: docsVistos.current.get(id)?.titulo ?? 'Documento (outra página)', versao: docsVistos.current.get(id)?.versao ?? null }))}
+          onFechar={() => setSubstituirLote(false)} onConcluido={(falhos) => { setSel(new Set(falhos)); void recarregar() }} />
+      )}
       {regAtualizacao && <RegistrarAtualizacaoLote alvo={regAtualizacao} onFechar={() => setRegAtualizacao(null)} onDone={() => void recarregar()} />}
       {capa && <CapaPaginaDialog alvo={capa} onFechar={() => setCapa(null)} onSalvo={() => void recarregar()} />}
       {acessoPasta && <DriveAcessoWrapper pastaId={acessoPasta.id} categoria={categoria} onFechar={() => { setAcessoPasta(null); void recarregar() }} />}
@@ -486,42 +489,6 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
       )}
       {metaLote && <MetadadosLoteDialog n={ids.length} onClose={() => setMetaLote(false)} onSalvo={() => { setMetaLote(false); setSel(new Set()); void recarregar() }} ids={ids} />}
     </div>
-  )
-}
-
-/** Edição EM MASSA dos metadados dos conteúdos selecionados (rota nova /api/admin/revisao/biblioteca/lote). */
-function MetadadosLoteDialog({ n, ids, onClose, onSalvo }: { n: number; ids: string[]; onClose: () => void; onSalvo: () => void }) {
-  const [v, setV] = useState<Record<string, string>>({})
-  const [salvando, setSalvando] = useState(false)
-  async function salvar() {
-    setSalvando(true)
-    try {
-      const r = await fetch('/api/admin/revisao/biblioteca/lote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ acao: 'metadados', ids, valores: v }) })
-      const j = await r.json().catch(() => null)
-      if (!j?.ok) { toast.error(j?.error || 'Não foi possível salvar.'); return }
-      toast.success(`Metadados atualizados em ${j.atualizados} ${j.atualizados === 1 ? 'conteúdo' : 'conteúdos'}.`); onSalvo()
-    } catch { toast.error('Falha de rede ao salvar.') } finally { setSalvando(false) }
-  }
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o && !salvando) onClose() }}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Editar metadados de {n} {n === 1 ? 'conteúdo' : 'conteúdos'}</DialogTitle>
-          <DialogDescription>Campo vazio mantém o valor atual; escreva <code className="rounded bg-muted px-1">-</code> para apagar o valor nos selecionados.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {CAMPOS_META.map((c) => (
-            <label key={c.k} className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">{c.rot}
-              <input value={v[c.k] ?? ''} onChange={(e) => setV((s) => ({ ...s, [c.k]: e.target.value }))} placeholder={c.dica} className="h-9 rounded-lg border bg-background px-2 text-sm font-normal text-foreground" />
-            </label>
-          ))}
-        </div>
-        <div className="-mx-4 -mb-4 mt-2 flex justify-end gap-2 border-t px-4 py-3">
-          <Button variant="outline" onClick={onClose} disabled={salvando}>Cancelar</Button>
-          <Button onClick={salvar} disabled={salvando || !Object.values(v).some((x) => x.trim())}>{salvando && <Loader2 className="animate-spin" />}Aplicar a {n}</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }
 

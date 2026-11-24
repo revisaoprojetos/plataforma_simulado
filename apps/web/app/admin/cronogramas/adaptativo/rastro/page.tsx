@@ -1,14 +1,17 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { BarraBusca, KpiCard, KpiGrid, Nota, ParamsInt, Pilula, ThFixo, hrefCom, type QS } from '@/app/admin/revisao/_comp/lista'
 import { TabelaCron, type LinhaCron } from '@/app/admin/revisao/cronograma/tabela-cron'
 import { rastroDoAluno } from '@/lib/cronograma/adaptativo/rastro-plano-server'
 import { cn } from '@/lib/utils'
 import { TIPOS_META } from '@/lib/cronograma/adaptativo/tipos-meta'
 import { dataBr } from '@/lib/admin/revisao/datas'
+import { EsqueletoTela } from '@/components/admin/cronograma/esqueleto-tela'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,10 +32,22 @@ export default async function RastroPage({ searchParams }: { searchParams: Promi
 
   const raw = await searchParams
   const qs: QS = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
+  // Título + busca primeiro; a re-simulação do plano (motor) chega por streaming.
+  return (
+    <div className="w-full space-y-4">
+      <TituloTela titulo="Rastro" descricao="Por que o motor posicionou as metas de um aluno como posicionou: faixa e ocupação por semana (plano gravado) e as decisões que adiaram/barraram metas (re-simulação com o estado atual do aluno). Somente leitura." />
+      <Suspense fallback={<><BarraBusca base={BASE} qs={qs} placeholder="E-mail completo do aluno" filtros={[]} preservar={['vis']} /><EsqueletoTela /></>}>
+        <CorpoRastro tenantId={acesso.tenantId} qs={qs} />
+      </Suspense>
+    </div>
+  )
+}
+
+async function CorpoRastro({ tenantId, qs }: { tenantId: string; qs: QS }) {
   const vis = qs.vis === 'eventos' ? 'eventos' : 'semanas'
   const pagina = ParamsInt(qs.pag, 1, 1, 100000)
   const porPagina = ParamsInt(qs.pps, 14, 5, 100)
-  const r = qs.q?.trim() ? await rastroDoAluno(createAdminClient(), acesso.tenantId, qs.q, qs.plano) : null
+  const r = qs.q?.trim() ? await rastroDoAluno(createAdminClient(), tenantId, qs.q, qs.plano) : null
   const d = r?.ok ? r.dados : null
 
   const filtros = d ? [{ nome: 'plano', rotulo: 'Plano', valor: d.planoId ?? '', opcoes: d.planos.map((p) => ({ v: p.id, l: (p.titulo || 'Plano') + (p.fixado ? ' (fixado)' : '') })) },
@@ -69,15 +84,12 @@ export default async function RastroPage({ searchParams }: { searchParams: Promi
     const head = <><ThFixo>Motivo</ThFixo><ThFixo>Decisão</ThFixo><ThFixo>Quando</ThFixo><ThFixo align="right">Vezes</ThFixo></>
     tabela = <TabelaCron tipo="leitura" podeEditar={false} colunas={4} total={lista.length} page={pagina} pp={porPagina} vazio={d.legado ? 'Plano legado (motor 2.8.1): o rastro só existe para o motor atual.' : 'Nenhuma decisão registrada: nenhuma meta foi adiada por restrição, teto ou limite.'} head={head} rows={rows} />
   }
-  const aba = (v: string, l: string) => <Link key={v} href={hrefCom(BASE, qs, { vis: v === 'semanas' ? undefined : v, pag: undefined })} className={cn('shrink-0 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition', vis === v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>{l}</Link>
+  const abasVis = (
+    <AbasLinha ativo={vis} itens={[['semanas', 'Faixa por semana'], ['eventos', 'Decisões do motor']].map(([v, l]) => ({ key: v, label: l, href: hrefCom(BASE, qs, { vis: v === 'semanas' ? undefined : v, pag: undefined }) }))} />
+  )
 
   return (
-    <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Rastro</h1>
-        <p className="text-muted-foreground">Por que o motor posicionou as metas de um aluno como posicionou: faixa e ocupação por semana (plano gravado) e as decisões que adiaram/barraram metas (re-simulação com o estado atual do aluno). Somente leitura.</p>
-      </div>
-      <AdaptativoTabs />
+    <div className="space-y-4">
       <BarraBusca base={BASE} qs={qs} placeholder="E-mail completo do aluno" filtros={filtros} preservar={['vis']} />
       {!qs.q?.trim() && <Nota>Informe o e-mail do aluno para ver o rastro do plano dele.</Nota>}
       {r && !r.ok && <Nota tipo="aviso">{r.error}</Nota>}
@@ -92,7 +104,7 @@ export default async function RastroPage({ searchParams }: { searchParams: Promi
             <KpiCard rotulo="Violações no plano gravado" valor={nf(d.totalViolacoes)} alerta={d.totalViolacoes > 0} />
             <KpiCard rotulo="Decisões não registradas (limite)" valor={nf(d.descartados)} alerta={d.descartados > 0} />
           </KpiGrid>
-          <div className="flex items-center gap-1 border-b">{aba('semanas', 'Faixa por semana')}{aba('eventos', 'Decisões do motor')}</div>
+          {abasVis}
           {tabela}
         </>
       )}

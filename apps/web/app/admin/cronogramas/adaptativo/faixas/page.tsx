@@ -1,5 +1,5 @@
 import { SemPermissao } from '@/components/ui/alert-box'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { carregarPaginaRegras } from '../regras-pagina'
 import { FaixasClient } from './faixas-client'
 
@@ -11,11 +11,7 @@ export default async function FaixasPage() {
   if (p.semAcesso) return <SemPermissao>Você não tem permissão para ver as regras do cronograma adaptativo.</SemPermissao>
   return (
     <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Faixas e limites</h1>
-        <p className="text-muted-foreground">Regras estruturais do motor desta plataforma. O que difere do padrão fica destacado. Salvar vale só para planos <b>gerados dali em diante</b>; planos já gravados não mudam.</p>
-      </div>
-      <AdaptativoTabs />
+      <TituloTela titulo="Faixas e limites" descricao={<>Regras estruturais do motor desta plataforma. O que difere do padrão fica destacado. Salvar vale só para planos <b>gerados dali em diante</b>; planos já gravados não mudam.</>} />
       <FaixasClient registro={p.registro} podeEditar={p.podeEditar} />
     </div>
   )

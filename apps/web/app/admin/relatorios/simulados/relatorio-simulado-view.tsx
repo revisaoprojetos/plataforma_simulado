@@ -9,7 +9,7 @@ import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import { cn } from '@/lib/utils'
 import { JanelaTestesPanel } from './janela-testes-panel'
-import { Users, CheckCircle2, Target, Trophy, Clock, Crown, Medal, ClipboardList, BookOpen, BarChart3, ListChecks, FileSpreadsheet, FileText, Loader2, LayoutDashboard, Search, ChevronDown, Check, X, LogIn, Eye, Download, Activity, AlertTriangle, Timer, Gauge, Repeat, Lock, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
+import { Users, CheckCircle2, Target, Trophy, Clock, Crown, Medal, ClipboardList, BookOpen, BarChart3, ListChecks, FileSpreadsheet, FileText, Loader2, Search, ChevronDown, Check, X, LogIn, Eye, Download, Activity, AlertTriangle, Timer, Gauge, Repeat, Lock, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 
 // ── Helpers de gráfico p/ o Excel: renderiza em canvas e devolve PNG base64 (sem prefixo) p/ addImage ──
 function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -658,10 +658,10 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
       ) : (
         <Tabs defaultValue="geral" className="gap-4">
           <TabsList>
-            <TabsTrigger value="geral"><LayoutDashboard className="h-[18px] w-[18px]" /> Visão geral</TabsTrigger>
+            <TabsTrigger value="geral">Visão geral</TabsTrigger>
             <TabsTrigger value="questoes">
-              <ListChecks className="h-[18px] w-[18px]" /> Questões
-              <span className="ml-1 rounded-md bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">{d.questoes.length}</span>
+              Questões
+              <span className="ml-1.5 text-[12px] font-medium tabular-nums text-muted-foreground">{d.questoes.length}</span>
             </TabsTrigger>
           </TabsList>
           <TabsContent value="geral">{geral}</TabsContent>

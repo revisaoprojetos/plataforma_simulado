@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Zap, Trophy, Award, Target, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import type { MetricasGam } from '@/lib/gamificacao/metricas'
 import type { ModuloConquistaDef } from '@/lib/leitura/carimbos-tipos'
@@ -28,13 +27,13 @@ export function GamificacaoTabs({ config, podeGerenciar, metricas, tabInicial, c
   }
   return (
     <Tabs value={tab} onValueChange={mudarTab}>
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="xp"><Zap /> XP & Níveis</TabsTrigger>
-        <TabsTrigger value="ligas"><Trophy /> Ligas & Divisões</TabsTrigger>
-        <TabsTrigger value="conquistas"><Award /> Conquistas</TabsTrigger>
-        <TabsTrigger value="missoes"><Target /> Missões</TabsTrigger>
-        <TabsTrigger value="regras"><SlidersHorizontal /> Regras gerais</TabsTrigger>
-        <TabsTrigger value="metricas"><BarChart3 /> Métricas</TabsTrigger>
+      <TabsList>
+        <TabsTrigger value="xp">XP & Níveis</TabsTrigger>
+        <TabsTrigger value="ligas">Ligas & Divisões</TabsTrigger>
+        <TabsTrigger value="conquistas">Conquistas</TabsTrigger>
+        <TabsTrigger value="missoes">Missões</TabsTrigger>
+        <TabsTrigger value="regras">Regras gerais</TabsTrigger>
+        <TabsTrigger value="metricas">Métricas</TabsTrigger>
       </TabsList>
 
       <TabsContent value="xp" keepMounted className="pt-1 pb-1"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} nivelMaisAlto={nivelMaisAlto} /></TabsContent>

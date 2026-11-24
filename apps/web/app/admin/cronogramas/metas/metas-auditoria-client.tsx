@@ -1,6 +1,9 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -134,38 +137,20 @@ export function MetasAuditoriaClient({
 
       {/* Navegação segmentada: cada aba mostra seu número e acende um ponto âmbar quando pede decisão. */}
       <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {abas.map((a) => {
-            const ativo = a.chave === aba
-            const Icone = a.icone
-            return (
-              <button
-                key={a.chave}
-                onClick={() => setAba(a.chave)}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition',
-                  ativo ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-foreground hover:border-primary/40 hover:bg-muted',
-                )}
-              >
-                <Icone className="h-4 w-4 shrink-0" />
-                {a.rotulo}
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
-                    a.grave
-                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                      : ativo
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {a.grave && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-                  {a.n.toLocaleString('pt-BR')}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <AbasLinhaControlada
+          valor={aba}
+          onChange={setAba}
+          itens={abas.map((a) => ({
+            valor: a.chave,
+            label: a.rotulo,
+            badge: (
+              <span className="inline-flex items-center gap-1">
+                {a.grave && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                {a.n.toLocaleString('pt-BR')}
+              </span>
+            ),
+          }))}
+        />
 
         {/* Consequência da aba ativa — o "por que importa" que os cartões grandes carregavam. */}
         <div
@@ -411,6 +396,7 @@ function AbaDuracao({
   setOcupado: (v: string | null) => void
   aoResolver: (d: DuracaoDivergente) => void
 }) {
+  const origem = useOrigem()
   async function uniformizar(d: DuracaoDivergente, alvo: string) {
     const chave = `dur:${d.cronograma_id}:${d.semana}:${d.tipo}`
     if (ocupado) return
@@ -447,7 +433,7 @@ function AbaDuracao({
             <div key={chave} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <Link
-                  href={`/admin/cronogramas/${d.cronograma_id}?semana=${d.semana}`}
+                  href={comVoltar(`/admin/cronogramas/${d.cronograma_id}?semana=${d.semana}`, origem)}
                   className="block truncate text-sm font-medium hover:underline"
                 >
                   {d.cronograma_nome}
@@ -503,6 +489,7 @@ function AbaBuscar({
   ocupado: string | null
   setOcupado: (v: string | null) => void
 }) {
+  const origem = useOrigem()
   const [grupos, setGrupos] = useState<GrupoMeta[]>([])
   const [total, setTotal] = useState(0)
   const [busca, setBusca] = useState('')
@@ -678,7 +665,7 @@ function AbaBuscar({
                     {g.cronogramas.map((c) => (
                       <div key={c.meta_id} className="flex flex-wrap items-center gap-x-3 px-4 py-1.5 pl-11 text-xs">
                         <Link
-                          href={`/admin/cronogramas/${c.id}`}
+                          href={comVoltar(`/admin/cronogramas/${c.id}`, origem)}
                           className="min-w-0 flex-1 truncate font-medium hover:underline"
                         >
                           {c.nome}
@@ -692,7 +679,7 @@ function AbaBuscar({
                           </Badge>
                         )}
                         <Link
-                          href={`/admin/cronogramas/${c.id}?meta=${c.meta_id}`}
+                          href={comVoltar(`/admin/cronogramas/${c.id}?meta=${c.meta_id}`, origem)}
                           className="inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 font-medium text-primary transition hover:bg-muted"
                           title="Editar esta meta no cronograma"
                         >

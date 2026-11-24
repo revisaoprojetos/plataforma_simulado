@@ -23,15 +23,15 @@ function Tabs({
   )
 }
 
-// Estilo padronizado (igual ao tab do Webhook): sublinhado com cor primária no ativo.
+// Padrão ÚNICO de abas (igual a components/ui/abas-linha.tsx): texto simples, uma só linha de base (border-b)
+// e o ativo sublinhado pelo PRÓPRIO trigger (border-b-2) — sem indicador deslizante (evita linha dupla).
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex items-center text-muted-foreground",
+  "group/tabs-list flex flex-wrap items-center gap-x-7 gap-y-1 overflow-x-auto border-b text-muted-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   {
     variants: {
       variant: {
-        default:
-          "w-full gap-5 border-b group-data-vertical/tabs:w-fit group-data-vertical/tabs:flex-col group-data-vertical/tabs:items-stretch group-data-vertical/tabs:gap-1 group-data-vertical/tabs:border-b-0 group-data-vertical/tabs:border-l",
-        line: "w-full gap-5 border-b",
+        default: "",
+        line: "",
       },
     },
     defaultVariants: {
@@ -50,20 +50,10 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn("relative", tabsListVariants({ variant }), className)}
+      className={cn(tabsListVariants({ variant }), className)}
       {...props}
     >
       {children}
-      {/* Indicador que desliza suavemente entre os tabs (movimento). */}
-      <TabsPrimitive.Indicator
-        data-slot="tabs-indicator"
-        className={cn(
-          // cor via [data-slot="tabs-indicator"] no globals.css → segue os controles de aba do console
-          "pointer-events-none absolute rounded-full transition-all duration-300 ease-out motion-reduce:transition-none",
-          "group-data-horizontal/tabs:bottom-[-1px] group-data-horizontal/tabs:left-0 group-data-horizontal/tabs:h-0.5 group-data-horizontal/tabs:w-[var(--active-tab-width)] group-data-horizontal/tabs:translate-x-[var(--active-tab-left)]",
-          "group-data-vertical/tabs:left-[-1px] group-data-vertical/tabs:top-0 group-data-vertical/tabs:w-0.5 group-data-vertical/tabs:h-[var(--active-tab-height)] group-data-vertical/tabs:translate-y-[var(--active-tab-top)]"
-        )}
-      />
     </TabsPrimitive.List>
   )
 }
@@ -73,9 +63,9 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        // cor do ativo via [data-slot="tabs-trigger"][data-active] no globals.css → controles de aba do console
-        "-mb-px inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 border-transparent pb-2.5 pt-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
-        "group-data-vertical/tabs:w-full group-data-vertical/tabs:-ml-px group-data-vertical/tabs:justify-start group-data-vertical/tabs:border-b-0 group-data-vertical/tabs:border-l-2 group-data-vertical/tabs:pb-0 group-data-vertical/tabs:pt-0 group-data-vertical/tabs:pl-3",
+        // cor do ativo (texto + border-color) via [data-slot="tabs-trigger"][data-active] no globals.css → controles de aba do console
+        "-mb-px inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 border-transparent pb-2.5 pt-1 text-[14px] font-semibold tracking-[-0.01em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+        "data-active:border-primary data-active:font-extrabold data-active:text-foreground",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}

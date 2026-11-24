@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition, type ReactNode } from 'react'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -183,6 +185,7 @@ export function NovoPacote() {
 }
 
 export function AcoesPacote({ p, perm }: { p: PacoteSel; perm: Perm }) {
+  const origem = useOrigem()
   const router = useRouter()
   const [pendente, iniciar] = useTransition()
   const [editando, setEditando] = useState(false)
@@ -205,7 +208,7 @@ export function AcoesPacote({ p, perm }: { p: PacoteSel; perm: Perm }) {
   }
   return (
     <span className="flex items-center justify-end gap-1">
-      <Link href={`/admin/cronogramas/pacotes/${p.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Abrir editor</Link>
+      <Link href={comVoltar(`/admin/cronogramas/pacotes/${p.id}`, origem)} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Abrir editor</Link>
       {perm.editar && (
         <>
           <Button size="icon-sm" variant="ghost" onClick={() => setEditando(true)} disabled={pendente} title="Renomear / descrição" aria-label="Renomear / descrição"><Pencil /></Button>

@@ -39,6 +39,11 @@ export interface ItemSetor {
    * nem no editor de rótulos (setoresVisiveis os remove). Nunca é o 1º item da aba (o 1º é o destino da entrada).
    */
   alias?: boolean
+  /**
+   * Só para ALIAS: href do item VISÍVEL da mesma aba que este alias acende na barra de abas (BarraSetor) — ex.: as
+   * rotas /admin/cronogramas/** acendem "Gerador". Ausente = o próprio href. Ver `hrefAtivoDaRota`.
+   */
+  alvo?: string
 }
 
 export interface AbaSetor {
@@ -132,27 +137,22 @@ export const SETORES: Setor[] = [
         ],
       },
       {
-        // UMA entrada, UM destino: a tela nova (/admin/revisao/cronograma) já tem as abas do Gerador (Catálogo, Metas,
-        // Conteúdos, Acessos, Importação, Relatórios, Liberação, Liberação de aulas) → sem barra de setor.
-        // Gate = o da PÁGINA (cronogramas:view; editar é decidido dentro da tela por cronogramas:update).
-        // As rotas antigas /admin/cronogramas/** são ALIAS (continuam abrindo e acendem esta entrada).
-        id: 'gerador-cronograma', label: 'Gerador de cronograma', icone: CalendarDays,
+        // UMA entrada ("Cronogramas") com 2 modalidades: Gerador e Adaptativo. A 1ª fileira de abas (BarraSetor) mostra
+        // [Gerador | Adaptativo]; a navegação interna (5 abas por modalidade; as telas de cada aba = abas internas ?v=, sem 3ª fileira) vive em lib/admin/cronogramas-nav.ts +
+        // components/admin/cronograma/{cronogramas-nav,vistas-cronograma}.tsx. Gate = o da PÁGINA (cronogramas:view).
+        // Os ALIAS são as rotas atuais (continuam abrindo) e acendem o item visível indicado em `alvo`:
+        // /admin/cronogramas/** (catálogo, [id], criar, conteudos, pacotes, links, tipos, metas, relatorios, importar) → Gerador;
+        // /admin/cronogramas/adaptativo/** e /lei-seca → Adaptativo; shell sem ?aba= → Gerador.
+        id: 'cronogramas', label: 'Cronogramas', icone: CalendarDays,
         itens: [
           { label: 'Gerador de cronograma', href: '/admin/revisao/cronograma?aba=gerador', icone: CalendarDays, perm: 'cronogramas:view' },
-          { label: 'Catálogo (antigo)', href: '/admin/cronogramas', icone: CalendarDays, alias: true },
-          { label: 'Relatórios (antigo)', href: '/admin/cronogramas/relatorios', icone: BarChart3, alias: true },
-          { label: 'Importar (antigo)', href: '/admin/cronogramas/importar', icone: Upload, alias: true },
-        ],
-      },
-      {
-        // Idem: ?aba=adaptativo tem as subs do adaptativo + links para "Liberação e configurações" (16 telas do
-        // AdaptativoTabs) e Lei seca. O href SEM query (rota padrão da tela = adaptativo) é alias p/ acender esta entrada.
-        id: 'adaptativo', label: 'Cronograma adaptativo', icone: Lock,
-        itens: [
           { label: 'Cronograma adaptativo', href: '/admin/revisao/cronograma?aba=adaptativo', icone: Route, perm: 'cronogramas:view' },
-          { label: 'Cronograma (rota padrão)', href: '/admin/revisao/cronograma', icone: Route, alias: true },
-          { label: 'Adaptativo · Liberação (antigo)', href: '/admin/cronogramas/adaptativo', icone: Lock, alias: true },
-          { label: 'Lei seca (adaptativo)', href: '/admin/cronogramas/lei-seca', icone: FileText, alias: true },
+          { label: 'Cronograma (rota padrão)', href: '/admin/revisao/cronograma', icone: Route, alias: true, alvo: '/admin/revisao/cronograma?aba=gerador' },
+          { label: 'Catálogo (antigo)', href: '/admin/cronogramas', icone: CalendarDays, alias: true, alvo: '/admin/revisao/cronograma?aba=gerador' },
+          { label: 'Relatórios (antigo)', href: '/admin/cronogramas/relatorios', icone: BarChart3, alias: true, alvo: '/admin/revisao/cronograma?aba=gerador' },
+          { label: 'Importar (antigo)', href: '/admin/cronogramas/importar', icone: Upload, alias: true, alvo: '/admin/revisao/cronograma?aba=gerador' },
+          { label: 'Adaptativo · Liberação (antigo)', href: '/admin/cronogramas/adaptativo', icone: Lock, alias: true, alvo: '/admin/revisao/cronograma?aba=adaptativo' },
+          { label: 'Lei seca (adaptativo)', href: '/admin/cronogramas/lei-seca', icone: FileText, alias: true, alvo: '/admin/revisao/cronograma?aba=adaptativo' },
         ],
       },
       {
@@ -388,6 +388,11 @@ export function resolverRota(pathname: string, search: Consulta, setores: Setor[
   if (exatos.length) return exatos.reduce(pior)
   const porPath = planos.filter((p) => itemCasaPath(p.item, pathname))
   return porPath.length ? porPath.reduce((a, b) => (b.item.href.split('?')[0].length > a.item.href.split('?')[0].length ? b : a)) : null
+}
+
+/** href do item da barra/rótulo que a rota acende: o `alvo` do alias, ou o próprio href. */
+export function hrefAtivoDaRota(rota: RotaResolvida): string {
+  return rota.item.alvo ?? rota.item.href
 }
 
 export interface OpcoesVisibilidade {

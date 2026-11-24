@@ -5,8 +5,8 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { formatBrt } from '@/lib/brt'
 import { NpsExport } from './nps-export'
-import { Star, TrendingUp, Minus, TrendingDown } from 'lucide-react'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { TrendingUp, Minus, TrendingDown } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ export default async function NpsPage() {
   if (!(access.isAdmin || accessCan(access, 'relatorios:view'))) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">NPS — Satisfação</h1>
+        <CabecalhoArea titulo="NPS — Satisfação" />
         <SemPermissao>Você não tem permissão para ver os relatórios.</SemPermissao>
       </div>
     )
@@ -75,18 +75,12 @@ export default async function NpsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"><Star className="h-5 w-5" /></span>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">NPS — Satisfação do aluno</h1>
-            <p className="text-muted-foreground">Avaliações que os alunos deixam ao concluir um simulado.</p>
-          </div>
-        </div>
-        {total > 0 && <NpsExport resumo={{ nps, media, total, promotores, neutros, detratores }} comentarios={comentarios} />}
-      </div>
+      <CabecalhoArea
+        titulo="NPS — Satisfação do aluno"
+        descricao="Avaliações que os alunos deixam ao concluir um simulado."
+        acoes={total > 0 ? <NpsExport resumo={{ nps, media, total, promotores, neutros, detratores }} comentarios={comentarios} /> : undefined}
+      />
 
-      <BarraSetorSlot />
       {semTabela ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-50/50 p-6 text-sm text-amber-800 dark:bg-amber-900/15 dark:text-amber-300">
           A tabela de avaliações ainda não foi criada. Rode <code className="rounded bg-black/10 px-1">scripts/sql/nps-avaliacoes.sql</code> no SQL Editor do Supabase.

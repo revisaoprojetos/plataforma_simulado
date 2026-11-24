@@ -174,6 +174,28 @@ export async function carregarResumo(svc: SupabaseClient, tenantId: string, f: F
   })
 }
 
+export interface TotaisAn { gerados: number; recalculados: number; falhas: number; desde: string | null }
+/** Totais DESDE O INÍCIO do registro (sem período/filtro): contagens leves por ação no log, cache 10 min. Falha = null (a página mostra "—"). */
+export async function carregarTotais(svc: SupabaseClient, tenantId: string): Promise<TotaisAn | null> {
+  return remember(chaveRelatorio(tenantId, 'adaptativo-an', 'totais'), 600, async () => {
+    const T = 'simulado_cronograma_adaptativo_geracao_log'
+    const cont = (acao: string, ok?: boolean) => {
+      let q = svc.from(T).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('acao', acao)
+      if (ok !== undefined) q = q.eq('ok', ok)
+      return q
+    }
+    const [g, r, fg, fr, ini] = await Promise.all([
+      cont('gerar', true), cont('recalcular', true), cont('gerar', false), cont('recalcular', false),
+      svc.from(T).select('criado_em').eq('tenant_id', tenantId).order('criado_em', { ascending: true }).limit(1),
+    ])
+    if (g.error || r.error) return null
+    return {
+      gerados: g.count ?? 0, recalculados: r.count ?? 0, falhas: (fg.count ?? 0) + (fr.count ?? 0),
+      desde: ((ini.data?.[0] as { criado_em?: string } | undefined)?.criado_em) ?? null,
+    }
+  })
+}
+
 export interface OpcoesAn { disciplinas: string[]; motores: string[] }
 export async function carregarOpcoes(svc: SupabaseClient, tenantId: string): Promise<OpcoesAn> {
   return remember(chaveRelatorio(tenantId, 'adaptativo-an', 'opcoes'), 600, async () => {

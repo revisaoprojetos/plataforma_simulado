@@ -108,7 +108,7 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
         <h2 className="text-sm font-semibold">Bloqueio por disciplina</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Disciplinas com PDFull, LegProc ou Jurisprudência desligados individualmente. Edite na aba{' '}
-          <Link href="/admin/revisao/cronograma?aba=adaptativo&sub=disc" className="text-primary underline-offset-2 hover:underline">Disciplinas (Revisão › Cronograma)</Link>.
+          <Link href="/admin/revisao/cronograma?aba=adaptativo&sub=conteudo&v=disciplinas" className="text-primary underline-offset-2 hover:underline">Disciplinas (Revisão › Cronograma)</Link>.
           Um tipo bloqueado acima vale para todas as disciplinas.
         </p>
         <ul className="mt-3 grid gap-3 text-xs sm:grid-cols-3">

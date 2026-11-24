@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -220,6 +222,7 @@ function Kpi({ label, valor, hint, destaque }: { label: string; valor: string; h
 }
 
 function LinhaPacote({ p, marcado, onSel, onEdit, onDelete, podeLiberar, alternando, onGeral }: { p: PacoteLista; marcado: boolean; onSel: () => void; onEdit: () => void; onDelete: () => void; podeLiberar: boolean; alternando: boolean; onGeral: (v: boolean) => void }) {
+  const origem = useOrigem()
   return (
     <div style={{ gridTemplateColumns: GRID }}
       className={cn('group grid items-center gap-2 border-b border-border/60 px-3 py-2.5 transition-colors hover:bg-muted/40', marcado && 'bg-primary/5', !p.ativo && 'opacity-60')}>
@@ -230,7 +233,7 @@ function LinhaPacote({ p, marcado, onSel, onEdit, onDelete, podeLiberar, alterna
       {/* Nome */}
       <div className="flex min-w-0 items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Package className="h-4 w-4" /></span>
-        <Link href={`/admin/cronogramas/pacotes/${p.id}`} className="truncate text-[13.5px] font-medium hover:text-primary">{p.nome}</Link>
+        <Link href={comVoltar(`/admin/cronogramas/pacotes/${p.id}`, origem)} className="truncate text-[13.5px] font-medium hover:text-primary">{p.nome}</Link>
         {!p.ativo && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">inativo</span>}
         {p.acesso_gratuito && <span className="shrink-0 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">gratuito</span>}
       </div>

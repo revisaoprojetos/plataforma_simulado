@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { listarDuvidasAdmin } from '@/lib/duvidas/duvidas'
@@ -8,6 +9,7 @@ import type { Requerimento, StatusRequerimento } from '@/lib/requerimentos/tipos
 import { listarReportesAdmin, listarAvaliacoesBaixas, resumoAvaliacoesPorMaterial } from '@/lib/demandas/demandas'
 import type { Reporte, Avaliacao, StatusReporte } from '@/lib/demandas/tipos'
 import { AtendimentoClient, type DuvidaRow, type RequerimentoRow, type ReporteRow, type AvaliacaoRow } from './atendimento-client'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 // Fila de ATENDIMENTO (Dúvidas + Requerimentos + Demandas). Consome as libs prontas (filtro de status NO
 // BANCO), enriquece com o nome do aluno (como /admin/feedbacks faz) e, nas Demandas, o título do material;
@@ -22,7 +24,7 @@ type Tab = 'duvidas' | 'requerimentos' | 'demandas'
 async function mapaEstudantes(svc: ReturnType<typeof createAdminClient>, tenantId: string, ids: string[]) {
   const unicos = [...new Set(ids.filter(Boolean))]
   if (!unicos.length) return new Map<string, { nome: string; email: string | null }>()
-  const { data } = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId).in('id', unicos)
+  const data = await fetchAllByIn<any>(unicos, (ch) => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId).in('id', ch).order('id', { ascending: true }))
   return new Map((data ?? []).map((e: any) => [e.id, { nome: e.nome ?? 'Aluno', email: e.email ?? null }]))
 }
 
@@ -30,7 +32,7 @@ async function mapaEstudantes(svc: ReturnType<typeof createAdminClient>, tenantI
 async function mapaMateriais(svc: ReturnType<typeof createAdminClient>, tenantId: string, ids: string[]) {
   const unicos = [...new Set(ids.filter(Boolean))]
   if (!unicos.length) return new Map<string, string>()
-  const { data } = await svc.from('simulado_conteudo_documentos').select('id, titulo').eq('tenant_id', tenantId).in('id', unicos)
+  const data = await fetchAllByIn<any>(unicos, (ch) => svc.from('simulado_conteudo_documentos').select('id, titulo').eq('tenant_id', tenantId).in('id', ch).order('id', { ascending: true }))
   return new Map((data ?? []).map((d: any) => [d.id, (d.titulo as string) ?? 'Material']))
 }
 
@@ -48,7 +50,7 @@ export default async function AtendimentoPage({
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Atendimento</h1>
+        <CabecalhoArea titulo="Atendimento" />
         <SemPermissao>Você não tem permissão para acessar o atendimento.</SemPermissao>
       </div>
     )
@@ -92,11 +94,13 @@ export default async function AtendimentoPage({
         listarReportesAdmin(svc, tenantId, { status: st }),
         listarAvaliacoesBaixas(svc, tenantId),
       ])
-      const resumo = await resumoAvaliacoesPorMaterial(svc, tenantId)
       const estIds = [...reps.map((r) => r.estudante_id), ...avas.map((a) => a.estudante_id)]
       const docIds = [...reps.map((r) => r.documento_id), ...avas.map((a) => a.documento_id)]
-      const nomes = await mapaEstudantes(svc, tenantId, estIds)
-      const materiais = await mapaMateriais(svc, tenantId, docIds)
+      const [resumo, nomes, materiais] = await Promise.all([
+        resumoAvaliacoesPorMaterial(svc, tenantId, docIds),
+        mapaEstudantes(svc, tenantId, estIds),
+        mapaMateriais(svc, tenantId, docIds),
+      ])
       const enriquecer = (estudante_id: string, documento_id: string) => ({
         estudante_nome: nomes.get(estudante_id)?.nome ?? 'Aluno',
         estudante_email: nomes.get(estudante_id)?.email ?? null,

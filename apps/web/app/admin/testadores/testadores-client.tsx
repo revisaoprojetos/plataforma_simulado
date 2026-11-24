@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { FlaskConical, Plus, Trash2, Search, Mail, ShieldCheck, Loader2 } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { Plus, Trash2, Search, Mail, ShieldCheck, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,18 +51,11 @@ export function TestadoresClient({ emailsIniciais, podeEditar }: { emailsIniciai
   return (
     <div className="w-full space-y-6">
       {/* Cabeçalho */}
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <FlaskConical className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Testadores</h1>
-          <p className="text-sm text-muted-foreground">
-            E-mails com <strong>acesso total</strong> ao entrar como aluno — enxergam áreas em manutenção e qualquer
-            conteúdo bloqueado para os demais (matrícula, grupo, prazo, não publicado, Biblioteca).
-          </p>
-        </div>
-      </div>
+      <CabecalhoArea
+        titulo="Testadores"
+        descricao={<>E-mails com <strong>acesso total</strong> ao entrar como aluno — enxergam áreas em manutenção e qualquer
+          conteúdo bloqueado para os demais (matrícula, grupo, prazo, não publicado, Biblioteca).</>}
+      />
 
       {/* Aviso de comportamento */}
       <div className="flex gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">

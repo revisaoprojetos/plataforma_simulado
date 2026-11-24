@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -25,14 +26,8 @@ export function DetalheIntegridade({ d }: { d: DetalhePlano }) {
         </div>
         <Link href={`/admin/estudantes/${d.estudanteId}`} className="inline-flex h-8 items-center rounded-[10px] border bg-background px-3 text-[13px] font-medium transition hover:bg-muted">Abrir aluno</Link>
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-1 border-b">
-        {[{ v: '', l: 'Todas' }, ...tipos.map((t) => ({ v: t, l: d.rotulos[t] }))].map((o) => (
-          <button key={o.v || 'todas'} type="button" onClick={() => setTipo(o.v)}
-            className={cn('shrink-0 rounded-t-lg border-b-2 px-3 py-2 text-[13px] font-medium transition', tipo === o.v ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {o.l}
-          </button>
-        ))}
-      </div>
+      <AbasLinhaControlada className="mb-3" valor={tipo} onChange={setTipo}
+        itens={[{ valor: '', label: 'Todas' }, ...tipos.map((t) => ({ valor: t as string, label: d.rotulos[t] }))]} />
       <div className="w-full overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">

@@ -3,8 +3,9 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Gauge, ListChecks, FileText, PackageSearch, Play, Loader2, Check, EyeOff, ShieldCheck, RotateCcw, Printer, Download } from 'lucide-react'
+import { Play, Loader2, Check, EyeOff, ShieldCheck, RotateCcw, Printer, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { DataTable } from '@/components/admin/data-table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { CATEGORIAS, SEVERIDADES, ROTULO_CATEGORIA, ROTULO_SEVERIDADE, ROTULO_STATUS_CORRECAO, type Categoria, type Severidade, type Correcao, type CorrecaoVerificada, type StatusCorrecao } from '@/lib/seguranca/tipos'
@@ -20,27 +21,16 @@ export interface DetalheVarredura {
 }
 
 const ABAS = [
-  { id: 'geral', label: 'Visão geral', icon: Gauge },
-  { id: 'achados', label: 'Achados', icon: ListChecks },
-  { id: 'relatorios', label: 'Relatórios', icon: FileText },
-  { id: 'atualizacoes', label: 'Atualizações', icon: PackageSearch },
+  { id: 'geral', label: 'Visão geral' },
+  { id: 'achados', label: 'Achados' },
+  { id: 'relatorios', label: 'Relatórios' },
+  { id: 'atualizacoes', label: 'Atualizações' },
 ]
 
-/** Abas de sublinhado (border-b-2), padrão do admin. */
+/** Abas de linha — padrão único do admin (AbasLinha). */
 export function SegurancaTabs({ ativa }: { ativa: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-1 overflow-x-auto border-b">
-      {ABAS.map((t) => {
-        const Icone = t.icon
-        return (
-          <Link key={t.id} href={`/admin/seguranca?aba=${t.id}`}
-            className={cn('relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition',
-              ativa === t.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            <Icone className="h-4 w-4 shrink-0" />{t.label}
-          </Link>
-        )
-      })}
-    </div>
+    <AbasLinha ativo={ativa} itens={ABAS.map((t) => ({ key: t.id, label: t.label, href: `/admin/seguranca?aba=${t.id}` }))} />
   )
 }
 

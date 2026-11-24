@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createEstudanteAction } from '../actions'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 const schema = z.object({
   nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres'),
@@ -59,11 +60,12 @@ export default function NovoEstudantePage() {
           <ChevronLeft className="h-4 w-4" />
           Voltar para Estudantes
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Novo Estudante</h1>
-        <p className="text-muted-foreground">
-          Cadastre um novo estudante na plataforma. Um e-mail de acesso será enviado.
-        </p>
       </div>
+      <CabecalhoArea
+        titulo="Novo Estudante"
+        descricao="Cadastre um novo estudante na plataforma. Um e-mail de acesso será enviado."
+        semBarraSetor
+      />
 
       <Card className="max-w-xl">
         <CardHeader>

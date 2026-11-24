@@ -2,9 +2,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { listarNovidadesAdmin } from '@/lib/novidades/novidades'
-import { Newspaper } from 'lucide-react'
 import { NovidadesClient, type NovidadeAdmin } from './novidades-client'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 // NOVIDADES ("O que mudou") — gestão do changelog/anúncios por tenant (admin). Consome a lib pronta
 // (listarNovidadesAdmin). Tolerante à migração 20261028000000 ainda não aplicada: lista vazia + aviso
@@ -18,7 +17,7 @@ export default async function NovidadesPage() {
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Novidades</h1>
+        <CabecalhoArea titulo="Novidades" semBarraSetor />
         <SemPermissao>Você não tem permissão para gerenciar as novidades.</SemPermissao>
       </div>
     )
@@ -42,14 +41,10 @@ export default async function NovidadesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"><Newspaper className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Novidades</h1>
-          <p className="text-muted-foreground">Changelog &quot;O que mudou&quot; exibido no início do aluno. Categoria, destaque com capa e até 2 botões (CTAs).</p>
-        </div>
-      </div>
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Novidades"
+        descricao={'Changelog "O que mudou" exibido no início do aluno. Categoria, destaque com capa e até 2 botões (CTAs).'}
+      />
       <NovidadesClient itens={itens} aviso={aviso} podeEditar={podeEditar} />
     </div>
   )

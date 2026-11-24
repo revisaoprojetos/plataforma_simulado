@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { BookOpen, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Link2, ListChecks, Loader2, Package, Pencil, Plus, Search, Send, Trash2, Users, X } from 'lucide-react'
@@ -70,6 +72,7 @@ export function MetasClient({
   pacotes: PacotesDoCronograma
   diagnostico: Diagnostico
 }) {
+  const origem = useOrigem()
   // Rótulo e ordem vêm do cadastro de tipos, não de constantes no código.
   const porSlug = useMemo(() => new Map(tipos.map((t) => [t.slug, t])), [tipos])
   const rotulo = (slug: string) => porSlug.get(slug)?.nome ?? slug
@@ -749,7 +752,7 @@ export function MetasClient({
           <div className="divide-y">
             {pac.dentro.map((p) => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-                <Link href={`/admin/cronogramas/pacotes/${p.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                <Link href={comVoltar(`/admin/cronogramas/pacotes/${p.id}`, origem)} className="min-w-0 flex-1 truncate text-sm hover:underline">
                   {p.nome}
                 </Link>
                 <Badge variant="outline" className="shrink-0 gap-1">

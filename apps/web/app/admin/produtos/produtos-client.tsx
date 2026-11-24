@@ -1,14 +1,14 @@
 'use client'
 
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Boxes, Plus, Search, Users, Loader2, ChevronRight } from 'lucide-react'
+import { Plus, Search, Users, Loader2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PRODUTO_TIPOS, type Produto, type ProdutoTipo } from '@/lib/produtos/tipos'
 import { salvarProdutoAction } from './actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 type Row = Produto & { membros: number; fontes: number; itens: number }
 const labelTipo = (t: string) => PRODUTO_TIPOS.find((x) => x.v === t)?.label ?? t
@@ -43,22 +43,13 @@ export function ProdutosClient({ produtosIniciais, podeEditar }: { produtosInici
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Boxes className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Produtos / Extensivos</h1>
-            <p className="text-sm text-muted-foreground">Pacotes que liberam conteúdo, videoaulas e simulados — de integrações (Curseduca/Guru) ou gestão manual.</p>
-          </div>
-        </div>
-        {podeEditar && !criando && (
+      <CabecalhoArea
+        titulo="Produtos / Extensivos"
+        descricao="Pacotes que liberam conteúdo, videoaulas e simulados — de integrações (Curseduca/Guru) ou gestão manual."
+        acoes={podeEditar && !criando ? (
           <Button onClick={() => setCriando(true)}><Plus className="h-4 w-4" />Novo produto</Button>
-        )}
-      </div>
-
-      <BarraSetorSlot />
+        ) : undefined}
+      />
       {criando && (
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <label className="mb-2 block text-sm font-semibold">Nome do novo produto</label>

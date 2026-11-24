@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import { Lock } from 'lucide-react'
+import { AppLoading } from '@/components/admin/app-loading'
 import { isSuperAdmin } from '@/lib/auth/permissions'
+import { Suspense } from 'react'
 import { BibliotecaClient } from './biblioteca-client'
+import { listarArvore } from './actions'
 
 export const metadata: Metadata = { title: 'Biblioteca de Conteúdos' }
 export const dynamic = 'force-dynamic'
@@ -20,9 +23,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
       </div>
     )
   }
+  const categoria = tab === 'modelos' || (Array.isArray(tab) && tab[0] === 'modelos') ? 'modelo_caderno' : (Array.isArray(tab) ? tab[0] : tab) === 'jurisclub' ? 'jurisclub' : 'conteudo'
   return (
     <div className="w-full">
-      <BibliotecaClient />
+      {/* Raiz pré-carregada no servidor (sem cascata HTML→JS→action); o shell/loading aparece enquanto resolve. */}
+      <Suspense fallback={<AppLoading />}>
+        <BibliotecaComRaiz categoria={categoria} />
+      </Suspense>
     </div>
   )
+}
+
+async function BibliotecaComRaiz({ categoria }: { categoria: 'conteudo' | 'modelo_caderno' | 'jurisclub' }) {
+  // Falha/sem permissão → sem `initial`: o client cai no fetch normal (mesma mensagem de erro de antes).
+  const r = await listarArvore(null, categoria).catch(() => null)
+  return <BibliotecaClient initial={r && r.ok ? { categoria, dados: r } : undefined} />
 }

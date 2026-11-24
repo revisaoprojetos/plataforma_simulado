@@ -1,10 +1,10 @@
 import Link from 'next/link'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { BookOpen, ChevronRight, Scale } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkPermission } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { buttonVariants } from '@/components/ui/button'
-import { RevisaoAbas } from '@/components/admin/revisao/ui'
 import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { listarConjuntosPag, listarLinksPag } from '@/lib/revisao/gerador/conteudos'
 import { BarraBusca, Nota, ParamsInt, Pilula, ThFixo, ThOrd, hrefCom, type QS } from '../../../_comp/lista'
@@ -37,14 +37,11 @@ export default async function GeradorConteudos({ sp, tenantId, basePath }: { sp:
   const dir = qs.dir === 'desc' ? 'desc' : 'asc'
   const pagina = ParamsInt(qs.pag, 1)
   const pp = porPagina(qs.pps)
-  const preservar = ['aba', 'sub', 'painel', 'pasta', 'pps']
+  const preservar = ['aba', 'sub', 'v', 'painel', 'pasta', 'pps']
 
   return (
     <div className="w-full">
-      <RevisaoAbas
-        base={pathname} param="painel" atual={painel} extra={{ aba: qs.aba, sub: qs.sub }}
-        abas={[{ id: 'conjuntos', titulo: 'Conjuntos' }, { id: 'links', titulo: 'Links de aula' }]}
-      />
+      {/* Conjuntos × Links de aula = sub-abas da CronogramasNav (?painel=); sem abas próprias aqui. */}
       {painel === 'conjuntos'
         ? await Conjuntos({ svc, tenantId, pathname, qs, dir, pagina, pp, preservar, podeEditar })
         : await Links({ svc, tenantId, pathname, qs, dir, pagina, pp, preservar, podeEditar })}
@@ -100,7 +97,7 @@ async function Conjuntos({ svc, tenantId, pathname, qs, dir, pagina, pp, preserv
           id: c.id,
           cells: [
             <span key="n" className="flex min-w-0 flex-col">
-              <Link href={`/admin/cronogramas/conteudos/${c.id}${qs.tipo === 'legproc' ? '?tipo=legproc' : ''}`} className="inline-flex items-center gap-1.5 font-medium hover:text-primary"><BookOpen className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate">{c.nome}</span></Link>
+              <Link href={comVoltar(`/admin/cronogramas/conteudos/${c.id}${qs.tipo === 'legproc' ? '?tipo=legproc' : ''}`, hrefCom(pathname, qs))} className="inline-flex items-center gap-1.5 font-medium hover:text-primary"><BookOpen className="h-3.5 w-3.5 shrink-0 text-primary" /><span className="truncate">{c.nome}</span></Link>
               {c.descricao && <span className="truncate text-xs text-muted-foreground">{c.descricao}</span>}
             </span>,
             <Pilula key="d" tipo="vio">{c.disciplina || '—'}</Pilula>,
@@ -108,7 +105,7 @@ async function Conjuntos({ svc, tenantId, pathname, qs, dir, pagina, pp, preserv
             <span key="q" className="block text-right tabular-nums">{c.questoes ? c.questoes.toLocaleString('pt-BR') : '—'}</span>,
             <span key="l" className="block text-right tabular-nums">{c.aulasLegproc ? <Pilula tipo="warn"><Scale className="h-3 w-3" />{c.aulasLegproc.toLocaleString('pt-BR')}</Pilula> : '—'}</span>,
             <span key="x" className="inline-flex items-center gap-1">
-              <Link href={`/admin/cronogramas/conteudos/${c.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Abrir</Link>
+              <Link href={comVoltar(`/admin/cronogramas/conteudos/${c.id}`, hrefCom(pathname, qs))} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Abrir</Link>
               <AcoesConjunto id={c.id} nome={c.nome} podeEditar={podeEditar} />
             </span>,
           ],

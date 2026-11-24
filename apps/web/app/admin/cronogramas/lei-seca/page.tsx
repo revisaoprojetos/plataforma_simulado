@@ -1,7 +1,6 @@
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { listarLegproc } from './actions'
 import { LeiSecaEditor } from './lei-seca-editor'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,12 +10,8 @@ export default async function LeiSecaPage() {
   const semanas = r.ok ? r.semanas ?? [] : []
   return (
     <div className="w-full space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Lei seca · Cronograma Adaptativo</h1>
-        <p className="text-muted-foreground">Blocos de LegProc por semana. Alimentam as metas de lei seca do cronograma gerado para o aluno.</p>
-      </div>
-      <BarraSetorSlot />
-      <AdaptativoTabs />
+      <TituloTela titulo="Lei seca" descricao="Blocos de LegProc por semana. Alimentam as metas de lei seca do cronograma gerado para o aluno." />
+
       {!r.ok ? (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{r.error ?? 'Falha ao carregar.'}</div>
       ) : (

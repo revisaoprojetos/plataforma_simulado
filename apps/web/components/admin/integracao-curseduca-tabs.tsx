@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { KeyRound, DownloadCloud, AlertTriangle, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { CurseducaConfig } from '@/components/admin/curseduca-config'
 import { CurseducaImport } from '@/components/admin/curseduca-import'
 import { CurseducaSyncCard } from '@/components/admin/curseduca-sync-card'
@@ -54,14 +55,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras, 
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 border-b">
-        {abas.map(({ id, label, Icon }) => (
-          <button key={id} type="button" onClick={() => setAba(id)}
-            className={cn('inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', aba === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <AbasLinha ativo={aba} itens={abas.map(({ id, label }) => ({ key: id, label, onClick: () => setAba(id) }))} />
 
       {aba === 'importar' && (
         !configurado ? (

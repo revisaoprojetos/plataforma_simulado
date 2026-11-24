@@ -1,20 +1,26 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
-import { BarraBusca, KpiCard, KpiGrid, Nota, ParamsInt, Pilula, ThFixo, ThOrd, type QS } from '@/app/admin/revisao/_comp/lista'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
+import { BarraBusca, Nota, ParamsInt, Pilula, ThFixo, ThOrd, type QS } from '@/app/admin/revisao/_comp/lista'
 import { TabelaCron, type LinhaCron } from '@/app/admin/revisao/cronograma/tabela-cron'
-import { carregarIntegridade } from '@/lib/cronograma/adaptativo/integridade-admin'
+import { lerIntegridade, dispararAuditoria } from '@/lib/cronograma/adaptativo/integridade-admin'
 import { ROTULO_ANOMALIA, TIPOS_ANOMALIA, norm, type TipoAnomalia } from '@/lib/cronograma/adaptativo/auditar-plano'
 import { dataBr } from '@/lib/admin/revisao/datas'
 import { formatBrt } from '@/lib/brt'
+import { cn } from '@/lib/utils'
 import { DetalheIntegridade } from './integridade-client'
+import { ReauditarBotao } from './reauditar-botao'
+import { AutoAtualizar } from './auto-atualizar'
+import { EsqueletoTela } from '@/components/admin/cronograma/esqueleto-tela'
 
 export const dynamic = 'force-dynamic'
 
-// Admin: Cronograma Adaptativo — INTEGRIDADE (somente leitura). Backend-first: o auditor roda no servidor (cache 60 s, leitura em lotes);
-// esta página só lista, filtra, ordena e pagina o que ele devolveu. Nenhuma correção automática aqui.
+// Admin: Cronograma Adaptativo — INTEGRIDADE (somente leitura). Backend-first: a varredura pesada (planos + metas) roda em SEGUNDO PLANO
+// (after) e grava o resultado no cache; esta página só LÊ o resultado pronto (instantâneo), agrupa por tipo e pagina. Nenhuma correção aqui.
 const BASE = '/admin/cronogramas/adaptativo/integridade'
 const nf = (n: number) => n.toLocaleString('pt-BR')
 const fmtData = (v: string | null): string | null => (!v ? null : v.length <= 10 ? dataBr(v) : formatBrt(v))
@@ -30,25 +36,57 @@ export default async function IntegridadeAdaptativoPage({ searchParams }: { sear
 
   const raw = await searchParams
   const qs: QS = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
+  const podeAtualizar = acesso.isAdmin || acesso.permissions.includes('*') || acesso.permissions.includes('cronogramas:update')
+  return (
+    <div className="w-full space-y-4">
+      <TituloTela titulo="Integridade" descricao="Somente as inconsistências dos planos ativos (progresso em aula diferente, revisão antes do estudo, meta fora do catálogo…). Indicadores gerais e a busca de alunos ficam na Análise de uso. Nada é corrigido aqui." />
+      <Suspense fallback={<EsqueletoTela linhas={4} />}><CorpoIntegridade tenantId={acesso.tenantId} podeAtualizar={podeAtualizar} qs={qs} /></Suspense>
+    </div>
+  )
+}
+
+function minutosAtras(iso: string): string {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))
+  return m < 1 ? 'agora há pouco' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`
+}
+
+async function CorpoIntegridade({ tenantId, podeAtualizar, qs }: { tenantId: string; podeAtualizar: boolean; qs: QS }) {
+  let leitura: Awaited<ReturnType<typeof lerIntegridade>>
+  try { leitura = await lerIntegridade(tenantId) } catch { leitura = { tipo: 'erro', msg: 'Não foi possível ler o resultado da auditoria agora.', em: Date.now() } }
+
+  if (leitura.tipo === 'vazio' || (leitura.tipo === 'pronto' && leitura.velho)) after(() => dispararAuditoria(createAdminClient(), tenantId))
+  if (leitura.tipo === 'vazio') return <AutoAtualizar desde={Date.now()} />
+  if (leitura.tipo === 'calculando') return <AutoAtualizar desde={leitura.desde} />
+  if (leitura.tipo === 'erro') {
+    return (
+      <div className="space-y-3">
+        <Nota tipo="aviso">A auditoria falhou: {leitura.msg} Nenhum número foi estimado.</Nota>
+        {podeAtualizar ? <ReauditarBotao rotulo="Tentar de novo" /> : <p className="text-sm text-muted-foreground">Peça a um administrador com permissão de edição para tentar de novo.</p>}
+      </div>
+    )
+  }
+  const r = leitura.r
+
   const pagina = ParamsInt(qs.pag, 1, 1, 100000)
   const porPagina = ParamsInt(qs.pps, 14, 5, 100)
-  const tipo = (TIPOS_ANOMALIA as readonly string[]).includes(qs.tipo ?? '') ? (qs.tipo as TipoAnomalia) : null
+  const comAnomalia = TIPOS_ANOMALIA.filter((t) => r.porTipo[t] > 0)
+  const tipo: TipoAnomalia | null = (comAnomalia as readonly string[]).includes(qs.tipo ?? '') ? (qs.tipo as TipoAnomalia) : (comAnomalia[0] ?? null)
   const ordem = ['total', 'nome', 'email'].includes(qs.ord ?? '') ? (qs.ord as 'total' | 'nome' | 'email') : 'total'
   const dir = qs.dir === 'asc' || (qs.dir !== 'desc' && ordem !== 'total') ? 1 : -1
-
-  const r = await carregarIntegridade(createAdminClient(), acesso.tenantId)
+  const hrefTipo = (t: TipoAnomalia) => { const q = new URLSearchParams(Object.entries(qs).filter(([k, v]) => v && !['tipo', 'pag', 'plano'].includes(k)) as [string, string][]); q.set('tipo', t); return `${BASE}?${q}` }
+  const baseQs: QS = { ...qs, tipo: tipo ?? undefined }
 
   const busca = norm(qs.q)
-  let lista = r.planos.filter((p) => (!tipo || (p.porTipo[tipo] ?? 0) > 0) && (!busca || norm(p.email).includes(busca) || norm(p.nome).includes(busca)))
+  let lista = tipo ? r.planos.filter((p) => (p.porTipo[tipo] ?? 0) > 0 && (!busca || norm(p.email).includes(busca) || norm(p.nome).includes(busca))) : []
   lista = [...lista].sort((a, b) => {
-    const c = ordem === 'total' ? a.total - b.total : ordem === 'nome' ? a.nome.localeCompare(b.nome, 'pt-BR') : a.email.localeCompare(b.email, 'pt-BR')
+    const c = ordem === 'total' ? (tipo ? (a.porTipo[tipo] ?? 0) - (b.porTipo[tipo] ?? 0) : 0) : ordem === 'nome' ? a.nome.localeCompare(b.nome, 'pt-BR') : a.email.localeCompare(b.email, 'pt-BR')
     return (c || a.email.localeCompare(b.email, 'pt-BR')) * dir
   })
   const total = lista.length
   const pagina_ = lista.slice((pagina - 1) * porPagina, pagina * porPagina)
 
   const sel = qs.plano ? r.planos.find((p) => p.planoId === qs.plano) : null
-  const hrefPlano = (id: string) => { const q = new URLSearchParams(Object.entries(qs).filter(([, v]) => v) as [string, string][]); q.set('plano', id); return `${BASE}?${q}` }
+  const hrefPlano = (id: string) => { const q = new URLSearchParams(Object.entries(baseQs).filter(([, v]) => v) as [string, string][]); q.set('plano', id); return `${BASE}?${q}` }
 
   const rows: LinhaCron[] = pagina_.map((p) => ({
     id: p.planoId,
@@ -56,44 +94,50 @@ export default async function IntegridadeAdaptativoPage({ searchParams }: { sear
       <Link key="a" href={`/admin/estudantes/${p.estudanteId}`} className="font-medium text-primary underline-offset-2 hover:underline">{p.nome || 'Aluno'}</Link>,
       <span key="e" className="text-muted-foreground">{p.email || '—'}</span>,
       <span key="t">{p.titulo || '—'}</span>,
-      <span key="n" className="tabular-nums font-semibold">{nf(p.total)}</span>,
-      <span key="p" className="flex flex-wrap gap-1">{(Object.entries(p.porTipo) as Array<[TipoAnomalia, number]>).map(([t, n]) => <Pilula key={t} tipo={PILULA_TIPO[t]}>{ROTULO_ANOMALIA[t]} · {n}</Pilula>)}</span>,
+      <span key="n" className="tabular-nums font-semibold">{nf(tipo ? (p.porTipo[tipo] ?? 0) : p.total)}</span>,
       <Link key="d" href={hrefPlano(p.planoId)} className="font-medium text-primary underline-offset-2 hover:underline">Ver detalhe</Link>,
+      <Link key="u" href={`/admin/cronogramas/adaptativo/analise?q=${encodeURIComponent(p.email || p.nome)}`} className="font-medium text-primary underline-offset-2 hover:underline">Ver na Análise</Link>,
     ],
   }))
   const head = (
     <>
-      <ThOrd rotulo="Aluno" col="nome" base={BASE} qs={qs} />
-      <ThOrd rotulo="E-mail" col="email" base={BASE} qs={qs} />
+      <ThOrd rotulo="Aluno" col="nome" base={BASE} qs={baseQs} />
+      <ThOrd rotulo="E-mail" col="email" base={BASE} qs={baseQs} />
       <ThFixo>Plano</ThFixo>
-      <ThOrd rotulo="Anomalias" col="total" base={BASE} qs={qs} align="right" />
-      <ThFixo>Tipos</ThFixo>
+      <ThOrd rotulo="Ocorrências" col="total" base={BASE} qs={baseQs} align="right" />
       <ThFixo>Detalhe</ThFixo>
+      <ThFixo>Análise de uso</ThFixo>
     </>
   )
 
   return (
-    <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Integridade</h1>
-        <p className="text-muted-foreground">Auditoria somente leitura dos planos ativos: progresso em aula diferente da gravada, revisões antes do estudo, metas fora do catálogo e outras inconsistências. Nada é corrigido aqui.</p>
-      </div>
-      <AdaptativoTabs />
-
+    <div className="space-y-4">
       {r.catalogoVazio && <Nota tipo="aviso">O catálogo de aulas não foi carregado agora (vazio ou falha de leitura). Sem ele não há referência confiável para auditar — nada foi estimado.</Nota>}
       {!r.catalogoVazio && !r.temAulaKey && <Nota tipo="aviso">A migração <b>20261129000000_adaptativo_meta_aula_key.sql</b> ainda não foi aplicada: sem a coluna <b>aula_key</b> o auditor não detecta “Progresso em aula diferente”. As demais verificações já funcionam.</Nota>}
 
-      <KpiGrid>
-        <KpiCard rotulo="Planos auditados" valor={nf(r.planosAuditados)} />
-        <KpiCard rotulo="Planos com anomalia" valor={nf(r.planosComAnomalia)} alerta={r.planosComAnomalia > 0} />
-        {TIPOS_ANOMALIA.map((t) => <KpiCard key={t} rotulo={ROTULO_ANOMALIA[t]} valor={nf(r.porTipo[t])} alerta={r.porTipo[t] > 0 && PILULA_TIPO[t] === 'bad'} />)}
-      </KpiGrid>
-      <p className="-mt-2 text-xs text-muted-foreground">Contagem de planos por tipo (um plano pode aparecer em mais de um). Calculado em {fmtData(r.geradoEm)} (cache de 60 s).</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xs text-muted-foreground">{nf(r.planosAuditados)} planos auditados · atualizado {minutosAtras(r.geradoEm)} ({fmtData(r.geradoEm)}, Brasília){leitura.velho ? ' · recalculando em segundo plano' : ''}.</p>
+        {podeAtualizar && <ReauditarBotao />}
+      </div>
 
-      <BarraBusca base={BASE} qs={qs} placeholder="Buscar por e-mail ou nome do aluno"
-        filtros={[{ nome: 'tipo', rotulo: 'Todos os tipos de anomalia', opcoes: TIPOS_ANOMALIA.map((t) => ({ v: t, l: ROTULO_ANOMALIA[t] })) }]} />
-      <TabelaCron tipo="leitura" podeEditar={false} colunas={6} total={total} page={pagina} pp={porPagina}
-        vazio={r.planosComAnomalia === 0 && !r.catalogoVazio ? 'Nenhum plano com anomalia — tudo íntegro.' : 'Nada encontrado com esses filtros.'} head={head} rows={rows} />
+      {!r.catalogoVazio && comAnomalia.length === 0 ? (
+        <div className="rounded-2xl border bg-card p-6 text-sm"><b className="text-base">Tudo íntegro.</b><p className="mt-1 text-muted-foreground">Nenhuma inconsistência encontrada nos {nf(r.planosAuditados)} planos auditados.</p></div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {comAnomalia.map((t) => (
+              <Link key={t} href={hrefTipo(t)} scroll={false} className={cn('rounded-2xl border bg-card p-4 shadow-sm transition hover:bg-muted/40', t === tipo && 'border-primary ring-1 ring-primary')}>
+                <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">{ROTULO_ANOMALIA[t]}</span>
+                <b className="mt-1 block text-3xl font-bold tabular-nums">{nf(r.porTipo[t])}</b>
+                <Pilula tipo={PILULA_TIPO[t]} className="mt-1">{r.porTipo[t] === 1 ? 'plano afetado' : 'planos afetados'}</Pilula>
+              </Link>
+            ))}
+          </div>
+          <BarraBusca base={BASE} qs={baseQs} preservar={['tipo']} placeholder="Buscar por e-mail ou nome do aluno" />
+          <TabelaCron tipo="leitura" podeEditar={false} colunas={6} total={total} page={pagina} pp={porPagina}
+            vazio="Nada encontrado com esses filtros." head={head} rows={rows} />
+        </>
+      )}
 
       {sel && (
         <DetalheIntegridade d={{

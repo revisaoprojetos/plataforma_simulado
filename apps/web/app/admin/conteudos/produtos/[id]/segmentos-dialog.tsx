@@ -9,6 +9,7 @@
 // Backend: aplicarVisibilidadeEmLoteAction · aplicarLiberacaoSegmentoAction · salvarCapaSegmentoAction (validam e auditam).
 
 import { useEffect, useMemo, useState } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import {
   Eye, EyeOff, Users, X, Loader2, Check, Trash2, Info, Plus, Pencil, Copy, CalendarClock, ImageIcon, Layers, FileText, KeyRound,
 } from 'lucide-react'
@@ -153,16 +154,8 @@ export function SegmentosDialog({ produtoId, alvos, titulo, titulos, imagens, fi
 
         <div className={cn('flex min-h-0 flex-1 flex-col', editSeg && 'hidden')}>
         {/* Abas */}
-        <nav role="tablist" aria-label="Regras por segmento" className="flex shrink-0 gap-1 border-b bg-muted/30 px-4">
-          {abas.map(({ k, rot, n, Icone, ajuda }) => (
-            <button key={k} type="button" role="tab" aria-selected={aba === k} onClick={() => setAba(k)}
-              className={cn('-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors', aba === k ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-              <Icone className="h-4 w-4" />
-              <span className="flex flex-col items-start leading-tight"><span>{rot}</span><span className="text-[10px] font-normal opacity-70">{ajuda}</span></span>
-              {n > 0 && <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', aba === k ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{n}</span>}
-            </button>
-          ))}
-        </nav>
+        <AbasLinha aria-label="Regras por segmento" ativo={aba} className="shrink-0 px-4 pt-2"
+          itens={abas.map(({ k, rot, n }) => ({ key: k, label: rot, badge: n > 0 ? n : undefined, onClick: () => setAba(k) }))} />
 
         {/* Corpo */}
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -578,7 +571,7 @@ function CronogramaForm({ produtoId, planilha, semPlano, setSemPlano, comPlano, 
         {!planilha ? <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Carregando…</span>
           : !planilha.disponivel ? <AvisoMigracao nome="20261117010000_produto_liberacao_aulas.sql" />
           : <p className="text-muted-foreground"><b className="text-foreground">{planilha.total}</b> aula(s) com data de liberação · <b className="text-foreground">{planilha.vinculadas}</b> vinculada(s) a aulas do produto{planilha.total > planilha.vinculadas ? ` · ${planilha.total - planilha.vinculadas} sem vínculo` : ''}{planilha.cfgAtiva === false ? ' · configuração desligada' : ''}</p>}
-        <Link href={`/admin/revisao/cronograma?aba=gerador&sub=liberacao-aulas&produto=${produtoId}`} target="_blank" className="mt-1.5 inline-block font-medium text-primary hover:underline">Gerenciar planilha</Link>
+        <Link href={`/admin/revisao/cronograma?aba=gerador&sub=acesso&v=liberacao-aulas&produto=${produtoId}`} target="_blank" className="mt-1.5 inline-block font-medium text-primary hover:underline">Gerenciar planilha</Link>
       </div>
       <div className="space-y-1.5"><span className="text-sm font-medium">Parte 1 · Aluno sem cronograma fixado</span>
         <OpcoesRadio nome="crono-sem" valor={semPlano} onChange={setSemPlano} itens={CRONOGRAMA_SEM_PLANO} /></div>

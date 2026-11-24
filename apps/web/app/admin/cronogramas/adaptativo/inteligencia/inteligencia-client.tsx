@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -45,13 +46,8 @@ export function InteligenciaClient({ versao, hash, podeEditar, comparacao, faixa
   const [versaoAtual, setVersaoAtual] = useState(versao)
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-1 border-b">
-        {ABAS.map((a) => (
-          <button key={a.id} type="button" onClick={() => setAba(a.id)}
-            className={cn('shrink-0 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition', aba === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>{a.rotulo}</button>
-        ))}
-        <span className="ml-auto pr-1 text-xs text-muted-foreground">Regras em vigor: versão {versaoAtual} · {hash.slice(0, 8)}</span>
-      </div>
+      <p className="text-xs text-muted-foreground">Regras em vigor: versão {versaoAtual} · {hash.slice(0, 8)}</p>
+      <AbasLinhaControlada valor={aba} onChange={setAba} itens={ABAS.map((a) => ({ valor: a.id, label: a.rotulo }))} />
       {!podeEditar && aba !== 'comparacao' && <Caixa tipo="aviso">Seu perfil só pode visualizar o cronograma: simulações, laboratório e importação exigem a permissão de edição.</Caixa>}
       {aba === 'impacto' && podeEditar && <PainelImpacto />}
       {aba === 'lab' && podeEditar && <Laboratorio />}

@@ -35,6 +35,7 @@
  * por documento enviado (cada um com seu `documentoId`).
  */
 
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -141,27 +142,9 @@ export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'bibliote
         )}
       >
         {/* Cabeçalho + abas (sublinhado) */}
-        <div className="shrink-0 border-b px-4 pt-4">
-          <DialogTitle className="mb-3">Selecionar arquivo</DialogTitle>
-          <div role="tablist" aria-label="Origem do arquivo" className="flex flex-wrap gap-1">
-            {ABAS.map(({ k, rotulo, Icone }) => (
-              <button
-                key={k}
-                role="tab"
-                aria-selected={aba === k}
-                onClick={() => trocarAba(k)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                  aba === k
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Icone className="h-4 w-4" aria-hidden />
-                {rotulo}
-              </button>
-            ))}
-          </div>
+        <div className="shrink-0 pt-4">
+          <DialogTitle className="mb-3 px-4">Selecionar arquivo</DialogTitle>
+          <AbasLinha className="px-4" aria-label="Origem do arquivo" ativo={aba} itens={ABAS.map(({ k, rotulo }) => ({ key: k, label: rotulo, onClick: () => trocarAba(k) }))} />
         </div>
 
         {/* Corpo da aba ativa */}

@@ -6,7 +6,8 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioDisciplinaView, type DadosRelatorioDisciplina } from './relatorio-disciplina-view'
 import { DisciplinasLista, type ResumoDisciplina } from './disciplinas-lista'
 import { montarRelatorioDisciplina } from './_dados'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { resumosDisciplinasSql } from '@/lib/relatorios/agregados-sql'
 
 export default async function RelatorioDisciplinaPage({ searchParams }: { searchParams: Promise<{ disciplina?: string }> }) {
   const { disciplina: discId } = await searchParams
@@ -21,6 +22,9 @@ export default async function RelatorioDisciplinaPage({ searchParams }: { search
   let resumos: ResumoDisciplina[] = []
   if (!discId) {
     resumos = await remember<ResumoDisciplina[]>(chaveRelatorio(tenantId, 'disciplinas', 'resumos'), TTL_RELATORIO, async () => {
+      // GROUP BY/count(distinct) no banco (antes: fetchAll de todas as questões do tenant).
+      const viaSql = await resumosDisciplinasSql(tid)
+      if (viaSql) return viaSql
       const { data: disciplinas } = await svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tid).order('nome')
       const qs = await fetchAll<{ disciplina_id: string | null; assunto_id: string | null }>(() =>
         svc.from('simulado_questoes').select('disciplina_id, assunto_id').eq('tenant_id', tid).eq('deletado', false).order('id', { ascending: true }))
@@ -39,13 +43,8 @@ export default async function RelatorioDisciplinaPage({ searchParams }: { search
 
   return (
     <div className="space-y-5">
-      <div>
-        {discId && <Voltar href="/admin/relatorios/disciplinas" label="Todas as disciplinas" />}
-        <h1 className="text-2xl font-bold tracking-tight">Relatório por Disciplina</h1>
-        <p className="text-muted-foreground">{discId ? 'Desempenho da turma na disciplina.' : 'Todas as disciplinas — clique numa para ver o desempenho da turma.'}</p>
-      </div>
-
-      <BarraSetorSlot />
+      {discId && <Voltar href="/admin/relatorios/disciplinas" label="Todas as disciplinas" />}
+      <CabecalhoArea titulo="Relatório por Disciplina" descricao={discId ? 'Desempenho da turma na disciplina.' : 'Todas as disciplinas — clique numa para ver o desempenho da turma.'} />
       {!discId ? (
         <DisciplinasLista itens={resumos} />
       ) : dados ? (

@@ -3,22 +3,25 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, NotebookPen, Package, Link2, Tag, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ABAS_LINHA_LISTA, abasLinhaItem } from '@/components/ui/abas-linha'
+import { useDentroDoShellCronogramas } from '@/components/admin/cronograma/shell-context'
 
 // Abas da seção Cronograma — usadas no catálogo E nas subpáginas (mesmo componente = sempre idênticas).
 // Relatórios e Importar NÃO são abas (ficam na sidebar / botão do catálogo).
-const TABS: { href: string; label: string; icon: typeof CalendarDays }[] = [
-  { href: '/admin/cronogramas', label: 'Catálogo', icon: CalendarDays },
-  { href: '/admin/cronogramas/conteudos', label: 'Conteúdos', icon: NotebookPen },
-  { href: '/admin/cronogramas/pacotes', label: 'Grupos de acessos', icon: Package },
-  { href: '/admin/cronogramas/links', label: 'Links de aula', icon: Link2 },
-  { href: '/admin/cronogramas/tipos', label: 'Tipos de meta', icon: Tag },
-  { href: '/admin/cronogramas/metas', label: 'Auditoria de metas', icon: ListChecks },
+const TABS: { href: string; label: string }[] = [
+  { href: '/admin/cronogramas', label: 'Catálogo' },
+  { href: '/admin/cronogramas/conteudos', label: 'Conteúdos' },
+  { href: '/admin/cronogramas/pacotes', label: 'Grupos de acessos' },
+  { href: '/admin/cronogramas/links', label: 'Links de aula' },
+  { href: '/admin/cronogramas/tipos', label: 'Tipos de meta' },
+  { href: '/admin/cronogramas/metas', label: 'Auditoria de metas' },
 ]
 
+/** FACHADA de compatibilidade: dentro do shell de Cronogramas a navegação é a CronogramasNav e este componente não renderiza nada. */
 export function CronogramaTabs({ catalogoCount }: { catalogoCount?: number }) {
   const pathname = usePathname()
+  const dentroShell = useDentroDoShellCronogramas()
   const secoes = TABS.slice(1)
   const ativaSecao = secoes.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))
 
@@ -29,6 +32,7 @@ export function CronogramaTabs({ catalogoCount }: { catalogoCount?: number }) {
   // cronogramas, ele desmonta ao sair — e o Next descarta o cache dessas rotas (limpa sozinho).
   const [prefetchAtivo, setPrefetchAtivo] = useState(false)
   useEffect(() => {
+    if (dentroShell) return
     let cancelado = false
     const ligar = () => { if (!cancelado) setPrefetchAtivo(true) }
     const w = window as any
@@ -38,33 +42,20 @@ export function CronogramaTabs({ catalogoCount }: { catalogoCount?: number }) {
     }
     const t = setTimeout(ligar, 800)
     return () => { cancelado = true; clearTimeout(t) }
-  }, [])
+  }, [dentroShell])
 
+  if (dentroShell) return null
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-1 overflow-x-auto border-b">
+    <div role="tablist" className={cn(ABAS_LINHA_LISTA, 'mb-5')}>
       {TABS.map((t) => {
         const ativo = t.href === '/admin/cronogramas' ? !ativaSecao : t === ativaSecao
-        const Icone = t.icon
         const n = t.href === '/admin/cronogramas' ? catalogoCount : undefined
         // Não pré-carrega a aba atual (já está aberta). As demais: prefetch full após o idle.
         const prefetch = prefetchAtivo && !ativo ? true : false
         return (
-          <Link
-            key={t.href}
-            href={t.href}
-            prefetch={prefetch}
-            className={cn(
-              'relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition',
-              ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Icone className="h-4 w-4 shrink-0" />
+          <Link key={t.href} href={t.href} prefetch={prefetch} role="tab" aria-selected={ativo} aria-current={ativo ? 'page' : undefined} className={abasLinhaItem(ativo)}>
             {t.label}
-            {n != null && n > 0 && (
-              <span className={cn('rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums', ativo ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
-                {n.toLocaleString('pt-BR')}
-              </span>
-            )}
+            {n != null && n > 0 && <span className="ml-1.5 text-[12px] font-medium tabular-nums text-muted-foreground">{n.toLocaleString('pt-BR')}</span>}
           </Link>
         )
       })}

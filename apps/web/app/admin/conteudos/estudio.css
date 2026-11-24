@@ -1,12 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 /* Design-system do designer (pacote revisao-admin-conteudos / design-system/tokens.css),
-   ESCOPADO à área Conteúdos (.estudio-scope). Só reescreve as variáveis de tema DENTRO do
-   escopo — o resto do admin fica intacto. Fonte Plus Jakarta Sans + superfícies/linhas/raios
-   do designer, mantendo a marca roxa (= --primary do tenant). */
+   ESCOPO VISUAL DO ADMIN (.estudio-scope), aplicado ao <main> de app/admin/layout.tsx (opt-out em
+   lib/admin/escopo-visual.ts). Só reescreve variáveis de tema DENTRO do escopo: superfícies/linhas/raios
+   do designer, mantendo a marca do tenant (--primary/--ring herdados; --pn-* da paleta nova recolorem).
+   Fonte: Plus Jakarta Sans já é a font-sans global (next/font em app/layout.tsx) — sem @import. */
 
 .estudio-scope {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   /* superfícies / texto / linhas (claro) */
   --background: var(--pn-f4f2fa,#F4F2FA);
   --foreground: var(--pn-1d1933,#1D1933);

@@ -1,17 +1,21 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { Download } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
-import { BarraBusca, KpiCard, KpiGrid, Nota, ParamsInt, ThFixo, ThOrd, hrefCom, type QS } from '@/app/admin/revisao/_comp/lista'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
+import { BarraBusca, Nota, ParamsInt, ThFixo, ThOrd, hrefCom, type QS } from '@/app/admin/revisao/_comp/lista'
 import { TabelaCron, type LinhaCron } from '@/app/admin/revisao/cronograma/tabela-cron'
 import { listarGruposFiltro } from '@/lib/admin/revisao/relatorios'
 import { dataBr } from '@/lib/admin/revisao/datas'
 import {
-  PERIODOS_AN, SECOES, carregarOpcoes, carregarResumo, consultarVisao, formatarValor, normalizarFiltro, periodoParaDatas, secaoDe, visaoDe, type ColAn,
+  PERIODOS_AN, SECOES, carregarOpcoes, carregarTotais, carregarResumo, consultarVisao, formatarValor, normalizarFiltro, periodoParaDatas, secaoDe, visaoDe, type ColAn,
 } from '@/lib/cronograma/adaptativo/analise'
 import { cn } from '@/lib/utils'
+import KpisAdaptativo from '@/app/admin/revisao/cronograma/adaptativo/kpis'
+import { EsqueletoTela } from '@/components/admin/cronograma/esqueleto-tela'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,27 +28,56 @@ const nf = (n: number | null | undefined) => Number(n ?? 0).toLocaleString('pt-B
 const dia = (iso: string | null) => (iso ? dataBr(new Date(new Date(iso).getTime() - 3 * 3600e3).toISOString().slice(0, 10)) : null)
 
 function Abas({ itens, atual, nivel }: { itens: Array<{ id: string; rotulo: string; href: string }>; atual: string; nivel: 1 | 2 }) {
-  return (
-    <div className={cn('flex flex-wrap items-center gap-1 overflow-x-auto', nivel === 1 ? 'border-b' : 'mb-3 border-b')}>
-      {itens.map((t) => (
-        <Link key={t.id} href={t.href}
-          className={cn('relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 font-medium transition', nivel === 1 ? 'text-sm' : 'text-[13px]',
-            t.id === atual ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-          {t.rotulo}
-        </Link>
-      ))}
-    </div>
-  )
+  return <AbasLinha className={nivel === 2 ? 'mb-3' : undefined} ativo={atual} itens={itens.map((t) => ({ key: t.id, label: t.rotulo, href: t.href }))} />
 }
 
 export default async function AnaliseUsoAdaptativoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const acesso = await getCurrentAccess()
   const permitido = acesso.isAdmin || acesso.permissions.includes('*') || acesso.permissions.includes('cronogramas:view')
   if (!acesso.tenantId || !permitido) return <SemPermissao>Você não tem permissão para ver a análise do cronograma adaptativo.</SemPermissao>
-  const tenantId = acesso.tenantId
-
   const raw = await searchParams
   const qs: QS = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
+  // Título primeiro; os blocos pesados (RPCs de resumo/opções/tabela) chegam por streaming.
+  return (
+    <div className="w-full space-y-4">
+      <TituloTela titulo="Análise de uso" descricao="Como os alunos geram, configuram e cumprem o cronograma: gerações e falhas, ritmo, atrasos, desempenho e tempo — por turma, matéria e versão do motor." />
+      <Suspense fallback={<div className="skeleton-shimmer h-24 rounded-2xl bg-muted/70" />}><KpisAdaptativo tenantId={acesso.tenantId} /></Suspense>
+      <Suspense fallback={<EsqueletoTela kpis />}><CorpoAnalise tenantId={acesso.tenantId} qs={qs} /></Suspense>
+    </div>
+  )
+}
+
+type MiniStat = { rotulo: string; valor: string; alerta?: boolean }
+/** Uso do cronograma em UMA faixa compacta: só entram indicadores com valor (sem 0/— de dado ausente). Alertas primeiro. */
+function ResumoUso({ resumo, totais, dias, desde }: { resumo: Awaited<ReturnType<typeof carregarResumo>>; totais: Awaited<ReturnType<typeof carregarTotais>>; dias: number; desde: string | null }) {
+  const alertas: MiniStat[] = []
+  if (resumo.falhas > 0) alertas.push({ rotulo: 'Falhas de geração no período', valor: nf(resumo.falhas), alerta: true })
+  if (resumo.atrasadas > 0) alertas.push({ rotulo: 'Metas atrasadas', valor: nf(resumo.atrasadas), alerta: true })
+  if (resumo.parados > 0) alertas.push({ rotulo: `Alunos parados há ${dias}+ dias`, valor: nf(resumo.parados), alerta: true })
+  if (totais && totais.falhas > 0) alertas.push({ rotulo: 'Falhas de geração (total)', valor: nf(totais.falhas), alerta: true })
+  const normais: MiniStat[] = []
+  if (resumo.alunos_com_plano > 0) normais.push({ rotulo: 'Alunos com cronograma', valor: nf(resumo.alunos_com_plano) })
+  if (resumo.planos_ativos > 0) normais.push({ rotulo: 'Cronogramas ativos', valor: nf(resumo.planos_ativos) })
+  if (resumo.geracoes > 0) normais.push({ rotulo: 'Gerações no período', valor: nf(resumo.geracoes) })
+  if (resumo.recalculos > 0) normais.push({ rotulo: 'Recálculos no período', valor: nf(resumo.recalculos) })
+  if (totais && totais.gerados + totais.recalculados > 0) normais.push({ rotulo: `Gerações no total${desde ? ` (desde ${desde})` : ''}`, valor: nf(totais.gerados + totais.recalculados) })
+  if (resumo.pct_feitas != null) normais.push({ rotulo: `Metas cumpridas (${nf(resumo.feitas)} de ${nf(resumo.planejadas)})`, valor: `${formatarValor('dec', resumo.pct_feitas)}%` })
+  if (resumo.acerto_pct != null) normais.push({ rotulo: 'Acerto nas questões', valor: `${formatarValor('dec', resumo.acerto_pct)}%` })
+  const todos = [...alertas, ...normais]
+  if (!todos.length) return <Nota tipo="info">Ainda não há dados de uso neste filtro.</Nota>
+  return (
+    <section aria-label="Resumo de uso" className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl border bg-card px-5 py-4 shadow-sm">
+      {todos.map((m) => (
+        <div key={m.rotulo} className="min-w-[110px]">
+          <span className="block text-[11px] font-medium uppercase leading-tight tracking-wide text-muted-foreground">{m.rotulo}</span>
+          <b className={cn('mt-0.5 block text-[22px] font-bold leading-none tabular-nums', m.alerta && 'text-amber-700 dark:text-amber-400')}>{m.valor}</b>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
   const sec = secaoDe(qs.sec)
   const vis = visaoDe(sec, qs.vis)
   const per = periodoParaDatas(qs.periodo)
@@ -53,8 +86,9 @@ export default async function AnaliseUsoAdaptativoPage({ searchParams }: { searc
   const porPagina = ParamsInt(qs.pps, 14, 5, 100)
 
   const svc = createAdminClient()
-  const [resumo, opcoes, grupos, lista] = await Promise.all([
+  const [resumo, totais, opcoes, grupos, lista] = await Promise.all([
     carregarResumo(svc, tenantId, filtro),
+    carregarTotais(svc, tenantId),
     carregarOpcoes(svc, tenantId),
     listarGruposFiltro(tenantId),
     consultarVisao(svc, tenantId, vis, filtro, { q: qs.q, ord: qs.ord, dir: qs.dir, pag: pagina, pp: porPagina }),
@@ -79,7 +113,7 @@ export default async function AnaliseUsoAdaptativoPage({ searchParams }: { searc
     const txt = formatarValor(c.f, r[c.k])
     if (c.aluno && r.estudante_id) return <Link href={`/admin/estudantes/${String(r.estudante_id)}`} className="font-medium text-primary underline-offset-2 hover:underline">{txt}</Link>
     const num = c.f === 'int' || c.f === 'pct' || c.f === 'dec' || c.f === 'seg'
-    return <span className={cn(num && 'tabular-nums', c.k === 'rotulo' || c.k === 'nome' ? 'font-medium' : '')}>{txt}</span>
+    return <span className={cn(num && 'block text-right tabular-nums', c.k === 'rotulo' || c.k === 'nome' ? 'font-medium' : '')}>{txt}</span>
   }
   const rows: LinhaCron[] = lista.rows.map((r, i) => ({ id: `${pagina}-${i}`, cells: vis.cols.map((c) => <span key={c.k}>{celula(c, r)}</span>) }))
   const head = (
@@ -97,15 +131,9 @@ export default async function AnaliseUsoAdaptativoPage({ searchParams }: { searc
     : 'Nada encontrado com esses filtros.'
 
   return (
-    <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Análise de uso</h1>
-        <p className="text-muted-foreground">Como os alunos geram, configuram e cumprem o cronograma: gerações e falhas, ritmo, atrasos, desempenho e tempo — por turma, matéria e versão do motor.</p>
-      </div>
-      <AdaptativoTabs />
-
+    <div className="space-y-4">
       {!resumo.migrado && <Nota tipo="aviso">Aplique a migração <b>20261119030000_adaptativo_log_analise.sql</b> no Supabase para ativar esta análise. Enquanto isso o cronograma dos alunos segue funcionando normalmente; só o registro e os números desta aba ficam indisponíveis.</Nota>}
-      {resumo.erro && <Nota tipo="aviso">Não foi possível calcular os indicadores agora ({resumo.erro}). Nada foi estimado.</Nota>}
+      {resumo.erro && <Nota tipo="aviso">Não foi possível calcular os indicadores agora ({resumo.erro}). Nada foi estimado. <Link href={hrefCom(BASE, qs, {})} className="ml-1 font-medium underline" prefetch={false}>Tentar de novo</Link></Nota>}
       {resumo.migrado && !resumo.erro && (
         <>
           <Nota tipo="info">
@@ -116,20 +144,7 @@ export default async function AnaliseUsoAdaptativoPage({ searchParams }: { searc
         </>
       )}
 
-      <div>
-        <KpiGrid>
-          <KpiCard rotulo="Alunos com cronograma" valor={nf(resumo.alunos_com_plano)} />
-          <KpiCard rotulo={`Cronogramas ativos · ${nf(resumo.planos_fixados)} fixados · ${nf(resumo.alunos_multiplano)} alunos c/ mais de um`} valor={nf(resumo.planos_ativos)} />
-          <KpiCard rotulo={`Gerações no período · ${nf(resumo.recalculos)} recálculos`} valor={nf(resumo.geracoes)} />
-          <KpiCard rotulo="Falhas de geração no período" valor={nf(resumo.falhas)} alerta={resumo.falhas > 0} />
-        </KpiGrid>
-        <KpiGrid>
-          <KpiCard rotulo={`Metas cumpridas (${nf(resumo.feitas)} de ${nf(resumo.planejadas)})`} valor={resumo.pct_feitas != null ? `${formatarValor('dec', resumo.pct_feitas)}%` : '—'} />
-          <KpiCard rotulo="Metas atrasadas (sem marcação)" valor={nf(resumo.atrasadas)} alerta={resumo.atrasadas > 0} />
-          <KpiCard rotulo={`Alunos parados há ${filtro.dias}+ dias`} valor={nf(resumo.parados)} alerta={resumo.parados > 0} />
-          <KpiCard rotulo={`Acerto nas questões · ${formatarValor('seg', resumo.tempo_real_seg)} estudados em foco`} valor={resumo.acerto_pct != null ? `${formatarValor('dec', resumo.acerto_pct)}%` : '—'} />
-        </KpiGrid>
-      </div>
+      {resumo.migrado && !resumo.erro && <ResumoUso resumo={resumo} totais={totais} dias={filtro.dias} desde={totais?.desde ? dia(totais.desde) : null} />}
 
       <Abas nivel={1} atual={sec.id} itens={SECOES.map((s) => ({ id: s.id, rotulo: s.rotulo, href: hrefSec(s.id) }))} />
       <div>

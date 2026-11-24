@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
@@ -6,7 +7,7 @@ import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { CorrecaoCards } from '@/components/admin/correcao-cards'
 import { Inbox } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { correcaoCardsSql } from '@/lib/relatorios/agregados-sql'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export default async function CorrecaoPage() {
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Correção de discursivas</h1>
+        <CabecalhoArea titulo="Correção de discursivas" />
         <SemPermissao>Sem permissão para corrigir.</SemPermissao>
       </div>
     )
@@ -31,10 +32,18 @@ export default async function CorrecaoPage() {
   const tenantId = access.tenantId ?? ZERO
 
   // EGRESS: a fila lê TODAS as respostas discursivas do tenant só para contar pendentes/corrigidas por
-  // simulado. Computação memoizada por tenant (2 min) — a fila não precisa ser real-time (a correção em
+  // simulado. Computação memoizada por tenant (5 min) — a fila não precisa ser real-time (a correção em
   // si é ao vivo em /correcao/sessao/[id]). Degrada sozinho sem Redis.
   const cards = await remember<{ id: string; titulo: string; status: string; pend: number; corr: number; vis: any }[]>(
-    chaveRelatorio(tenantId, 'correcao', 'cards'), 120, async () => {
+    chaveRelatorio(tenantId, 'correcao', 'cards'), 300, async () => {
+      // 1 query (JOIN/GROUP BY por simulado) — fallback: caminho PostgREST abaixo.
+      const viaSql = await correcaoCardsSql(tenantId)
+      if (viaSql) {
+        const visualSql = await resolverVisualSimulados(svc, viaSql)
+        return viaSql
+          .map((s) => ({ id: s.id, titulo: s.titulo, status: s.status, pend: s.pend, corr: s.corr, vis: visualSql.get(s.id) ?? null }))
+          .sort((a, b) => b.pend - a.pend || a.titulo.localeCompare(b.titulo, 'pt-BR'))
+      }
       // 1) Questões discursivas do tenant → 2) simulados OFICIAIS que as usam.
       const qd = await fetchAll<any>(() => svc.from('simulado_questoes').select('id').eq('tenant_id', tenantId).eq('tipo', 'discursiva').order('id'))
       const qdIds = qd.map((q) => q.id)
@@ -73,12 +82,8 @@ export default async function CorrecaoPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Correção de discursivas</h1>
-        <p className="text-muted-foreground">{cards.length} simulado(s) discursivo(s) · {totalPend} resposta(s) pendente(s).</p>
-      </div>
+      <CabecalhoArea titulo="Correção de discursivas" descricao={`${cards.length} simulado(s) discursivo(s) · ${totalPend} resposta(s) pendente(s).`} />
 
-      <BarraSetorSlot />
       {cards.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
           <Inbox className="h-8 w-8" />

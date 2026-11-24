@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.0 — 2026-11-24
+
+### Biblioteca
+- **Substituir arquivos em lote** (barra de seleção): arraste/importe vários arquivos e eles são casados com os documentos selecionados (por nome parecido ou por ordem); modo **Avançado** com arquivo individual por documento, reatribuição de sobras e escolha de publicar na hora ou deixar como rascunho. Cada troca cria nova versão com reconciliação de grifos.
+- **Seleção múltipla no modo card**: ícone de seleção em cada documento/pasta (hover; sempre visível em toque) que entra no modo de seleção.
+- Barra em lote de `/admin/biblioteca` com as mesmas ações da Biblioteca da Revisão: Mostrar/Ocultar ao aluno, Editar metadados, Substituir arquivos, Publicar, Leitura LegProc e Arquivar. Diálogo de metadados extraído para componente compartilhado.
+
+### Resultado do simulado (aluno)
+- **Treinar erros** agora abre o Banco de questões real (`/aluno/questoes?erros_simulado=<id>`) já filtrado nas questões erradas daquele simulado (chip "Erros do simulado"). Antes o botão ficava sem link.
+
+### Outros
+- Demais ajustes de admin/cronogramas que estavam pendentes na máquina (cabeçalho de área, layouts/loading/error do cronograma adaptativo, relatórios).
+
 ## 4.29.0 — 2026-11-23
 
 ### Downloads do aluno

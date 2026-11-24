@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Gamepad2, ArrowLeft } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { ArrowLeft } from 'lucide-react'
 import { listarDesafios, lerDesafio, obterRankingJuris, detalheRankingAlunoJuris, salvarSequenciaAjusteJuris } from '@/app/admin/jurisprudencia/actions'
 import { RankingAdmin } from '@/components/admin/ranking-admin'
 import { RelatorioAsync } from '@/components/admin/relatorio-async'
@@ -15,7 +16,6 @@ import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { createAdminClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,18 +26,12 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
 
   // Sem desafio selecionado: lista de desafios + criar.
   if (!desafio) {
-    const desafios = await listarDesafios()
-    const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
+    const [desafios, tenantAtual] = await Promise.all([listarDesafios(), getCurrentTenant()])
+    const temaCards = (tenantAtual?.tema as any) ?? {}
     const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Gamepad2 className="h-6 w-6 text-primary" /> Desafio de Jurisprudência</h1>
-            <p className="text-muted-foreground">Jogo arcade de teses e súmulas — cada desafio tem 15 dias de perguntas.</p>
-          </div>
-        </div>
-        <BarraSetorSlot />
+        <CabecalhoArea titulo="Desafio de Jurisprudência" descricao="Jogo arcade de teses e súmulas — cada desafio tem 15 dias de perguntas." />
         <JurisDesafioLista desafios={desafios} cardView={cardView} />
       </div>
     )
@@ -79,18 +73,16 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2">
-        <Link href="/admin/jurisprudencia" aria-label="Voltar aos desafios" title="Voltar aos desafios" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Gamepad2 className="h-6 w-6 text-primary" /> {nome}</h1>
-          <p className="text-muted-foreground">Edite os dias, as teses e as regras do jogo.</p>
-        </div>
-      </div>
-
-      <BarraSetorSlot />
-      <JurisTabsBar desafioId={desafio} abaAtual={abaAtual} />
+      <CabecalhoArea
+        titulo={nome}
+        descricao="Edite os dias, as teses e as regras do jogo."
+        acoes={
+          <Link href="/admin/jurisprudencia" aria-label="Voltar aos desafios" title="Voltar aos desafios" className="inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        }
+        abas={<JurisTabsBar desafioId={desafio} abaAtual={abaAtual} />}
+      />
 
       <div className={cn('pt-1')}>
         {abaAtual === 'dias' && <JurisDiasEditor desafioId={desafio} dias={jogo.dias ?? {}} materias={jogo.materias ?? []} final={jogo.final ?? null} quizPorDia={quizPorDia} />}

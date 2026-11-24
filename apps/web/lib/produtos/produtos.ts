@@ -1,5 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sqlQuery } from '@/lib/data/sql'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { concederProduto } from './conceder'
 import type { Produto, ProdutoDetalhe, ProdutoFonte, ProdutoItem, ProdutoSecao } from './tipos'
 
@@ -12,8 +14,24 @@ export async function listarProdutos(tenantId: string): Promise<(Produto & { mem
   const lista = (prods ?? []) as Produto[]
   if (!lista.length) return []
   const ids = lista.map((p) => p.id)
-  const [{ data: ass }, { data: fontes }, { data: itens }] = await Promise.all([
-    svc.from('simulado_assinaturas').select('produto_id').eq('tenant_id', tenantId).eq('status', 'ativo').in('produto_id', ids),
+  // CONTAGEM DE MEMBROS: antes puxava TODAS as assinaturas ativas (~23 mil) e contava em JS — o teto de
+  // 1000 linhas do PostgREST TRUNCAVA (membros subcontados, somando no máx. 1000). Agora é GROUP BY no
+  // banco (1 query) com fallback em head counts exatos por produto; cache 60 s por tenant.
+  const mA = await remember(chaveRelatorio(tenantId, 'produtos', 'membros-ativos'), 60, async () => {
+    const rows = await sqlQuery<{ produto_id: string; n: number }>(
+      `SELECT produto_id, count(*)::int AS n FROM simulado_assinaturas
+        WHERE tenant_id = $1 AND status = 'ativo' AND produto_id = ANY($2::uuid[]) GROUP BY produto_id`,
+      [tenantId, ids],
+    )
+    const m: Record<string, number> = {}
+    if (rows !== null) { for (const r of rows) m[r.produto_id] = Number(r.n); return m }
+    await Promise.all(ids.map(async (pid) => {
+      const { count } = await svc.from('simulado_assinaturas').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'ativo').eq('produto_id', pid)
+      m[pid] = count ?? 0
+    }))
+    return m
+  })
+  const [{ data: fontes }, { data: itens }] = await Promise.all([
     svc.from('simulado_produto_fontes').select('produto_id').eq('tenant_id', tenantId).in('produto_id', ids),
     svc.from('simulado_produto_itens').select('produto_id').eq('tenant_id', tenantId).in('produto_id', ids),
   ])
@@ -22,8 +40,8 @@ export async function listarProdutos(tenantId: string): Promise<(Produto & { mem
     for (const r of rows ?? []) m.set(r.produto_id, (m.get(r.produto_id) ?? 0) + 1)
     return m
   }
-  const mA = tally(ass), mF = tally(fontes), mI = tally(itens)
-  return lista.map((p) => ({ ...p, membros: mA.get(p.id) ?? 0, fontes: mF.get(p.id) ?? 0, itens: mI.get(p.id) ?? 0 }))
+  const mF = tally(fontes), mI = tally(itens)
+  return lista.map((p) => ({ ...p, membros: mA[p.id] ?? 0, fontes: mF.get(p.id) ?? 0, itens: mI.get(p.id) ?? 0 }))
 }
 
 /** Produto + fontes + itens + nº de membros. null se não existe no tenant. */

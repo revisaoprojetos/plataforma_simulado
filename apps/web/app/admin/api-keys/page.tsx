@@ -1,9 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { EstudioHeader } from '@/components/admin/estudio/estudio-header'
-import { cn } from '@/lib/utils'
-import Link from 'next/link'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { ApiKeysManager } from './api-keys-manager'
 import { AbaUso } from './aba-uso'
 
@@ -33,7 +32,7 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
   if (!accessCan(access, 'api_keys:manage')) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>
+        <CabecalhoArea eyebrow="Integrações" titulo="API Keys" semBarraSetor />
         <SemPermissao>Você não tem permissão para gerenciar API keys.</SemPermissao>
       </div>
     )
@@ -43,16 +42,11 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <EstudioHeader eyebrow="Integrações" titulo="API Keys" semAbas />
-      <div className="flex items-center gap-x-7 border-b">
-        {abas.map((t) => (
-          <Link key={t.id} href={t.id === 'chaves' ? '/admin/api-keys' : '/admin/api-keys?aba=uso'}
-            className={cn('-mb-px border-b-2 pb-2.5 pt-1 text-[14px] tracking-[-0.01em] transition-colors',
-              aba === t.id ? 'border-primary font-extrabold text-foreground' : 'border-transparent font-semibold text-muted-foreground hover:text-foreground')}>
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <CabecalhoArea
+        eyebrow="Integrações"
+        titulo="API Keys"
+        abas={<AbasLinha ativo={aba} itens={abas.map((t) => ({ key: t.id, label: t.label, href: t.id === 'chaves' ? '/admin/api-keys' : '/admin/api-keys?aba=uso' }))} />}
+      />
       {aba === 'uso' ? <AbaUso tenantId={tenantId} sp={sp} /> : <ApiKeysManager initialKeys={await getApiKeys(tenantId)} />}
     </div>
   )

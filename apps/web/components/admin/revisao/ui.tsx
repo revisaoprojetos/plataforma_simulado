@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { cn } from '@/lib/utils'
 import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
@@ -11,31 +12,24 @@ export function RevisaoHead({
   titulo,
   subtitulo,
   acoes,
+  abas,
 }: {
   secao?: string
   titulo: string
   subtitulo?: string
   acoes?: React.ReactNode
+  /** Abas próprias da área (2ª fileira), repassadas ao CabecalhoArea. */
+  abas?: React.ReactNode
 }) {
   return (
-    <>
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        {secao && (
-          <nav className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Caminho">
-            <span>{secao}</span>
-            <span>/</span>
-            <b className="font-medium text-foreground">{titulo}</b>
-          </nav>
-        )}
-        <h1 className="text-2xl font-bold tracking-tight">{titulo}</h1>
-        {subtitulo && <p className="mt-1 text-sm text-muted-foreground">{subtitulo}</p>}
-      </div>
-      {acoes && <div className="flex flex-wrap items-center gap-2">{acoes}</div>}
-    </div>
-    {/* Barra de abas do setor: abaixo do título/descrição, acima das abas próprias/conteúdo. */}
-    <BarraSetorSlot />
-    </>
+    <CabecalhoArea
+      eyebrow={secao}
+      titulo={titulo}
+      descricao={subtitulo}
+      acoes={acoes}
+      abas={abas}
+      className="mb-5"
+    />
   )
 }
 
@@ -65,28 +59,7 @@ export function RevisaoAbas({
     <>
     {/* Sem RevisaoHead na página, a barra do setor entra aqui, acima destas abas (dedup: aparece 1x). */}
     <BarraSetorSlot />
-    <div className="mb-4 flex gap-1 overflow-x-auto border-b" role="tablist">
-      {abas.map((a) => {
-        const on = a.id === atual
-        return (
-          <Link
-            key={a.id}
-            href={a.href ?? href(a.id)}
-            role="tab"
-            aria-selected={on}
-            className={cn(
-              '-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              on ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {a.titulo}
-            {a.contagem != null && a.contagem > 0 && (
-              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{a.contagem}</span>
-            )}
-          </Link>
-        )
-      })}
-    </div>
+    <AbasLinha className="mb-4" ativo={atual} itens={abas.map((a) => ({ key: a.id, label: a.titulo, badge: a.contagem != null && a.contagem > 0 ? a.contagem : undefined, href: a.href ?? href(a.id) }))} />
     </>
   )
 }

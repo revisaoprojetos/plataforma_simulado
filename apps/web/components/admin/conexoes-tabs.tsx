@@ -1,7 +1,6 @@
 'use client'
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Webhook, Workflow, Inbox, Send, ListChecks } from 'lucide-react'
 import { WebhooksConfig } from '@/components/admin/webhooks-config'
 import { N8nBuilder } from '@/components/admin/n8n-builder'
 import { RecebidosInbox } from '@/components/admin/recebidos-inbox'
@@ -16,22 +15,22 @@ export function ConexoesTabs({ webhooks, automacoes, eventos, simulados, precisa
   logsSaida: LogSaida[]; logsPrecisaMigrar: boolean; origensExistentes: string[]; modulos: Sim[]
 }) {
   return (
-    <Tabs defaultValue="webhook" className="gap-5">
+    <Tabs defaultValue="webhook">
       <TabsList>
-        <TabsTrigger value="webhook"><Webhook className="h-[18px] w-[18px]" /> Webhook (saída)</TabsTrigger>
-        <TabsTrigger value="recebidos"><Inbox className="h-[18px] w-[18px]" /> Recebidos</TabsTrigger>
+        <TabsTrigger value="webhook">Webhook (saída)</TabsTrigger>
+        <TabsTrigger value="recebidos">Recebidos</TabsTrigger>
         <TabsTrigger value="n8n">
-          <Workflow className="h-[18px] w-[18px]" /> n8n
-          <span className="ml-1 rounded-md bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">{automacoes.length}</span>
+          n8n
+          <span className="ml-1.5 text-[12px] font-medium tabular-nums text-muted-foreground">{automacoes.length}</span>
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="webhook">
         {/* Sub-abas do webhook de saída: entrega de eventos (com gatilhos de engajamento por webhook) e logs. */}
-        <Tabs defaultValue="entrega" className="gap-4">
+        <Tabs defaultValue="entrega">
           <TabsList variant="line">
-            <TabsTrigger value="entrega"><Send className="h-4 w-4" /> Entrega de eventos</TabsTrigger>
-            <TabsTrigger value="logs"><ListChecks className="h-4 w-4" /> Logs de saída</TabsTrigger>
+            <TabsTrigger value="entrega">Entrega de eventos</TabsTrigger>
+            <TabsTrigger value="logs">Logs de saída</TabsTrigger>
           </TabsList>
 
           <TabsContent value="entrega">

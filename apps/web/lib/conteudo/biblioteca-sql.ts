@@ -62,3 +62,20 @@ export async function resumoAcessoPastaSql(
   const r = rows[0]
   return { nGrupos: Number(r?.n_grupos ?? 0), nAlunos: Number(r?.n_alunos ?? 0) }
 }
+
+/**
+ * Nº de documentos (não deletados) por pasta do banco de aulas (Lei Seca / Jurisprudência), em UMA
+ * query GROUP BY — substitui o fetchAll de TODOS os documentos só para contar. Chave `__root__` = sem pasta.
+ * Devolve null se o SQL direto não está disponível (o chamador cai no caminho PostgREST).
+ */
+export async function contagemDocsPorPastaSql(tenantId: string): Promise<Map<string, number> | null> {
+  const rows = await sqlQuery<{ pasta_id: string | null; n: string }>(
+    `SELECT pasta_id, count(*)::text AS n FROM simulado_documentos
+      WHERE tenant_id = $1 AND deletado = false GROUP BY pasta_id`,
+    [tenantId],
+  )
+  if (rows === null) return null
+  const m = new Map<string, number>()
+  for (const r of rows) m.set(r.pasta_id ?? '__root__', Number(r.n))
+  return m
+}

@@ -255,23 +255,32 @@ export interface ResumoGlobal { sessoesAtivas: number; sessoes24h: number; ips24
 
 /**
  * Contadores do painel + alunos com alerta. Varre as sessões dos últimos 7 dias (teto 6000) agrupadas por aluno e
- * aplica as MESMAS regras da ficha. Cache de 2 min por tenant (backend-first).
+ * aplica as MESMAS regras da ficha. Cache de 5 min por tenant (backend-first).
  */
 export async function resumoGlobal(tenantId: string): Promise<{ indisponivel: boolean; resumo: ResumoGlobal | null }> {
-  const r = await remember(`acessos-global:${tenantId}`, 120, async () => {
+  const r = await remember(`acessos-global:${tenantId}`, 300, async () => {
     const svc = createAdminClient()
     const agora = Date.now()
     const desde7 = new Date(agora - 7 * D).toISOString()
     const rows: AcessoRow[] = []
-    for (let i = 0; i < 6; i++) {
-      const { data, error } = await svc.from(T_ACESSOS).select(COLS_ACESSO).eq('tenant_id', tenantId).gte('iniciado_em', desde7)
-        .order('iniciado_em', { ascending: false }).order('id').range(i * 1000, i * 1000 + 999)
-      if (tabelaIndisponivel(error)) return { indisponivel: true, resumo: null as ResumoGlobal | null }
-      rows.push(...((data ?? []) as unknown as AcessoRow[]))
-      if ((data ?? []).length < 1000) break
+    const pagina = (i: number) => svc.from(T_ACESSOS).select(COLS_ACESSO).eq('tenant_id', tenantId).gte('iniciado_em', desde7)
+      .order('iniciado_em', { ascending: false }).order('id').range(i * 1000, i * 1000 + 999)
+    // 1ª página + rajadas em paralelo; se a 1ª veio cheia, as demais (até 6 no total, mesmo teto) também em paralelo.
+    const [p0, { data: rajadas }] = await Promise.all([
+      pagina(0),
+      svc.from(T_ATIV).select('estudante_id, tipo, criado_em, meta').eq('tenant_id', tenantId).eq('tipo', 'grifo_criado')
+        .gte('criado_em', desde7).filter('meta->>rajada', 'eq', 'true').range(0, 999),
+    ])
+    if (tabelaIndisponivel(p0.error)) return { indisponivel: true, resumo: null as ResumoGlobal | null }
+    rows.push(...((p0.data ?? []) as unknown as AcessoRow[]))
+    if ((p0.data ?? []).length >= 1000) {
+      const resto = await Promise.all([1, 2, 3, 4, 5].map(pagina))
+      for (const pg of resto) {
+        if (tabelaIndisponivel(pg.error)) return { indisponivel: true, resumo: null as ResumoGlobal | null }
+        rows.push(...((pg.data ?? []) as unknown as AcessoRow[]))
+        if ((pg.data ?? []).length < 1000) break
+      }
     }
-    const { data: rajadas } = await svc.from(T_ATIV).select('estudante_id, tipo, criado_em, meta').eq('tenant_id', tenantId).eq('tipo', 'grifo_criado')
-      .gte('criado_em', desde7).filter('meta->>rajada', 'eq', 'true').range(0, 999)
     const porAluno = new Map<string, AcessoRow[]>()
     for (const a of rows) { const l = porAluno.get(a.estudante_id) ?? []; l.push(a); porAluno.set(a.estudante_id, l) }
     const rajPorAluno = new Map<string, { tipo: string; criado_em: string; meta: Record<string, unknown> | null }[]>()

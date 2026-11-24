@@ -1,5 +1,7 @@
 'use client'
 
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -14,6 +16,9 @@ import { CapaPaginaDialog } from '@/components/biblioteca/capa-pagina-dialog'
 import { CheckSelecao, BarraLote, useSelecaoIds, type AcaoBarra } from '@/components/biblioteca/selecao-lote'
 import { LoteDialog, type InicialLote, type SecaoLote } from '@/components/biblioteca/lote-dialogs'
 import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atualizacao-lote'
+import { SubstituirLoteDialog } from '@/components/biblioteca/substituir-lote-dialog'
+import { MetadadosLoteDialog } from '@/components/biblioteca/metadados-lote-dialog'
+import { arquivarConteudo, salvarLeituraLegproc } from './gestao-actions'
 import type { AlvoLote, AcaoLote, ResultadoLote } from './lote-actions-tipos'
 import type { AlvoCP } from './capa-actions-tipos'
 import {
@@ -41,7 +46,6 @@ import { SeloCronograma, MenuPasta, MenuDoc, MoverConteudoDialog, Overlay, Drive
 import { formatBrt } from '@/lib/brt'
 import type { PastaConteudo, Categoria, NoAcesso } from './actions-tipos'
 import { listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento, importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx, renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento, definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta, carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from './actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 declare global { interface Window { DocsAPI?: any } }
 
@@ -137,26 +141,28 @@ type TipoFiltro = 'todos' | 'docx' | 'pdf'
 const categoriaDaTab = (t: string | null): Categoria => (t === 'modelos' ? 'modelo_caderno' : t === 'jurisclub' ? 'jurisclub' : 'conteudo')
 type Ordenar = 'atualizados' | 'nome' | 'criados'
 
-export function BibliotecaClient() {
+export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria; dados: Awaited<ReturnType<typeof listarArvore>> } } = {}) {
+  const ini = initial?.dados
   const searchParams = useSearchParams()
   const routerTopo = useRouter()
   const [categoria, setCategoria] = useState<Categoria>(categoriaDaTab(searchParams.get('tab')))
   const ehModelo = categoria === 'modelo_caderno'
   const ehJurisclub = categoria === 'jurisclub'
   const [pastaAtual, setPastaAtual] = useState<string | null>(null)
-  const [pastas, setPastas] = useState<PastaConteudo[]>([])
-  const [docs, setDocs] = useState<Doc[]>([])
-  const [previas, setPrevias] = useState<Record<string, { tipo: string; texto: string }[]>>({})
-  const [thumbs, setThumbs] = useState<Record<string, string>>({})
-  const [breadcrumb, setBreadcrumb] = useState<PastaConteudo[]>([])
-  const [contagens, setContagens] = useState<Record<string, number>>({})
-  const [restritasPasta, setRestritasPasta] = useState<Record<string, boolean>>({})
-  const [restritoDoc, setRestritoDoc] = useState<Record<string, boolean>>({})
-  const [resumo, setResumo] = useState<{ nGrupos: number; nAlunos: number }>({ nGrupos: 0, nAlunos: 0 })
-  const [metadados, setMetadados] = useState<Record<string, Metadados>>({}) // colunas da lista (disciplina, tribunal…)
+  const [pastas, setPastas] = useState<PastaConteudo[]>(ini?.pastas ?? [])
+  const [docs, setDocs] = useState<Doc[]>((ini?.documentos ?? []) as Doc[])
+  const [previas, setPrevias] = useState<Record<string, { tipo: string; texto: string }[]>>(ini?.previas ?? {})
+  const [thumbs, setThumbs] = useState<Record<string, string>>(ini?.thumbs ?? {})
+  const [breadcrumb, setBreadcrumb] = useState<PastaConteudo[]>(ini?.breadcrumb ?? [])
+  const [contagens, setContagens] = useState<Record<string, number>>(ini?.contagens ?? {})
+  const [restritasPasta, setRestritasPasta] = useState<Record<string, boolean>>(ini?.restritasPasta ?? {})
+  const [restritoDoc, setRestritoDoc] = useState<Record<string, boolean>>(ini?.restritoDoc ?? {})
+  const [resumo, setResumo] = useState<{ nGrupos: number; nAlunos: number }>(ini?.resumo ?? { nGrupos: 0, nAlunos: 0 })
+  const [metadados, setMetadados] = useState<Record<string, Metadados>>(ini?.metadados ?? {}) // colunas da lista (disciplina, tribunal…)
   const [colunas, setColunas] = useColunasLista()                            // colunas visíveis (preferência local)
   const [filtrosMeta, setFiltrosMeta] = useState<FiltrosMeta>({})            // filtros por metadado
-  const [carregando, setCarregando] = useState(true)
+  const [carregando, setCarregando] = useState(!ini)
+  const pularCargaInicial = useRef(!!ini) // raiz já veio do servidor → sem refetch no mount
   const [view, setView] = useState<'grid' | 'lista'>('grid')
   const [busca, setBusca] = useState('')
   const [buscaAtiva, setBuscaAtiva] = useState<string | null>(null) // termo submetido (Enter) → tela de resultados
@@ -179,6 +185,9 @@ export function BibliotecaClient() {
   const selPastas = useSelecaoIds()
   const [loteDlg, setLoteDlg] = useState<{ titulo: string; alvo: AlvoLote; secoes: SecaoLote[]; config?: boolean; inicial?: InicialLote } | null>(null)
   const [regAtualizacao, setRegAtualizacao] = useState<AlvoLote | null>(null)
+  const [substituirLote, setSubstituirLote] = useState(false)
+  const [metaLote, setMetaLote] = useState(false)
+  const [emLote, setEmLote] = useState<string | null>(null)
   const limparSelecao = () => { selDocs.limpar(); selPastas.limpar() }
   const sairSelecao = () => { limparSelecao(); setModoSel(false) }
 
@@ -214,6 +223,8 @@ export function BibliotecaClient() {
     // para o "Voltar" do navegador reconhecer o fundo da pilha da Biblioteca.
     if (typeof window !== 'undefined') { try { window.history.replaceState({ ...(window.history.state || {}), _bibPasta: null }, '') } catch { /* no-op */ } }
     selDocs.limpar(); selPastas.limpar()
+    if (pularCargaInicial.current && initial && initial.categoria === categoria) { pularCargaInicial.current = false; return }
+    pularCargaInicial.current = false
     carregar(null, categoria, false) /* eslint-disable-next-line */
   }, [categoria])
 
@@ -256,6 +267,11 @@ export function BibliotecaClient() {
   function acaoLote(a: AcaoBarra) {
     const alvo = alvoSelecao()
     if (a === 'atualizacao') { setRegAtualizacao(alvo); return }
+    if (a === 'substituir') { setSubstituirLote(true); return }
+    if (a === 'metadados') { setMetaLote(true); return }
+    if (a === 'publicar') { void loteSimples('Publicando', 'Publicados', (id) => publicarDocumento(id)); return }
+    if (a === 'legproc') { void loteSimples('Marcando como LegProc', 'Marcados como LegProc', (id) => salvarLeituraLegproc(id, true)); return }
+    if (a === 'arquivar') { void arquivarSelecionados(); return }
     const abrir = (titulo: string, secoes: SecaoLote[], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo, secoes, ...extra })
     if (a === 'baixar') abrir('Baixar documentos', ['baixar'])
     else if (a === 'mover') abrir('Mover para a pasta', ['mover'])
@@ -267,6 +283,33 @@ export function BibliotecaClient() {
     else if (a === 'legenda') abrir('Legenda de grifos', ['legenda'])
     else if (a === 'lixeira') abrir('Enviar para a lixeira', ['lixeira'])
     else abrir('Configurar em lote', ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], { config: true })
+  }
+  // Ações simples por documento (publicar / LegProc / arquivar): 5 em paralelo, com progresso; mantém selecionados só os que falharam.
+  async function loteSimples(rotulo: string, okMsg: string, fn: (id: string) => Promise<{ ok: boolean; error?: string }>) {
+    const ids = [...selDocs.sel]
+    if (!ids.length || emLote) return
+    setEmLote(rotulo)
+    const tid = toast.loading(`${rotulo}… 0/${ids.length}`)
+    let feitos = 0; const falhas: string[] = []; let motivo = ''
+    const fila = [...ids]
+    await Promise.all(Array.from({ length: Math.min(5, fila.length) }, async () => {
+      while (fila.length) {
+        const id = fila.shift()!
+        try { const r = await fn(id); if (!r.ok) { falhas.push(id); motivo = motivo || (r.error ?? '') } } catch (e: any) { falhas.push(id); motivo = motivo || (e?.message ?? '') }
+        feitos++; toast.loading(`${rotulo}… ${feitos}/${ids.length}`, { id: tid })
+      }
+    }))
+    toast.dismiss(tid)
+    if (falhas.length) toast.error(`${ids.length - falhas.length} de ${ids.length} concluídos. ${falhas.length} falharam${motivo ? `: ${motivo}` : '.'}`)
+    else toast.success(`${okMsg} (${ids.length}).`)
+    selPastas.limpar(); selDocs.manter(falhas)
+    setEmLote(null)
+    carregar(pastaAtual)
+  }
+  async function arquivarSelecionados() {
+    const n = selDocs.sel.size
+    if (!(await confirmar({ titulo: `Arquivar ${n} ${n === 1 ? 'material' : 'materiais'}`, mensagem: 'O status vira “Arquivado”. Os documentos continuam na Biblioteca.', confirmar: 'Arquivar' }))) return
+    await loteSimples('Arquivando', 'Arquivados', arquivarConteudo)
   }
   function configurarPasta(p: PastaConteudo) {
     setLoteDlg({
@@ -285,7 +328,7 @@ export function BibliotecaClient() {
     if (falhos.length === 0) sairSelecao(); else { selPastas.limpar(); selDocs.manter(falhos) }
     carregar(pastaAtual)
   }
-  const dialogoAberto = !!(loteDlg || regAtualizacao || capaDlg || acessoDrive || detalheId || acessoDoc || acessoPasta || gerenciarAberto || importAberto || uploads)
+  const dialogoAberto = !!(loteDlg || regAtualizacao || substituirLote || metaLote || capaDlg || acessoDrive || detalheId || acessoDoc || acessoPasta || gerenciarAberto || importAberto || uploads)
   useEffect(() => {
     if (!modoSel) return
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !dialogoAberto) sairSelecao() }
@@ -573,17 +616,15 @@ export function BibliotecaClient() {
       <DriveAcessoStyles />
       <DriveNovoStyles />
 
-      {/* Cabeçalho: voltar redondo (só dentro de pasta) + breadcrumb + título + resumo + ações */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
+      {/* Voltar + breadcrumb (navegação da árvore de pastas) acima do cabeçalho padrão. */}
+      <div className="flex min-w-0 items-center gap-2">
           {pastaAtual !== null && (
             <button
               onClick={() => carregar(breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null)}
               title="Voltar para a pasta anterior" aria-label="Voltar"
-              className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:-translate-x-0.5 hover:bg-muted hover:text-foreground"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:-translate-x-0.5 hover:bg-muted hover:text-foreground"
             ><ChevronLeft className="h-5 w-5" /></button>
           )}
-          <div className="min-w-0">
             <nav className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
               <button onClick={() => carregar(null)} className={`rounded px-1.5 py-0.5 hover:bg-muted ${pastaAtual === null ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{ehModelo ? 'Modelos' : ehJurisclub ? 'JurisClub' : 'Biblioteca'}</button>
               {breadcrumb.map((b) => (
@@ -593,26 +634,22 @@ export function BibliotecaClient() {
                 </span>
               ))}
             </nav>
-            <h1 className="truncate text-2xl font-bold tracking-tight text-primary">
-              {ehModelo
+      </div>
+      <CabecalhoArea
+        titulo={ehModelo
                 ? 'Modelos de Caderno (OnlyOffice)'
                 : pastaAtual && breadcrumb.length
                   ? breadcrumb[breadcrumb.length - 1].nome
                   : 'Biblioteca de Conteúdos'}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {ehModelo
+        descricao={ehModelo
                 ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).'
                 : pastaAtual
                   ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · ${docs.length} ${docs.length === 1 ? 'material' : 'materiais'} · entrega a ${resumo.nGrupos} ${resumo.nGrupos === 1 ? 'grupo' : 'grupos'} e ${resumo.nAlunos} ${resumo.nAlunos === 1 ? 'aluno' : 'alunos'}`
                   : ehJurisclub
                     ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · materiais produzidos para o JurisClub — entregues aos alunos pelo gerenciador de produtos`
                     : `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · documentos versionados — os grifos sobrevivem às edições`}
-            </p>
-          </div>
-        </div>
-        {/* Menu "Novo" ACIMA da busca (z-index do menu fica acima da barra) */}
-        <div className="flex shrink-0 items-center gap-2">
+        acoes={
+          <>
           {/* Modelos de caderno não têm aluno (só admin): sem "Gerenciar acessos". */}
           {!ehModelo && <button onClick={abrirGerenciarAcessos} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Users2 className="h-4 w-4" />Gerenciar acessos</button>}
           <DriveNovoButton
@@ -629,28 +666,23 @@ export function BibliotecaClient() {
             onNovoQuestoes={ehModelo || ehJurisclub ? undefined : novoConjuntoQuestoes}
             onToast={(m) => toast.message(m)}
           />
-        </div>
-      </div>
-
-      <BarraSetorSlot />
-      {/* Abas da coleção (sublinhado): Conteúdos | JurisClub — logo abaixo do título. Modelos tem entrada própria no menu. */}
-      {!ehModelo && (
-        <div role="tablist" aria-label="Coleção da biblioteca" className="flex gap-1 border-b">
-          {([['conteudo', 'Conteúdos'], ['jurisclub', 'JurisClub']] as [Categoria, string][]).map(([k, label]) => (
-            <button
-              key={k} role="tab" aria-selected={categoria === k}
-              onClick={() => {
-                if (categoria === k) return
-                // Troca de coleção 100% no cliente (sem round-trip do RSC): o efeito [categoria] recarrega a árvore;
-                // a URL acompanha via history (Next sincroniza o useSearchParams).
-                setBusca(''); setBuscaAtiva(null); setFiltro('todos'); setCategoria(k)
-                try { window.history.replaceState({ ...(window.history.state || {}) }, '', k === 'jurisclub' ? '/admin/biblioteca?tab=jurisclub' : '/admin/biblioteca') } catch { /* no-op */ }
-              }}
-              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${categoria === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >{label}</button>
-          ))}
-        </div>
-      )}
+          </>
+        }
+        abas={!ehModelo ? (
+        <AbasLinhaControlada
+          aria-label="Coleção da biblioteca"
+          valor={categoria}
+          itens={[{ valor: 'conteudo', label: 'Conteúdos' }, { valor: 'jurisclub', label: 'JurisClub' }]}
+          onChange={(k: Categoria) => {
+            if (categoria === k) return
+            // Troca de coleção 100% no cliente (sem round-trip do RSC): o efeito [categoria] recarrega a árvore;
+            // a URL acompanha via history (Next sincroniza o useSearchParams).
+            setBusca(''); setBuscaAtiva(null); setFiltro('todos'); setCategoria(k)
+            try { window.history.replaceState({ ...(window.history.state || {}) }, '', k === 'jurisclub' ? '/admin/biblioteca?tab=jurisclub' : '/admin/biblioteca') } catch { /* no-op */ }
+          }}
+        />
+        ) : undefined}
+      />
 
       {/* Busca estilo Drive (Ctrl/⌘+K) */}
       <BuscaDrive
@@ -754,7 +786,7 @@ export function BibliotecaClient() {
                       </span>
                     ) : undefined}
                     onClick={() => carregar(p.id)}
-                    selecao={modoSel ? { marcado: selPastas.sel.has(p.id), onToggle: (sh) => selPastas.alternar(p.id, sh, ordemPastas), rotulo: `Selecionar pasta ${p.nome}` } : undefined}
+                    selecao={{ marcado: selPastas.sel.has(p.id), onToggle: (sh) => { if (!modoSel) setModoSel(true); selPastas.alternar(p.id, sh, ordemPastas) }, rotulo: `Selecionar pasta ${p.nome}`, inativo: !modoSel }}
                     acoes={
                       <MenuPasta
                         p={p}
@@ -804,7 +836,7 @@ export function BibliotecaClient() {
                     categoria={categoria}
                     thumbInicial={thumbs[d.id]}
                     restrito={restritoDoc[d.id]}
-                    selecao={modoSel ? { marcado: selDocs.sel.has(d.id), onToggle: (sh) => selDocs.alternar(d.id, sh, ordemDocs), rotulo: `Selecionar ${d.titulo}` } : undefined}
+                    selecao={{ marcado: selDocs.sel.has(d.id), onToggle: (sh) => { if (!modoSel) setModoSel(true); selDocs.alternar(d.id, sh, ordemDocs) }, rotulo: `Selecionar ${d.titulo}`, inativo: !modoSel }}
                     onAbrir={() => { if (d.tipo_origem === 'questoes') { routerTopo.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`) } else setDetalheId(d.id) }}
                     onAcesso={() => setAcessoDoc(d)}
                     onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })}
@@ -873,7 +905,7 @@ export function BibliotecaClient() {
         </div>
       )}
 
-      {modoSel && !loteDlg && !regAtualizacao && (
+      {modoSel && !loteDlg && !regAtualizacao && !substituirLote && !metaLote && (
         <BarraLote
           nDocs={nSelDocs} nPastas={nSelPastas} totalVisivel={totalVisivel} todosMarcados={todosMarcados} ehModelo={ehModelo}
           onTodos={selecionarTodos} onLimpar={limparSelecao} onSair={sairSelecao} onAcao={acaoLote}
@@ -888,6 +920,11 @@ export function BibliotecaClient() {
           onAtualizacao={(alvo) => setRegAtualizacao(alvo)}
         />
       )}
+      {substituirLote && (
+        <SubstituirLoteDialog docs={docs.filter((d) => selDocs.sel.has(d.id)).map((d) => ({ id: d.id, titulo: d.titulo, versao: (d as any).versao ?? null }))}
+          onFechar={() => setSubstituirLote(false)} onConcluido={(falhos) => { selPastas.limpar(); selDocs.manter(falhos); carregar(pastaAtual) }} />
+      )}
+      {metaLote && <MetadadosLoteDialog n={selDocs.sel.size} ids={[...selDocs.sel]} onClose={() => setMetaLote(false)} onSalvo={() => { setMetaLote(false); sairSelecao(); carregar(pastaAtual) }} />}
       {regAtualizacao && <RegistrarAtualizacaoLote alvo={regAtualizacao} onFechar={() => setRegAtualizacao(null)} onDone={() => { carregar(pastaAtual) }} />}
       {capaDlg && <CapaPaginaDialog alvo={capaDlg} onFechar={() => setCapaDlg(null)} onSalvo={() => carregar(pastaAtual)} />}
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
@@ -943,7 +980,7 @@ export function BibliotecaClient() {
 /** Card de documento (grid) — CardConteudo + selo por tipo + capa lazy (thumb docx) + menu "…". */
 function DocCard({ d, categoria, thumbInicial, restrito, selecao, onAbrir, onAcesso, onCapaPagina, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
   d: Doc; categoria: Categoria; thumbInicial?: string; restrito?: boolean
-  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string }
+  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string; /** fora do modo de seleção: só mostra o ícone (hover) que ENTRA no modo ao clicar */ inativo?: boolean }
   onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onEditarOffice: () => void; onBaixar: () => void
   onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
@@ -1102,13 +1139,7 @@ function DetalheDialog({ documentoId, pdfUrlInicial, capaInicial, onFechar, onMu
             </div>
 
             {/* Abas (linha / sublinhado) */}
-            <div className="flex items-center gap-1 border-b px-3">
-              {ABAS.map(({ k, rotulo, Icone: Ic }) => (
-                <button key={k} onClick={() => setAba(k)} className={`flex cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${aba === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-                  <Ic className="h-4 w-4" />{rotulo}
-                </button>
-              ))}
-            </div>
+            <AbasLinhaControlada className="px-3" valor={aba} onChange={setAba} itens={ABAS.map(({ k, rotulo }) => ({ valor: k, label: rotulo }))} />
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               {aba === 'versoes' && (

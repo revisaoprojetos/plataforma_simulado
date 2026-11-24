@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Eye, Loader2, SlidersHorizontal, RotateCcw, FolderOpen, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
@@ -146,11 +147,9 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
             </button>
           ) : (
           <>
-          <div className="flex items-center gap-1 border-b px-2">
-            {([['reguladores', 'Reguladores'], ['textos', 'Textos']] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setAbaPanel(k)} className={`relative border-b-2 px-3 py-2.5 text-sm font-semibold transition ${abaPanel === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
-            ))}
-            <button onClick={() => setRecolhida(true)} aria-label="Recolher reguladores" title="Recolher" className="ml-auto shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <div className="relative">
+            <AbasLinhaControlada className="px-2 pr-10" valor={abaPanel} onChange={setAbaPanel} itens={[{ valor: 'reguladores', label: 'Reguladores' }, { valor: 'textos', label: 'Textos' }]} />
+            <button onClick={() => setRecolhida(true)} aria-label="Recolher reguladores" title="Recolher" className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <PanelLeftClose className="h-4 w-4" />
             </button>
           </div>

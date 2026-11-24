@@ -3,6 +3,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { DownloadCloud, CreditCard, ChevronRight, AlertTriangle } from 'lucide-react'
 import { verificarSilencioWebhook, formatarSilencio } from '@/lib/integracoes/silencio'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { SemPermissao } from '@/components/ui/alert-box'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,7 @@ export default async function IntegracoesPage() {
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Integrações</h1>
+        <CabecalhoArea titulo="Integrações" semBarraSetor />
         <SemPermissao>Sem permissão.</SemPermissao>
       </div>
     )
@@ -26,10 +27,15 @@ export default async function IntegracoesPage() {
 
   // Status por provedor (configurado/ativo).
   const svc = createAdminClient()
-  const { data: cfgs } = await svc.from('simulado_integracao_config').select('provider, ativo, credenciais').eq('tenant_id', access.tenantId ?? '00000000-0000-0000-0000-000000000000')
+  const tid = access.tenantId ?? '00000000-0000-0000-0000-000000000000'
+  // Em paralelo: config + checagem de silêncio do Guru (só é usada se o Guru estiver ativo — ver abaixo).
+  const [{ data: cfgs }, silencioBruto] = await Promise.all([
+    svc.from('simulado_integracao_config').select('provider, ativo, credenciais').eq('tenant_id', tid),
+    access.tenantId ? verificarSilencioWebhook(svc, access.tenantId, 'guru').catch(() => null) : Promise.resolve(null),
+  ])
   const statusPorProvider = new Map((cfgs ?? []).map((c: any) => [c.provider, c.ativo]))
   // Alerta de silêncio: Guru ativo mas sem NENHUMA requisição além do tolerado (ver lib/integracoes/silencio.ts).
-  const silencioGuru = statusPorProvider.get('guru') && access.tenantId ? await verificarSilencioWebhook(svc, access.tenantId, 'guru') : null
+  const silencioGuru = statusPorProvider.get('guru') && access.tenantId ? silencioBruto : null
 
   // Alerta de segurança: webhook ativo SEM segredo configurado (só o token da URL protege). Não derruba nada, só avisa.
   const semSegredo = (cfgs ?? []).filter((c: any) => c.ativo && !(c.credenciais && c.credenciais.webhook_secret))
@@ -37,10 +43,10 @@ export default async function IntegracoesPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Integrações</h1>
-        <p className="text-muted-foreground">Conecte plataformas externas (Curseduca, Guru) para importar alunos e conceder acesso automaticamente.</p>
-      </div>
+      <CabecalhoArea
+        titulo="Integrações"
+        descricao="Conecte plataformas externas (Curseduca, Guru) para importar alunos e conceder acesso automaticamente."
+      />
 
       {silencioGuru?.emSilencio && silencioGuru.silencioMin != null && (
         <div role="alert" className="flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm">

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { NovaMatriculaForm } from '@/components/admin/nova-matricula-form'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export default async function NovaMatriculaPage() {
   const supabase = await createServiceClient()
@@ -14,12 +15,7 @@ export default async function NovaMatriculaPage() {
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Nova Matrícula</h1>
-        <p className="text-muted-foreground">
-          Vincule um estudante a um simulado específico.
-        </p>
-      </div>
+      <CabecalhoArea titulo="Nova Matrícula" descricao="Vincule um estudante a um simulado específico." semBarraSetor />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Dados da Matrícula</CardTitle>

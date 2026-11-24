@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { cn } from '@/lib/utils'
@@ -19,17 +20,10 @@ import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { simuladosTiposSql } from '@/lib/data/simulados.repo'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { AbasLinha } from '@/components/ui/abas-linha'
 
 // Hash estável (djb2) do CONJUNTO de simulados → chave de cache. Muda ao criar/excluir/publicar
 // simulado (recomputa), e é invalidada por import/re-correção (invalidarRelatorios).
-/** Aba "de linha" (sublinhado) — padrão do admin. */
-function SimTabLink({ href, ativa, label }: { href: string; ativa: boolean; label: string }) {
-  return (
-    <Link href={href} className={cn('relative -mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors', ativa ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>{label}</Link>
-  )
-}
-
 function hashIds(ids: string[]): string {
   let h = 5381
   const s = [...ids].sort().join(',')
@@ -83,37 +77,36 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   }
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
-          <VoltarSimulados pastaId={pastaParam ?? null} voltarHref={voltarHref} />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Aplicação de simulados</h1>
-            <p className="text-muted-foreground">{abaDesafios ? 'Agrupe simulados em desafios, com configurações e acessos próprios.' : 'Gerencie provas, agendamentos e publicações.'}</p>
-          </div>
-        </div>
-        {!abaDesafios && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <NovaPastaBtn pastaId={pastaParam ?? null} />
-            <NovoSimuladoDialog
-              trigger={
-                <button type="button"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 72%, #000))' }}>
-                  <Plus className="h-4 w-4" />
-                  Novo simulado
-                </button>
-              }
-            />
-          </div>
-        )}
-      </div>
-
-      <BarraSetorSlot />
-      {/* Abas: SIMULADOS (aplicação normal) · DESAFIOS (agrupamentos tipo maratona) — tab de linha. */}
-      <div className="flex items-center gap-1 border-b">
-        <SimTabLink href={`/admin/simulados${pastaParam ? `?pasta=${pastaParam}` : ''}`} ativa={!abaDesafios} label="Simulados" />
-        <SimTabLink href="/admin/simulados?tab=desafios" ativa={abaDesafios} label="Desafios" />
-      </div>
+      <CabecalhoArea
+        titulo="Aplicação de simulados"
+        descricao={abaDesafios ? 'Agrupe simulados em desafios, com configurações e acessos próprios.' : 'Gerencie provas, agendamentos e publicações.'}
+        acoes={
+          <>
+            <VoltarSimulados pastaId={pastaParam ?? null} voltarHref={voltarHref} />
+            {!abaDesafios && (
+              <>
+                <NovaPastaBtn pastaId={pastaParam ?? null} />
+                <NovoSimuladoDialog
+                  trigger={
+                    <button type="button"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
+                      style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 72%, #000))' }}>
+                      <Plus className="h-4 w-4" />
+                      Novo simulado
+                    </button>
+                  }
+                />
+              </>
+            )}
+          </>
+        }
+        abas={
+        <AbasLinha ativo={abaDesafios ? 'desafios' : 'simulados'} itens={[
+          { key: 'simulados', label: 'Simulados', href: `/admin/simulados${pastaParam ? `?pasta=${pastaParam}` : ''}` },
+          { key: 'desafios', label: 'Desafios', href: '/admin/simulados?tab=desafios' },
+        ]} />
+        }
+      />
 
       {abaDesafios ? (
         <DesafiosSimuladoAdmin desafioId={null} maratonaId={maratonaId} rankingInicial={rankingVazioDesafio} config={listaDesafioConfig} />
@@ -139,8 +132,10 @@ function BoardSkeleton() {
 }
 
 async function BoardData({ pastaParam }: { pastaParam?: string }) {
-  const supabase = await createServiceClient()
-  const tenantId = await getCurrentTenantId()
+  // Independentes entre si → num único Promise.all (tenant é memoizado; headers/prefs só são lidos no fim).
+  const [supabase, tenantId, tenantAtual, hh, prefs] = await Promise.all([
+    createServiceClient(), getCurrentTenantId(), getCurrentTenant(), headers(), getAdminPrefs(),
+  ])
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
   // Pastas da Aplicação PRIMEIRO: precisamos da árvore p/ escopar os simulados à SUBÁRVORE da pasta atual
@@ -280,7 +275,7 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
   // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — getCurrentTenant é memoizado (sem 2ª query).
-  const cardFadePastas = (((await getCurrentTenant())?.tema as any)?.card_fade_pastas ?? {}) as Record<string, { ativo?: boolean; cor?: string | null }>
+  const cardFadePastas = (((tenantAtual)?.tema as any)?.card_fade_pastas ?? {}) as Record<string, { ativo?: boolean; cor?: string | null }>
   // `capa` = pôster (card 4:5, prefere capa_card_url); `capaLarga` = banner (capa_url) usado no card ticket.
   // Enquadramento não-destrutivo do card da pasta (capa_meta.card = orig + poster/ticket) → CapaCard.
   const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contRec(f.id), cardFade: cardFadePastas[f.id] ?? null, orig: (f.capa_meta?.card?.orig ?? capa(f)) ?? null, cfgPoster: f.capa_meta?.card?.poster ?? null, cfgTicket: f.capa_meta?.card?.ticket ?? null }))
@@ -303,7 +298,6 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   // Base do LINK DE CÓPIA do simulado: usa o HOST ATUAL (o admin de cada tenant acessa pelo SEU domínio,
   // ex.: VND em simulado.vocenadefensoria.com.br) — NÃO o NEXT_PUBLIC_APP_URL global (que era o revisaopge
   // para todos). Fallback: env e localhost. x-forwarded-host = host público real atrás do proxy/Traefik.
-  const hh = await headers()
   const hostHdr = hh.get('x-forwarded-host') || hh.get('host') || ''
   const protoHdr = hh.get('x-forwarded-proto') || (hostHdr.includes('localhost') || hostHdr.includes('127.0.0.1') ? 'http' : 'https')
   const appUrl = hostHdr ? `${protoHdr}://${hostHdr}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
@@ -312,11 +306,10 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   // Lê a tema do getCurrentTenant (createAdminClient, memoizado, mesma fonte do tema visual) — NÃO
   // via createServiceClient/PostgREST, que herda o cookie do admin e pode voltar null por RLS
   // (isso fazia o board cair em pôster mesmo com card_view='ticket').
-  const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
+  const temaCards = (tenantAtual?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
   // Tipo de exibição salvo POR ADMIN (individual). Admin novo = sem pref → o board cai no padrão.
-  const prefs = await getAdminPrefs()
   const vistaInicial = (['linhas', 'pastas', 'status'] as const).includes(prefs.simulados_vista as any)
     ? (prefs.simulados_vista as 'linhas' | 'pastas' | 'status') : undefined
 

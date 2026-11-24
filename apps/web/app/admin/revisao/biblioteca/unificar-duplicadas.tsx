@@ -15,7 +15,7 @@ import { DESC_NIVEL_DUP, ROTULO_NIVEL_DUP } from '@/lib/admin-revisao/biblioteca
 import {
   FILTROS_U_PADRAO, LIMIAR_MIN, LIMIAR_PADRAO, type GrupoU, type InicialUnificar, type HistoricoU, type MembroDup, type NivelDup, type PreviaU, type RespostaGruposU, type UsoFiltro, type VistaU,
 } from '@/lib/admin-revisao/questoes-unificar-tipos'
-import { Carregando, ErroTentar, ItemTrilho, PainelCard, Trilho, Vazio, campoBusca, selectBarra } from './gestao-ui'
+import { AbasSublinhado, Carregando, ErroTentar, ItemTrilho, PainelCard, Trilho, Vazio, campoBusca, selectBarra } from './gestao-ui'
 import { aoMutar, limparCacheG } from './questoes-api'
 
 const URL_U = '/api/admin/revisao/biblioteca/questoes-unificar'
@@ -188,14 +188,10 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
         </span>}
         rodape={dados ? <>Detecção em {dados.totalQuestoes.toLocaleString('pt-BR')} questões · às {new Date(dados.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (cache de 5 min).{dados.degradado && ' Alguns blocos muito repetidos foram simplificados.'}</> : undefined}>
         <div className="space-y-2 px-1 pb-2">
-          <div className="flex border-b" role="tablist" aria-label="Vista">
-            {([['pendentes', 'Pendentes', resumo?.grupos], ['ignoradas', 'Ignoradas', resumo?.ignoradas], ['resolvidas', 'Resolvidas', resumo?.resolvidas]] as const).map(([id, nome, n]) => (
-              <button key={id} type="button" role="tab" aria-selected={vista === id} onPointerEnter={() => { if (id !== vista) prefetchU({ ...filtros, vista: id, page: 1 }) }} onClick={() => { setVista(id); setPage(1); setGrupo(null); setMembros(null) }}
-                className={cn('-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-1.5 py-1.5 text-xs font-medium transition-colors', vista === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-                {nome}{!!n && <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold tabular-nums text-primary">{n.toLocaleString('pt-BR')}</span>}
-              </button>
-            ))}
-          </div>
+          <AbasSublinhado rotulo="Vista" valor={vista}
+            abas={[{ id: 'pendentes' as const, nome: 'Pendentes', n: resumo?.grupos }, { id: 'ignoradas' as const, nome: 'Ignoradas', n: resumo?.ignoradas }, { id: 'resolvidas' as const, nome: 'Resolvidas', n: resumo?.resolvidas }]}
+            onHover={(id) => { if (id !== vista) prefetchU({ ...filtros, vista: id, page: 1 }) }}
+            onChange={(id) => { setVista(id); setPage(1); setGrupo(null); setMembros(null) }} />
           {resumo && vista === 'pendentes' && (
             <p className="rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
               <b className="text-foreground">{resumo.grupos.toLocaleString('pt-BR')}</b> grupos · <b className="text-foreground">{resumo.questoes.toLocaleString('pt-BR')}</b> questões envolvidas

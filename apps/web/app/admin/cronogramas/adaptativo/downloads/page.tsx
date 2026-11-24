@@ -1,4 +1,4 @@
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { DownloadsClient } from './downloads-client'
 
 export const dynamic = 'force-dynamic'
@@ -7,13 +7,7 @@ export const dynamic = 'force-dynamic'
 export default function CronogramaAdaptativoDownloadsPage() {
   return (
     <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Downloads dos alunos</h1>
-        <p className="text-muted-foreground">
-          Controle se o aluno pode baixar os materiais e acompanhe cada download (e cada tentativa bloqueada) por conteúdo, por meta do cronograma e por aluno.
-        </p>
-      </div>
-      <AdaptativoTabs />
+      <TituloTela titulo="Downloads dos alunos" descricao="Controle se o aluno pode baixar os materiais e acompanhe cada download (e cada tentativa bloqueada) por conteúdo, por meta do cronograma e por aluno." />
       <DownloadsClient />
     </div>
   )

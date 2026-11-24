@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { ConexoesTabs } from '@/components/admin/conexoes-tabs'
 import { EVENTOS_WEBHOOK } from '@/lib/webhooks/dispatch'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,11 +63,10 @@ export default async function WebhooksPage() {
 
   return (
     <div className="animate-page space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Webhooks & n8n</h1>
-        <p className="text-muted-foreground">Notifique e automatize com base na progressão do estudante — envie eventos por webhook ou monte fluxos (estilo n8n).</p>
-      </div>
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Webhooks & n8n"
+        descricao="Notifique e automatize com base na progressão do estudante — envie eventos por webhook ou monte fluxos (estilo n8n)."
+      />
       <ConexoesTabs
         webhooks={webhooks.map((w) => ({
           id: w.id, nome: w.nome, url: w.url,

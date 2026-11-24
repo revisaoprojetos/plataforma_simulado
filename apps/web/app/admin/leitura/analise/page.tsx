@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { redirect } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, BarChart3, FileText, Flame, Users, TrendingUp, Trophy, Zap } from 'lucide-react'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
@@ -8,7 +9,7 @@ import { KpiCard, BarrasH, Painel } from '@/components/admin/relatorios/viz'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { formatBrt } from '@/lib/brt'
 import { cn } from '@/lib/utils'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { AbasLinha } from '@/components/ui/abas-linha'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,10 +30,7 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
     return (
       <div className="space-y-5">
         <Link href="/admin/leitura/analise" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Análise · Desafio de Lei Seca</Link>
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">{det.titulo}</h1>
-          <span className="text-sm text-muted-foreground tabular-nums">{det.total} aluno{det.total === 1 ? '' : 's'}</span>
-        </div>
+        <CabecalhoArea titulo={det.titulo} semBarraSetor acoes={<span className="text-sm text-muted-foreground tabular-nums">{det.total} aluno{det.total === 1 ? '' : 's'}</span>} />
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -78,17 +76,16 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><BarChart3 className="h-6 w-6 text-primary" /> Análise · Desafio de Lei Seca</h1>
-        <p className="text-muted-foreground">Progresso por documento e sequências do Desafio.</p>
-      </div>
-
-      <BarraSetorSlot />
-      {/* Abas */}
-      <div className="flex gap-1 border-b">
-        <AbaLink ativa={aba === 'documentos'} href="/admin/leitura/analise" icon={FileText}>Documentos</AbaLink>
-        <AbaLink ativa={aba === 'sequencias'} href="/admin/leitura/analise?tab=sequencias" icon={Flame}>Sequências</AbaLink>
-      </div>
+      <CabecalhoArea
+        titulo="Análise · Desafio de Lei Seca"
+        descricao="Progresso por documento e sequências do Desafio."
+        abas={
+          <AbasLinha ativo={aba} itens={[
+            { key: 'documentos', label: 'Documentos', href: '/admin/leitura/analise' },
+            { key: 'sequencias', label: 'Sequências', href: '/admin/leitura/analise?tab=sequencias' },
+          ]} />
+        }
+      />
 
       {aba === 'sequencias' ? (
         <SequenciasRelatorio tenantId={access.tenantId} mod={mod ?? ''} />
@@ -217,14 +214,6 @@ function DocumentosTabela({ linhas }: { linhas: Awaited<ReturnType<typeof relato
         </tbody>
       </table>
     </div>
-  )
-}
-
-function AbaLink({ ativa, href, icon: Icon, children }: { ativa: boolean; href: string; icon: typeof FileText; children: React.ReactNode }) {
-  return (
-    <Link href={href} className={cn('-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', ativa ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-      <Icon className="h-4 w-4" /> {children}
-    </Link>
   )
 }
 

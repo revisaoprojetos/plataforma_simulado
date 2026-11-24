@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trophy, SlidersHorizontal, FileSpreadsheet, Crown, Medal, Users, Star, FolderTree, RefreshCw, Download, Shield, RotateCcw } from 'lucide-react'
+import { AbasLinha } from '@/components/ui/abas-linha'
+import { FileSpreadsheet, Crown, Medal, Users, Star, FolderTree, RefreshCw, Download, Shield, RotateCcw } from 'lucide-react'
 import { BotaoExportar } from '@/components/admin/relatorios/viz'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { CriteriosForm } from './criterios-form'
@@ -79,11 +80,14 @@ export function RankingView({ simuladoId, titulo, grupos, totalQuestoes, entrada
   return (
     <div className="space-y-4">
       {/* Barra de comando: tabs (esq) + ações (dir) — SEMPRE no mesmo lugar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-xl border bg-card p-0.5 shadow-sm">
-          <button type="button" onClick={() => setTab('classificacao')} className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${tab === 'classificacao' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}><Trophy className="h-4 w-4" /> Classificação</button>
-          <button type="button" onClick={() => setTab('criterios')} className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${tab === 'criterios' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}><SlidersHorizontal className="h-4 w-4" /> Critérios</button>
-        </div>
+      <AbasLinha
+        ativo={tab}
+        itens={[
+          { key: 'classificacao', label: 'Classificação', onClick: () => setTab('classificacao') },
+          { key: 'criterios', label: 'Critérios', onClick: () => setTab('criterios') },
+        ]}
+      />
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => router.refresh()} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-muted" title="Atualizar">
             <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">Atualizar</span>

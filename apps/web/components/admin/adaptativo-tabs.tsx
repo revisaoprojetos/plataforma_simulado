@@ -1,48 +1,39 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Lock, SlidersHorizontal, Library, FileText, ListChecks, Download, Activity, ShieldCheck, UsersRound, Gauge, History, FlaskConical, Ban, Route, Workflow, Map as MapaIcon, Brain } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
+import { useDentroDoShellCronogramas } from '@/components/admin/cronograma/shell-context'
 
 // Abas do admin do Cronograma Adaptativo (sublinhado, padrão do projeto): 17 telas (Liberação … Inteligência, Lei seca).
 const TABS = [
-  { href: '/admin/cronogramas/adaptativo', label: 'Liberação', icon: Lock },
-  { href: '/admin/cronogramas/adaptativo/metas', label: 'Metas & inteligência', icon: SlidersHorizontal },
-  { href: '/admin/cronogramas/adaptativo/catalogo', label: 'Catálogo de metas', icon: Library },
-  { href: '/admin/cronogramas/adaptativo/definicoes', label: 'Definição e análise', icon: ListChecks },
-  { href: '/admin/cronogramas/adaptativo/downloads', label: 'Downloads', icon: Download },
-  { href: '/admin/cronogramas/adaptativo/analise', label: 'Análise de uso', icon: Activity },
-  { href: '/admin/cronogramas/adaptativo/integridade', label: 'Integridade', icon: ShieldCheck },
-  { href: '/admin/cronogramas/adaptativo/personagens', label: 'Personagens', icon: UsersRound },
-  { href: '/admin/cronogramas/adaptativo/faixas', label: 'Faixas e limites', icon: Gauge },
-  { href: '/admin/cronogramas/adaptativo/restricoes', label: 'Restrições', icon: Ban },
-  { href: '/admin/cronogramas/adaptativo/versoes', label: 'Versões', icon: History },
-  { href: '/admin/cronogramas/adaptativo/rastro', label: 'Rastro', icon: Route },
-  { href: '/admin/cronogramas/adaptativo/fluxo', label: 'Fluxo', icon: Workflow },
-  { href: '/admin/cronogramas/adaptativo/simulacao', label: 'Simulação', icon: FlaskConical },
-  { href: '/admin/cronogramas/adaptativo/mapa', label: 'Mapa', icon: MapaIcon },
-  { href: '/admin/cronogramas/adaptativo/inteligencia', label: 'Inteligência', icon: Brain },
+  { href: '/admin/cronogramas/adaptativo', label: 'Liberação' },
+  { href: '/admin/cronogramas/adaptativo/metas', label: 'Metas & inteligência' },
+  { href: '/admin/cronogramas/adaptativo/catalogo', label: 'Catálogo de metas' },
+  { href: '/admin/cronogramas/adaptativo/definicoes', label: 'Análise das metas' },
+  { href: '/admin/cronogramas/adaptativo/downloads', label: 'Downloads' },
+  { href: '/admin/cronogramas/adaptativo/analise', label: 'Análise de uso' },
+  { href: '/admin/cronogramas/adaptativo/integridade', label: 'Integridade' },
+  { href: '/admin/cronogramas/adaptativo/personagens', label: 'Personagens' },
+  { href: '/admin/cronogramas/adaptativo/faixas', label: 'Faixas e limites' },
+  { href: '/admin/cronogramas/adaptativo/restricoes', label: 'Restrições' },
+  { href: '/admin/cronogramas/adaptativo/versoes', label: 'Versões' },
+  { href: '/admin/cronogramas/adaptativo/rastro', label: 'Rastro' },
+  { href: '/admin/cronogramas/adaptativo/fluxo', label: 'Fluxo' },
+  { href: '/admin/cronogramas/adaptativo/simulacao', label: 'Simulação' },
+  { href: '/admin/cronogramas/adaptativo/mapa', label: 'Mapa' },
+  { href: '/admin/cronogramas/adaptativo/inteligencia', label: 'Inteligência' },
   // Lei seca (WLP) do adaptativo: rota irmã (fora de /adaptativo/*), por isso o casamento por prefixo abaixo a cobre.
-  { href: '/admin/cronogramas/lei-seca', label: 'Lei seca', icon: FileText },
+  { href: '/admin/cronogramas/lei-seca', label: 'Lei seca' },
 ]
 
+/**
+ * FACHADA de compatibilidade: dentro do shell de Cronogramas (layout de /admin/cronogramas) a navegação é a
+ * <CronogramasNav/> (grupos › sub-abas) e este componente não renderiza nada. Mantido só p/ páginas ainda não migradas.
+ */
 export function AdaptativoTabs() {
   const pathname = usePathname()
-  return (
-    <div className="flex flex-wrap items-center gap-1 overflow-x-auto border-b">
-      {TABS.map((t) => {
-        const ativo = t.href === '/admin/cronogramas/adaptativo' ? pathname === t.href : pathname === t.href || pathname.startsWith(t.href + '/')
-        const Icone = t.icon
-        return (
-          <Link key={t.href} href={t.href}
-            className={cn('relative flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition',
-              ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            <Icone className="h-4 w-4 shrink-0" />
-            {t.label}
-          </Link>
-        )
-      })}
-    </div>
-  )
+  const dentroShell = useDentroDoShellCronogramas()
+  if (dentroShell) return null
+  const ativo = TABS.find((t) => (t.href === '/admin/cronogramas/adaptativo' ? pathname === t.href : pathname === t.href || pathname.startsWith(t.href + '/')))?.href ?? ''
+  return <AbasLinha ativo={ativo} itens={TABS.map((t) => ({ key: t.href, label: t.label, href: t.href }))} />
 }

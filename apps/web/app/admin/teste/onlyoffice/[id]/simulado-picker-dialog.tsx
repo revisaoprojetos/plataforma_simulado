@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Folder, ChevronRight, ChevronLeft, Loader2, X, FileText } from 'lucide-react'
@@ -62,15 +63,7 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
         </div>
 
         {/* Abas: Simulados × Desafios (os desafios se comportam como pastas com simulados internos) */}
-        <div className="flex items-center gap-1 border-b px-4">
-          {([['simulado', 'Simulados'], ['desafio', 'Desafios']] as const).map(([k, label]) => (
-            <button key={k} type="button" onClick={() => setAba(k)}
-              className={`relative px-3 py-2 text-sm font-medium transition-colors ${aba === k ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              {label}
-              {aba === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
-            </button>
-          ))}
-        </div>
+        <AbasLinha className="px-4" ativo={aba} itens={([['simulado', 'Simulados'], ['desafio', 'Desafios']] as const).map(([k, label]) => ({ key: k, label, onClick: () => setAba(k) }))} />
 
         <div className="border-b px-4 py-3">
           <div className="relative">

@@ -1,20 +1,23 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, ArrowUp, ArrowDown, ChevronsUpDown, ChevronDown, FileText, FileSpreadsheet } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { BarraBusca, FiltroSelect, Iniciais, Vazio } from '@/components/admin/relatorios/lista-kit'
-import { BotaoExportar } from '@/components/admin/relatorios/viz'
+import { baixarCsv } from '@/components/admin/relatorios/viz'
 import { cn } from '@/lib/utils'
 
 export type GrupoDoAluno = { id: string; nome: string; cor: string | null; em: string | null }
 export type LinhaGrupoAluno = { id: string; nome: string; total: number; ultimoEm: string | null; grupos: GrupoDoAluno[] }
 export type GrupoOpcao = { id: string; nome: string; cor: string | null }
 
-const POR_PAGINA = 25
 const fmtData = (s: string | null) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
 type OrdCampo = 'nome' | 'total' | 'recente'
+type FiltroView = { q: string; grupo: string | null; ord: OrdCampo; dir: 'asc' | 'desc' }
 
 function ColOrd({ label, campo, ordCampo, ordDir, onSort, className }: { label: string; campo: OrdCampo; ordCampo: OrdCampo; ordDir: 'asc' | 'desc'; onSort: (c: OrdCampo) => void; className?: string }) {
   const ativo = ordCampo === campo
@@ -40,69 +43,90 @@ function ChipGrupo({ g }: { g: GrupoDoAluno }) {
   )
 }
 
-export function GruposView({ linhas, grupos }: { linhas: LinhaGrupoAluno[]; grupos: GrupoOpcao[] }) {
-  const [q, setQ] = useState('')
-  const [filtroGrupo, setFiltroGrupo] = useState('todos')
-  const [ordCampo, setOrdCampo] = useState<OrdCampo>('recente')
-  const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('desc')
-  const [pagina, setPagina] = useState(1)
+/**
+ * Lista paginada NO SERVIDOR: busca/filtro/ordenação/página vão na URL e a page re-renderiza só com a
+ * página visível. A exportação (CSV/Excel) busca o conjunto completo do filtro atual em
+ * /api/admin/relatorios/grupos (fora do payload RSC).
+ */
+export function GruposView({ linhas, total, pagina, porPagina, filtro, grupos }: {
+  linhas: LinhaGrupoAluno[]; total: number; pagina: number; porPagina: number; filtro: FiltroView; grupos: GrupoOpcao[]
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const atual = useSearchParams()
+  const [pend, startTransition] = useTransition()
+  const [q, setQ] = useState(filtro.q)
+  const [exportando, setExportando] = useState(false)
+  const filtroGrupo = filtro.grupo ?? 'todos'
+  const { ord: ordCampo, dir: ordDir } = filtro
 
-  function ordenar(campo: OrdCampo) {
-    if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setOrdCampo(campo); setOrdDir(campo === 'nome' ? 'asc' : 'desc') }
+  function navegar(mudancas: Record<string, string | null>) {
+    const p = new URLSearchParams(atual?.toString() ?? '')
+    for (const [k, v] of Object.entries(mudancas)) { if (v == null || v === '') p.delete(k); else p.set(k, v) }
+    const qs = p.toString()
+    startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }))
   }
 
-  const lista = useMemo(() => {
-    const termo = q.trim().toLowerCase()
-    const r = linhas.filter((e) =>
-      (!termo || e.nome.toLowerCase().includes(termo)) &&
-      (filtroGrupo === 'todos' || e.grupos.some((g) => g.id === filtroGrupo)))
-    const dir = ordDir === 'asc' ? 1 : -1
-    const val = (e: LinhaGrupoAluno): string | number => {
-      if (ordCampo === 'nome') return e.nome.toLowerCase()
-      if (ordCampo === 'total') return e.total
-      return e.ultimoEm ? new Date(e.ultimoEm).getTime() : -1
-    }
-    return [...r].sort((a, b) => {
-      const va = val(a), vb = val(b)
-      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir || a.nome.localeCompare(b.nome, 'pt-BR')
-      return String(va).localeCompare(String(vb), 'pt-BR') * dir
-    })
-  }, [linhas, q, filtroGrupo, ordCampo, ordDir])
+  function ordenar(campo: OrdCampo) {
+    if (ordCampo === campo) navegar({ ord: campo, dir: ordDir === 'asc' ? 'desc' : 'asc', pagina: null })
+    else navegar({ ord: campo, dir: campo === 'nome' ? 'asc' : 'desc', pagina: null })
+  }
 
-  useEffect(() => { setPagina(1) }, [q, filtroGrupo, ordCampo, ordDir])
-  const totalPaginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA))
+  // Busca com debounce → URL (o servidor refaz a consulta).
+  const primeira = useRef(true)
+  useEffect(() => {
+    if (primeira.current) { primeira.current = false; return }
+    if (q.trim() === filtro.q.trim()) return
+    const t = setTimeout(() => navegar({ q: q.trim() || null, pagina: null }), 350)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q])
+
+  const totalPaginas = Math.max(1, Math.ceil(total / porPagina))
   const paginaAtual = Math.min(pagina, totalPaginas)
-  const visiveis = lista.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA)
+  const irPara = (n: number) => navegar({ pagina: n <= 1 ? null : String(n) })
 
-  // Export (respeita busca + filtro atuais); grupos do mais recente → mais antigo.
-  const exportar = (): (string | number | null)[][] => [
-    ['Grupos por aluno'],
-    filtroGrupo !== 'todos' ? ['Filtro de grupo', grupos.find((g) => g.id === filtroGrupo)?.nome ?? filtroGrupo] : [],
-    [],
-    ['Estudante', 'Qtd. grupos', 'Último vínculo', 'Grupos (recentes primeiro)'],
-    ...lista.map((e) => [e.nome, e.total, fmtData(e.ultimoEm), e.grupos.map((g) => g.nome).join(' · ')]),
-  ].filter((l) => l.length)
-
+  async function buscarExport(): Promise<{ linhas: (string | number | null)[][] } | null> {
+    setExportando(true)
+    try {
+      const p = new URLSearchParams()
+      if (filtro.q.trim()) p.set('q', filtro.q.trim())
+      if (filtro.grupo) p.set('grupo', filtro.grupo)
+      p.set('ord', filtro.ord); p.set('dir', filtro.dir)
+      const r = await fetch(`/api/admin/relatorios/grupos?${p.toString()}`, { cache: 'no-store' })
+      if (!r.ok) throw new Error('falha')
+      return await r.json()
+    } catch { toast.error('Não foi possível exportar.'); return null } finally { setExportando(false) }
+  }
   const nomeArqGrupo = filtroGrupo !== 'todos' ? `_${(grupos.find((g) => g.id === filtroGrupo)?.nome ?? '').replace(/\s+/g, '-').toLowerCase()}` : ''
+  const arq = `grupos-por-aluno${nomeArqGrupo}`
 
   return (
     <div className="space-y-3">
       <BarraBusca valor={q} onValor={setQ} placeholder="Buscar estudante pelo nome…">
-        <FiltroSelect valor={filtroGrupo} onValor={setFiltroGrupo} opcoes={[
+        <FiltroSelect valor={filtroGrupo} onValor={(v) => navegar({ grupo: v === 'todos' ? null : v, pagina: null })} opcoes={[
           { valor: 'todos', rotulo: 'Todos os grupos' },
           ...grupos.map((g) => ({ valor: g.id, rotulo: g.nome })),
         ]} />
-        <BotaoExportar nome={`grupos-por-aluno${nomeArqGrupo}`} linhas={exportar} />
+        <DropdownMenu>
+          <DropdownMenuTrigger disabled={exportando} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-60">
+            <FileSpreadsheet className="h-4 w-4" />
+            {exportando ? 'Exportando…' : 'Exportar'} <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={async () => { const d = await buscarExport(); if (d) baixarCsv(arq, d.linhas) }}><FileText className="mr-2 h-4 w-4" /> CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => { const d = await buscarExport(); if (d) { const { baixarExcelSimples } = await import('@/lib/relatorios/excel-kit'); await baixarExcelSimples(arq, d.linhas) } }}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </BarraBusca>
 
-      <div className="overflow-hidden rounded-2xl border bg-card">
+      <div className={cn('overflow-hidden rounded-2xl border bg-card transition-opacity', pend && 'opacity-60')}>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
-          <span>{lista.length > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{(paginaAtual - 1) * POR_PAGINA + 1}–{Math.min(paginaAtual * POR_PAGINA, lista.length)}</b> de <b className="tabular-nums text-foreground">{lista.length}</b> aluno(s)</> : ' '}</span>
+          <span>{total > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{(paginaAtual - 1) * porPagina + 1}–{Math.min(paginaAtual * porPagina, total)}</b> de <b className="tabular-nums text-foreground">{total}</b> aluno(s)</> : ' '}</span>
           {filtroGrupo !== 'todos' && <span>Filtrando por <b className="text-foreground">{grupos.find((g) => g.id === filtroGrupo)?.nome}</b></span>}
         </div>
 
-        {visiveis.length === 0 ? (
+        {linhas.length === 0 ? (
           <Vazio>Nenhum aluno encontrado.</Vazio>
         ) : (
           <div className="max-h-[62vh] overflow-auto">
@@ -116,7 +140,7 @@ export function GruposView({ linhas, grupos }: { linhas: LinhaGrupoAluno[]; grup
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visiveis.map((e) => (
+                {linhas.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
@@ -138,14 +162,14 @@ export function GruposView({ linhas, grupos }: { linhas: LinhaGrupoAluno[]; grup
           </div>
         )}
 
-        {lista.length > POR_PAGINA && (
+        {total > porPagina && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">
             <span className="text-xs text-muted-foreground">Página <b className="tabular-nums text-foreground">{paginaAtual}</b> de <b className="tabular-nums text-foreground">{totalPaginas}</b></span>
             <div className="flex items-center gap-1">
-              <PagBtn onClick={() => setPagina(1)} disabled={paginaAtual === 1} title="Início"><ChevronsLeft className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaAtual === 1} title="Anterior"><ChevronLeft className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaAtual === totalPaginas} title="Próxima"><ChevronRight className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina(totalPaginas)} disabled={paginaAtual === totalPaginas} title="Final"><ChevronsRight className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPara(1)} disabled={paginaAtual === 1} title="Início"><ChevronsLeft className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPara(Math.max(1, paginaAtual - 1))} disabled={paginaAtual === 1} title="Anterior"><ChevronLeft className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPara(Math.min(totalPaginas, paginaAtual + 1))} disabled={paginaAtual === totalPaginas} title="Próxima"><ChevronRight className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPara(totalPaginas)} disabled={paginaAtual === totalPaginas} title="Final"><ChevronsRight className="h-4 w-4" /></PagBtn>
             </div>
           </div>
         )}

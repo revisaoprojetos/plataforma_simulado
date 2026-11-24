@@ -3,7 +3,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Plus, Upload } from 'lucide-react'
 import { EstudantesLista } from '@/components/admin/estudantes-lista'
 import { carregarLoteEstudantes, kpisEstudantes } from './actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,22 +18,20 @@ export default async function EstudantesPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Estudantes</h1>
-          <p className="text-muted-foreground">Gerencie os alunos e acesse o dashboard pessoal de cada um.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/admin/estudantes/novo?tab=csv" className={buttonVariants({ variant: 'outline' })}>
-            <Upload className="mr-2 h-4 w-4" /> Importar
-          </Link>
-          <Link href="/admin/estudantes/novo" className={buttonVariants()}>
-            <Plus className="mr-2 h-4 w-4" /> Novo Estudante
-          </Link>
-        </div>
-      </div>
-
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Estudantes"
+        descricao="Gerencie os alunos e acesse o dashboard pessoal de cada um."
+        acoes={
+          <>
+            <Link href="/admin/estudantes/novo?tab=csv" className={buttonVariants({ variant: 'outline' })}>
+              <Upload className="mr-2 h-4 w-4" /> Importar
+            </Link>
+            <Link href="/admin/estudantes/novo" className={buttonVariants()}>
+              <Plus className="mr-2 h-4 w-4" /> Novo Estudante
+            </Link>
+          </>
+        }
+      />
       <EstudantesLista
         inicial={inicial}
         total={total}

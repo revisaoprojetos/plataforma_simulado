@@ -29,7 +29,7 @@ export async function AbaCronogramas({ svc, tenantId, produtoId, qs, pathname, p
   ])
   const ativas = trilhas.filter((t) => t.ativo)
   const comData = trilhas.reduce((s, t) => s + t.aulasComData, 0)
-  const preservar = ['aba', 'sub', 'produto', 'vis', 'pps']
+  const preservar = ['aba', 'sub', 'v', 'produto', 'vis', 'pps']
   const limpar = hrefCom(pathname, Object.fromEntries(preservar.map((k) => [k, qs[k]])))
   const temFiltro = !!(qs.q || qs.disc)
 

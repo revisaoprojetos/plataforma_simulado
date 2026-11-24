@@ -110,15 +110,16 @@ export async function definirResolvidaAluno(
 
 /** Fila de dúvidas do tenant (todas), com filtro opcional por status. */
 export async function listarDuvidasAdmin(
-  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusDuvida },
+  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusDuvida; limite?: number },
 ): Promise<Duvida[]> {
   if (!tenantId) return []
-  const rows = await fetchAll<Duvida>(() => {
-    let q = svc.from(T_DUV).select(SEL_DUV).eq('tenant_id', tenantId)
-    if (filtro?.status) q = q.eq('status', filtro.status)
-    return q.order('ultima_msg_em', { ascending: false }).order('id', { ascending: false })
-  })
-  return rows ?? []
+  // Paginado no banco (.range): só as `limite` mais recentes (padrão 300) — não varre a fila inteira.
+  const lim = Math.max(1, filtro?.limite ?? 300)
+  let q = svc.from(T_DUV).select(SEL_DUV).eq('tenant_id', tenantId)
+  if (filtro?.status) q = q.eq('status', filtro.status)
+  const { data, error } = await q.order('ultima_msg_em', { ascending: false }).order('id', { ascending: false }).range(0, lim - 1)
+  if (error) throw error
+  return (data ?? []) as Duvida[]
 }
 
 /** Admin carrega uma dúvida (qualquer aluno do tenant) + mensagens. */

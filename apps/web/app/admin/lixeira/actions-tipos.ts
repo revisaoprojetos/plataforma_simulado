@@ -9,4 +9,6 @@ export type LixeiraItem = {
   rotulo: string
   deletado_em: string | null
   deletado_por_nome: string | null
+  /** true no(s) item(ns) de uma tabela que bateu o teto (200) — há mais itens na lixeira dessa tabela. */
+  haMais?: boolean
 }

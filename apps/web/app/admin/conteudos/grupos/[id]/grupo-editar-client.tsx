@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Check, Users, KeyRound, Layers, Link2, ExternalLink, Unlink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { DataTable, type DataTableSelection } from '@/components/admin/data-table'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { salvarConfigGrupo } from '@/app/admin/grupos/actions'
@@ -171,23 +172,18 @@ export function GrupoEditarClient(props: {
       </div>
 
       {/* Abas (sublinhado, sem ícone — porte fiel) */}
-      <div className="flex flex-wrap items-center gap-6 overflow-x-auto border-b">
-        {TAB_META.map((t) => {
-          const ativo = t.key === tab
+      <AbasLinha
+        ativo={tab}
+        itens={TAB_META.map((t) => {
           const count = t.key === 'membros' ? membrosTotal : t.key === 'bancos' ? bancosVinculadosCount : null
-          return (
-            <Link
-              key={t.key}
-              href={`/admin/conteudos/grupos/${grupo.id}?tab=${t.key}`}
-              className={cn('-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-1 py-2.5 text-sm transition-colors',
-                ativo ? 'border-primary font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground')}
-            >
-              {t.label}
-              {count != null && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-primary">{count.toLocaleString('pt-BR')}</span>}
-            </Link>
-          )
+          return {
+            key: t.key,
+            label: t.label,
+            href: `/admin/conteudos/grupos/${grupo.id}?tab=${t.key}`,
+            badge: count != null ? count.toLocaleString('pt-BR') : undefined,
+          }
         })}
-      </div>
+      />
 
       {/* Conteúdo da aba */}
       {tab === 'informacoes' && (

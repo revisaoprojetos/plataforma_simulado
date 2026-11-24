@@ -4,7 +4,7 @@
 // persiste entre card/tabela) e a barra de ações em lote (fixa no rodapé, com contador).
 
 import { useCallback, useRef, useState } from 'react'
-import { Check, Minus, X, MoreHorizontal, FolderInput, Eye, EyeOff, Trash2, Users2, Layers, Settings2, History, Type, CircleDot, Download } from 'lucide-react'
+import { Check, Minus, X, MoreHorizontal, FolderInput, Eye, EyeOff, Trash2, Users2, Layers, Settings2, History, Type, CircleDot, Download, Replace, Tags, SquarePen, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -67,7 +67,7 @@ export function useSelecaoIds() {
   return { sel, alternar, todos, limpar, manter }
 }
 
-export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'baixar' | 'lixeira'
+export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'baixar' | 'lixeira' | 'substituir' | 'metadados' | 'publicar' | 'legproc' | 'arquivar'
 
 /** Barra de ação em lote: fixa no rodapé, sem ocupar largura útil da página. */
 export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModelo, onTodos, onLimpar, onSair, onAcao }: {
@@ -77,6 +77,7 @@ export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModel
   const n = nDocs + nPastas
   const btn = 'inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50'
   const off = n === 0
+  const semDoc = nDocs === 0 // ações que só valem para documentos
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[90] flex justify-center px-3" role="region" aria-label="Ações em lote">
       <div className="pointer-events-auto flex w-full max-w-full flex-wrap items-center gap-2 rounded-2xl border bg-card px-3 py-2 shadow-xl sm:w-auto">
@@ -87,8 +88,14 @@ export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModel
         <button type="button" onClick={onTodos} className={btn}>{todosMarcados ? 'Desmarcar todos' : `Selecionar todos (${totalVisivel})`}</button>
         <button type="button" onClick={onLimpar} disabled={off} className={btn}>Limpar</button>
         <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
+        {!ehModelo && <button type="button" onClick={() => onAcao('visibilidade_mostrar')} disabled={off} className={btn}><Eye className="h-3.5 w-3.5" />Mostrar ao aluno</button>}
+        {!ehModelo && <button type="button" onClick={() => onAcao('visibilidade_ocultar')} disabled={off} className={btn}><EyeOff className="h-3.5 w-3.5" />Ocultar do aluno</button>}
         <button type="button" onClick={() => onAcao('baixar')} disabled={off} className={btn}><Download className="h-3.5 w-3.5" />Baixar</button>
         <button type="button" onClick={() => onAcao('mover')} disabled={off} className={btn}><FolderInput className="h-3.5 w-3.5" />Mover</button>
+        <button type="button" onClick={() => onAcao('metadados')} disabled={semDoc} className={btn}><Tags className="h-3.5 w-3.5" />Editar metadados</button>
+        <button type="button" onClick={() => onAcao('substituir')} disabled={semDoc} className={btn}><Replace className="h-3.5 w-3.5" />Substituir arquivos</button>
+        <button type="button" onClick={() => onAcao('publicar')} disabled={semDoc} className={btn}><SquarePen className="h-3.5 w-3.5" />Publicar</button>
+        {!ehModelo && <button type="button" onClick={() => onAcao('legproc')} disabled={semDoc} className={btn}><Layers className="h-3.5 w-3.5" />Leitura LegProc</button>}
         <button type="button" onClick={() => onAcao('status')} disabled={off} className={btn}><CircleDot className="h-3.5 w-3.5" />Status</button>
         {!ehModelo && <button type="button" onClick={() => onAcao('acesso')} disabled={off} className={btn}><Users2 className="h-3.5 w-3.5" />Acesso</button>}
         {!ehModelo && <button type="button" onClick={() => onAcao('atualizacao')} disabled={off} className={btn}><History className="h-3.5 w-3.5" />Registrar atualização</button>}
@@ -99,9 +106,8 @@ export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModel
           <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuItem onClick={() => onAcao('configurar')}><Settings2 className="mr-2 h-4 w-4" /> Configurar em lote…</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onAcao('categoria')}><Layers className="mr-2 h-4 w-4" /> Alterar categoria</DropdownMenuItem>
-            {!ehModelo && <DropdownMenuItem onClick={() => onAcao('visibilidade_mostrar')}><Eye className="mr-2 h-4 w-4" /> Mostrar ao aluno</DropdownMenuItem>}
-            {!ehModelo && <DropdownMenuItem onClick={() => onAcao('visibilidade_ocultar')}><EyeOff className="mr-2 h-4 w-4" /> Ocultar do aluno</DropdownMenuItem>}
             {!ehModelo && <DropdownMenuItem onClick={() => onAcao('legenda')}><Type className="mr-2 h-4 w-4" /> Legenda de grifos</DropdownMenuItem>}
+            <DropdownMenuItem onClick={() => onAcao('arquivar')} disabled={semDoc}><Archive className="mr-2 h-4 w-4" /> Arquivar</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onAcao('lixeira')} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Enviar para a lixeira</DropdownMenuItem>
           </DropdownMenuContent>

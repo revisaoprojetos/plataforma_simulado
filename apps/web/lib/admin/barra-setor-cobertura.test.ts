@@ -77,7 +77,7 @@ const MAPA: Record<string, string[]> = {
 }
 
 // Cabeçalhos compartilhados que já embutem o slot (components/admin/revisao/ui.tsx e estudio-header.tsx).
-const TEM_SLOT = /<BarraSetorSlot\b|<RevisaoHead\b|<RevisaoAbas\b|<EstudioHeader\b/
+const TEM_SLOT = /<BarraSetorSlot\b|<RevisaoHead\b|<RevisaoAbas\b|<EstudioHeader\b|<CabecalhoArea\b|<TituloTela\b/
 
 /** Rotas (sem query) de clusters com 2+ itens e sem `abasProprias` — as que exibem a barra. */
 function rotasComBarra(): string[] {
@@ -108,7 +108,7 @@ describe('barra do setor: posição por slot (nunca no topo do <main>)', () => {
   })
 
   it('os cabeçalhos compartilhados embutem o slot', () => {
-    for (const f of ['components/admin/revisao/ui.tsx', 'components/admin/estudio/estudio-header.tsx']) {
+    for (const f of ['components/admin/revisao/ui.tsx', 'components/admin/cabecalho-area.tsx']) {
       expect(readFileSync(resolve(RAIZ, f), 'utf8')).toContain('<BarraSetorSlot')
     }
   })

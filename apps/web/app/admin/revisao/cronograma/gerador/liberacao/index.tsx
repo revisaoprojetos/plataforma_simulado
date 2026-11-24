@@ -32,11 +32,11 @@ export default async function LiberacaoGerador({ sp, tenantId, basePath }: { sp:
 
   const topo = (
     <>
-      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub }} abas={[
+      <RevisaoAbas base={base} param="vis" atual={vis} extra={{ aba: qs.aba, sub: qs.sub, v: qs.v }} abas={[
         { id: 'grupos', titulo: 'Grupos', contagem: b.cfg.grupos.length },
         { id: 'alunos', titulo: 'Alunos', contagem: b.cfg.alunos.length },
       ]} />
-      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'vis']} placeholder={vis === 'grupos' ? 'Buscar grupo' : 'Buscar aluno da exceção por nome ou e-mail'}
+      <BarraBusca base={base} qs={qs} preservar={['aba', 'sub', 'v', 'vis']} placeholder={vis === 'grupos' ? 'Buscar grupo' : 'Buscar aluno da exceção por nome ou e-mail'}
         filtros={vis === 'grupos' ? [{ nome: 'situ', rotulo: 'Todos os grupos', opcoes: [{ v: 'isento', l: 'Sem bloqueio (exceção)' }, { v: 'nao', l: 'Com bloqueio' }] }] : []} />
     </>
   )

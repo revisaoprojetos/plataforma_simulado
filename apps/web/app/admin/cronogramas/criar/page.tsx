@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { toast } from 'sonner'
 import { Loader2, Rocket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ import { PreviaViva } from './previa-viva'
 export default function CriarCronogramaPage() {
   const { draft, patch, reset } = useCriar()
   const router = useRouter()
+  const voltar = useSearchParams().get('voltar')
   const [salvando, setSalvando] = useState(false)
 
   const nomeOk = draft.nome.trim().length >= 3
@@ -46,7 +48,7 @@ export default function CriarCronogramaPage() {
       const id = r.id
       reset()
       toast.success('Cronograma criado como rascunho.')
-      router.push(`/admin/cronogramas/${id}`)
+      router.push(comVoltar(`/admin/cronogramas/${id}`, voltar ?? ''))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha ao criar o cronograma.')
     } finally {

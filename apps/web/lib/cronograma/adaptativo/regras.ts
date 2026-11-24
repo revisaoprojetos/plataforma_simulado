@@ -39,6 +39,8 @@ export interface RestricaoRegra {
   valor: number
   /** Faixas de carga (1/2/3) em que vale; vazio = todas. */
   faixas: number[]
+  /** Dias da semana em que vale (0 = segunda … 6 = domingo); ausente/vazio = todos. Usado pelas regras do usuário do editor de fluxo. */
+  dias?: number[]
 }
 
 export interface RegrasMotor {
@@ -280,6 +282,7 @@ export function normalizarRestricoes(raw: unknown): RestricaoRegra[] {
     const a = FAMILIAS_RESTRICAO.find((f) => f === o.tipoA)
     if (!tipo || !a) continue
     const rel = RELACIONAIS.includes(tipo)
+    const dias = listaInt(o.dias, [], 0, 6)
     const b = rel ? (FAMILIAS_RESTRICAO.find((f) => f === o.tipoB) ?? null) : null
     if (rel && !b) continue
     let id = typeof o.id === 'string' && o.id.trim() ? o.id.trim().slice(0, 40) : `${tipo}:${a}:${b ?? ''}`
@@ -287,8 +290,9 @@ export function normalizarRestricoes(raw: unknown): RestricaoRegra[] {
     ids.add(id)
     out.push({
       id, tipo, ativa: bool(o.ativa, true), rotulo: (typeof o.rotulo === 'string' ? o.rotulo : '').slice(0, 80), tipoA: a, tipoB: b,
-      valor: tipo === 'max_por_dia' ? int(o.valor, 1, 1, 6) : tipo === 'depois_de' ? int(o.valor, 1, 0, 60) : 0,
+      valor: tipo === 'max_por_dia' ? int(o.valor, 1, 0, 6) : tipo === 'depois_de' ? int(o.valor, 1, 0, 60) : 0,
       faixas: listaInt(o.faixas, [], 1, 3),
+      ...(dias.length ? { dias } : {}),
     })
     if (out.length >= 40) break
   }

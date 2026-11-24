@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { registrarAudit } from '@/lib/audit'
+import { aplicarRegrasUsuarioDoTenant } from './regras-usuario-server'
 import { normalizarRegras, hashRegras, deltaDoPadrao, type RegrasMotor } from './regras'
 
 /**
@@ -69,9 +70,12 @@ export async function lerRegistroRegras(svc: SupabaseClient, tenantId: string): 
   })
 }
 
-/** Só as regras vigentes (para `ctx.regras`). */
+/**
+ * Regras EFETIVAS do motor (para `ctx.regras`): as regras do tenant + as REGRAS DO USUÁRIO do Fluxo compiladas (`regras-usuario.ts`).
+ * Sem overlay/regra com efeito = a mesma referência de `lerRegistroRegras(...).regras`. NÃO use para editar/salvar (use `lerRegistroRegras`).
+ */
 export async function lerRegrasMotor(svc: SupabaseClient, tenantId: string): Promise<RegrasMotor> {
-  return (await lerRegistroRegras(svc, tenantId)).regras
+  return aplicarRegrasUsuarioDoTenant(svc, tenantId, (await lerRegistroRegras(svc, tenantId)).regras)
 }
 
 export type ResultadoSalvar = { ok: true; versao: number; hash: string } | { ok: false; error: string; conflito?: boolean }

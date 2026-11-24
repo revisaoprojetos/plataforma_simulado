@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { startOfDay } from 'date-fns'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -10,26 +11,29 @@ import { SecaoHeader } from '@/components/admin/secao-header'
 import { montarDashboardSerie } from '@/lib/admin/dashboard-serie'
 import { DashboardCharts } from '@/components/admin/dashboard-charts'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 async function getDados(tenantId: string) {
   const svc = await createServiceClient()
   const t = { tenant_id: tenantId }
   const hojeIso = startOfDay(new Date()).toISOString()
 
+  // 4 contagens exact em UM remember de 60 s por tenant ("sessões hoje" muda por dia: a chave inclui a data).
+  const contagens = remember(chaveRelatorio(tenantId, 'dashboard', 'contagens', hojeIso.slice(0, 10)), 60, async () => {
+    const [q, s, e, h] = await Promise.all([
+      svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
+      svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null),
+      svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
+      svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
+    ])
+    return { totalQuestoes: q.count ?? 0, totalSimulados: s.count ?? 0, totalEstudantes: e.count ?? 0, sessoesHoje: h.count ?? 0 }
+  })
   const [
-    { count: totalQuestoes },
-    { count: totalSimulados },
-    { count: totalEstudantes },
-    { count: sessoesHoje },
+    { totalQuestoes, totalSimulados, totalEstudantes, sessoesHoje },
     serieInicial,
     { data: recentes },
     notaMedia,
   ] = await Promise.all([
-    svc.from('simulado_questoes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
-    svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null),
-    svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
-    svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
+    contagens,
     // EGRESS: a série do dashboard lê todas as sessões dos últimos 7 dias por abertura. Memoizada no
     // Redis (10 min) — no cache-hit o dashboard não toca no banco. Degrada sozinho sem Redis.
     remember(chaveRelatorio(tenantId, 'dashboard', 'serie', 'semana'), 600, () => montarDashboardSerie(svc, tenantId, 'semana')),
@@ -83,12 +87,8 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral da plataforma</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <CabecalhoArea titulo="Dashboard" descricao="Visão geral da plataforma" acoes={
+        <>
           <Link href="/admin/questoes/nova" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:bg-muted">
             <Plus className="h-4 w-4" /> Nova questão
           </Link>
@@ -100,10 +100,9 @@ export default async function AdminDashboard() {
               </button>
             }
           />
-        </div>
-      </div>
+        </>
+      } />
 
-      <BarraSetorSlot />
       {/* Stats Cards (clicáveis) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (

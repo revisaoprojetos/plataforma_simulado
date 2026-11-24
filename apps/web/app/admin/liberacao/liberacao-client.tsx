@@ -13,7 +13,8 @@ import {
   salvarRegraAction, pausarRegraAction, retomarRegraAction, cancelarRegraAction, excluirRegraAction,
   reprocessarPendentesAction, simularPedidoAction, listarPedidosAction, salvarStatusMapAction, removerStatusMapAction,
 } from './actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { AbasLinha } from '@/components/ui/abas-linha'
 
 const ABAS = [['regras', 'Regras'], ['pedidos', 'Pedidos'], ['simulador', 'Simulador'], ['status', 'Mapa de status']] as const
 type Aba = (typeof ABAS)[number][0]
@@ -92,24 +93,11 @@ export function LiberacaoClient({ regras, produtos, statusMaps, pedidosInicial, 
 
   return (
     <div className="w-full space-y-6 px-1">
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Regras de liberação</h1>
-          <p className="text-sm text-muted-foreground">Libera produtos automaticamente a partir das vendas (webhooks), por regras configuráveis. Casamento AND estrito; concessões com data de início/fim.</p>
-        </div>
-      </div>
-
-      <BarraSetorSlot />
-      {/* Abas (sublinhado) */}
-      <div className="flex gap-1 border-b">
-        {ABAS.map(([k, label]) => (
-          <button key={k} onClick={() => setAba(k)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${aba === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <CabecalhoArea
+        titulo="Regras de liberação"
+        descricao="Libera produtos automaticamente a partir das vendas (webhooks), por regras configuráveis. Casamento AND estrito; concessões com data de início/fim."
+        abas={<AbasLinha ativo={aba} itens={ABAS.map(([k, label]) => ({ key: k, label, onClick: () => setAba(k) }))} />}
+      />
 
       {aba === 'regras' && (
         <div className="space-y-4">

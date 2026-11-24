@@ -16,7 +16,7 @@ import {
   Folder, FolderOpen, FolderPlus, FolderInput, X, Check, GripVertical, FolderMinus,
   Search, ArrowUpDown, ChevronsUpDown, Hash, Download, FolderTree,
 } from 'lucide-react'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 type Origem = 'guru' | 'curseduca' | null
 type Grupo = { id: string; nome: string; membros: number; cor: string | null; is_mestre: boolean; pai_id: string | null; codigo?: string | null; origem?: Origem }
@@ -243,30 +243,24 @@ export function GruposClient({ grupos }: { grupos: Grupo[] }) {
   return (
     <div className="animate-page space-y-5 pb-24">
       {/* Cabeçalho */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <span>Alunos</span><span>/</span><span className="text-foreground/70">Grupos</span><span>/</span>
-            <span className="font-semibold text-primary">{scopeNome}</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Organização de grupos</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Agrupe turmas em pastas (grupos mestre), mova em lote e acompanhe a distribuição de membros. Arraste as linhas para reorganizar a hierarquia.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" onClick={() => novaPasta()} disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
-            <FolderPlus className="h-4 w-4" /> Nova pasta
-          </button>
-          <button type="button" onClick={novo} disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Novo grupo
-          </button>
-        </div>
-      </div>
+      <CabecalhoArea
+        titulo="Organização de grupos"
+        descricao={<>Agrupe turmas em pastas (grupos mestre), mova em lote e acompanhe a distribuição de membros. Arraste as linhas para reorganizar a hierarquia. Escopo: <span className="font-semibold text-primary">{scopeNome}</span></>}
+        denso
+        acoes={
+          <>
+            <button type="button" onClick={() => novaPasta()} disabled={pending}
+              className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
+              <FolderPlus className="h-4 w-4" /> Nova pasta
+            </button>
+            <button type="button" onClick={novo} disabled={pending}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Novo grupo
+            </button>
+          </>
+        }
+      />
 
-      <BarraSetorSlot />
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Grupos" valor={nf(comuns.length)} hint="grupos comuns" />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SETORES, SUPER_ONLY_PREFIXOS, itensPlanos, resolverRota, rotaSuperOnly, setoresVisiveis, hrefInicialSetor, hrefInicialAba, itensDaBarra, chaveRotuloAba, iconeDaAba } from './setores'
+import { SETORES, SUPER_ONLY_PREFIXOS, itensPlanos, resolverRota, rotaSuperOnly, setoresVisiveis, hrefInicialSetor, hrefInicialAba, itensDaBarra, chaveRotuloAba, iconeDaAba, hrefAtivoDaRota } from './setores'
 
 // Snapshot dos hrefs do menu ANTIGO (`navGroups` + Dashboard da sidebar). Nenhum pode sumir nem duplicar.
 const HREFS_MENU_ANTIGO = [
@@ -105,6 +105,13 @@ describe('resolverRota / visibilidade', () => {
   it('sub-rotas acendem o item certo', () => {
     expect(resolverRota('/admin/cronogramas/pacotes', sem)?.item.href).toBe('/admin/cronogramas')
     expect(resolverRota('/admin/cronogramas/adaptativo/faixas', sem)?.item.href).toBe('/admin/cronogramas/adaptativo')
+    // alias → alvo (item visível que a barra acende)
+    const alvo = (p: string, q: Record<string, string> = {}) => { const r = resolverRota(p, com(q)); return r ? hrefAtivoDaRota(r) : null }
+    expect(alvo('/admin/cronogramas/pacotes')).toBe('/admin/revisao/cronograma?aba=gerador')
+    expect(alvo('/admin/cronogramas/adaptativo/mapa')).toBe('/admin/revisao/cronograma?aba=adaptativo')
+    expect(alvo('/admin/cronogramas/lei-seca')).toBe('/admin/revisao/cronograma?aba=adaptativo')
+    expect(alvo('/admin/revisao/cronograma')).toBe('/admin/revisao/cronograma?aba=gerador')
+    expect(alvo('/admin/revisao/cronograma', { aba: 'adaptativo', sub: 'sprint' })).toBe('/admin/revisao/cronograma?aba=adaptativo')
     expect(resolverRota('/admin/conteudos/materiais/aulas', sem)?.item.href).toBe('/admin/conteudos/produtos')
     expect(resolverRota('/admin/auditoria/problemas', sem)?.setor.id).toBe('super')
     expect(resolverRota('/admin/acessos', sem)?.setor.id).toBe('admin')
@@ -145,54 +152,39 @@ describe('clusters (aba = 1 entrada da sidebar) e barra de abas internas', () =>
     const ids = SETORES.flatMap((s) => s.abas.map((a) => a.id))
     expect(new Set(ids).size).toBe(ids.length)
   })
-  it('exemplo do dono: Cronogramas = só 2 entradas (Gerador e Adaptativo), cada uma com 1 destino e SEM barra', () => {
+  it('Cronogramas = UMA entrada com 2 itens visíveis (Gerador | Adaptativo) → a barra de setor os mostra', () => {
     const ped = SETORES.find((s) => s.id === 'pedagogico')!
-    expect(ped.abas.map((a) => a.id)).toEqual(['cursos-produtos', 'simulados', 'lei-seca-juris', 'gerador-cronograma', 'adaptativo', 'biblioteca', 'questoes', 'videoteca', 'atualizacoes', 'duvidas'])
-    const ger = ped.abas.find((a) => a.id === 'gerador-cronograma')!
-    const ada = ped.abas.find((a) => a.id === 'adaptativo')!
-    // 1º item = destino da entrada (tela nova); o resto são ALIAS (rotas antigas) que não aparecem no menu.
-    expect(ger.itens.filter((i) => !i.alias).map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=gerador'])
-    expect(ada.itens.filter((i) => !i.alias).map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=adaptativo'])
-    expect(ger.itens.filter((i) => i.alias).map((i) => i.href)).toEqual(['/admin/cronogramas', '/admin/cronogramas/relatorios', '/admin/cronogramas/importar'])
-    expect(ada.itens.filter((i) => i.alias).map((i) => i.href)).toEqual(['/admin/revisao/cronograma', '/admin/cronogramas/adaptativo', '/admin/cronogramas/lei-seca'])
-    expect(ger.itens[0].alias || ada.itens[0].alias).toBeFalsy()
-    // gate da sidebar = gate real da página (cronogramas:view)
-    expect(ger.itens[0].perm).toBe('cronogramas:view')
-    expect(ada.itens[0].perm).toBe('cronogramas:view')
-    // aliases nunca aparecem na sidebar nem na barra
+    expect(ped.abas.map((a) => a.id)).toEqual(['cursos-produtos', 'simulados', 'lei-seca-juris', 'cronogramas', 'biblioteca', 'questoes', 'videoteca', 'atualizacoes', 'duvidas'])
+    const cr = ped.abas.find((a) => a.id === 'cronogramas')!
+    expect(cr.label).toBe('Cronogramas')
+    expect(cr.itens.filter((i) => !i.alias).map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=gerador', '/admin/revisao/cronograma?aba=adaptativo'])
+    expect(cr.itens.filter((i) => i.alias).map((i) => i.href)).toEqual(['/admin/revisao/cronograma', '/admin/cronogramas', '/admin/cronogramas/relatorios', '/admin/cronogramas/importar', '/admin/cronogramas/adaptativo', '/admin/cronogramas/lei-seca'])
+    for (const i of cr.itens.filter((x) => x.alias)) expect(i.alvo, i.href).toMatch(/^\/admin\/revisao\/cronograma\?aba=(gerador|adaptativo)$/)
+    expect(cr.itens.filter((i) => !i.alias).every((i) => i.perm === 'cronogramas:view')).toBe(true)
     const v = vis.find((s) => s.id === 'pedagogico')!
-    expect(v.abas.find((a) => a.id === 'gerador-cronograma')!.itens.map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=gerador'])
-    expect(v.abas.find((a) => a.id === 'adaptativo')!.itens.map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=adaptativo'])
-    expect(barra('/admin/revisao/cronograma', { aba: 'gerador' })).toBeNull()
-    expect(barra('/admin/revisao/cronograma', { aba: 'adaptativo' })).toBeNull()
-    expect(barra('/admin/cronogramas/importar')).toBeNull()
-    // sem perm de cronogramas: as 2 entradas somem
+    expect(v.abas.find((a) => a.id === 'cronogramas')!.itens.map((i) => i.href)).toEqual(['/admin/revisao/cronograma?aba=gerador', '/admin/revisao/cronograma?aba=adaptativo'])
+    expect(barra('/admin/revisao/cronograma', { aba: 'adaptativo' })).toEqual(['/admin/revisao/cronograma?aba=gerador', '/admin/revisao/cronograma?aba=adaptativo'])
+    expect(barra('/admin/cronogramas/importar')).toEqual(['/admin/revisao/cronograma?aba=gerador', '/admin/revisao/cronograma?aba=adaptativo'])
     const sem = setoresVisiveis({ can: (p) => !p || !p.startsWith('cronogramas:'), isSuperAdmin: false })
-    expect(sem.find((s) => s.id === 'pedagogico')!.abas.map((a) => a.id)).not.toContain('gerador-cronograma')
-    expect(sem.find((s) => s.id === 'pedagogico')!.abas.map((a) => a.id)).not.toContain('adaptativo')
+    expect(sem.find((s) => s.id === 'pedagogico')!.abas.map((a) => a.id)).not.toContain('cronogramas')
   })
   it('rotas antigas e novas resolvem para a entrada certa (destaque da sidebar)', () => {
     const aba = (path: string, q: Record<string, string> = {}) => resolverRota(path, com(q))?.aba.id
-    expect(aba('/admin/revisao/cronograma', { aba: 'gerador', sub: 'metas' })).toBe('gerador-cronograma')
-    expect(aba('/admin/revisao/cronograma', { aba: 'adaptativo', sub: 'regras' })).toBe('adaptativo')
-    expect(aba('/admin/revisao/cronograma')).toBe('adaptativo') // padrão da tela = adaptativo
-    for (const r of ['/admin/cronogramas', '/admin/cronogramas/relatorios', '/admin/cronogramas/importar', '/admin/cronogramas/pacotes', '/admin/cronogramas/conteudos/abc', '/admin/cronogramas/metas', '/admin/cronogramas/tipos', '/admin/cronogramas/links', '/admin/cronogramas/criar', '/admin/cronogramas/xyz']) {
-      expect(aba(r), r).toBe('gerador-cronograma')
-    }
-    for (const r of ['/admin/cronogramas/adaptativo', '/admin/cronogramas/adaptativo/faixas', '/admin/cronogramas/adaptativo/catalogo/paginas', '/admin/cronogramas/lei-seca']) {
-      expect(aba(r), r).toBe('adaptativo')
+    expect(aba('/admin/revisao/cronograma', { aba: 'gerador', sub: 'metas' })).toBe('cronogramas')
+    expect(aba('/admin/revisao/cronograma', { aba: 'adaptativo', sub: 'regras' })).toBe('cronogramas')
+    expect(aba('/admin/revisao/cronograma')).toBe('cronogramas')
+    for (const r of ['/admin/cronogramas', '/admin/cronogramas/relatorios', '/admin/cronogramas/importar', '/admin/cronogramas/pacotes', '/admin/cronogramas/conteudos/abc', '/admin/cronogramas/metas', '/admin/cronogramas/tipos', '/admin/cronogramas/links', '/admin/cronogramas/criar', '/admin/cronogramas/xyz', '/admin/cronogramas/adaptativo', '/admin/cronogramas/adaptativo/faixas', '/admin/cronogramas/adaptativo/catalogo/paginas', '/admin/cronogramas/lei-seca']) {
+      expect(aba(r), r).toBe('cronogramas')
     }
   })
-  it('chave de rótulo das 2 entradas = href completo (1 item real); aliases não contam', () => {
+  it('chave de rótulo da entrada = aba:cronogramas (2 itens reais); aliases não contam', () => {
     const ped = vis.find((s) => s.id === 'pedagogico')!
-    expect(chaveRotuloAba(ped.abas.find((a) => a.id === 'gerador-cronograma')!)).toBe('/admin/revisao/cronograma?aba=gerador')
-    expect(chaveRotuloAba(ped.abas.find((a) => a.id === 'adaptativo')!)).toBe('/admin/revisao/cronograma?aba=adaptativo')
+    expect(chaveRotuloAba(ped.abas.find((a) => a.id === 'cronogramas')!)).toBe('aba:cronogramas')
   })
   it('manutenção por área bloqueia pelo path (inclui hrefs com ?aba=)', () => {
     const m = setoresVisiveis({ can: () => true, isSuperAdmin: true, areasBloqueadas: ['/admin/revisao/cronograma'] })
     const ids = m.find((s) => s.id === 'pedagogico')!.abas.map((a) => a.id)
-    expect(ids).not.toContain('gerador-cronograma')
-    expect(ids).not.toContain('adaptativo')
+    expect(ids).not.toContain('cronogramas')
   })
   it('barra mostra SÓ os itens da aba ativa (1 nível)', () => {
     expect(barra('/admin/estudantes')).toEqual(['/admin/estudantes', '/admin/revisao/membros', '/admin/impersonation'])

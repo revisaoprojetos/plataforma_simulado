@@ -1,7 +1,10 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { useRouter } from 'next/navigation'
 import { BookOpen, Folder, FolderPlus, Loader2, Plus, Scale, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,6 +40,7 @@ export function ConteudosClient({
   pastaAtual: string | null
   disciplinas: { id: string; nome: string }[]
 }) {
+  const origem = useOrigem()
   const router = useRouter()
   const [aba, setAba] = useState<'disciplinas' | 'legproc'>('disciplinas')
   const [busca, setBusca] = useState('')
@@ -85,7 +89,7 @@ export function ConteudosClient({
     setOcupado(null)
     if (!r.ok || !r.id) return toast.error(r.error ?? 'Não foi possível criar.')
     toast.success('Conjunto criado')
-    router.push(`/admin/cronogramas/conteudos/${r.id}`)
+    router.push(comVoltar(`/admin/cronogramas/conteudos/${r.id}`, origem))
   }
 
   async function salvarPasta() {
@@ -124,23 +128,11 @@ export function ConteudosClient({
       {/* Sub-abas Disciplinas × LegProc na MESMA linha das ações (Nova pasta / Novo conjunto). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
-            {([['disciplinas', 'Disciplinas', nDisc], ['legproc', 'LegProc', nLeg]] as const).map(([v, rot, n]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setAba(v)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition',
-                  aba === v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {v === 'legproc' && <Scale className="h-3.5 w-3.5" />}
-                {rot}
-                <span className="text-xs text-muted-foreground">{n}</span>
-              </button>
-            ))}
-          </div>
+          <AbasLinhaControlada
+            valor={aba}
+            onChange={setAba}
+            itens={[{ valor: 'disciplinas', label: 'Disciplinas', badge: nDisc }, { valor: 'legproc', label: 'LegProc', badge: nLeg }]}
+          />
           {trilha.length > 0 && (
             <nav className="flex items-center gap-1 text-sm text-muted-foreground">
               {trilha.map((t, i) => (
@@ -204,7 +196,7 @@ export function ConteudosClient({
           {conjuntosFiltrados.map((c) => (
             <div key={c.id} className="group relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
               <span className="absolute inset-y-0 left-0 w-1" style={{ background: c.cor || 'var(--primary)' }} />
-              <Link href={`/admin/cronogramas/conteudos/${c.id}${aba === 'legproc' ? '?tipo=legproc' : ''}`} className="block">
+              <Link href={comVoltar(`/admin/cronogramas/conteudos/${c.id}${aba === 'legproc' ? '?tipo=legproc' : ''}`, origem)} className="block">
                 <div className="flex items-start justify-between gap-2">
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     {aba === 'legproc' ? <Scale className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}

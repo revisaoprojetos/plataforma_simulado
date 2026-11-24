@@ -124,6 +124,8 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
       titulo: sim.titulo,
       notaLiberada, gabaritoLiberado,
       refazerHref,
+      // Treinar erros → Banco de questões REAL já filtrado nas questões que o aluno errou neste simulado.
+      treinarErrosHref: questoes.some((q) => !q.anulada && q.errou > 0) ? `/aluno/questoes?erros_simulado=${id}` : null,
       melhor: {
         nota: melhorT?.nota ?? (melhor.nota != null ? Number(melhor.nota) : null),
         acertos: melhorT?.acertos ?? 0,

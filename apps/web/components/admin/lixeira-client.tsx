@@ -1,4 +1,5 @@
 'use client'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 import { useMemo, useState, useTransition } from 'react'
@@ -63,15 +64,9 @@ export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar item…" className="pl-8" />
         </div>
-        <div className="inline-flex flex-wrap rounded-xl border bg-muted/40 p-1">
-          {abas.map((a) => (
-            <button key={a.k} onClick={() => setAba(a.k)}
-              className={cn('rounded-lg px-3 py-1.5 text-sm font-medium transition-colors', aba === a.k ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-              {a.label} <span className="text-muted-foreground">({a.n})</span>
-            </button>
-          ))}
-        </div>
       </div>
+
+      <AbasLinha ativo={aba} itens={abas.map((a) => ({ key: a.k, label: a.label, badge: a.n, onClick: () => setAba(a.k) }))} />
 
       {filtrados.length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">

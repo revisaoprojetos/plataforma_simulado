@@ -1,6 +1,5 @@
-import { ListChecks } from 'lucide-react'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { SemPermissao } from '@/components/ui/alert-box'
-import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { buscarGrupos, carregarDuracoes, carregarVariantesAula } from './actions'
@@ -47,17 +46,8 @@ export default async function AuditoriaMetasPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <ListChecks className="h-6 w-6 text-primary" />
-          Auditoria de metas
-        </h1>
-        <p className="text-muted-foreground">
-          Onde as metas se contradizem entre cronogramas — e onde uma meta específica aparece.
-        </p>
-      </div>
+      <TituloTela titulo="Auditoria de metas" descricao="Onde as metas se contradizem entre cronogramas — e onde uma meta específica aparece." />
 
-      <CronogramaTabs />
 
       <MetasAuditoriaClient
         variantesIniciais={variantes.itens ?? []}

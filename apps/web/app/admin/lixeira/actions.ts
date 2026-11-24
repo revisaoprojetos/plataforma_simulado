@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softRestore, SOFT_DELETE_TABELAS, type SoftDeleteTabela } from '@/lib/soft-delete'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { bloquearSeTemVinculos } from '@/lib/conteudo/dependencias-documento'
 
 // tabela → { tipo exibido, coluna de rótulo (ou __sessao = composto Aluno — Simulado) }
@@ -49,46 +50,58 @@ export async function listarLixeira(): Promise<LixeiraItem[]> {
   type Cru = LixeiraItem & { _por: string | null }
   const crus: Cru[] = []
 
-  for (const tabela of SOFT_DELETE_TABELAS) {
+  // Teto por tabela (a lixeira é purgada em 30d, mas pode crescer): 200 mais recentes + sinal de "há mais".
+  const LIM = 200
+  await Promise.all(SOFT_DELETE_TABELAS.map(async (tabela) => {
     const cfg = CFG[tabela]
+    const local: Cru[] = []
     if (cfg.rotulo === '__sessao') {
       const { data } = await svc
         .from(tabela)
         .select('id, deletado_em, deletado_por, estudante_id, simulado_id')
-        .eq('tenant_id', tenant).eq('deletado', true).order('deletado_em', { ascending: false })
+        .eq('tenant_id', tenant).eq('deletado', true).order('deletado_em', { ascending: false }).order('id', { ascending: false }).limit(LIM)
       const rows = (data ?? []) as any[]
-      if (!rows.length) continue
-      const estIds = [...new Set(rows.map((r) => r.estudante_id).filter(Boolean))]
-      const simIds = [...new Set(rows.map((r) => r.simulado_id).filter(Boolean))]
-      const { data: ests } = estIds.length ? await svc.from('simulado_estudantes').select('id, nome').in('id', estIds) : { data: [] as any[] }
-      const { data: sims } = simIds.length ? await svc.from('simulado_simulados').select('id, titulo').in('id', simIds) : { data: [] as any[] }
-      const nomeEst = new Map((ests ?? []).map((e: any) => [e.id, e.nome]))
-      const tituloSim = new Map((sims ?? []).map((s: any) => [s.id, s.titulo]))
+      if (!rows.length) return
+      const estIds = [...new Set(rows.map((r) => r.estudante_id).filter(Boolean))] as string[]
+      const simIds = [...new Set(rows.map((r) => r.simulado_id).filter(Boolean))] as string[]
+      const [ests, sims] = await Promise.all([
+        fetchAllByIn<any>(estIds, (ch) => svc.from('simulado_estudantes').select('id, nome').in('id', ch).order('id', { ascending: true })),
+        fetchAllByIn<any>(simIds, (ch) => svc.from('simulado_simulados').select('id, titulo').in('id', ch).order('id', { ascending: true })),
+      ])
+      const nomeEst = new Map(ests.map((e: any) => [e.id, e.nome]))
+      const tituloSim = new Map(sims.map((s: any) => [s.id, s.titulo]))
       for (const r of rows) {
-        crus.push({ tabela, tipo: cfg.tipo, id: r.id, deletado_em: r.deletado_em, deletado_por_nome: null, _por: r.deletado_por ?? null,
+        local.push({ tabela, tipo: cfg.tipo, id: r.id, deletado_em: r.deletado_em, deletado_por_nome: null, _por: r.deletado_por ?? null,
           rotulo: `${nomeEst.get(r.estudante_id) ?? 'Aluno'} — ${tituloSim.get(r.simulado_id) ?? 'Simulado'}` })
       }
     } else {
       const { data, error } = await svc
         .from(tabela)
         .select(`id, deletado_em, deletado_por, ${cfg.rotulo}`)
-        .eq('tenant_id', tenant).eq('deletado', true).order('deletado_em', { ascending: false })
-      if (error) continue
+        .eq('tenant_id', tenant).eq('deletado', true).order('deletado_em', { ascending: false }).order('id', { ascending: false }).limit(LIM)
+      if (error) return
       for (const r of (data ?? []) as any[]) {
-        crus.push({ tabela, tipo: cfg.tipo, id: r.id, deletado_em: r.deletado_em, deletado_por_nome: null, _por: r.deletado_por ?? null,
+        local.push({ tabela, tipo: cfg.tipo, id: r.id, deletado_em: r.deletado_em, deletado_por_nome: null, _por: r.deletado_por ?? null,
           rotulo: String(r[cfg.rotulo] ?? '—').replace(/\s+/g, ' ').slice(0, 140) })
       }
     }
-  }
+    if (local.length >= LIM) local[local.length - 1].haMais = true
+    crus.push(...local)
+  }))
 
-  // Resolve "excluído por" → e-mail/nome do admin (auth), best-effort, uma vez por id.
+  // Resolve "excluído por" → nome/e-mail do admin: lote em simulado_users; só os ausentes vão ao Auth (em paralelo).
   const nome = new Map<string, string>()
-  for (const uid of [...new Set(crus.map((c) => c._por).filter(Boolean))] as string[]) {
+  const porIds = [...new Set(crus.map((c) => c._por).filter(Boolean))] as string[]
+  try {
+    const us = await fetchAllByIn<any>(porIds, (ch) => svc.from('simulado_users').select('id, nome, email').in('id', ch).order('id', { ascending: true }))
+    for (const u of us) if (u.nome || u.email) nome.set(u.id, u.nome ?? u.email)
+  } catch { /* cai no Auth */ }
+  await Promise.all(porIds.filter((uid) => !nome.has(uid)).map(async (uid) => {
     try {
       const { data } = await (svc as any).auth.admin.getUserById(uid)
       if (data?.user) nome.set(uid, data.user.user_metadata?.nome ?? data.user.email ?? uid)
     } catch { /* ignora */ }
-  }
+  }))
 
   return crus
     .map(({ _por, ...i }) => ({ ...i, deletado_por_nome: _por ? (nome.get(_por) ?? null) : null }))

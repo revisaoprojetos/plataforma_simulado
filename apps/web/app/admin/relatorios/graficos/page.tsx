@@ -2,7 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { RelatorioGraficoView } from './relatorio-grafico-view'
 import { montarRelatorioGrafico } from './_dados'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export default async function RelatorioGraficoPage() {
   const svc = await createServiceClient()
@@ -11,11 +11,7 @@ export default async function RelatorioGraficoPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Relatório Gráfico</h1>
-        <p className="text-muted-foreground">Visão geral da plataforma. Alterne a granularidade (dia/semana/mês/ano) nas séries temporais.</p>
-      </div>
-      <BarraSetorSlot />
+      <CabecalhoArea titulo="Relatório Gráfico" descricao="Visão geral da plataforma. Alterne a granularidade (dia/semana/mês/ano) nas séries temporais." />
       <RelatorioGraficoView d={dados} />
     </div>
   )

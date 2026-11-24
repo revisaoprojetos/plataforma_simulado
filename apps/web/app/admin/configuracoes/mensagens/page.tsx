@@ -1,6 +1,6 @@
 import { getAllTenantMensagens, getTenantContato } from '@/lib/tenant-messages'
 import { MensagensEditor } from '@/components/admin/mensagens-editor'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export default async function MensagensPage() {
   const [mensagens, contato] = await Promise.all([
@@ -10,14 +10,10 @@ export default async function MensagensPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mensagens e contatos</h1>
-        <p className="text-muted-foreground">
-          Personalize os textos exibidos ao aluno e os canais de suporte da plataforma.
-        </p>
-      </div>
-
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Mensagens e contatos"
+        descricao="Personalize os textos exibidos ao aluno e os canais de suporte da plataforma."
+      />
       <MensagensEditor mensagens={mensagens} contato={contato} />
     </div>
   )

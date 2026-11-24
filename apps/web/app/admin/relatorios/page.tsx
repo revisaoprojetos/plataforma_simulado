@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { PieChart, ClipboardList, BookOpen, GraduationCap, Trophy, Users, ArrowRight, BarChart3 } from 'lucide-react'
+import { PieChart, ClipboardList, BookOpen, GraduationCap, Trophy, Users, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 type Tom = 'primary' | 'amber'
 
@@ -22,17 +22,8 @@ const TOM: Record<Tom, { accent: string; chip: string; glow: string }> = {
 export default function RelatoriosPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <BarChart3 className="h-5 w-5" />
-        </span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Análise &amp; Relatórios</h1>
-          <p className="text-muted-foreground">Desempenho da plataforma, simulados, disciplinas e estudantes — em gráficos e exportável.</p>
-        </div>
-      </div>
+      <CabecalhoArea titulo="Análise & Relatórios" descricao="Desempenho da plataforma, simulados, disciplinas e estudantes — em gráficos e exportável." />
 
-      <BarraSetorSlot />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {areas.map((card) => {
           const tom = TOM[card.tom]

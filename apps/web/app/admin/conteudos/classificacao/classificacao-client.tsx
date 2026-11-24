@@ -16,6 +16,7 @@ import {
   Check, ChevronRight, Info, MapPin, Palette, Link2, Copy, FolderInput, Eye,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -283,24 +284,10 @@ export function ClassificacaoClient({
       />
 
       {/* Sub-abas (tab de linha / sublinhado — padrão do admin) */}
-      <div className="flex flex-wrap items-center gap-1 overflow-x-auto border-b">
-        {TABS.map((t) => {
-          const ativo = t.aba === aba
-          const TabIcon = t.icon
-          return (
-            <Link
-              key={t.aba}
-              href={`/admin/conteudos/classificacao?aba=${t.aba}`}
-              className={cn(
-                '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                ativo ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
-              )}
-            >
-              <TabIcon className="h-4 w-4 shrink-0" /> {t.label}
-            </Link>
-          )
-        })}
-      </div>
+      <AbasLinha
+        ativo={aba}
+        itens={TABS.map((t) => ({ key: t.aba, label: t.label, href: `/admin/conteudos/classificacao?aba=${t.aba}` }))}
+      />
 
       {/* Master-detail: tabela à esquerda, painel de detalhe à direita */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

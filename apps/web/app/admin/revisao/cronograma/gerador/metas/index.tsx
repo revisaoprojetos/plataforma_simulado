@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { RevisaoAbas } from '@/components/admin/revisao/ui'
 import { checkPermission } from '@/lib/auth/permissions'
@@ -7,7 +8,7 @@ import { carregarDuracoes, carregarVariantesAula, buscarGrupos } from '@/app/adm
 import {
   idsTiposEmOrdem, montarQsGerador, paginaGerador, paginarDuracoes, paginarTipos, paginarVariantes, porPaginaGerador, termoSeguro,
 } from '@/lib/revisao/gerador/metas'
-import { BarraBusca, Nota, Pilula, ThFixo, ThOrd } from '../../../_comp/lista'
+import { BarraBusca, Nota, Pilula, ThFixo, ThOrd, hrefCom } from '../../../_comp/lista'
 import { TabelaCron } from '../../tabela-cron'
 import { AcoesTipo, NovoTipo } from './tipos-acoes'
 import { OndeMeta, PadronizarDisciplina, UniformizarDuracao } from './auditoria-acoes'
@@ -17,10 +18,11 @@ import { OndeMeta, PadronizarDisciplina, UniformizarDuracao } from './auditoria-
 
 type Vista = 'tipos' | 'aula' | 'duracao' | 'buscar'
 const VISTAS: Vista[] = ['tipos', 'aula', 'duracao', 'buscar']
-const PRESERVAR = ['aba', 'sub', 'vista', 'ord', 'dir', 'pps']
+const PRESERVAR = ['aba', 'sub', 'v', 'vista', 'ord', 'dir', 'pps']
 
 export default async function GeradorMetas({ sp, tenantId, basePath }: { sp: Record<string, string | string[] | undefined>; tenantId: string; basePath: string }) {
   const { path, qs } = montarQsGerador(sp, basePath)
+  const origem = hrefCom(path, qs)
   const vista: Vista = VISTAS.includes(qs.vista as Vista) ? (qs.vista as Vista) : 'tipos'
   const podeEditar = await checkPermission('cronogramas:update')
   const por = porPaginaGerador(qs.pps)
@@ -111,7 +113,7 @@ export default async function GeradorMetas({ sp, tenantId, basePath }: { sp: Rec
           <TabelaCron tipo="leitura" podeEditar={podeEditar} colunas={5} total={r.total} page={pagina} pp={por} vazio={todas.length ? 'Nada encontrado com esses filtros.' : 'Tudo em ordem: nenhuma duração se contradizendo.'}
             head={<><ThOrd rotulo="Cronograma" col="cron" base={path} qs={qs} /><ThOrd rotulo="Semana" col="semana" base={path} qs={qs} /><ThOrd rotulo="Tipo" col="tipo" base={path} qs={qs} /><ThOrd rotulo="Metas" col="total" base={path} qs={qs} /><ThFixo>Uniformizar para</ThFixo></>}
             rows={r.linhas.map((d) => ({ id: `${d.cronograma_id}:${d.semana}:${d.tipo}`, cells: [
-              <Link key="c" href={`/admin/cronogramas/${d.cronograma_id}?semana=${d.semana}`} className="block max-w-[20rem] truncate font-medium hover:underline" title={d.cronograma_nome}>{d.cronograma_nome}</Link>,
+              <Link key="c" href={comVoltar(`/admin/cronogramas/${d.cronograma_id}?semana=${d.semana}`, origem)} className="block max-w-[20rem] truncate font-medium hover:underline" title={d.cronograma_nome}>{d.cronograma_nome}</Link>,
               <span key="s" className="tabular-nums">{d.semana}</span>,
               <Pilula key="t">{d.tipo}</Pilula>,
               <span key="m" className="tabular-nums">{d.total}</span>,
@@ -131,7 +133,7 @@ export default async function GeradorMetas({ sp, tenantId, basePath }: { sp: Rec
     corpo = (
       <>
         <Nota>Consulta: veja em quais cronogramas uma meta aparece. É normal a mesma aula servir a vários cronogramas — isto não é um problema. A busca começa vazia, esperando a pergunta (mín. 2 letras ou algum filtro).</Nota>
-        <BarraBusca base={path} qs={qs} preservar={['aba', 'sub', 'vista', 'pps']} placeholder="Buscar por disciplina, conteúdo ou aula" filtros={[
+        <BarraBusca base={path} qs={qs} preservar={['aba', 'sub', 'v', 'vista', 'pps']} placeholder="Buscar por disciplina, conteúdo ou aula" filtros={[
           { nome: 'tipo', rotulo: 'Todos os tipos', opcoes: tipos.map((t) => ({ v: t.slug, l: t.nome })) },
           { nome: 'minc', rotulo: 'Em qualquer cronograma', opcoes: [2, 3, 5, 10].map((k) => ({ v: String(k), l: `Em ${k}+ cronogramas` })) },
         ]} />
@@ -154,12 +156,14 @@ export default async function GeradorMetas({ sp, tenantId, basePath }: { sp: Rec
 
   return (
     <>
-      <RevisaoAbas base={path} param="vista" atual={vista} extra={{ aba: qs.aba, sub: qs.sub }} abas={[
-        { id: 'tipos', titulo: 'Tipos de meta', contagem: contagem.tipos },
-        { id: 'aula', titulo: 'Auditoria: formato de aula', contagem: contagem.aula },
-        { id: 'duracao', titulo: 'Auditoria: durações', contagem: contagem.duracao },
-        { id: 'buscar', titulo: 'Buscar metas' },
-      ]} />
+      {/* "Tipos de meta" × "Auditoria de metas" = sub-abas da CronogramasNav; aqui só as vistas internas da auditoria. */}
+      {vista !== 'tipos' && (
+        <RevisaoAbas base={path} param="vista" atual={vista} extra={{ aba: qs.aba, sub: qs.sub, v: qs.v }} abas={[
+          { id: 'aula', titulo: 'Formato de aula', contagem: contagem.aula },
+          { id: 'duracao', titulo: 'Durações', contagem: contagem.duracao },
+          { id: 'buscar', titulo: 'Buscar metas' },
+        ]} />
+      )}
       {corpo}
     </>
   )

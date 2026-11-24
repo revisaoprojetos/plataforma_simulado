@@ -1,12 +1,11 @@
 'use client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useCan } from '@/components/auth/can-provider'
 import { RotuloMenu, type SidebarRotulosAdmin } from '@/lib/sidebar-rotulos'
-import { SETORES, resolverRota, setoresVisiveis, itensDaBarra } from '@/lib/admin/setores'
+import { SETORES, resolverRota, setoresVisiveis, itensDaBarra, hrefAtivoDaRota } from '@/lib/admin/setores'
 
 /**
  * ABAS INTERNAS da entrada atual da sidebar — renderizada pelo `<BarraSetorSlot />` (barra-setor-slot.tsx), que cada
@@ -33,29 +32,18 @@ export function BarraSetor({ isSuperAdmin = false, areasBloqueadas = [], rotulos
   // O que o usuário PODE ver (permissão, flags, super-only, manutenção).
   const itens = itensDaBarra(rota, setoresVisiveis({ can, isSuperAdmin, areasBloqueadas }, SETORES))
   if (!rota || !itens || duplicada) return null
+  const hrefAtivo = hrefAtivoDaRota(rota) // alias (rota antiga) acende o item visível indicado em `alvo`
 
   return (
     <nav ref={ref} data-barra-setor aria-label={`Abas de ${rota.aba.label}`} className="mb-1 print:hidden">
-      <div role="tablist" className="flex w-fit max-w-full items-center gap-x-7 overflow-x-auto border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {itens.map((item) => {
-          const ativo = rota.item.href === item.href
-          return (
-            <Link
-              key={item.href}
-              role="tab"
-              aria-selected={ativo}
-              aria-current={ativo ? 'page' : undefined}
-              href={item.href}
-              className={cn(
-                '-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2.5 pt-1 text-[14px] tracking-[-0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
-                ativo ? 'border-primary font-extrabold text-foreground' : 'border-transparent font-semibold text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <RotuloMenu map={rotulos?.itens} chave={item.href} fallback={item.label} ativo={ativo} />
-            </Link>
-          )
-        })}
-      </div>
+      <AbasLinha
+        ativo={hrefAtivo}
+        itens={itens.map((item) => ({
+          key: item.href,
+          href: item.href,
+          label: <RotuloMenu map={rotulos?.itens} chave={item.href} fallback={item.label} ativo={hrefAtivo === item.href} />,
+        }))}
+      />
     </nav>
   )
 }

@@ -1,5 +1,6 @@
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import { getConfigGlobal } from '@/lib/config-global'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { EntradaForm } from '@/components/admin/entrada-form'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,7 +13,7 @@ export default async function EntradaPage() {
   if (!(await isSuperAdmin())) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Entrada</h1>
+        <CabecalhoArea titulo="Entrada" semBarraSetor />
         <SemPermissao>Área exclusiva do super-administrador global.</SemPermissao>
       </div>
     )
@@ -22,13 +23,10 @@ export default async function EntradaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Entrada neutra</h1>
-        <p className="text-muted-foreground">
-          Aparência e comportamento da tela de login — igual para todas as plataformas, sem preferência por nenhuma.
-          Os logos de cada plataforma continuam aparecendo nos cards de seleção.
-        </p>
-      </div>
+      <CabecalhoArea
+        titulo="Entrada neutra"
+        descricao="Aparência e comportamento da tela de login — igual para todas as plataformas, sem preferência por nenhuma. Os logos de cada plataforma continuam aparecendo nos cards de seleção."
+      />
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as never]: '0px' }}>
         <SecaoHeader icon={LogIn} titulo="Tela de login" subtitulo="Layout, seletor de plataforma e marca neutra." />

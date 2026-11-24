@@ -6,6 +6,7 @@
 // Reusa as actions de produção (salvarProdutoAction/salvarGruposAction/...) e as tabelas novas do currículo.
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Boxes, Copy, FolderInput, Trash2, MoreVertical, Eye, Check, ChevronDown, Wrench, Loader2, Save, Globe,
@@ -251,16 +252,7 @@ export function ProdutoEstudioClient({
         </div>
 
         {/* Abas sublinhadas */}
-        <div className="flex gap-4 overflow-x-auto border-b">
-          {abas.map(([k, label, n]) => (
-            <button key={k} type="button" onClick={() => trocarAba(k)}
-              className={cn('-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-1 pb-2.5 text-sm font-medium transition-colors',
-                aba === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-              {label}
-              {n !== null && <span className={cn('rounded-full px-1.5 py-0.5 text-[11px] tabular-nums', aba === k ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{n}</span>}
-            </button>
-          ))}
-        </div>
+        <AbasLinha ativo={aba} itens={abas.map(([k, label, n]) => ({ key: k, label, badge: n !== null ? n : undefined, onClick: () => trocarAba(k) }))} />
       </div>
 
       {/* Atalho cruzado: as telas que editam regras apontam para o mapa único */}

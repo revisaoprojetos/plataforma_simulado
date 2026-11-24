@@ -1,4 +1,5 @@
-import { LayoutDashboard, Palette } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { LayoutDashboard } from 'lucide-react'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 
 // A edição visual (identidade, cores/tema, seleção, carregamento, avançado) foi MIGRADA para o
@@ -8,13 +9,10 @@ export default async function ConfiguracoesPage() {
   const sup = await isSuperAdmin()
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Palette className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Aparência da plataforma</h1>
-          <p className="text-muted-foreground">A edição visual foi centralizada no Console de administração.</p>
-        </div>
-      </div>
+      <CabecalhoArea
+        titulo="Aparência da plataforma"
+        descricao="A edição visual foi centralizada no Console de administração."
+      />
 
       <div className="rounded-2xl border bg-card p-6 shadow-sm">
         <p className="text-sm text-foreground/90">

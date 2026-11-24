@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { redirect } from 'next/navigation'
 import {
-  ExternalLink, CreditCard, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown,
+  ExternalLink, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown,
   Users, TrendingUp, AlertTriangle, Target, CheckCircle2, ClipboardList, Library,
 } from 'lucide-react'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
@@ -62,13 +62,10 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
   ])
 
   const header = (
-    <>
-    <div>
-      <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><CreditCard className="h-6 w-6 text-primary" /> Assinaturas &amp; Engajamento</h1>
-      <p className="text-muted-foreground">Quem é <b>recorrente</b> (está numa assinatura ativa) × quem está <b>engajado</b> — por área. Identifica risco de cancelamento e oportunidades de conversão.</p>
-    </div>
-    <BarraSetorSlot />
-    </>
+    <CabecalhoArea
+      titulo="Assinaturas & Engajamento"
+      descricao={<>Quem é <b>recorrente</b> (está numa assinatura ativa) × quem está <b>engajado</b> — por área. Identifica risco de cancelamento e oportunidades de conversão.</>}
+    />
   )
 
   if (lista.sqlOff || !k) {

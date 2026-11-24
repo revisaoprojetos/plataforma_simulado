@@ -10,7 +10,10 @@ import {
   type CfgLiberacao, type MotivoLiberacao,
 } from '@/lib/cronograma/adaptativo/liberacao'
 
-import { esquecer } from '@/lib/cache/relatorio-cache'
+import { esquecer, remember } from '@/lib/cache/relatorio-cache'
+import { sqlQuery } from '@/lib/data/sql'
+import { fetchAll } from '@/lib/supabase/fetch-all'
+import { chaveIntegridade, chaveEstadoIntegridade } from '@/lib/cronograma/adaptativo/integridade-admin'
 import { lerPoliticaDownload, salvarPoliticaDownload } from '@/lib/conteudo/politica-download'
 import { listarDownloads, resumoDownloads, detalheDownloads, type FiltroDownloads, type VisaoDownloads, type LinhaDownloads, type ResumoDownloads, type AlunoNoConteudo, type EventoDownload } from '@/lib/conteudo/download-analise'
 import { lerCfgMetas, lerDiscSemTipo, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
@@ -30,6 +33,26 @@ async function acesso(acao: 'view' | 'update') {
   return { tenantId: a.tenantId, userId: a.userId ?? null }
 }
 
+/** Alunos DISTINTOS com plano ativo (não arquivado, não exemplo). SQL count(distinct) — o select + Set em JS truncava em 1000 linhas. Cache 5 min por tenant. */
+async function contarAlunosComPlano(svc: ReturnType<typeof createAdminClient>, tenantId: string): Promise<number> {
+  return remember<number>(`crono-alunos-com-plano:${tenantId}`, 300, async () => {
+    const r = await sqlQuery<{ n: string }>(
+      `SELECT count(DISTINCT estudante_id)::text AS n FROM simulado_cronograma_adaptativo_plano WHERE tenant_id = $1 AND arquivada = false AND exemplo = false`, [tenantId])
+    if (r) return Number(r[0]?.n ?? 0)
+    const rows = await fetchAll<{ id: string; estudante_id: string }>(
+      () => svc.from('simulado_cronograma_adaptativo_plano').select('id,estudante_id').eq('tenant_id', tenantId).eq('arquivada', false).eq('exemplo', false).order('id', { ascending: true }), 1000, 'crono:alunos-com-plano')
+    return new Set(rows.map((p) => p.estudante_id)).size
+  })
+}
+
+/** Reauditar agora (cronogramas:update): descarta o cache da auditoria de integridade; a próxima leitura recalcula. */
+export async function reauditarIntegridade(): Promise<{ ok: boolean; error?: string }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  await esquecer(chaveIntegridade(g.tenantId)).catch(() => {})
+  await esquecer(chaveEstadoIntegridade(g.tenantId)).catch(() => {})
+  revalidatePath('/admin/cronogramas/adaptativo/integridade')
+  return { ok: true }
+}
 
 export async function obterPainelLiberacao(): Promise<{ ok: boolean; error?: string; painel?: PainelLiberacao }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
@@ -38,10 +61,10 @@ export async function obterPainelLiberacao(): Promise<{ ok: boolean; error?: str
     const [cfg, mapa, planos, grp] = await Promise.all([
       lerCfgLiberacao(svc, g.tenantId),
       mapaDocsCronograma(svc, g.tenantId),
-      svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
+      contarAlunosComPlano(svc, g.tenantId),
       svc.from('simulado_grupos').select('id, nome').eq('tenant_id', g.tenantId).order('nome', { ascending: true }).limit(1000),
     ])
-    const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
+    const alunosComPlano = planos
     let alunosExcecao: PainelLiberacao['alunosExcecao'] = []
     if (cfg.alunos.length) {
       const { data } = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', g.tenantId).in('id', cfg.alunos)
@@ -92,7 +115,7 @@ export async function obterEditorCatalogo(): Promise<{ ok: boolean; error?: stri
     const [c, row, planos, tab] = await Promise.all([
       carregarConteudoBancoBase(svc, g.tenantId),
       lerOverrideRow(svc, g.tenantId),
-      svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
+      contarAlunosComPlano(svc, g.tenantId),
       svc.from('simulado_cronograma_adaptativo_catalogo').select('tenant_id').limit(1),
     ])
     const baseAS = c.base?.AS ?? c.AS, baseOrdem = c.base?.ordem ?? c.ordem ?? baseAS.map((_, i) => i), baseLP = c.base?.LP ?? c.LP ?? []
@@ -123,7 +146,7 @@ export async function obterEditorCatalogo(): Promise<{ ok: boolean; error?: stri
     const lp: EditorLpBase[] = baseLP.map((x) => { const p = partirTexto(x.texto); return { id: x.id, disc: x.disc, leiNome: p.leiNome, trecho: p.trecho, doc: x.doc ?? null, origem: origemLei.get(x.id) ?? null } })
     const nomes = new Set<string>(); const disciplinas: string[] = []
     for (const n of [...c.disciplinas.map((d) => d.nome), ...aulas.map((a) => a.disc), ...lp.map((l) => l.disc)]) { const k = chaveDisciplina(n); if (!nomes.has(k)) { nomes.add(k); disciplinas.push(n) } }
-    const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
+    const alunosComPlano = planos
     return {
       ok: true,
       editor: {
@@ -157,10 +180,10 @@ export async function salvarEditorCatalogo(draft: unknown, versaoBase: number): 
       antes: { versao: antes?.versao ?? 0, itens: Object.keys(antes?.dados.aulas ?? {}).length + (antes?.dados.novas.length ?? 0) + Object.keys(antes?.dados.lp ?? {}).length + (antes?.dados.lpNovas.length ?? 0) },
       depois: { versao: r.versao, itens: Object.keys(ov.aulas).length + ov.novas.length + Object.keys(ov.lp).length + ov.lpNovas.length },
     }).catch(() => {})
-    const { data } = await svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false)
+    await esquecer(`crono-alunos-com-plano:${g.tenantId}`).catch(() => {})
     await esquecer(`crono-catalogo-diag:${g.tenantId}`).catch(() => {})
     revalidatePath('/admin/cronogramas/adaptativo/catalogo')
-    return { ok: true, versao: r.versao, alunosComPlano: new Set(((data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size }
+    return { ok: true, versao: r.versao, alunosComPlano: await contarAlunosComPlano(svc, g.tenantId) }
   } catch (e) {
     return { ok: false, error: (e as Error)?.message || 'Falha ao salvar o catálogo.' }
   }
@@ -175,10 +198,10 @@ export async function obterPainelMetas(): Promise<{ ok: boolean; error?: string;
     const [cfg, discSemTipo, planos] = await Promise.all([
       lerCfgMetas(svc, g.tenantId),
       lerDiscSemTipo(svc, g.tenantId),
-      svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
+      contarAlunosComPlano(svc, g.tenantId),
     ])
     const { atualizadoEm, atualizadoPor: _a, ...params } = cfg
-    const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
+    const alunosComPlano = planos
     const a = await getCurrentAccess()
     const podeEditar = a.isAdmin || a.permissions.includes('*') || a.permissions.includes('cronogramas:update')
     return { ok: true, painel: { params, padrao: PARAMS_PADRAO, atualizadoEm: atualizadoEm ?? null, alunosComPlano, discSemTipo, podeEditar } }
@@ -232,11 +255,17 @@ export async function obterEstadoEspelho(): Promise<EstadoEspelho> {
   const vazio: EstadoEspelho = { ok: false, migrado: true, planos: 0, espelhados: 0, linhas: 0 }
   const g = await acesso('view'); if (!g) return { ...vazio, error: 'Sem permissão.' }
   const svc = createAdminClient()
-  const pl = await svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('exemplo', false)
-  const es = await svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('exemplo', false).not('grade_espelhada_hash', 'is', null)
-  if (es.error) return { ...vazio, ok: true, migrado: false, planos: pl.count ?? 0 }
-  const li = await svc.from('simulado_cronograma_adaptativo_plano_meta').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId)
-  return { ok: true, migrado: !li.error, planos: pl.count ?? 0, espelhados: es.count ?? 0, linhas: li.count ?? 0 }
+  const tenantId = g.tenantId
+  // 3 counts em paralelo + cache de 5 min por tenant (o count em plano_meta, 1,48 mi linhas, levava ~7 s). Erro (migração pendente) não é cacheado como sucesso longo: o fluxo é o mesmo, só mais rápido.
+  return remember<EstadoEspelho>(`crono-espelho-estado:${tenantId}`, 300, async () => {
+    const [pl, es, li] = await Promise.all([
+      svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('exemplo', false),
+      svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('exemplo', false).not('grade_espelhada_hash', 'is', null),
+      svc.from('simulado_cronograma_adaptativo_plano_meta').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+    ])
+    if (es.error) return { ...vazio, ok: true, migrado: false, planos: pl.count ?? 0 }
+    return { ok: true, migrado: !li.error, planos: pl.count ?? 0, espelhados: es.count ?? 0, linhas: li.count ?? 0 }
+  })
 }
 
 /** Espelha um LOTE de planos (preenchimento inicial). Chamar de novo até `restantes = 0`. */
@@ -245,6 +274,7 @@ export async function espelharPlanosLote(): Promise<{ ok: boolean; error?: strin
   const { espelharLote } = await import('@/lib/cronograma/adaptativo/plano-metas')
   const r = await espelharLote(createAdminClient(), g.tenantId, 20)
   if (!r.ok) return { ok: false, error: r.motivo === 'migracao_pendente' ? 'Aplique a migração 20261105050000_cronograma_adaptativo_plano_meta.sql no Supabase.' : (r.motivo || 'Falha ao espelhar.') }
+  await esquecer(`crono-espelho-estado:${g.tenantId}`).catch(() => {})
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cronograma_adaptativo_plano_meta', entidadeId: g.tenantId, tenantId: g.tenantId, atorId: g.userId, depois: { espelhados: r.processados, linhas: r.linhas } }).catch(() => {})
   return { ok: true, processados: r.processados, linhas: r.linhas, restantes: r.restantes }
 }

@@ -201,9 +201,9 @@ html.theme-anim *::after {
 /* ABAS ligadas aos controles do console: "Fundo da tab ativa" (--tab-active) = cor do sublinhado
    ativo; "Texto da tab ativa" (--tab-active-foreground) = texto do ativo. Fallback p/ a primária →
    tenant que NÃO configurar fica idêntico a antes. Centraliza aqui (a base ui/tabs.tsx não fixa mais
-   bg-primary/text-primary). "Fundo das tabs" (--tab-bg) só se aplica a abas estilo pílula (n/a no
+   bg-primary/text-primary). O sublinhado é o border-b-2 do próprio trigger (sem indicador deslizante). "Fundo das tabs" (--tab-bg) só se aplica a abas estilo pílula (n/a no
    sublinhado padrão). */
-[data-slot="tabs-indicator"] { background-color: var(--tab-active, var(--primary)); }
+[data-slot="tabs-trigger"][data-active] { border-color: var(--tab-active, var(--primary)); }
 /* Aba SUBLINHADA: texto ativo = "Texto da tab ativa" (--tab-active-foreground), fallback p/ o destaque.
    (As abas PÍLULA usam --tab-active-contrast — contraste garantido do preenchimento.) */
 [data-slot="tabs-trigger"][data-active] { color: var(--tab-active-foreground, var(--tab-active, var(--primary))); }

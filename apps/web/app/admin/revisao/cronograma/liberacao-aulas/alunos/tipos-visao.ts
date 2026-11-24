@@ -11,5 +11,5 @@ export interface PropsVisao {
   pathname: string
   podeEditar: boolean
 }
-export const PRESERVAR = ['aba', 'sub', 'produto', 'vis']
+export const PRESERVAR = ['aba', 'sub', 'v', 'produto', 'vis']
 export const CAMPO = 'h-9 rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'

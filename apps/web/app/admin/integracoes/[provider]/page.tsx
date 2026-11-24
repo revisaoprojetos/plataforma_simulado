@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, CreditCard, DownloadCloud } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -23,21 +24,17 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Integrações</h1>
+        <CabecalhoArea titulo="Integrações" semBarraSetor />
         <SemPermissao>Sem permissão.</SemPermissao>
       </div>
     )
   }
 
   const meta = PROVIDER_META[prov]
-  const IconeProvider = prov === 'guru' ? CreditCard : DownloadCloud
   const header = (
     <div>
       <Link href="/admin/integracoes" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Integrações</Link>
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: meta.cor }}><IconeProvider className="h-5 w-5" /></span>
-        <h1 className="text-2xl font-bold tracking-tight">{meta.nome}</h1>
-      </div>
+      <CabecalhoArea titulo={meta.nome} />
     </div>
   )
 

@@ -1,32 +1,35 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, Info } from 'lucide-react'
 import { obterCatalogoMotor, obterEditorCatalogo } from '../actions'
 import { obterFiltrosQf } from '../qf-actions'
 import { CatalogoEditor } from './catalogo-editor'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { cn } from '@/lib/utils'
+import { EsqueletoTela } from '@/components/admin/cronograma/esqueleto-tela'
 
 export const dynamic = 'force-dynamic'
 
 // Admin: Cronograma Adaptativo — Catálogo de metas: edição de aulas, links de questões e LegProc (+ diagnóstico do que o motor usa).
-export default async function CatalogoMetasPage() {
-  const [ed, r, filtrosQf] = await Promise.all([obterEditorCatalogo(), obterCatalogoMotor(), obterFiltrosQf()])
-  const c = r.catalogo
+export default function CatalogoMetasPage() {
   return (
     <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Catálogo de metas</h1>
-        <p className="text-muted-foreground">
-          Cadastre e ajuste as aulas (títulos, páginas e links de questões) e as metas de LegProc por disciplina. Ao salvar, os cronogramas dos alunos
+      <TituloTela titulo="Catálogo de metas" descricao={<>Cadastre e ajuste as aulas (títulos, páginas e links de questões) e as metas de LegProc por disciplina. Ao salvar, os cronogramas dos alunos
           são atualizados preservando o que já foi concluído. Os documentos em si continuam na{' '}
-          <Link href="/admin/biblioteca" className="text-primary underline-offset-2 hover:underline">Biblioteca</Link>.
-        </p>
-      </div>
-      <AdaptativoTabs />
+          <Link href="/admin/biblioteca" className="text-primary underline-offset-2 hover:underline">Biblioteca</Link>.</>} />
       <div className="text-sm">
         <Link href="/admin/cronogramas/adaptativo/catalogo/paginas" className="text-primary underline-offset-2 hover:underline">Divergência de páginas (planilha × Biblioteca) e recontagem →</Link>
       </div>
+      <Suspense fallback={<EsqueletoTela linhas={8} />}><CorpoCatalogo /></Suspense>
+    </div>
+  )
+}
 
+async function CorpoCatalogo() {
+  const [ed, r, filtrosQf] = await Promise.all([obterEditorCatalogo(), obterCatalogoMotor(), obterFiltrosQf()])
+  const c = r.catalogo
+  return (
+    <div className="space-y-4">
       {c && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-2xl border bg-card px-4 py-2.5 text-sm">
           {[['disciplinas', c.totais.disciplinas], ['aulas ativas', c.totais.aulas], ['metas de LegProc', c.totais.legprocMetas], ['leis', c.totais.leis]].map(([t, v]) => (

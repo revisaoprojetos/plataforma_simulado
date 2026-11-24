@@ -10,6 +10,7 @@ import { softDelete } from '@/lib/soft-delete'
 import { rankearSimulado } from '@/lib/ranking'
 import { invalidarRelatorios, remember, chaveRelatorio, esquecer } from '@/lib/cache/relatorio-cache'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { sqlQuery } from '@/lib/data/sql'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
@@ -130,17 +131,33 @@ export async function kpisEstudantes(): Promise<KpisEstudantes> {
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
   return remember(chaveRelatorio(tenantId, 'estudantes-kpis'), 300, async () => {
     const svc = await createServiceClient()
-    const [{ count: totalRaw }, { count: totalPass }, { count: totalFeitos }, sess, { data: acessos }] = await Promise.all([
+    // ATIVOS = alunos distintos com sessão finalizada: count(distinct) no banco; fallback = varredura (antigo).
+    const ativosSql = async (): Promise<number> => {
+      const rows = await sqlQuery<{ n: number }>(
+        `SELECT count(DISTINCT estudante_id)::int AS n FROM simulado_sessoes_prova
+          WHERE tenant_id = $1 AND status = 'finalizada' AND is_teste = false AND deletado = false AND estudante_id IS NOT NULL`,
+        [tenantId],
+      )
+      if (rows !== null) return Number(rows[0]?.n ?? 0)
+      const sess = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_sessoes_prova').select('estudante_id').eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false).order('id', { ascending: true }))
+      return new Set(sess.map((s) => s.estudante_id)).size
+    }
+    const [{ count: totalRaw }, { count: totalPass }, { count: totalFeitos }, ativos, { data: acessos }] = await Promise.all([
       svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId),
       svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId).eq('classificacao', 'passaporte'),
       svc.from('simulado_sessoes_prova').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
-      fetchAll<{ estudante_id: string }>(() => svc.from('simulado_sessoes_prova').select('estudante_id').eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false).order('estudante_id', { ascending: true })),
+      ativosSql(),
       svc.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tenantId).eq('ativo', true).neq('role', 'estudante'),
     ])
-    const ativos = new Set(sess.map((s) => s.estudante_id)).size
     const staffIds = [...new Set((acessos ?? []).map((a: any) => a.user_id).filter(Boolean))] as string[]
     const adminSet = new Set<string>()
-    await Promise.all(staffIds.map(async (uid) => { try { const { data } = await svc.auth.admin.getUserById(uid); const e = data?.user?.email?.toLowerCase(); if (e) adminSet.add(e) } catch { /* auth indisponível */ } }))
+    // E-mails em LOTE via simulado_users; só os ids ausentes caem no Auth (getUserById).
+    const faltam = new Set(staffIds)
+    try {
+      const us = await fetchAllByIn<{ id: string; email: string | null }>(staffIds, (ch) => svc.from('simulado_users').select('id, email').in('id', ch).order('id', { ascending: true }))
+      for (const u of us) { if (u.email) { adminSet.add(u.email.toLowerCase()); faltam.delete(u.id) } }
+    } catch { /* tabela indisponível: cai tudo no Auth */ }
+    await Promise.all([...faltam].map(async (uid) => { try { const { data } = await svc.auth.admin.getUserById(uid); const e = data?.user?.email?.toLowerCase(); if (e) adminSet.add(e) } catch { /* auth indisponível */ } }))
     const adminEmails = [...adminSet]
     let adminEstudantes = 0
     if (adminEmails.length) { const { count } = await svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId).in('email', adminEmails); adminEstudantes = count ?? 0 }

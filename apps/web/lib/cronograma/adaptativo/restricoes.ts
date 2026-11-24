@@ -33,6 +33,11 @@ export interface CtxRestricao {
 
 const famDe = (id: string): string => familiaDoTipo(id.split(':')[0])
 const ehVariante = (id: string): boolean => /:(revisao|reforco|hist):/.test(id)
+/** Dia da semana de uma data ISO: 0 = segunda … 6 = domingo. */
+export function diaSemanaISO(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+}
 export function somaDiasISO(iso: string, n: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
@@ -50,6 +55,7 @@ export function restricaoQueBloqueia(restricoes: readonly RestricaoRegra[], id: 
   for (const r of restricoes) {
     if (!r.ativa) continue
     if (r.faixas.length && !r.faixas.includes(ctx.faixa)) continue
+    if (r.dias && r.dias.length && !r.dias.includes(diaSemanaISO(d))) continue
     switch (r.tipo) {
       case 'max_por_dia': {
         if (F !== r.tipoA) break
@@ -105,6 +111,7 @@ export function detectarConflitosRestricoes(restricoes: readonly RestricaoRegra[
     if (r.tipo === 'depois_de' && [r.tipoA, r.tipoB].some((f) => f === 'lp' || f === 'jp')) erros.push('"Depois de" só vale entre PDFull, PDFlash e Questões (LegProc e Jurisprudência não têm ordem por conteúdo).')
     if (r.tipo === 'so_na_sobra' && r.tipoA === 'pf') erros.push('PDFull não pode ser "só na sobra do dia": a leitura é o que abre o dia e o plano não fecharia.')
     if (r.tipo === 'nao_dias_seguidos' && r.tipoA === 'pf') avisos.push('PDFull "não em dias seguidos" pode impedir que a leitura caiba na semana (o motor então não gera o plano).')
+    if (r.tipo === 'max_por_dia' && r.valor === 0 && r.tipoA === 'pf' && !(r.dias && r.dias.length && r.dias.length < 7)) erros.push('PDFull "no máximo 0 por dia" em todos os dias impede qualquer leitura: o plano não seria gerado.')
     if (r.tipo === 'max_por_dia' && r.tipoA === 'jp') avisos.push('Jurisprudência já é no máximo 1 por semana; o limite por dia não muda o plano.')
   }
   for (let x = 0; x < at.length; x++) for (let y = x + 1; y < at.length; y++) {
@@ -144,10 +151,11 @@ export const EXEMPLOS_RESTRICOES: readonly RestricaoRegra[] = [
 
 /** Descrição legível de uma restrição (UI, avisos, relatórios). */
 export function descreverRestricao(r: RestricaoRegra): string {
-  const esc = r.faixas.length ? ` (faixa ${r.faixas.join(', ')})` : ''
+  const NOMES_DIA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
+  const esc = (r.faixas.length ? ` (faixa ${r.faixas.join(', ')})` : '') + (r.dias && r.dias.length ? ` (${r.dias.map((d) => NOMES_DIA[d]).join(', ')})` : '')
   const A = nome(r.tipoA), B = r.tipoB ? nome(r.tipoB) : ''
   switch (r.tipo) {
-    case 'max_por_dia': return `${A}: no máximo ${r.valor} por dia${esc}`
+    case 'max_por_dia': return r.valor === 0 ? `${A}: bloqueado${esc}` : `${A}: no máximo ${r.valor} por dia${esc}`
     case 'nao_mesmo_dia': return `${A} não no mesmo dia que ${B}${esc}`
     case 'nao_dias_seguidos': return `${A} não em dias seguidos${esc}`
     case 'so_na_sobra': return `${A} só na sobra do dia${esc}`

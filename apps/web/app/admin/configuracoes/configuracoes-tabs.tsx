@@ -1,7 +1,6 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft, LogIn, Brush } from 'lucide-react'
 import { MenuLateralForm } from './menu-lateral-form'
 import { AparenciaAuthForm } from './aparencia-auth-form'
 import { ConfiguracoesForm } from './configuracoes-form'
@@ -22,19 +21,19 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
   const animacaoInicial = (tema?.animacao_entrada as boolean | undefined) !== false
   return (
     <Tabs defaultValue="identidade">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="identidade"><Fingerprint /> Identidade</TabsTrigger>
-        <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
-        <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
-        <TabsTrigger value="paleta"><Brush /> Paleta nova</TabsTrigger>
-        <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
-        <TabsTrigger value="login-carregamento"><LogIn /> Login e carregamento</TabsTrigger>
-        <TabsTrigger value="menu"><PanelLeft /> Menu lateral</TabsTrigger>
-        <TabsTrigger value="mobile"><Smartphone /> Mobile</TabsTrigger>
-        <TabsTrigger value="cards"><StretchHorizontal /> Cards</TabsTrigger>
-        <TabsTrigger value="assistente"><Sparkles /> Assistente</TabsTrigger>
-        <TabsTrigger value="personalizacao"><Contact /> Personalização</TabsTrigger>
-        <TabsTrigger value="avancado"><Settings2 /> Avançado</TabsTrigger>
+      <TabsList>
+        <TabsTrigger value="identidade">Identidade</TabsTrigger>
+        <TabsTrigger value="selecao">Seleção</TabsTrigger>
+        <TabsTrigger value="tema">Cores &amp; Tema</TabsTrigger>
+        <TabsTrigger value="paleta">Paleta nova</TabsTrigger>
+        <TabsTrigger value="carregamento">Carregamento</TabsTrigger>
+        <TabsTrigger value="login-carregamento">Login e carregamento</TabsTrigger>
+        <TabsTrigger value="menu">Menu lateral</TabsTrigger>
+        <TabsTrigger value="mobile">Mobile</TabsTrigger>
+        <TabsTrigger value="cards">Cards</TabsTrigger>
+        <TabsTrigger value="assistente">Assistente</TabsTrigger>
+        <TabsTrigger value="personalizacao">Personalização</TabsTrigger>
+        <TabsTrigger value="avancado">Avançado</TabsTrigger>
       </TabsList>
 
       <TabsContent value="identidade">
@@ -55,10 +54,10 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
 
       {/* Carregamento reúne, em sub-tabs, o loader de navegação + a tela cheia (splash). */}
       <TabsContent value="carregamento">
-        <Tabs defaultValue="loader" className="mt-1 rounded-xl border bg-muted/20 p-4">
-          <TabsList variant="line" className="gap-4">
-            <TabsTrigger value="loader"><PanelTop /> Durante a navegação</TabsTrigger>
-            <TabsTrigger value="splash"><MonitorPlay /> Tela cheia (splash)</TabsTrigger>
+        <Tabs defaultValue="loader" className="mt-1">
+          <TabsList variant="line">
+            <TabsTrigger value="loader">Durante a navegação</TabsTrigger>
+            <TabsTrigger value="splash">Tela cheia (splash)</TabsTrigger>
           </TabsList>
           <TabsContent value="loader" className="pt-4">
             <CarregamentoForm estiloInicial={estiloInicial} animacaoInicial={animacaoInicial} salvarTema={salvarTema} />

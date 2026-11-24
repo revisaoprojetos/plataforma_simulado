@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { FileUp, Loader2 } from 'lucide-react'
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Pilula } from '../../_comp/lista'
@@ -89,11 +90,7 @@ export function ImportarPlanilha({ produtoId }: { produtoId: string }) {
               {previa.existentes > 0 && <p className="text-sm text-amber-700 dark:text-amber-400">Atenção: o produto já tem {previa.existentes} linha(s). Ao confirmar elas são substituídas por estas {previa.total}.</p>}
               {previa.invalidas.length > 0 && <p className="text-sm text-muted-foreground">Ignoradas por erro ({previa.invalidas.length}): {previa.invalidas.slice(0, 5).map((i) => `linha ${i.linha} (${i.motivo})`).join('; ')}{previa.invalidas.length > 5 ? '…' : ''}</p>}
 
-              <div className="flex gap-4 border-b">
-                {([['sem', `Sem vínculo (${previa.semVinculo})`], ['suspeitas', `A conferir (${previa.suspeitas})`], ['ok', `Casadas (${previa.casadas - previa.suspeitas > 0 ? previa.casadas - previa.suspeitas : 0})`]] as const).map(([id, t]) => (
-                  <button key={id} type="button" onClick={() => setVer(id)} className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium ${ver === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{t}</button>
-                ))}
-              </div>
+              <AbasLinhaControlada valor={ver} onChange={setVer} itens={([['sem', `Sem vínculo (${previa.semVinculo})`], ['suspeitas', `A conferir (${previa.suspeitas})`], ['ok', `Casadas (${previa.casadas - previa.suspeitas > 0 ? previa.casadas - previa.suspeitas : 0})`]] as const).map(([id, t]) => ({ valor: id, label: t }))} />
               <div className="max-h-72 overflow-auto rounded-lg border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-card"><tr className="border-b text-left uppercase tracking-wide text-muted-foreground"><th className="px-2 py-2">Nº</th><th className="px-2 py-2">Data</th><th className="px-2 py-2">Matéria / aula da planilha</th><th className="px-2 py-2">Aula do produto</th></tr></thead>

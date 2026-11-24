@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -111,12 +112,7 @@ export function DownloadsClient() {
       )}
 
       {/* Visões (abas de linha) */}
-      <div role="tablist" className="flex gap-1 border-b">
-        {VISOES.map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={visao === k} onClick={() => trocarVisao(k)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${visao === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
-        ))}
-      </div>
+      <AbasLinhaControlada valor={visao} onChange={trocarVisao} itens={VISOES.map(([k, label]) => ({ valor: k, label }))} />
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">

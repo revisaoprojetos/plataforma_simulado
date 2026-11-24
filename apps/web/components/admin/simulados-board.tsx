@@ -1,5 +1,6 @@
 'use client'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { AbasLinha } from '@/components/ui/abas-linha'
 
 import { useState, useTransition, useMemo, useEffect } from 'react'
 import type React from 'react'
@@ -1128,16 +1129,8 @@ function SelecionarDestinoDialog({ titulo, subtitulo, icone, destinos, atualId, 
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         {/* Abas Simulado / Desafio (padrão sublinhado) */}
-        <div className="flex gap-6 border-b px-5">
-          {abas.map(([k, label, Icon]) => (
-            <button key={k} type="button" onClick={() => setTab(k)}
-              className={cn('relative -mb-px inline-flex items-center gap-1.5 border-b-2 py-2.5 text-sm font-medium transition-colors',
-                tab === k ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-              <Icon className="h-4 w-4" /> {label}
-              <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">{k === 'desafio' ? totalDesafios : todasPastas.length + (incluirRaiz ? 1 : 0)}</span>
-            </button>
-          ))}
-        </div>
+        <AbasLinha ativo={tab} className="px-5 pt-1"
+          itens={abas.map(([k, label]) => ({ key: k, label, badge: k === 'desafio' ? totalDesafios : todasPastas.length + (incluirRaiz ? 1 : 0), onClick: () => setTab(k) }))} />
         <div className="border-b p-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

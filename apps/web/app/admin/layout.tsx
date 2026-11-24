@@ -26,6 +26,8 @@ import { NavProgress } from '@/components/brand/nav-progress'
 import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
 import { RastreioAdmin } from '@/components/admin/rastreio-admin'
 import { FontScaleInit } from '@/components/font-scale-init'
+import { adminUsaEscopoVisual } from '@/lib/admin/escopo-visual'
+import './conteudos/estudio.css'
 import { Lock } from 'lucide-react'
 import { Suspense } from 'react'
 
@@ -85,22 +87,30 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/conteudos/lixeira', perm: 'questoes:view' },
 ]
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const user = await getAuthUser()
+// PERF (navegação do admin): este layout roda a CADA navegação e antes fazia ~6 idas ao banco EM FILA
+// (LGPD → acesso → super → contagem de plataformas → tema/contagens → impersonation). Agora: (1) as
+// independentes rodam em Promise.all; (2) as de baixa volatilidade (LGPD, nº de plataformas,
+// permissão de impersonation) têm cache em memória de TTL curto, por usuário/tenant.
+const TTL_LAYOUT_MS = 30_000
+const memoLayout = new Map<string, { at: number; v: Promise<any> }>()
+function memoCurto<T>(chave: string, fn: () => Promise<T>): Promise<T> {
+  const agora = Date.now()
+  const e = memoLayout.get(chave)
+  if (e && agora - e.at < TTL_LAYOUT_MS) return e.v
+  const v = fn().catch((err) => { memoLayout.delete(chave); throw err })
+  memoLayout.set(chave, { at: agora, v })
+  if (memoLayout.size > 500) for (const [k, x] of memoLayout) if (agora - x.at >= TTL_LAYOUT_MS) memoLayout.delete(k)
+  return v
+}
 
-  if (!user) redirect('/login')
-
-  // Check LGPD consent — gracefully skip if table doesn't exist yet
+// Check LGPD consent — gracefully skip if table doesn't exist yet (comportamento original preservado).
+async function checarLgpd(userId: string) {
   try {
     const serviceClient = await createServiceClient()
     const { data: consentimento, error } = await serviceClient
       .from('simulado_lgpd_consentimentos')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('versao_politica', CURRENT_POLICY_VERSION)
       .single()
 
@@ -114,26 +124,42 @@ export default async function AdminLayout({
   } catch {
     // Table doesn't exist yet — allow access
   }
+}
+
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const user = await getAuthUser()
+
+  if (!user) redirect('/login')
 
   const userName = user.user_metadata?.full_name || user.email || 'Usuário'
   const userEmail = user.email || ''
 
-  // Resolve permissões do usuário no tenant atual (para esconder UI por papel).
-  const access = await getCurrentAccess()
-  // Super-admin GLOBAL (acima das plataformas) — ortogonal ao papel por-tenant.
-  const superAdmin = await isSuperAdmin()
+  // Acesso (papel+permissões), super-admin e consentimento LGPD são independentes: em PARALELO.
+  // (getCurrentAccess/isSuperAdmin são memoizados por request e compartilham a consulta de super-admin.)
+  const [access, superAdmin] = await Promise.all([
+    getCurrentAccess(),
+    isSuperAdmin(),
+    memoCurto(`lgpd:${user.id}`, () => checarLgpd(user.id)),
+  ])
 
   // "Trocar de plataforma" (rodapé da sidebar) só faz sentido p/ super-admin (acessa tudo) ou admin
   // com acesso a MAIS DE UMA plataforma. Com 1 acesso só, o seletor reentra na MESMA plataforma
   // ("carrega e volta") — então o botão some. Conta os vínculos ativos (service role: cross-tenant).
-  let podeTrocarPlataforma = superAdmin
-  if (!superAdmin) {
-    const { count } = await createAdminClient()
-      .from('simulado_tenant_acessos')
-      .select('tenant_id', { count: 'exact', head: true })
-      .eq('user_id', user.id).eq('ativo', true)
-    podeTrocarPlataforma = (count ?? 0) > 1
-  }
+  const podeTrocarPromise: Promise<boolean> = superAdmin
+    ? Promise.resolve(true)
+    : memoCurto(`ptp:${user.id}`, async () => {
+        const { count } = await createAdminClient()
+          .from('simulado_tenant_acessos')
+          .select('tenant_id', { count: 'exact', head: true })
+          .eq('user_id', user.id).eq('ativo', true)
+        return (count ?? 0) > 1
+      })
+  // Permissão de impersonation (2 queries) — independe do tema; dispara já, em paralelo com o resto.
+  const impPermPromise = memoCurto(`imp:${access.userId}:${access.tenantId}:${access.role}`, () => getImpersonationPermission(access))
 
   // Gate de papel (defesa em profundidade): só a EQUIPE entra no /admin. Um usuário
   // autenticado sem papel de staff (ou papel "estudante") é mandado para a área do aluno —
@@ -145,7 +171,7 @@ export default async function AdminLayout({
 
   // Config da tela de imersão (mostrada uma vez ao acessar o sistema).
   // Tema + contagens da sidebar em paralelo (contagens são cacheadas 45s, não pesam a navegação).
-  const [{ tema, tenantNome }, counts] = await Promise.all([getTenantTheme(), contagensSidebar(access.tenantId)])
+  const [{ tema, tenantNome }, counts, podeTrocarPlataforma, impPerm] = await Promise.all([getTenantTheme(), contagensSidebar(access.tenantId), podeTrocarPromise, impPermPromise])
   const ti = (tema ?? {}) as any
 
   // Visibilidade "Só super-admin": a plataforma está reservada a super-admins globais (p/ teste).
@@ -188,7 +214,6 @@ export default async function AdminLayout({
 
   // Visualização de aluno (impersonation): dono global da sessão + janela flutuante (persiste ao
   // navegar). Config de carregamento branded = mesma marca do login.
-  const impPerm = await getImpersonationPermission(access)
   const impLoading = {
     config: resolverLoginConfig(ti.login),
     logo: ti.logo_url ?? null,
@@ -226,7 +251,8 @@ export default async function AdminLayout({
               <NavProgress edge="top" />
               <RastreioAdmin />
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
-              <main className="flex-1 overflow-y-auto p-6">
+              {/* Escopo visual único do admin (fonte+tokens+fundo do Estúdio) — opt-out em lib/admin/escopo-visual.ts. */}
+              <main className={`${adminUsaEscopoVisual(pathname) ? 'estudio-scope ' : ''}flex-1 overflow-y-auto p-4 sm:p-6`}>
                 {semAcesso ? (
                   <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
                     <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400"><Lock className="h-7 w-7" /></span>

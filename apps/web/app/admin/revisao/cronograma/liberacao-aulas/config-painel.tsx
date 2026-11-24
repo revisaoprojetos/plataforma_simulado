@@ -20,7 +20,7 @@ export function SeletorProduto({ produtos, atual }: { produtos: ProdutoOpcao[]; 
   const [pend, nav] = useTransition()
   function trocar(id: string) {
     const q = new URLSearchParams()
-    for (const k of ['aba', 'sub']) { const v = sp.get(k); if (v) q.set(k, v) }
+    for (const k of ['aba', 'sub', 'v']) { const v = sp.get(k); if (v) q.set(k, v) }
     if (id) q.set('produto', id)
     nav(() => { router.push(`${pathname}?${q.toString()}`) })
   }

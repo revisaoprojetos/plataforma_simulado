@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { Plus, Upload } from 'lucide-react'
 import { checkPermission } from '@/lib/auth/permissions'
 import { buttonVariants } from '@/components/ui/button'
@@ -76,7 +77,7 @@ export default async function GeradorCatalogo({ sp, tenantId, basePath }: {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <DivisoesBotao categorias={categorias} podeEditar={podeEditar} />
           {podeCriar && <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}><Upload />Importar modelo</Link>}
-          {podeCriar && <Link href="/admin/cronogramas/criar" className={buttonVariants()}><Plus />Novo cronograma</Link>}
+          {podeCriar && <Link href={comVoltar('/admin/cronogramas/criar', hrefCom(base, qs))} className={buttonVariants()}><Plus />Novo cronograma</Link>}
         </div>
       </div>
 
@@ -94,7 +95,7 @@ export default async function GeradorCatalogo({ sp, tenantId, basePath }: {
         </Nota>
       )}
 
-      <BarraBusca base={base} qs={qs} placeholder="Buscar por nome (várias palavras)…" preservar={['aba', 'sub', 'pps', 'ord', 'dir']}
+      <BarraBusca base={base} qs={qs} placeholder="Buscar por nome (várias palavras)…" preservar={['aba', 'sub', 'v', 'pps', 'ord', 'dir']}
         filtros={[
           { nome: 'cat', rotulo: 'Todas as divisões', opcoes: [{ v: 'sem', l: 'Sem divisão' }, ...categorias.map((c) => ({ v: c.id, l: c.nome }))] },
           { nome: 'carga', rotulo: 'Toda carga', opcoes: r.cargas.map((h) => ({ v: String(h), l: `${h}h por dia` })) },

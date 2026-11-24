@@ -15,7 +15,8 @@ import { resumoRegistro } from '@/lib/auditoria/resumo'
 import { cn } from '@/lib/utils'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { emChunks, ajustarTotal, mesclarPaginas } from '@/lib/auditoria/paginacao'
 
 const ITEMS_PER_PAGE = 12
 
@@ -105,11 +106,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
     }
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Auditoria · Visualizações de aluno</h1>
-          <p className="text-muted-foreground">Quando um admin abriu e operou a conta de um aluno — {logs.length} registro(s)</p>
-        </div>
-        <BarraSetorSlot />
+        <CabecalhoArea
+          titulo="Auditoria · Visualizações de aluno"
+          descricao={`Quando um admin abriu e operou a conta de um aluno — ${logs.length} registro(s)`}
+        />
         <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
           <SecaoHeader icon={ScrollText} titulo="Visualizações de aluno" subtitulo={`${logs.length} sessão(ões) · registro imutável`} />
           <CardContent className="p-0">
@@ -169,14 +169,14 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const like = sanearBusca(params.q ?? '')
   const NADA = '00000000-0000-0000-0000-000000000000'
   let estIdsQ: string[] | null = null, simIdsQ: string[] | null = null
-  if (like && (view === 'sessoes' || view === 'eventos' || (acessosEstud && sub === 'plataforma'))) {
-    const { data } = await supabase.from('simulado_estudantes').select('id').eq('tenant_id', tid).eq('deletado', false).or(`nome.ilike.%${like}%,email.ilike.%${like}%`).limit(300)
-    estIdsQ = (data ?? []).map((e: any) => e.id)
-  }
-  if (like && (view === 'sessoes' || view === 'eventos')) {
-    const { data } = await supabase.from('simulado_simulados').select('id').eq('tenant_id', tid).is('owner_estudante_id', null).ilike('titulo', `%${like}%`).limit(200)
-    simIdsQ = (data ?? []).map((s: any) => s.id)
-  }
+  const precisaEst = !!like && (view === 'sessoes' || view === 'eventos' || (acessosEstud && sub === 'plataforma'))
+  const precisaSim = !!like && (view === 'sessoes' || view === 'eventos')
+  const [rEstQ, rSimQ] = await Promise.all([
+    precisaEst ? supabase.from('simulado_estudantes').select('id').eq('tenant_id', tid).eq('deletado', false).or(`nome.ilike.%${like}%,email.ilike.%${like}%`).limit(300) : Promise.resolve({ data: null as any[] | null }),
+    precisaSim ? supabase.from('simulado_simulados').select('id').eq('tenant_id', tid).is('owner_estudante_id', null).ilike('titulo', `%${like}%`).limit(200) : Promise.resolve({ data: null as any[] | null }),
+  ])
+  if (precisaEst) estIdsQ = (rEstQ.data ?? []).map((e: any) => e.id)
+  if (precisaSim) simIdsQ = (rSimQ.data ?? []).map((x: any) => x.id)
 
   let logs: any[] | null = null, sessoes: any[] | null = null, eventos: any[] | null = null, count = 0
   let cVis = 0, cBx = 0 // contagens Visualizou/Baixou (subtítulo da aba Cadernos)
@@ -188,29 +188,44 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const nomesEntidade = new Map<string, string>() // entidade_id → nome (simulado/banco/estudante/caderno/grupo)
 
   if (view === 'audit' || view === 'automacoes') {
-    let query = supabase
-      .from('simulado_audit_logs')
-      .select('id, ator_tipo, ator_id, operacao, entidade, entidade_id, dados_anteriores, dados_novos, detalhes, ip, user_agent, criado_em', { count: 'exact' })
-      .eq('tenant_id', tid).order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(offset, offset + ITEMS_PER_PAGE - 1)
-    if (tipo === 'acessos') {
-      query = query.in('operacao', ACESSO_OPS)
-      if (area === 'admin') query = query.neq('ator_tipo', 'estudante')
-      else query = query.eq('ator_tipo', 'estudante')
-    } else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
-    else if (ehAuto) query = query.or('entidade.eq.simulado_assinaturas,entidade.eq.simulado_curseduca_sync,and(entidade.eq.simulado_estudantes,dados_novos->curseduca_grupos.not.is.null)')
-    if (isUuid(params.ator)) query = query.or(`actor_user_id.eq.${params.ator},ator_id.eq.${params.ator}`)
-    if (params.acao) query = query.eq('operacao', params.acao)
-    if (params.entidade) query = query.ilike('entidade', `%${sanearBusca(params.entidade)}%`)
-    if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
-    if (params.data_fim) query = query.lte('criado_em', params.data_fim + 'T23:59:59Z')
-    if (like) {
-      if (acessosEstud && sub === 'plataforma') query = estIdsQ?.length ? query.in('entidade_id', estIdsQ) : query.eq('id', NADA)
-      else query = query.or(`entidade.ilike.%${like}%,operacao.ilike.%${like}%`)
+    // count 'estimated' (planner; exato se pequeno): o count exato fazia Seq Scan de 1 mi de linhas a cada aba.
+    // Total é corrigido por ajustarTotal() com o que a página trouxe (Próxima/Final seguem funcionando).
+    const SEL = 'id, ator_tipo, ator_id, operacao, entidade, entidade_id, dados_anteriores, dados_novos, detalhes, ip, user_agent, criado_em'
+    const porEntidade = !!like && acessosEstud && sub === 'plataforma' // busca por aluno => filtra entidade_id IN (ids)
+    const montar = (modo: 'estimated' | 'exact', ids: string[] | null, ate: number) => {
+      let query = supabase
+        .from('simulado_audit_logs')
+        .select(SEL, { count: modo })
+        .eq('tenant_id', tid).order(ord, { ascending: dir === 'asc', nullsFirst: false }).range(ids ? 0 : offset, ids ? ate : offset + ITEMS_PER_PAGE - 1)
+      if (tipo === 'acessos') {
+        query = query.in('operacao', ACESSO_OPS)
+        if (area === 'admin') query = query.neq('ator_tipo', 'estudante')
+        else query = query.eq('ator_tipo', 'estudante')
+      } else if (tipo === 'modificacoes') query = query.in('operacao', MODIFICACAO_OPS)
+      else if (ehAuto) query = query.or('entidade.eq.simulado_assinaturas,entidade.eq.simulado_curseduca_sync,and(entidade.eq.simulado_estudantes,dados_novos->curseduca_grupos.not.is.null)')
+      if (isUuid(params.ator)) query = query.or(`actor_user_id.eq.${params.ator},ator_id.eq.${params.ator}`)
+      if (params.acao) query = query.eq('operacao', params.acao)
+      if (params.entidade) query = query.ilike('entidade', `%${sanearBusca(params.entidade)}%`)
+      if (params.data_inicio) query = query.gte('criado_em', params.data_inicio)
+      if (params.data_fim) query = query.lte('criado_em', params.data_fim + 'T23:59:59Z')
+      if (ids) query = query.in('entidade_id', ids)
+      else if (like && !porEntidade) query = query.or(`entidade.ilike.%${like}%,operacao.ilike.%${like}%`)
+      return query
     }
-    const r = await query; count = r.count ?? 0
+    let dataLogs: any[] | null
+    const [exibCpf, resLogs] = await Promise.all([
+      exibidorCpf(),
+      (async () => {
+        if (!porEntidade) { const r = await montar('estimated', null, 0); return { data: r.data as any[] | null, total: ajustarTotal(r.count, offset, ITEMS_PER_PAGE, r.data?.length ?? 0) } }
+        if (!estIdsQ?.length) return { data: [] as any[], total: 0 }
+        // Busca por nome: até 300 ids => consultas em chunks de 80 (proxy), mescladas e re-paginadas aqui.
+        const rs = await Promise.all(emChunks(estIdsQ, 80).map((ch) => montar('exact', ch, offset + ITEMS_PER_PAGE - 1)))
+        return { data: mesclarPaginas(rs.map((x) => (x.data ?? []) as any[]), ord, dir, offset, ITEMS_PER_PAGE), total: rs.reduce((n, x) => n + (x.count ?? 0), 0) }
+      })(),
+    ])
+    dataLogs = resLogs.data; count = resLogs.total
     // Diffs (antes/depois) de estudante trazem o CPF → mascarado p/ quem não é super-admin.
-    const exibCpf = await exibidorCpf()
-    logs = exibCpf.ver ? r.data : (r.data ?? []).map((l: any) => ({ ...l, dados_anteriores: exibCpf.profundo(l.dados_anteriores), dados_novos: exibCpf.profundo(l.dados_novos), detalhes: exibCpf.profundo(l.detalhes) }))
+    logs = exibCpf.ver ? dataLogs : (dataLogs ?? []).map((l: any) => ({ ...l, dados_anteriores: exibCpf.profundo(l.dados_anteriores), dados_novos: exibCpf.profundo(l.dados_novos), detalhes: exibCpf.profundo(l.detalhes) }))
 
     if (ehAuto && logs?.length) {
       const grupoIds = [...new Set(logs.filter((l) => l.entidade === 'simulado_estudantes' && isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]
@@ -310,12 +325,7 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{titulo}</h1>
-        <p className="text-muted-foreground">{subtitulo} — {count ?? 0} entradas</p>
-      </div>
-
-      <BarraSetorSlot />
+      <CabecalhoArea titulo={titulo} descricao={`${subtitulo} — ${count ?? 0} entradas`} />
       {tipo === 'acessos' && (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition, type ReactNode } from 'react'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -27,6 +29,7 @@ export function TabelaCatalogo({ head, itens, total, page, pp, categorias, perm,
   head: ReactNode; itens: CronogramaLista[]; total: number; page: number; pp: number; categorias: CategoriaRow[]
   perm: { liberar: boolean; editar: boolean; excluir: boolean }; vazio: ReactNode
 }) {
+  const origem = useOrigem()
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
@@ -117,7 +120,7 @@ export function TabelaCatalogo({ head, itens, total, page, pp, categorias, perm,
               {itens.map((c) => (
                 <tr key={c.id} className={cn('border-b last:border-0 hover:bg-muted/40', sel.has(c.id) && 'bg-primary/5')}>
                   <td className="px-3 py-1.5"><input type="checkbox" aria-label={`Selecionar ${c.nome}`} checked={sel.has(c.id)} onChange={(e) => marcar(c, e.target.checked)} className="h-4 w-4 cursor-pointer accent-[var(--primary)]" /></td>
-                  <td className="px-3 py-1.5"><Link href={`/admin/cronogramas/${c.id}`} className="font-medium underline-offset-4 hover:underline">{c.nome}</Link></td>
+                  <td className="px-3 py-1.5"><Link href={comVoltar(`/admin/cronogramas/${c.id}`, origem)} className="font-medium underline-offset-4 hover:underline">{c.nome}</Link></td>
                   <td className="px-3 py-1.5">
                     {c.status === 'liberado'
                       ? (c.pacotes === 0
@@ -138,7 +141,7 @@ export function TabelaCatalogo({ head, itens, total, page, pp, categorias, perm,
                           {ocupado === c.id ? <Loader2 className="animate-spin" /> : <Power className={c.status === 'liberado' ? 'text-emerald-600' : 'text-muted-foreground'} />}
                         </Button>
                       )}
-                      <Link href={`/admin/cronogramas/${c.id}`} title="Editar grade (metas e pacotes)" className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}><ListChecks /></Link>
+                      <Link href={comVoltar(`/admin/cronogramas/${c.id}`, origem)} title="Editar grade (metas e pacotes)" className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}><ListChecks /></Link>
                       {perm.editar && <Button size="icon-sm" variant="ghost" title="Mover para outra divisão" onClick={() => setMover([c])}><FolderInput /></Button>}
                       {perm.excluir && <Button size="icon-sm" variant="ghost" title="Excluir" disabled={executando} onClick={() => excluirVarios([c])}><Trash2 className="text-destructive" /></Button>}
                     </div>

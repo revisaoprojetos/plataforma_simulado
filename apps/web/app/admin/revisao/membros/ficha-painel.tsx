@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { AlertTriangle, ExternalLink, KeyRound, Link2, Loader2, Lock, LockOpen, Mail, Trash2, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { formatBrt } from '@/lib/brt'
 import { ehCorFundo } from '@/lib/aluno/personalizacao'
 import { CampoCpfOculto } from '@/components/admin/campo-cpf-oculto'
@@ -138,12 +139,12 @@ export function FichaPainel({ membro, podeEditar, podeRemover, onFechar, onMudou
         <Link href={fichaInternaHref(membro.id)} prefetch onClick={(e) => { e.currentTarget.href = fichaInternaHref(membro.id) }} className={cn(buttonVariants({ variant: 'ghost' }), 'text-muted-foreground')}><ExternalLink /> Ficha interna</Link>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b px-2" role="tablist" aria-label="Seções da ficha">
-        {FICHA_ABAS.map((a) => (
-          <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}
-            className={cn('-mb-px shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors', aba === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>{a.titulo}</button>
-        ))}
-      </div>
+      <AbasLinha
+        className="px-4"
+        aria-label="Seções da ficha"
+        ativo={aba}
+        itens={FICHA_ABAS.map((a) => ({ key: a.id, label: a.titulo, onClick: () => setAba(a.id) }))}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {carregando && !d ? <Skeleton /> : erro ? (

@@ -222,7 +222,7 @@ export function PaletaNovaForm({ tema, salvarTema }: { tema: any; salvarTema: (t
         </div>
 
         <Tabs value={vis} onValueChange={(v) => setVis(v as Tema)}>
-          <TabsList variant="line" className="gap-4">
+          <TabsList variant="line">
             <TabsTrigger value="claro">Tema claro</TabsTrigger>
             <TabsTrigger value="escuro">Tema escuro</TabsTrigger>
           </TabsList>

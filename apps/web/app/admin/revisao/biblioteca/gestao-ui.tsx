@@ -1,5 +1,6 @@
 'use client'
 
+import { ABAS_LINHA_LISTA, abasLinhaItem } from '@/components/ui/abas-linha'
 import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -50,14 +51,14 @@ export function ItemTrilho({ ativo, onClick, onPointerEnter, children, n, destaq
   )
 }
 
-/** Abas de sublinhado (border-b-2) — padrão das abas do admin. */
+/** Abas de sublinhado — padrão único do admin (abas-linha); mantém o prefetch por hover. */
 export function AbasSublinhado<T extends string>({ abas, valor, onChange, rotulo, onHover }: { abas: { id: T; nome: string; n?: number }[]; valor: T; onChange: (v: T) => void; rotulo: string; onHover?: (v: T) => void }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b" role="tablist" aria-label={rotulo}>
+    <div className={ABAS_LINHA_LISTA} role="tablist" aria-label={rotulo}>
       {abas.map((a) => (
         <button key={a.id} type="button" role="tab" aria-selected={valor === a.id} onClick={() => onChange(a.id)} onPointerEnter={() => onHover?.(a.id)}
-          className={cn('-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', valor === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-          {a.nome}{a.n !== undefined && a.n > 0 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{a.n.toLocaleString('pt-BR')}</span>}
+          className={abasLinhaItem(valor === a.id)}>
+          {a.nome}{a.n !== undefined && a.n > 0 && <span className="ml-1.5 text-[12px] font-medium tabular-nums text-muted-foreground">{a.n.toLocaleString('pt-BR')}</span>}
         </button>
       ))}
     </div>

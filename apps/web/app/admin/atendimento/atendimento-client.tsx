@@ -13,6 +13,7 @@ import {
   CornerDownRight, User, Clock, Save, Flag, Star, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { formatBrt } from '@/lib/brt'
 import { Card, CardContent } from '@/components/ui/card'
 import { SecaoHeader } from '@/components/admin/secao-header'
@@ -32,6 +33,7 @@ import {
 } from '@/lib/demandas/tipos'
 import type { ThreadDuvida } from './actions-tipos'
 import { carregarThreadDuvidaAction, responderDuvidaAction, responderRequerimentoAction, resolverReporteAction } from './actions'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export type DuvidaRow = Duvida & { estudante_nome: string; estudante_email: string | null }
 export type RequerimentoRow = Requerimento & { estudante_nome: string; estudante_email: string | null }
@@ -121,21 +123,17 @@ export function AtendimentoClient({ tab, statusFiltro, duvidas, requerimentos, r
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Atendimento</h1>
-        <p className="text-muted-foreground">Responda às dúvidas dos alunos, processe os requerimentos e trate as demandas de material.</p>
-      </div>
-
-      {/* Abas — tab de linha (sublinhado), navega por ?tab= */}
-      <div className="flex gap-8 border-b text-sm">
-        {([['duvidas', 'Dúvidas', MessageCircle], ['requerimentos', 'Requerimentos', FileText], ['demandas', 'Demandas', Flag]] as const).map(([id, label, Icon]) => (
-          <Link key={id} href={`/admin/atendimento?tab=${id}`}
-            className={cn('-mb-px inline-flex items-center gap-1.5 border-b-2 py-2.5 font-medium transition-colors',
-              tab === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            <Icon className="h-4 w-4" /> {label}
-          </Link>
-        ))}
-      </div>
+      <CabecalhoArea
+        titulo="Atendimento"
+        descricao="Responda às dúvidas dos alunos, processe os requerimentos e trate as demandas de material."
+        semBarraSetor
+        abas={
+          <AbasLinha
+            ativo={tab}
+            itens={([['duvidas', 'Dúvidas'], ['requerimentos', 'Requerimentos'], ['demandas', 'Demandas']] as const).map(([id, label]) => ({ key: id, label, href: `/admin/atendimento?tab=${id}` }))}
+          />
+        }
+      />
 
       {aviso && <AlertBox variante="aviso">{aviso}</AlertBox>}
 

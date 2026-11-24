@@ -8,6 +8,7 @@ import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { UsoArmazenamentoBar } from '@/components/super/uso-armazenamento-bar'
 import { formatarBytes, gbParaBytes, bytesParaGb } from '@/lib/storage/formato'
 import type { EstadoUso } from '@/lib/storage/uso'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import type { RelatorioOrganizador } from '@/lib/storage/organizador'
 import { recalcularUsoAction, definirLimiteAction, analisarOrganizacaoAction, aplicarMigracaoAction, limparOrfaosAction } from './actions'
 
@@ -202,10 +203,7 @@ export function ArmazenamentoClient({ estadoInicial, limitesIniciais, porTenantI
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1 border-b text-sm">
-        <button onClick={() => setAba('visao')} className={`-mb-px border-b-2 px-3 py-2 font-medium transition-colors ${aba === 'visao' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Visão geral</button>
-        <button onClick={() => setAba('organizar')} className={`-mb-px border-b-2 px-3 py-2 font-medium transition-colors ${aba === 'organizar' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Organizar</button>
-      </div>
+      <AbasLinha ativo={aba} itens={[{ key: 'visao', label: 'Visão geral', onClick: () => setAba('visao') }, { key: 'organizar', label: 'Organizar', onClick: () => setAba('organizar') }]} />
 
       {aba === 'organizar' && <OrganizarPanel />}
 

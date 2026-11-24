@@ -5,7 +5,7 @@ import { RankingView } from './ranking-view'
 import { RankingLista } from './ranking-lista'
 import { resumosSimulados } from '../_resumos'
 import { montarRankingSimulado } from './_dados'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export default async function RankingPage({ searchParams }: { searchParams: Promise<{ simulado?: string }> }) {
   const { simulado: simId } = await searchParams
@@ -17,13 +17,8 @@ export default async function RankingPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-5">
-      <div>
-        {simId && <Voltar href="/admin/relatorios/ranking" label="Todos os simulados" />}
-        <h1 className="text-2xl font-bold tracking-tight">Ranking</h1>
-        <p className="text-muted-foreground">{simId ? 'Classificação e critérios de desempate.' : 'Todos os simulados — clique num para ver a classificação e configurar os critérios.'}</p>
-      </div>
-
-      <BarraSetorSlot />
+      {simId && <Voltar href="/admin/relatorios/ranking" label="Todos os simulados" />}
+      <CabecalhoArea titulo="Ranking" descricao={simId ? 'Classificação e critérios de desempate.' : 'Todos os simulados — clique num para ver a classificação e configurar os critérios.'} />
       {!simId ? (
         <RankingLista itens={resumos} />
       ) : dados ? (

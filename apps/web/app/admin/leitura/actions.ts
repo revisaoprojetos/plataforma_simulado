@@ -24,6 +24,7 @@ import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
 import { resolverTopicos, type TopicosConfig } from '@/lib/leitura/topicos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
+import { contagemDocsPorPastaSql } from '@/lib/conteudo/biblioteca-sql'
 import { invalidarRankingLeitura, carregarRankingModulo, type RankingLeituraItem } from '@/lib/leitura/ranking'
 import { carregarRelatorioModulo, type RelatorioModulo } from '@/lib/leitura/relatorio'
 import { classificarFormato } from '@/lib/simulado/formato'
@@ -588,17 +589,9 @@ async function pastasLeitura(svc: any, tenantId: string, area: string = AREA_LEI
     const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', area)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
+  // SELECT fixo (todas as colunas já migradas em produção). Um único fallback mínimo p/ bases antigas/dev.
   let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, regra_sequencial, quiz_bloquear_refazer, ordem, publicacao', true)
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, regra_sequencial, ordem, publicacao', true) // quiz_bloquear_refazer pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, ordem, publicacao', true) // regra_sequencial pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, ordem, publicacao', true) // desafios pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, ordem, publicacao', true) // trilha_aparencia pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, ordem, publicacao', true) // regulamento pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, ordem, publicacao', true) // intro_config pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, ordem, publicacao', true) // pontuacao pode não estar migrada
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem, publicacao', true) // adesivo_url pode não estar migrado
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem', true) // publicacao pode não estar migrada
-  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url', false) // capa_card_url/ordem podem não estar migradas
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url', false)
   return (r.data as any[]) ?? []
 }
 
@@ -615,23 +608,46 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   // migração 20260918000000 (coluna ausente) degrada sem quebrar a página.
   const SEL_AULA = 'id, titulo, descricao, cor, capa_url, pasta_id, versao, ordem, atualizado_em, publicado'
   let docs: any[] = []
-  if (detalhes) {
-    try { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(`${SEL_AULA}, publicacao`).eq('tenant_id', g.tenantId).eq('deletado', false)) }
-    catch { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(SEL_AULA).eq('tenant_id', g.tenantId).eq('deletado', false)) }
-  }
-  // Flip preguiçoso de agendamentos vencidos (publicarEm <= agora) → publica de fato (sem cron).
-  if (detalhes && docs.length) {
-    const agora = new Date().toISOString()
-    const vencidos = docs.filter((d) => { const p = d.publicacao; return p && typeof p === 'object' && typeof p.publicarEm === 'string' && p.publicarEm <= agora && !d.publicado })
-    for (const d of vencidos) {
-      try {
-        await svc.from('simulado_documentos').update({ publicado: true, publicacao: { estado: 'publicada', publicarEm: null }, situacao_editorial: 'publicada', atualizado_em: agora }).eq('id', d.id).eq('tenant_id', g.tenantId)
-        d.publicado = true; d.publicacao = { estado: 'publicada', publicarEm: null }
-      } catch { /* coluna ausente / migração pendente — ignora */ }
+  let docsPorPasta = new Map<string, number>()
+  // Contagem por pasta em SQL (GROUP BY); sem SQL direto → cai no fetchAll de TODOS os docs (caminho antigo).
+  const contSql = detalhes ? await contagemDocsPorPastaSql(g.tenantId) : null
+  const agora = new Date().toISOString()
+  if (detalhes && contSql) {
+    docsPorPasta = contSql
+    // Só os docs do NÍVEL atual (detalhados) — não baixa a área inteira.
+    const buscaNivel = (cols: string) => fetchAll<any>(() => {
+      const b = svc.from('simulado_documentos').select(cols).eq('tenant_id', g.tenantId).eq('deletado', false)
+      return (paiAtual ? b.eq('pasta_id', paiAtual) : b.is('pasta_id', null)).order('id')
+    })
+    try { docs = await buscaNivel(`${SEL_AULA}, publicacao`) } catch { docs = await buscaNivel(SEL_AULA) }
+    // Flip preguiçoso (qualquer nível): só os agendamentos vencidos ainda não publicados, filtrados no banco.
+    try {
+      const vencidos = await fetchAll<any>(() => svc.from('simulado_documentos').select('id, publicado, publicacao').eq('tenant_id', g.tenantId).eq('deletado', false).eq('publicado', false).lte('publicacao->>publicarEm', agora).order('id'))
+      for (const d of vencidos) {
+        try {
+          await svc.from('simulado_documentos').update({ publicado: true, publicacao: { estado: 'publicada', publicarEm: null }, situacao_editorial: 'publicada', atualizado_em: agora }).eq('id', d.id).eq('tenant_id', g.tenantId)
+          const noNivel = docs.find((x) => x.id === d.id)
+          if (noNivel) { noNivel.publicado = true; noNivel.publicacao = { estado: 'publicada', publicarEm: null } }
+        } catch { /* coluna ausente / migração pendente — ignora */ }
+      }
+    } catch { /* coluna ausente / migração pendente — ignora */ }
+  } else {
+    if (detalhes) {
+      try { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(`${SEL_AULA}, publicacao`).eq('tenant_id', g.tenantId).eq('deletado', false)) }
+      catch { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(SEL_AULA).eq('tenant_id', g.tenantId).eq('deletado', false)) }
     }
+    // Flip preguiçoso de agendamentos vencidos (publicarEm <= agora) → publica de fato (sem cron).
+    if (detalhes && docs.length) {
+      const vencidos = docs.filter((d) => { const p = d.publicacao; return p && typeof p === 'object' && typeof p.publicarEm === 'string' && p.publicarEm <= agora && !d.publicado })
+      for (const d of vencidos) {
+        try {
+          await svc.from('simulado_documentos').update({ publicado: true, publicacao: { estado: 'publicada', publicarEm: null }, situacao_editorial: 'publicada', atualizado_em: agora }).eq('id', d.id).eq('tenant_id', g.tenantId)
+          d.publicado = true; d.publicacao = { estado: 'publicada', publicarEm: null }
+        } catch { /* coluna ausente / migração pendente — ignora */ }
+      }
+    }
+    for (const d of docs) { const k = d.pasta_id ?? '__root__'; docsPorPasta.set(k, (docsPorPasta.get(k) ?? 0) + 1) }
   }
-  const docsPorPasta = new Map<string, number>()
-  for (const d of docs) { const k = d.pasta_id ?? '__root__'; docsPorPasta.set(k, (docsPorPasta.get(k) ?? 0) + 1) }
   const subPorPasta = new Map<string, number>()
   for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
 

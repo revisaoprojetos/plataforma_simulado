@@ -1,6 +1,5 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Suspense } from 'react'
+import { VoltarCronogramas } from '@/components/admin/cronograma/voltar-cronogramas'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
@@ -25,10 +24,7 @@ export default async function ConjuntoPage({ params, searchParams }: { params: P
   return (
     <div className="animate-page space-y-6">
       <div>
-        <Link href="/admin/cronogramas/conteudos" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao banco
-        </Link>
+        <Suspense fallback={null}><VoltarCronogramas tela="conteudo" /></Suspense>
       </div>
       {!r.ok || !r.dados ? (
         <SemPermissao>{r.error ?? 'Conjunto não encontrado.'}</SemPermissao>

@@ -4,8 +4,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { BannersManager, type Banner } from '@/components/admin/banners-manager'
 import { dedupePorLabel } from '@/lib/banner-destinos'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
-import { Megaphone } from 'lucide-react'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +14,7 @@ export default async function BannersPage() {
   if (!pode) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Banners &amp; Pop-ups</h1>
+        <CabecalhoArea titulo="Banners & Pop-ups" semBarraSetor />
         <SemPermissao>Você não tem permissão para gerenciar banners.</SemPermissao>
       </div>
     )
@@ -51,14 +50,10 @@ export default async function BannersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"><Megaphone className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Banners &amp; Pop-ups</h1>
-          <p className="text-muted-foreground">Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez.</p>
-        </div>
-      </div>
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Banners & Pop-ups"
+        descricao="Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez."
+      />
       <BannersManager banners={banners} destinos={destinosBanner} desempenhoAtivo={desempenhoAtivo} destaques={destaques} bannerAspect={bannerAspect} />
     </div>
   )

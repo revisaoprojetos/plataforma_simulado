@@ -1,8 +1,7 @@
-import { Upload } from 'lucide-react'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { carregarEstadoAtual } from './actions'
 import { ImportarClient } from './importar-client'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,17 +10,7 @@ export default async function ImportarPage() {
 
   return (
     <div className="animate-page space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <Upload className="h-6 w-6 text-primary" />
-          Importar cronogramas
-        </h1>
-        <p className="text-muted-foreground">
-          Substitui as metas dos cronogramas mencionados nos arquivos. Cronogramas que não aparecerem ficam
-          intocados, e reimportar o mesmo arquivo duas vezes dá o mesmo resultado.
-        </p>
-      </div>
-      <BarraSetorSlot />
+      <TituloTela titulo="Importação" descricao="Substitui as metas dos cronogramas mencionados nos arquivos. Cronogramas que não aparecerem ficam intocados, e reimportar o mesmo arquivo duas vezes dá o mesmo resultado." />
 
       {!r.ok || !r.estado ? (
         <SemPermissao>{r.error ?? 'Não foi possível carregar o catálogo atual.'}</SemPermissao>

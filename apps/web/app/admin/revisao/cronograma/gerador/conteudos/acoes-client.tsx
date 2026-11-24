@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Copy, ExternalLink, Folder, FolderPlus, Layers, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
@@ -26,6 +28,7 @@ import type { PlataformaLinha } from '@/lib/revisao/gerador/conteudos'
 // ───────────────────────────── conjuntos ─────────────────────────────
 
 export function NovoConjunto({ pastaId, disciplinas: inicial }: { pastaId: string | null; disciplinas: { id: string; nome: string }[] }) {
+  const origem = useOrigem()
   const router = useRouter()
   const [aberto, setAberto] = useState(false)
   const [pend, iniciar] = useTransition()
@@ -49,7 +52,7 @@ export function NovoConjunto({ pastaId, disciplinas: inicial }: { pastaId: strin
       const r = await criarConjunto({ nome, disciplina, disciplina_id: disciplinaId, descricao, pastaId })
       if (!r.ok || !r.id) return void toast.error(r.error ?? 'Não foi possível criar.')
       toast.success('Conjunto criado')
-      router.push(`/admin/cronogramas/conteudos/${r.id}`)
+      router.push(comVoltar(`/admin/cronogramas/conteudos/${r.id}`, origem))
     })
   }
   return (

@@ -182,5 +182,5 @@ export interface ItemHistorico {
 
 export const hrefProduto = (produtoId: string, aba: string) => `/admin/conteudos/produtos/${produtoId}?aba=${aba}`
 export const hrefLiberacaoAulas = (produtoId: string, vis?: 'aulas' | 'cronogramas' | 'regras' | 'alunos' | 'excecoes' | 'log') =>
-  `/admin/revisao/cronograma?aba=gerador&sub=liberacao-aulas&produto=${produtoId}${vis && vis !== 'aulas' ? `&vis=${vis}` : ''}`
+  `/admin/revisao/cronograma?aba=gerador&sub=acesso&v=liberacao-aulas&produto=${produtoId}${vis && vis !== 'aulas' ? `&vis=${vis}` : ''}`
 export const hrefMapaRegras = (produtoId: string) => `/admin/conteudos/produtos/${produtoId}?aba=regras`

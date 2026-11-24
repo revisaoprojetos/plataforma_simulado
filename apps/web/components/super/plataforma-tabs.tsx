@@ -1,7 +1,6 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Settings2, ShieldCheck, Palette, Megaphone, Code2, LogIn, HardDrive, BookOpen } from 'lucide-react'
 import { PlataformaGerenciar } from '@/components/super/plataforma-gerenciar'
 import { PlataformaAcessos } from '@/components/super/plataforma-acessos'
 import { PlataformaEmbed } from '@/components/super/plataforma-embed'
@@ -43,14 +42,14 @@ export function PlataformaTabs({ geral, membros, cargos, temaCompleto, salvarTem
   return (
     <Tabs defaultValue="geral" className="space-y-4">
       <TabsList>
-        <TabsTrigger value="geral"><Settings2 className="mr-1.5 h-4 w-4" /> Geral</TabsTrigger>
-        <TabsTrigger value="aparencia"><Palette className="mr-1.5 h-4 w-4" /> Aparência</TabsTrigger>
-        <TabsTrigger value="login"><LogIn className="mr-1.5 h-4 w-4" /> Login</TabsTrigger>
-        <TabsTrigger value="avisos"><Megaphone className="mr-1.5 h-4 w-4" /> Avisos</TabsTrigger>
-        <TabsTrigger value="embed"><Code2 className="mr-1.5 h-4 w-4" /> Embed</TabsTrigger>
-        <TabsTrigger value="disciplinas"><BookOpen className="mr-1.5 h-4 w-4" /> Disciplinas</TabsTrigger>
-        <TabsTrigger value="armazenamento"><HardDrive className="mr-1.5 h-4 w-4" /> Armazenamento</TabsTrigger>
-        <TabsTrigger value="acessos"><ShieldCheck className="mr-1.5 h-4 w-4" /> Acessos (RBAC)</TabsTrigger>
+        <TabsTrigger value="geral">Geral</TabsTrigger>
+        <TabsTrigger value="aparencia">Aparência</TabsTrigger>
+        <TabsTrigger value="login">Login</TabsTrigger>
+        <TabsTrigger value="avisos">Avisos</TabsTrigger>
+        <TabsTrigger value="embed">Embed</TabsTrigger>
+        <TabsTrigger value="disciplinas">Disciplinas</TabsTrigger>
+        <TabsTrigger value="armazenamento">Armazenamento</TabsTrigger>
+        <TabsTrigger value="acessos">Acessos (RBAC)</TabsTrigger>
       </TabsList>
 
       <TabsContent value="disciplinas">

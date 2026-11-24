@@ -169,6 +169,7 @@ function normalizarRestricoes(raw) {
         if (!tipo || !a)
             continue;
         const rel = RELACIONAIS.includes(tipo);
+        const dias = listaInt(o.dias, [], 0, 6);
         const b = rel ? ((_a = exports.FAMILIAS_RESTRICAO.find((f) => f === o.tipoB)) !== null && _a !== void 0 ? _a : null) : null;
         if (rel && !b)
             continue;
@@ -182,8 +183,9 @@ function normalizarRestricoes(raw) {
         ids.add(id);
         out.push({
             id, tipo, ativa: bool(o.ativa, true), rotulo: (typeof o.rotulo === 'string' ? o.rotulo : '').slice(0, 80), tipoA: a, tipoB: b,
-            valor: tipo === 'max_por_dia' ? int(o.valor, 1, 1, 6) : tipo === 'depois_de' ? int(o.valor, 1, 0, 60) : 0,
+            valor: tipo === 'max_por_dia' ? int(o.valor, 1, 0, 6) : tipo === 'depois_de' ? int(o.valor, 1, 0, 60) : 0,
             faixas: listaInt(o.faixas, [], 1, 3),
+            ...(dias.length ? { dias } : {}),
         });
         if (out.length >= 40)
             break;
@@ -667,6 +669,7 @@ exports.baseDeRegras = baseDeRegras;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EXEMPLOS_RESTRICOES = exports.restricaoBloqueia = exports.ROTULO_TIPO_RESTRICAO = exports.ROTULO_FAMILIA = void 0;
+exports.diaSemanaISO = diaSemanaISO;
 exports.somaDiasISO = somaDiasISO;
 exports.restricaoQueBloqueia = restricaoQueBloqueia;
 exports.detectarConflitosRestricoes = detectarConflitosRestricoes;
@@ -689,6 +692,11 @@ exports.ROTULO_TIPO_RESTRICAO = {
 };
 const famDe = (id) => (0, tipos_meta_1.familiaDoTipo)(id.split(':')[0]);
 const ehVariante = (id) => /:(revisao|reforco|hist):/.test(id);
+/** Dia da semana de uma data ISO: 0 = segunda … 6 = domingo. */
+function diaSemanaISO(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
 function somaDiasISO(iso, n) {
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
@@ -707,6 +715,8 @@ function restricaoQueBloqueia(restricoes, id, d, ctx) {
         if (!r.ativa)
             continue;
         if (r.faixas.length && !r.faixas.includes(ctx.faixa))
+            continue;
+        if (r.dias && r.dias.length && !r.dias.includes(diaSemanaISO(d)))
             continue;
         switch (r.tipo) {
             case 'max_por_dia': {
@@ -776,6 +786,8 @@ function detectarConflitosRestricoes(restricoes) {
             erros.push('PDFull não pode ser "só na sobra do dia": a leitura é o que abre o dia e o plano não fecharia.');
         if (r.tipo === 'nao_dias_seguidos' && r.tipoA === 'pf')
             avisos.push('PDFull "não em dias seguidos" pode impedir que a leitura caiba na semana (o motor então não gera o plano).');
+        if (r.tipo === 'max_por_dia' && r.valor === 0 && r.tipoA === 'pf' && !(r.dias && r.dias.length && r.dias.length < 7))
+            erros.push('PDFull "no máximo 0 por dia" em todos os dias impede qualquer leitura: o plano não seria gerado.');
         if (r.tipo === 'max_por_dia' && r.tipoA === 'jp')
             avisos.push('Jurisprudência já é no máximo 1 por semana; o limite por dia não muda o plano.');
     }
@@ -818,10 +830,11 @@ exports.EXEMPLOS_RESTRICOES = [
 ];
 /** Descrição legível de uma restrição (UI, avisos, relatórios). */
 function descreverRestricao(r) {
-    const esc = r.faixas.length ? ` (faixa ${r.faixas.join(', ')})` : '';
+    const NOMES_DIA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+    const esc = (r.faixas.length ? ` (faixa ${r.faixas.join(', ')})` : '') + (r.dias && r.dias.length ? ` (${r.dias.map((d) => NOMES_DIA[d]).join(', ')})` : '');
     const A = nome(r.tipoA), B = r.tipoB ? nome(r.tipoB) : '';
     switch (r.tipo) {
-        case 'max_por_dia': return `${A}: no máximo ${r.valor} por dia${esc}`;
+        case 'max_por_dia': return r.valor === 0 ? `${A}: bloqueado${esc}` : `${A}: no máximo ${r.valor} por dia${esc}`;
         case 'nao_mesmo_dia': return `${A} não no mesmo dia que ${B}${esc}`;
         case 'nao_dias_seguidos': return `${A} não em dias seguidos${esc}`;
         case 'so_na_sobra': return `${A} só na sobra do dia${esc}`;

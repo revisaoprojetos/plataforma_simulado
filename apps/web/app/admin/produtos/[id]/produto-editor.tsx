@@ -10,6 +10,7 @@
 // sobrescreveria os campos do outro.
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -282,14 +283,7 @@ export function ProdutoEditor({ produto, membrosIniciais, podeEditar }: { produt
       </div>
 
       {/* Abas de linha */}
-      <div className="flex gap-4 overflow-x-auto border-b">
-        {ABAS.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setAba(k)}
-            className={`-mb-px shrink-0 border-b-2 px-1 pb-2 text-sm font-medium transition-colors ${aba === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <AbasLinha ativo={aba} itens={ABAS.map(([k, label]) => ({ key: k, label, onClick: () => setAba(k) }))} />
 
       {/* ───────── IDENTIDADE ───────── */}
       {aba === 'identidade' && (

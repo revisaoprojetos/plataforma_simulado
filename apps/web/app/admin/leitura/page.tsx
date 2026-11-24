@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Library, ArrowLeft, Home, ChevronRight } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { ArrowLeft, Home, ChevronRight } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-grid'
 import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
@@ -14,7 +15,6 @@ import { carregarCarimbosModulo, carregarConquistasModulo, listarAulasDoModulo }
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,28 +56,25 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
         />
       ) : (
         <>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-2">
-            {pasta && (
-              <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            )}
-            <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Desafio de Lei Seca</h1>
-              <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
+        <CabecalhoArea
+          titulo="Desafio de Lei Seca"
+          descricao="Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno."
+          acoes={
+            <>
+              {pasta && (
+                <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              )}
             {data.ok && pasta && data.moduloAtual && (
               <>
                 <CopiarLinkModuloBotao pastaId={pasta} />
                 <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
               </>
             )}
-          </div>
-        </div>
-        <BarraSetorSlot />
+            </>
+          }
+        />
         </>
       )}
 

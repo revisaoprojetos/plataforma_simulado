@@ -5,7 +5,7 @@ import { Search, Loader2, Eye, ExternalLink, SlidersHorizontal } from 'lucide-re
 import { cn } from '@/lib/utils'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { useImpersonationDock, Barra, BannerAviso, Corpo, TabStrip } from '@/components/admin/impersonation/impersonation-dock'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 /** Página do console (consome o provider global). Picker + abas das visualizações abertas + a
  *  área da ativa. As janelas e a divisão são globais (no layout), por isso persistem ao navegar. */
@@ -30,15 +30,12 @@ export function ImpersonationConsole() {
 
   return (
     <div className="animate-page space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Eye className="h-6 w-6 text-primary" /> Visualização de aluno</h1>
-          <p className="text-sm text-muted-foreground">Abra a conta de um aluno e opere como ele — as ações contam como do próprio aluno. O histórico fica em <Link href="/admin/auditoria?tipo=visualizacoes" className="text-primary hover:underline">Auditoria</Link>.</p>
-        </div>
-        {d.isAdmin && <Link href="/admin/impersonation/config" className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-muted"><SlidersHorizontal className="h-4 w-4" /> Configurar</Link>}
-      </div>
+      <CabecalhoArea
+        titulo="Visualização de aluno"
+        descricao={<>Abra a conta de um aluno e opere como ele — as ações contam como do próprio aluno. O histórico fica em <Link href="/admin/auditoria?tipo=visualizacoes" className="text-primary hover:underline">Auditoria</Link>.</>}
+        acoes={d.isAdmin ? <Link href="/admin/impersonation/config" className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-muted"><SlidersHorizontal className="h-4 w-4" /> Configurar</Link> : undefined}
+      />
 
-      <BarraSetorSlot />
       {!d.podeAbrir && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300">Seu papel não pode visualizar alunos. Peça a um administrador para habilitar em <b>Configurar</b>.</div>
       )}

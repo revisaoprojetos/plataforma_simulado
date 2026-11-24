@@ -1,6 +1,6 @@
-import Link from 'next/link'
-import { ArrowLeft, Package } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Package } from 'lucide-react'
+import { Suspense } from 'react'
+import { VoltarCronogramas } from '@/components/admin/cronograma/voltar-cronogramas'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { checkPermission } from '@/lib/auth/permissions'
 import { carregarPacote } from '../actions'
@@ -15,10 +15,7 @@ export default async function PacoteDetalhePage({ params }: { params: Promise<{ 
   return (
     <div className="animate-page space-y-6">
       <div>
-        <Link href="/admin/cronogramas/pacotes" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar aos acessos
-        </Link>
+        <Suspense fallback={null}><VoltarCronogramas tela="pacote" /></Suspense>
       </div>
 
       {!r.ok || !r.dados ? (

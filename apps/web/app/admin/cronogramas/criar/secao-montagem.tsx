@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowDownUp, ArrowUp, BookOpen, Calculator, CheckCircle2, Info, Layers, ListOrdered, Loader2, Plus, Scale, Settings2, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -709,9 +710,6 @@ function PickerConteudos({
     }
   }
 
-  const tabCls = (on: boolean) =>
-    cn('flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition', on ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')
-
   return (
     <Dialog open={aberto} onOpenChange={(o) => !o && aoFechar()}>
       <DialogContent className="w-full sm:max-w-4xl">
@@ -720,10 +718,11 @@ function PickerConteudos({
           <DialogDescription>Cada disciplina entra uma vez. A aba LegProc mostra as que têm legislação seca.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex w-fit rounded-lg border p-0.5">
-            <button onClick={() => setAba('disciplinas')} className={tabCls(aba === 'disciplinas')}><BookOpen className="h-3.5 w-3.5" /> Disciplinas ({porDisciplina.length})</button>
-            <button onClick={() => setAba('legproc')} className={tabCls(aba === 'legproc')}><Scale className="h-3.5 w-3.5" /> LegProc ({legproc.length})</button>
-          </div>
+          <AbasLinhaControlada
+            valor={aba}
+            onChange={setAba}
+            itens={[{ valor: 'disciplinas', label: `Disciplinas (${porDisciplina.length})` }, { valor: 'legproc', label: `LegProc (${legproc.length})` }]}
+          />
           <label
             className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"
             title="Ao marcar uma disciplina que tem LegProc, marca também o LegProc dela (e vice-versa). Desligado, cada aba é independente."

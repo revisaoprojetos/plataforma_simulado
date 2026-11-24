@@ -5,7 +5,7 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { resumosSimulados } from '../_resumos'
 import { RelatorioSimuladoView } from './relatorio-simulado-view'
 import { montarRelatorioSimulado } from './_dados'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 // Sempre renderiza com dados frescos (reflete matrículas/sessões recém-criadas).
 export const dynamic = 'force-dynamic'
@@ -20,13 +20,8 @@ export default async function RelatorioSimuladoPage({ searchParams }: { searchPa
 
   return (
     <div className="space-y-5">
-      <div>
-        {simId && <Voltar href="/admin/relatorios/simulados" label="Todos os simulados" />}
-        <h1 className="text-2xl font-bold tracking-tight">Relatório por Simulado</h1>
-        <p className="text-muted-foreground">{simId ? 'Análise completa do simulado.' : 'Todos os simulados — clique num para ver a análise completa.'}</p>
-      </div>
-
-      <BarraSetorSlot />
+      {simId && <Voltar href="/admin/relatorios/simulados" label="Todos os simulados" />}
+      <CabecalhoArea titulo="Relatório por Simulado" descricao={simId ? 'Análise completa do simulado.' : 'Todos os simulados — clique num para ver a análise completa.'} />
       {!simId ? (
         <SimuladosLista itens={resumos} />
       ) : dados ? (

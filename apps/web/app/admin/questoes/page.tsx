@@ -1,5 +1,8 @@
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -21,7 +24,6 @@ import { listarUnificacoesRecentes } from './disciplinas-actions'
 import { EtiquetasClient } from '../etiquetas/etiquetas-client'
 import { listarEtiquetas } from '../etiquetas/actions'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
 
 const PER_PAGE_OPTIONS = [10, 12, 15, 20]
 const PER_PAGE_DEFAULT = 12
@@ -62,10 +64,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         : 'questoes'
   const tipoTax = ehTipoTaxonomia(params.tipoTax) ? params.tipoTax : 'disciplina'
 
-  const supabase = await createServiceClient()
-  const tenantId = await getCurrentTenantId()
   // Super-admin: libera a aba "Plataformas" do "Nova Questão" (importar questões de outro tenant).
-  const podeImportarPlataforma = await isSuperAdmin()
+  const [supabase, tenantId, podeImportarPlataforma] = await Promise.all([createServiceClient(), getCurrentTenantId(), isSuperAdmin()])
 
   // ── Aba QUESTÕES: filtro (disciplinas) + lista paginada (só busca aqui) ──
   let disciplinas: { id: string; nome: string }[] = []
@@ -76,10 +76,13 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const nomeOrgao = new Map<string, string>()
   const qtdAlternativas = new Map<string, number>()
   if (tab === 'questoes') {
-    const { data: disc } = await supabase
-      .from('simulado_disciplinas').select('id, nome')
-      .eq('tenant_id', tenantId ?? NADA).order('nome')
-    disciplinas = (disc ?? []) as { id: string; nome: string }[]
+    // Disciplinas (filtro) em paralelo com a query principal; taxonomia muda pouco → cache 5 min por tenant.
+    const discP = remember(chaveRelatorio(tenantId, 'questoes-filtro-disciplinas'), 300, async () => {
+      const { data: disc } = await supabase
+        .from('simulado_disciplinas').select('id, nome')
+        .eq('tenant_id', tenantId ?? NADA).order('nome')
+      return (disc ?? []) as { id: string; nome: string }[]
+    })
 
     // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
     // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
@@ -104,9 +107,12 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       if (tipo) query = query.eq('tipo', tipo)
       return query
     }
-    let res = await montarQuery(true, true)
-    if (res.error && /(cargo|assunto_detalhe|assunto_id|orgao_id)/i.test(res.error.message)) res = await montarQuery(true, false)
-    if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false, false)
+    // SELECT fixo (colunas codigo/cargo/assunto_detalhe/assunto_id/orgao_id já migradas). Um único
+    // fallback mínimo p/ bases antigas/dev — sem a escada de 3 tentativas no caminho feliz.
+    const [discRes, resFull] = await Promise.all([discP, montarQuery(true, true)])
+    disciplinas = discRes
+    let res = resFull
+    if (res.error) res = await montarQuery(false, false)
     questoes = (res.data ?? []) as any[]
     count = res.count
     totalPages = Math.ceil((count ?? 0) / perPage)
@@ -147,39 +153,33 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       ])
     : [[], []]
 
-  const tabCls = (ativo: boolean) => cn('flex items-center gap-1.5 border-b-2 px-1 pb-2 font-medium transition-colors', ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Questões</h1>
-          <p className="text-muted-foreground">
-            {tab === 'questoes'
+      <CabecalhoArea
+        titulo="Questões"
+        descricao={tab === 'questoes'
               ? `${count ?? 0} questões cadastradas`
               : tab === 'etiquetas'
                 ? `${etiquetas.length} etiqueta(s) — rótulos para organizar e sinalizar questões`
                 : tab === 'classificacao'
                   ? `${discClass.length} disciplina(s) — classifique e dê cor (usado no Cronograma Adaptativo)`
                   : `${itensTax.length} item(ns) — mescle os duplicados`}
-          </p>
-        </div>
-        {tab === 'questoes' && (
-          <div className="flex items-center gap-2">
+        acoes={tab === 'questoes' ? (
+          <>
             <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
             <NovaQuestaoDialog podeImportarPlataforma={podeImportarPlataforma} />
-          </div>
-        )}
-      </div>
-
-      <BarraSetorSlot />
-      {/* Abas: Questões · Unificação · Etiquetas */}
-      <div className="flex gap-4 border-b text-sm">
-        <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>
-        <Link href="/admin/questoes?tab=unificacao" className={tabCls(tab === 'unificacao')}><Merge className="h-4 w-4" /> Unificação</Link>
-        <Link href="/admin/questoes?tab=classificacao" className={tabCls(tab === 'classificacao')}><Layers className="h-4 w-4" /> Classificação</Link>
-        <Link href="/admin/questoes?tab=etiquetas" className={tabCls(tab === 'etiquetas')}><Tag className="h-4 w-4" /> Etiquetas</Link>
-      </div>
+          </>
+        ) : undefined}
+        abas={
+          <AbasLinha ativo={tab} itens={[
+        { key: 'questoes', label: 'Questões', href: '/admin/questoes' },
+        { key: 'unificacao', label: 'Unificação', href: '/admin/questoes?tab=unificacao' },
+        { key: 'classificacao', label: 'Classificação', href: '/admin/questoes?tab=classificacao' },
+        { key: 'etiquetas', label: 'Etiquetas', href: '/admin/questoes?tab=etiquetas' },
+      ]} />
+        }
+      />
 
       {tab === 'classificacao' ? (
         <DisciplinasClassificacao itens={discClass} pastas={pastasConteudo} />

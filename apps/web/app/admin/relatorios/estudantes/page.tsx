@@ -6,9 +6,10 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioEstudanteView, type DadosRelatorioEstudante } from './relatorio-estudante-view'
 import { EstudantesLista, type AgregadoEstudante } from './estudantes-lista'
 import { montarRelatorioEstudante } from './_dados'
+import { agregadosEstudantesSql } from '@/lib/relatorios/agregados-sql'
 import type { EstudanteBase } from '@/app/admin/estudantes/actions-tipos'
 import {carregarLoteEstudantes} from '@/app/admin/estudantes/actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 const PRIMEIRA_PAGINA = 30
 
@@ -34,6 +35,9 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
     const [batch, agg] = await Promise.all([
       carregarLoteEstudantes(0, PRIMEIRA_PAGINA, true, { comAgregados: false }),
       remember<Record<string, AgregadoEstudante>>(chaveRelatorio(tenantId, 'estudantes', 'agregados'), TTL_RELATORIO, async () => {
+        // GROUP BY no banco (1 linha por aluno com sessão) em vez de varrer todas as sessões no JS.
+        const viaSql = await agregadosEstudantesSql(tid)
+        if (viaSql) return viaSql
         const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
           .select('estudante_id, nota, iniciado_em')
           .eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
@@ -58,13 +62,8 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
 
   return (
     <div className="space-y-5">
-      <div>
-        {estId && <Voltar href="/admin/relatorios/estudantes" label="Todos os estudantes" />}
-        <h1 className="text-2xl font-bold tracking-tight">Relatório por Estudante</h1>
-        <p className="text-muted-foreground">{estId ? 'Evolução e desempenho vs. a turma.' : 'Todos os estudantes — clique num para ver a análise detalhada.'}</p>
-      </div>
-
-      <BarraSetorSlot />
+      {estId && <Voltar href="/admin/relatorios/estudantes" label="Todos os estudantes" />}
+      <CabecalhoArea titulo="Relatório por Estudante" descricao={estId ? 'Evolução e desempenho vs. a turma.' : 'Todos os estudantes — clique num para ver a análise detalhada.'} />
       {!estId ? (
         <EstudantesLista inicial={inicial} agregados={agregados} total={total} />
       ) : dados ? (

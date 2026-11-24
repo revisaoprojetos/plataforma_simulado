@@ -44,22 +44,24 @@ export function CardConteudo({
   onClick?: () => void
   className?: string
   /** Modo de seleção (admin): mostra o checkbox e o clique no card alterna a seleção. */
-  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string }
+  selecao?: { marcado: boolean; onToggle: (shift: boolean) => void; rotulo?: string; /** fora do modo de seleção: só mostra o ícone (hover) que ENTRA no modo ao clicar */ inativo?: boolean }
 }) {
+  const inativo = !!selecao?.inativo
+  const selAtiva = selecao && !inativo ? selecao : undefined
   const Icone = ICONE[kind]
   const tipo = TIPOS_CONTEUDO[kind]
   // Capa lazy pode dar 404 (não cacheada) → cai no placeholder do tipo, sem imagem quebrada.
   const [imgErro, setImgErro] = useState(false)
   return (
     <div
-      onClick={selecao ? (e) => selecao.onToggle(e.shiftKey) : onClick}
-      role={selecao ? 'checkbox' : onClick ? 'button' : undefined}
-      aria-checked={selecao ? selecao.marcado : undefined}
-      tabIndex={onClick || selecao ? 0 : undefined}
-      onKeyDown={onClick || selecao ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (selecao) selecao.onToggle(e.shiftKey); else onClick?.() } } : undefined}
+      onClick={selAtiva ? (e) => selAtiva.onToggle(e.shiftKey) : onClick}
+      role={selAtiva ? 'checkbox' : onClick ? 'button' : undefined}
+      aria-checked={selAtiva ? selAtiva.marcado : undefined}
+      tabIndex={onClick || selAtiva ? 0 : undefined}
+      onKeyDown={onClick || selAtiva ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (selAtiva) selAtiva.onToggle(e.shiftKey); else onClick?.() } } : undefined}
       className={cn(
         'group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all',
-        (onClick || selecao) && 'cursor-pointer hover:border-primary/30 hover:shadow-md',
+        (onClick || selAtiva) && 'cursor-pointer hover:border-primary/30 hover:shadow-md',
         selecao?.marcado && 'border-primary ring-2 ring-primary/60',
         className,
       )}
@@ -75,8 +77,8 @@ export function CardConteudo({
           </div>
         )}
         <div className="absolute left-2 top-2"><SeloTipo kind={kind} tamanho="sm" /></div>
-        {selecao && <div className="absolute right-2 top-2 z-10"><CheckSelecao marcado={selecao.marcado} onToggle={selecao.onToggle} rotulo={selecao.rotulo ?? `Selecionar ${titulo}`} /></div>}
-        {novo && (
+        {selecao && <div className={cn('absolute right-2 top-2 z-10', inativo && 'opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100')}><CheckSelecao marcado={selecao.marcado} onToggle={selecao.onToggle} rotulo={selecao.rotulo ?? `Selecionar ${titulo}`} /></div>}
+        {novo && !selecao && (
           <span className="absolute right-2 top-2 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground shadow">NOVO</span>
         )}
         {typeof progressoPct === 'number' && (

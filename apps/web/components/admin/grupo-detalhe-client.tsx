@@ -10,6 +10,7 @@ import { ImportarMembrosDialog } from '@/components/admin/importar-membros-dialo
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import {
   ChevronLeft, Pencil, Users, UserPlus, UserMinus, Search, Upload, Loader2, X, Download,
@@ -181,22 +182,11 @@ export function GrupoDetalheClient({ grupo, membros: membrosBase, subgrupos, pas
         </div>
       </div>
 
-      {/* Abas (segmentadas, mesmo modelo + ícones) */}
-      <div>
-        <div className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border bg-card p-1 shadow-sm">
-          {abas.map((t) => {
-            const on = aba === t.k
-            return (
-              <button key={t.k} type="button" onClick={() => setAba(t.k)}
-                className={cn('inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors',
-                  on ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
-                <t.icon className="h-4 w-4" /> {t.label}
-                {t.count != null && <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold', on ? 'bg-white/20 text-primary-foreground' : 'bg-muted text-muted-foreground')}>{nf(t.count)}</span>}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      {/* Abas (padrão único: AbasLinha) */}
+      <AbasLinha
+        ativo={aba}
+        itens={abas.map((t) => ({ key: t.k, label: t.label, badge: t.count != null ? nf(t.count) : undefined, onClick: () => setAba(t.k) }))}
+      />
 
       {/* ── Participantes ── */}
       {aba === 'participantes' && (

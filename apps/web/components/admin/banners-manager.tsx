@@ -16,6 +16,7 @@ function fileToDataUrl(f: File): Promise<string> {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Switch } from '@/components/ui/switch'
 import { criarBannerAction, toggleBannerAction, excluirBannerAction, reordenarBannersAction, toggleBannerDesempenhoAction } from '@/app/admin/configuracoes/banners/actions'
@@ -190,15 +191,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   return (
     <div className="space-y-5">
       {/* Abas por tipo de aviso */}
-      <div className="flex flex-wrap gap-1.5 rounded-2xl border bg-card p-1.5 shadow-sm">
-        {TABS.map(({ t, label, Icon }) => (
-          <button key={t} type="button" onClick={() => { if (t !== aba) setUiTipo(t) }}
-            className={cn('flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition', aba === t ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
-            <Icon className="h-4 w-4" /> {label}
-            <span className={cn('ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', aba === t ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/15 text-muted-foreground')}>{contaTab(t)}</span>
-          </button>
-        ))}
-      </div>
+      <AbasLinha
+        ativo={aba}
+        itens={TABS.map(({ t, label }) => ({ key: t, label, badge: contaTab(t), onClick: () => { if (t !== aba) setUiTipo(t) } }))}
+      />
 
       {/* Modal de criação (abre pelo botão "Adicionar") */}
       {criando && typeof document !== 'undefined' && createPortal(

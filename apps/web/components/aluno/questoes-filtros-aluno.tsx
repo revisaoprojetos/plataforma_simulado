@@ -12,6 +12,7 @@ export type AssuntoOpt = { id: string; nome: string; disciplina_id: string | nul
 export type FiltrosParams = {
   tipo?: string; minhas?: string; disciplina?: string; assunto?: string
   banca?: string; ano?: string; dificuldade?: string; busca?: string; comentadas?: string; favoritas?: string
+  erros_simulado?: string
 }
 
 const DIFICULDADES = [{ v: 'facil', r: 'Fácil' }, { v: 'medio', r: 'Médio' }, { v: 'dificil', r: 'Difícil' }]
@@ -70,6 +71,7 @@ export function QuestoesFiltrosAluno({
   if (f.dificuldade) chips.push({ k: 'dificuldade', label: DIFICULDADES.find((d) => d.v === f.dificuldade)?.r ?? f.dificuldade })
   if (f.comentadas) chips.push({ k: 'comentadas', label: 'Gabarito comentado' })
   if (f.favoritas) chips.push({ k: 'favoritas', label: 'Favoritas' })
+  if (f.erros_simulado) chips.push({ k: 'erros_simulado', label: 'Erros do simulado' })
   if (f.busca) chips.push({ k: 'busca', label: `"${f.busca}"` })
   const ativos = chips.length
 

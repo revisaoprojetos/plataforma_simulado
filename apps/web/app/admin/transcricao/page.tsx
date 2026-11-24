@@ -1,10 +1,9 @@
-import { Plug } from 'lucide-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { statusConfigIA } from './actions'
 import { TranscricaoTabs } from './transcricao-tabs'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export const dynamic = 'force-dynamic'
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -34,14 +33,10 @@ export default async function TranscricaoIAPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Plug className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Chaves de API</h1>
-          <p className="text-muted-foreground">Duas direções: a <b>IA que o sistema usa</b> para transcrever (chave de saída) e as <b>APIs de fora</b> — chaves de acesso para sistemas externos (entrada).</p>
-        </div>
-      </div>
-      <BarraSetorSlot />
+      <CabecalhoArea
+        titulo="Chaves de API"
+        descricao={<>Duas direções: a <b>IA que o sistema usa</b> para transcrever (chave de saída) e as <b>APIs de fora</b> — chaves de acesso para sistemas externos (entrada).</>}
+      />
       <TranscricaoTabs inicial={inicial} apiKeys={apiKeys} podeApiKeys={podeApiKeys} />
     </div>
   )

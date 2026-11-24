@@ -69,10 +69,21 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
 
   let questoes: any[] = []
   let count = 0
-  if (params.minhas || params.favoritas) {
+  if (params.minhas || params.favoritas || params.erros_simulado) {
     // Filtros "minhas" (resolvidas/…) e/ou "favoritas": em vez de .in()/.not-in() de uma lista GRANDE
     // de ids na URL (estourava 400), busca os IDS que casam a taxonomia (leve) + as respostas e os
     // favoritos do aluno, e intersecta em memória — paginando só a PÁGINA.
+    // erros_simulado=<id>: só as questões que o aluno ERROU nesse simulado (vem do botão "Treinar erros" do resultado).
+    const errosSim = new Set<string>()
+    if (params.erros_simulado) {
+      const { data: ss } = await svc.from('simulado_sessoes_prova').select('id')
+        .eq('estudante_id', estId).eq('simulado_id', params.erros_simulado).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
+      const sids = (ss ?? []).map((s: any) => s.id)
+      if (sids.length) {
+        const { data: rs } = await svc.from('simulado_respostas_objetivas').select('questao_id').in('sessao_id', sids).eq('correta', false)
+        for (const r of (rs ?? []) as any[]) if (r.questao_id) errosSim.add(r.questao_id)
+      }
+    }
     const [idsFiltrados, ra, favRows] = await Promise.all([
       fetchAll<{ id: string }>(() => aplicarFiltros(svc.from('simulado_questoes').select('id')).order('created_at', { ascending: false })),
       params.minhas
@@ -93,7 +104,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
             : params.minhas === 'acertei' ? acertei.has(id)
               : params.minhas === 'errei' ? errei.has(id)
                 : true
-      return okMinhas && (!params.favoritas || favSetF.has(id))
+      return okMinhas && (!params.favoritas || favSetF.has(id)) && (!params.erros_simulado || errosSim.has(id))
     })
     count = alvo.length
     const pageIds = alvo.slice(offset, offset + POR_PAGINA)

@@ -1,13 +1,11 @@
 import { SemPermissao } from '@/components/ui/alert-box'
-import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { createAdminClient } from '@/lib/supabase/server'
 import { TIPOS_META, SLUGS_META } from '@/lib/cronograma/adaptativo/tipos-meta'
 import { fichaDoTipo } from '@/lib/cronograma/adaptativo/regras-campos'
 import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
 import { carregarPaginaRegras } from '../regras-pagina'
 import { PersonagensClient, type PersonagemLinha } from './personagens-client'
-
-export const dynamic = 'force-dynamic'
 
 // Admin: Cronograma Adaptativo — PERSONAGENS (tipos de meta). Somente leitura: o registro de tipos é estático no código;
 // o que é editável via regras aparece em cada ficha. Tudo calculado aqui no servidor.
@@ -29,11 +27,7 @@ export default async function PersonagensPage() {
   })
   return (
     <div className="w-full space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cronograma adaptativo · Personagens</h1>
-        <p className="text-muted-foreground">Os tipos de meta do motor, como “fichas de personagem”: quanto duram, quando voltam e quais limites seguem, conforme as regras vigentes desta plataforma.</p>
-      </div>
-      <AdaptativoTabs />
+      <TituloTela titulo="Personagens" descricao="Os tipos de meta do motor, como “fichas de personagem”: quanto duram, quando voltam e quais limites seguem, conforme as regras vigentes desta plataforma." />
       <PersonagensClient linhas={linhas} versao={p.registro.versao} />
     </div>
   )

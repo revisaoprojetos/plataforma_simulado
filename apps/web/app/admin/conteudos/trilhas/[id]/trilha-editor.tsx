@@ -5,6 +5,7 @@
 // REUSA <FilePicker> para banner/conquista (imagem via "Link externo" ou vídeo via "Vídeo").
 
 import { useMemo, useState, useTransition } from 'react'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -127,13 +128,8 @@ export function TrilhaEditor({ trilha, produtos, outrasTrilhas, tenantId, tabIni
       </div>
 
       {/* Abas (sublinhado) */}
-      <div className="flex items-center gap-1 border-b">
-        {([['informacoes', 'Informações'], ['imagens', 'Imagens'], ['conteudos', 'Conteúdos']] as [Tab, string][]).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} className={cn('-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors', tab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {label}{k === 'conteudos' && <span className="rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary">{itens.length}</span>}
-          </button>
-        ))}
-      </div>
+      <AbasLinha ativo={tab}
+        itens={([['informacoes', 'Informações'], ['imagens', 'Imagens'], ['conteudos', 'Conteúdos']] as [Tab, string][]).map(([k, label]) => ({ key: k, label, badge: k === 'conteudos' ? itens.length : undefined, onClick: () => setTab(k) }))} />
 
       {tab === 'informacoes' && (
         <AbaInformacoes

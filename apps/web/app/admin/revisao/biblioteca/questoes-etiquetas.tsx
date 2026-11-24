@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -419,15 +420,10 @@ function DetalheDrawer({ et, podeEditar, onClose, onVer, onMudou, onMesclar, onE
   return (
     <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl" aria-describedby={undefined}>
-        <SheetHeader className="border-b p-4 pb-0">
+        <SheetHeader className="p-4 pb-0">
           <SheetTitle className="flex items-center gap-2"><Chip nome={et.nome} cor={et.cor} /></SheetTitle>
           <SheetDescription>{n(et.questoes)} {et.questoes === 1 ? 'questão' : 'questões'} · {n(et.emSimulados)} em simulados · {f ? `função: ${f.nome}` : 'só rótulo'}</SheetDescription>
-          <div className="-mb-px mt-2 flex gap-1 overflow-x-auto" role="tablist" aria-label="Seções da etiqueta">
-            {ABAS.map((a) => (
-              <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}
-                className={cn('-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors', aba === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>{a.nome}</button>
-            ))}
-          </div>
+          <AbasLinhaControlada className="-mx-4 mt-2 px-4" aria-label="Seções da etiqueta" valor={aba} onChange={setAba} itens={ABAS.map((a) => ({ valor: a.id, label: a.nome }))} />
         </SheetHeader>
         <div className="min-h-0 flex-1 space-y-5 overflow-auto p-4">
           {aba === 'aplicar' ? <AplicarSemEtiqueta et={et} onFeito={() => { carregar(true); onMudou() }} /> : erro && !d ? <ErroTentar msg={erro} onTentar={() => carregar(true)} /> : !d ? <Carregando linhas={5} /> : aba === 'resumo' ? (<>

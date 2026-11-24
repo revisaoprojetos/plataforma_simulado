@@ -1,4 +1,5 @@
 'use client'
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
@@ -224,13 +225,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       </section>
 
       {/* ABAS */}
-      <div className="tabs" role="tablist">
-        {TABS.map((tb) => (
-          <button key={tb.k} className={aba === tb.k ? 'tab on' : 'tab'} onClick={() => setAba(tb.k)} role="tab" aria-selected={aba === tb.k}>
-            {tb.label}{tb.n != null && <span className="n">{tb.n}</span>}
-          </button>
-        ))}
-      </div>
+      <AbasLinhaControlada valor={aba} onChange={setAba} itens={TABS.map((tb) => ({ valor: tb.k, label: tb.label, badge: tb.n }))} />
 
       {aba === 'visao' && <AbaVisao base={base} dados={dados} tp={tp} />}
       {aba === 'acesso' && <AbaAcesso base={base} dados={dados} tp={tp} />}
@@ -536,13 +531,7 @@ function AbaHistorico({ dados }: { dados: GestaoDados }) {
   const [sub, setSub] = useState<'ver' | 'ent' | 'atu'>('ver')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div className="seg" role="tablist">
-          <button className={sub === 'ver' ? 'sg on' : 'sg'} onClick={() => setSub('ver')} role="tab" aria-selected={sub === 'ver'}>Versões do arquivo</button>
-          <button className={sub === 'ent' ? 'sg on' : 'sg'} onClick={() => setSub('ent')} role="tab" aria-selected={sub === 'ent'}>Entregas e permissões</button>
-          <button className={sub === 'atu' ? 'sg on' : 'sg'} onClick={() => setSub('atu')} role="tab" aria-selected={sub === 'atu'}>Atualizações</button>
-        </div>
-      </div>
+      <AbasLinhaControlada valor={sub} onChange={setSub} itens={[{ valor: 'ver', label: 'Versões do arquivo' }, { valor: 'ent', label: 'Entregas e permissões' }, { valor: 'atu', label: 'Atualizações' }]} />
       {sub === 'ver' && (
         <div className="kc" style={{ gap: 0, padding: '4px 18px' }}>
           {versoes.length === 0 && <div style={{ padding: 16, fontSize: 13, color: 'var(--muted-foreground)' }}>Sem versões.</div>}

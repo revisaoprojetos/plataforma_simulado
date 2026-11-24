@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { Reporte, Avaliacao, StatusReporte, TipoReporte } from './tipos'
 
 // DEMANDAS (material) — camada de dados (I/O). Reportes + avaliações do Leitor. Tipos puros em ./tipos.
@@ -60,15 +60,16 @@ export async function minhaAvaliacao(
 // ───────────────────────────── Admin (Central de Demandas) ─────────────────────────────
 
 export async function listarReportesAdmin(
-  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusReporte },
+  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusReporte; limite?: number },
 ): Promise<Reporte[]> {
   if (!tenantId) return []
-  const rows = await fetchAll<Reporte>(() => {
-    let q = svc.from(T_REP).select(SEL_REP).eq('tenant_id', tenantId)
-    if (filtro?.status) q = q.eq('status', filtro.status)
-    return q.order('criado_em', { ascending: false }).order('id', { ascending: false })
-  })
-  return rows ?? []
+  // Paginado no banco (.range): só os `limite` mais recentes (padrão 300).
+  const lim = Math.max(1, filtro?.limite ?? 300)
+  let q = svc.from(T_REP).select(SEL_REP).eq('tenant_id', tenantId)
+  if (filtro?.status) q = q.eq('status', filtro.status)
+  const { data, error } = await q.order('criado_em', { ascending: false }).order('id', { ascending: false }).range(0, lim - 1)
+  if (error) throw error
+  return (data ?? []) as Reporte[]
 }
 
 /** Admin responde e/ou muda o status do reporte. */
@@ -92,22 +93,27 @@ export async function resolverReporte(
 
 /** Avaliações baixas (1–2 estrelas) = fila "Precisa de você". */
 export async function listarAvaliacoesBaixas(
-  svc: SupabaseClient, tenantId: string,
+  svc: SupabaseClient, tenantId: string, limite = 300,
 ): Promise<Avaliacao[]> {
   if (!tenantId) return []
-  const rows = await fetchAll<Avaliacao>(() => svc.from(T_AVA).select(SEL_AVA)
-    .eq('tenant_id', tenantId).lte('nota', 2).order('criado_em', { ascending: false }).order('id', { ascending: false }))
-  return rows ?? []
+  const { data, error } = await svc.from(T_AVA).select(SEL_AVA)
+    .eq('tenant_id', tenantId).lte('nota', 2).order('criado_em', { ascending: false }).order('id', { ascending: false }).range(0, Math.max(1, limite) - 1)
+  if (error) throw error
+  return (data ?? []) as Avaliacao[]
 }
 
 /** Média e total de avaliações por material (para a visão do admin). */
 export async function resumoAvaliacoesPorMaterial(
-  svc: SupabaseClient, tenantId: string,
+  svc: SupabaseClient, tenantId: string, documentoIds?: string[],
 ): Promise<Map<string, { media: number; total: number }>> {
   const out = new Map<string, { media: number; total: number; soma?: number }>()
   if (!tenantId) return out as Map<string, { media: number; total: number }>
-  const rows = await fetchAll<{ documento_id: string; nota: number }>(() => svc.from(T_AVA)
-    .select('documento_id, nota').eq('tenant_id', tenantId).order('id', { ascending: true }))
+  // Com `documentoIds` (os materiais exibidos), lê só as avaliações desses (chunk 80); sem, varre o tenant.
+  const rows = documentoIds
+    ? await fetchAllByIn<{ documento_id: string; nota: number }>([...new Set(documentoIds.filter(Boolean))], (ch) => svc.from(T_AVA)
+        .select('documento_id, nota').eq('tenant_id', tenantId).in('documento_id', ch).order('id', { ascending: true }))
+    : await fetchAll<{ documento_id: string; nota: number }>(() => svc.from(T_AVA)
+        .select('documento_id, nota').eq('tenant_id', tenantId).order('id', { ascending: true }))
   const acc = new Map<string, { soma: number; total: number }>()
   for (const r of rows ?? []) {
     const a = acc.get(r.documento_id) ?? { soma: 0, total: 0 }

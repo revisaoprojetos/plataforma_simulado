@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { FileUp, Loader2 } from 'lucide-react'
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
@@ -104,11 +105,7 @@ export function ImportarTrilhas({ produtoId }: { produtoId: string }) {
               <p className="text-xs text-muted-foreground">{previa.celulasVazias.toLocaleString('pt-BR')} célula(s) vazia(s) (aula fora da trilha) · {previa.celulasIguais.toLocaleString('pt-BR')} já iguais · offset das trilhas novas: 28 dias · data do cronograma = data da planilha + {previa.descontoDias} dia(s). Depois de importar, use “Recalcular data-base”.</p>
               {previa.invalidas.length > 0 && <p className="text-xs text-muted-foreground">Ignoradas por erro ({previa.invalidas.length}): {previa.invalidas.slice(0, 5).map((i) => `linha ${i.linha} (${i.motivo})`).join('; ')}{previa.invalidas.length > 5 ? '…' : ''}</p>}
 
-              <div className="flex gap-4 border-b">
-                {([['sem', `Sem aula correspondente (${previa.linhasSemAula})`], ['amostra', 'Amostra das casadas']] as const).map(([id, t]) => (
-                  <button key={id} type="button" onClick={() => setVer(id)} className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium ${ver === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{t}</button>
-                ))}
-              </div>
+              <AbasLinhaControlada valor={ver} onChange={setVer} itens={([['sem', `Sem aula correspondente (${previa.linhasSemAula})`], ['amostra', 'Amostra das casadas']] as const).map(([id, t]) => ({ valor: id, label: t }))} />
               <div className="max-h-72 overflow-auto rounded-lg border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-card">

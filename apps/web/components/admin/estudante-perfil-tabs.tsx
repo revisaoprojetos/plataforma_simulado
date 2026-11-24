@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 
 export interface PerfilTab {
   key: string
@@ -25,43 +24,14 @@ export function EstudantePerfilTabs({ tabs, inicial }: { tabs: PerfilTab[]; inic
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-1 rounded-xl border bg-card p-1 shadow-sm">
-        {tabs.map((t) => {
-          const on = ativa === t.key
-          const cls = cn(
-            'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-            on ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-          )
-          if (t.href) {
-            return (
-              <Link key={t.key} href={t.href} className={cls}>
-                <span className="flex h-4 w-4 items-center justify-center">{t.icon}</span>
-                {t.label}
-              </Link>
-            )
-          }
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setAtiva(t.key)}
-              aria-current={on ? 'page' : undefined}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-                on ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <span className="flex h-4 w-4 items-center justify-center">{t.icon}</span>
-              {t.label}
-              {t.count != null && (
-                <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', on ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground')}>
-                  {t.count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      <AbasLinha
+        ativo={ativa ?? ''}
+        itens={tabs.map((t) =>
+          t.href
+            ? { key: t.key, label: t.label, href: t.href }
+            : { key: t.key, label: t.label, badge: t.count ?? undefined, onClick: () => setAtiva(t.key) },
+        )}
+      />
 
       {/* Renderiza SÓ o painel ativo: painéis ocultos no DOM poluíam a ordem/índices do CascataEntrada
           (cards apareciam fora de sequência e o painel visível entrava atrasado). A entrada em si é do

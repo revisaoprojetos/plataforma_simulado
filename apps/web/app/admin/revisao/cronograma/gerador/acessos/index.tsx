@@ -9,7 +9,7 @@ import { AcoesPacote, NovoPacote, TabelaAcessos } from './acessos-client'
 // Só LÊ dados prontos (lib/revisao/gerador/acessos); mutações = actions existentes de /admin/cronogramas/pacotes.
 // Vincular cronogramas/grupos/alunos continua no editor do pacote (link "Abrir editor").
 
-const PRESERVAR = ['aba', 'sub', 'ord', 'dir', 'pps']
+const PRESERVAR = ['aba', 'sub', 'v', 'ord', 'dir', 'pps']
 
 export default async function GeradorAcessos({ sp, tenantId, basePath }: { sp: Record<string, string | string[] | undefined>; tenantId: string; basePath: string }) {
   const { path, qs } = montarQsGerador(sp, basePath)

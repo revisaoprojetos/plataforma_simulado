@@ -11,6 +11,7 @@
  * LIGA (não copia) — para isso existe o <FilePicker> na área da aula. Cores via token; pt-BR.
  */
 
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -151,19 +152,11 @@ function ModalNovo({ tenantId: _tenantId, pastaId, onClose, onConcluido }: { ten
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !enviando) onClose() }}>
       <DialogContent showCloseButton className="flex max-h-[90vh] w-[min(720px,calc(100vw-2rem))] max-w-[min(720px,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0">
-        <div className="border-b px-5 pt-5">
-          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">Biblioteca{destino ? ` › ${caminhoPasta}` : ''}</p>
-          <DialogTitle className="mt-1">Adicionar conteúdo à biblioteca</DialogTitle>
-          <p className="mt-1 text-sm text-muted-foreground">O item fica na biblioteca e pode ser ligado a quantas aulas precisar.</p>
-          <div role="tablist" aria-label="Tipo de conteúdo" className="mt-3 flex flex-wrap gap-1">
-            {ABAS.map(({ k, rotulo: r, Icone }) => (
-              <button key={k} role="tab" aria-selected={aba === k} onClick={() => setAba(k)}
-                className={cn('-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                  aba === k ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-                <Icone className="h-4 w-4" />{r}
-              </button>
-            ))}
-          </div>
+        <div className="pt-5">
+          <p className="truncate px-5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Biblioteca{destino ? ` › ${caminhoPasta}` : ''}</p>
+          <DialogTitle className="mt-1 px-5">Adicionar conteúdo à biblioteca</DialogTitle>
+          <p className="mt-1 px-5 text-sm text-muted-foreground">O item fica na biblioteca e pode ser ligado a quantas aulas precisar.</p>
+          <AbasLinha className="mt-3 px-5" aria-label="Tipo de conteúdo" ativo={aba} itens={ABAS.map(({ k, rotulo: r }) => ({ key: k, label: r, onClick: () => setAba(k) }))} />
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">

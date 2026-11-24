@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useTransition, type ComponentType, type Re
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import {
-  Loader2, Save, ImagePlus, RotateCcw, PanelLeft, UserCog, GraduationCap, ChevronDown, Type, EyeOff,
+  Loader2, Save, ImagePlus, RotateCcw, PanelLeft, ChevronDown, Type, EyeOff,
   LayoutDashboard, BookOpen, ClipboardList, PenLine, LayoutTemplate, CalendarDays, BarChart3, Upload,
   Library, Users, UsersRound, Eye, Share2, Plug, Webhook, PieChart, Trophy, Star, ClipboardCheck, LogIn,
   FilePen, Zap, MessagesSquare, MessageSquare, Flag, SlidersHorizontal, KeyRound, ServerCog, Megaphone,
@@ -327,10 +327,10 @@ export function MenuLateralForm({ tema, salvarTema }: { tema: any; salvarTema: (
         </button>
       </div>
 
-      <Tabs defaultValue="admin" className="rounded-xl border bg-muted/20 p-4">
-        <TabsList variant="line" className="gap-4">
-          <TabsTrigger value="admin"><UserCog /> Admin</TabsTrigger>
-          <TabsTrigger value="aluno"><GraduationCap /> Aluno</TabsTrigger>
+      <Tabs defaultValue="admin">
+        <TabsList variant="line">
+          <TabsTrigger value="admin">Admin</TabsTrigger>
+          <TabsTrigger value="aluno">Aluno</TabsTrigger>
         </TabsList>
 
         <TabsContent value="admin">

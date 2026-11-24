@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { BarChart3, ChevronLeft, ChevronRight, Loader2, Search, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +50,7 @@ function Barra({ feitas, total }: { feitas: number; total: number }) {
 }
 
 export function RelatoriosClient({ dados }: { dados: DadosRelatorio }) {
+  const origem = useOrigem()
   const [alunos, setAlunos] = useState<LinhaAluno[]>(dados.alunos)
   const [total, setTotal] = useState(dados.alunos[0]?.total_linhas ?? 0)
   const [busca, setBusca] = useState('')
@@ -153,7 +156,7 @@ export function RelatoriosClient({ dados }: { dados: DadosRelatorio }) {
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_3.5rem_14rem]"
               >
                 <div className="min-w-0">
-                  <Link href={`/admin/cronogramas/${c.cronograma_id}`} className="block truncate font-medium hover:underline">
+                  <Link href={comVoltar(`/admin/cronogramas/${c.cronograma_id}`, origem)} className="block truncate font-medium hover:underline">
                     {c.nome}
                   </Link>
                   <p className="truncate text-xs text-muted-foreground">

@@ -4,7 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ShieldCheck, RefreshCw, ChevronRight, Users } from 'lucide-react'
+import { EstudioHeader } from '@/components/admin/estudio/estudio-header'
+import { RefreshCw, ChevronRight, Users } from 'lucide-react'
 import { DataTable } from '@/components/admin/data-table'
 import { Button } from '@/components/ui/button'
 import { reconciliarAgoraAction } from './actions'
@@ -32,18 +33,15 @@ export function AcessoClient({ rows, total, podeReconciliar }: { rows: AcessoLin
 
   return (
     <div className="w-full space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Conteúdos</p>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><ShieldCheck className="h-6 w-6 text-primary" /> Quem tem acesso</h1>
-          <p className="text-sm text-muted-foreground">Acesso efetivo por aluno (une regras de venda, integração e matrícula manual). Abra um aluno para ver por quê.</p>
-        </div>
-        {podeReconciliar && (
+      <EstudioHeader
+        titulo="Quem tem acesso"
+        acoes={podeReconciliar ? (
           <Button size="lg" variant="outline" onClick={reconciliar} disabled={reconciliando}>
             <RefreshCw className={reconciliando ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Reconciliar grupos ↔ bancos
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
+      <p className="-mt-3 text-sm text-muted-foreground">Acesso efetivo por aluno (une regras de venda, integração e matrícula manual). Abra um aluno para ver por quê.</p>
 
       {podeReconciliar && (
         <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

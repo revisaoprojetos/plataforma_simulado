@@ -54,15 +54,16 @@ export async function criarRequerimento(
 // ───────────────────────────── Admin ─────────────────────────────
 
 export async function listarRequerimentosAdmin(
-  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusRequerimento },
+  svc: SupabaseClient, tenantId: string, filtro?: { status?: StatusRequerimento; limite?: number },
 ): Promise<Requerimento[]> {
   if (!tenantId) return []
-  const rows = await fetchAll<Requerimento>(() => {
-    let q = svc.from(T_REQ).select(SEL).eq('tenant_id', tenantId)
-    if (filtro?.status) q = q.eq('status', filtro.status)
-    return q.order('criado_em', { ascending: false }).order('id', { ascending: false })
-  })
-  return rows ?? []
+  // Paginado no banco (.range): só os `limite` mais recentes (padrão 300).
+  const lim = Math.max(1, filtro?.limite ?? 300)
+  let q = svc.from(T_REQ).select(SEL).eq('tenant_id', tenantId)
+  if (filtro?.status) q = q.eq('status', filtro.status)
+  const { data, error } = await q.order('criado_em', { ascending: false }).order('id', { ascending: false }).range(0, lim - 1)
+  if (error) throw error
+  return (data ?? []) as Requerimento[]
 }
 
 /** Equipe responde e/ou muda o status do requerimento. */

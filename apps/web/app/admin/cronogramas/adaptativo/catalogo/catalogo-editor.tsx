@@ -1,5 +1,6 @@
 'use client'
 
+import { AbasLinhaControlada } from '@/components/ui/abas-linha'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -191,19 +192,13 @@ export function CatalogoEditor({ inicial, filtrosQf = {} }: { inicial: EditorCat
 
       {/* seleção de disciplina + abas */}
       <div className="rounded-2xl border bg-card">
-        <div className="flex flex-wrap items-end gap-3 border-b px-4 pt-3">
+        <div className="flex flex-wrap items-end gap-3 px-4 pt-3">
           <label className="mb-2 block min-w-[220px]">
             <span className="text-xs font-medium text-muted-foreground">Disciplina</span>
             <select value={disc} onChange={(e) => setDisc(e.target.value)} className="mt-1 h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring">
               {inicial.disciplinas.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </label>
-          <div className="flex gap-1">
-            {([['aulas', `Aulas (${contagens.aulas[disc] || 0})`], ['legproc', `LegProc · 30 min (${contagens.lp[disc] || 0})`]] as const).map(([k, rot]) => (
-              <button key={k} type="button" onClick={() => setAba(k)}
-                className={cn('rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition', aba === k ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>{rot}</button>
-            ))}
-          </div>
           <div className="mb-2 ml-auto flex items-center gap-2">
             <span className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -213,6 +208,12 @@ export function CatalogoEditor({ inicial, filtrosQf = {} }: { inicial: EditorCat
               <Plus className="h-4 w-4" />{aba === 'aulas' ? 'Nova aula' : 'Nova meta'}
             </button>
           </div>
+        <AbasLinhaControlada
+          className="mx-4"
+          valor={aba}
+          onChange={setAba}
+          itens={[{ valor: 'aulas', label: `Aulas (${contagens.aulas[disc] || 0})` }, { valor: 'legproc', label: `LegProc · 30 min (${contagens.lp[disc] || 0})` }]}
+        />
         </div>
 
         <p className="px-4 pt-3 text-xs text-muted-foreground">

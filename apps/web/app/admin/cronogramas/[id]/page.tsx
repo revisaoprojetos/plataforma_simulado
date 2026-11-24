@@ -1,6 +1,5 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Suspense } from 'react'
+import { VoltarCronogramas } from '@/components/admin/cronograma/voltar-cronogramas'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { carregarDetalhe, pacotesDoCronograma } from './metas-actions'
 import { MetasClient } from './metas-client'
@@ -15,10 +14,7 @@ export default async function CronogramaDetalhePage({ params }: { params: Promis
   if (!r.ok || !r.cronograma) {
     return (
       <div className="animate-page space-y-6">
-        <Link href="/admin/cronogramas" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao catálogo
-        </Link>
+        <Suspense fallback={null}><VoltarCronogramas tela="cronograma" /></Suspense>
         <SemPermissao>{r.error ?? 'Cronograma não encontrado.'}</SemPermissao>
       </div>
     )
@@ -27,10 +23,7 @@ export default async function CronogramaDetalhePage({ params }: { params: Promis
   return (
     <div className="animate-page space-y-6">
       <div>
-        <Link href="/admin/cronogramas" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Voltar ao catálogo
-        </Link>
+        <Suspense fallback={null}><VoltarCronogramas tela="cronograma" /></Suspense>
       </div>
       <MetasClient cronograma={r.cronograma} metasIniciais={r.metas ?? []} tipos={r.tipos ?? []} disciplinas={r.disciplinas ?? []} simulados={r.simulados ?? []} pacotes={p.dados ?? { dentro: [], fora: [] }} diagnostico={r.diagnostico!} tenantId={tenantId ?? undefined} />
     </div>

@@ -1,7 +1,6 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Wrench, ListChecks, LayoutList, ShieldCheck, GraduationCap, UsersRound } from 'lucide-react'
 import { ManutencaoSistemaForm } from '@/components/admin/manutencao-sistema-form'
 import { ManutencaoPaginasForm } from '@/components/admin/manutencao-paginas-form'
 import { ChecklistSistema } from '@/components/admin/checklist-sistema'
@@ -24,19 +23,19 @@ export function SistemaTabs({ manutencao, admin, aluno, workspace }: {
 }) {
   return (
     <Tabs defaultValue="manutencao">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="manutencao"><Wrench /> Manutenção</TabsTrigger>
-        <TabsTrigger value="areas"><LayoutList /> Páginas em manutenção</TabsTrigger>
-        <TabsTrigger value="workspace"><UsersRound /> Workspace</TabsTrigger>
-        <TabsTrigger value="checklist"><ListChecks /> Checklist do sistema</TabsTrigger>
+      <TabsList>
+        <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
+        <TabsTrigger value="areas">Páginas em manutenção</TabsTrigger>
+        <TabsTrigger value="workspace">Workspace</TabsTrigger>
+        <TabsTrigger value="checklist">Checklist do sistema</TabsTrigger>
       </TabsList>
       <TabsContent value="manutencao"><ManutencaoSistemaForm inicial={manutencao} /></TabsContent>
       <TabsContent value="areas">
         {/* Sub-abas: Admin (painel) | Aluno (portal) */}
         <Tabs defaultValue="admin">
-          <TabsList className="mb-4">
-            <TabsTrigger value="admin"><ShieldCheck /> Admin</TabsTrigger>
-            <TabsTrigger value="aluno"><GraduationCap /> Aluno</TabsTrigger>
+          <TabsList>
+            <TabsTrigger value="admin">Admin</TabsTrigger>
+            <TabsTrigger value="aluno">Aluno</TabsTrigger>
           </TabsList>
           <TabsContent value="admin">
             <ManutencaoPaginasForm tipo="admin" areas={AREAS_MANUTENCAO} ativosIniciais={admin.ativos} liberadosIniciais={admin.liberados} nomesIniciais={admin.nomes} />

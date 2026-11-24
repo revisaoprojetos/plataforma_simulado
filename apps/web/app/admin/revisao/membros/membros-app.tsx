@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AbasLinha } from '@/components/ui/abas-linha'
 import { AvatarMembro, KpisCs, NotaCs, PillStatusMembro } from '@/components/admin/revisao/cs-ui'
 import type { GrupoOpcao, MembroLinha, MembrosContagens, MembrosFiltro } from '@/lib/admin-revisao/cs-tipos'
 import { MembrosTopo } from './membros-topo'
@@ -118,14 +119,12 @@ export function MembrosApp({ inicial, estadoInicial, selInicial, grupos, podeCri
         {carregando && <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Carregando" />}
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Filtro de membros">
-        {ABAS.map((a) => (
-          <button key={a.id} type="button" role="tab" aria-selected={st.f === a.id} onClick={() => setSt((s) => ({ ...s, f: a.id, page: 1 }))}
-            className={cn('-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors', st.f === a.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {a.t}<span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', st.f === a.id ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>{a.n.toLocaleString('pt-BR')}</span>
-          </button>
-        ))}
-      </div>
+      <AbasLinha
+        className="mb-4"
+        aria-label="Filtro de membros"
+        ativo={st.f}
+        itens={ABAS.map((a) => ({ key: a.id, label: a.t, badge: a.n.toLocaleString('pt-BR'), onClick: () => setSt((s) => ({ ...s, f: a.id, page: 1 })) }))}
+      />
 
       <div className="grid items-start gap-4 xl:items-stretch xl:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
         <section className="flex min-w-0 flex-col rounded-2xl border bg-card shadow-sm" aria-busy={carregando}>

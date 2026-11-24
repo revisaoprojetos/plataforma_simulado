@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { carregarConfigImpersonacao } from '../actions'
 import { ImpersonationConfig } from '@/components/admin/impersonation/impersonation-config'
@@ -17,13 +18,11 @@ export default async function ImpersonationConfigPage() {
 
   return (
     <div className="animate-page space-y-5">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/impersonation" className="flex h-9 w-9 items-center justify-center rounded-lg border transition-colors hover:bg-muted"><ArrowLeft className="h-4 w-4" /></Link>
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><SlidersHorizontal className="h-6 w-6 text-primary" /> Configuração — Visualização de aluno</h1>
-          <p className="text-muted-foreground">Defina quais papéis podem visualizar contas de aluno e como o aluno é notificado.</p>
-        </div>
-      </div>
+      <CabecalhoArea
+        titulo="Configuração — Visualização de aluno"
+        descricao="Defina quais papéis podem visualizar contas de aluno e como o aluno é notificado."
+        acoes={<Link href="/admin/impersonation" className="flex h-9 w-9 items-center justify-center rounded-lg border transition-colors hover:bg-muted" aria-label="Voltar"><ArrowLeft className="h-4 w-4" /></Link>}
+      />
 
       {cfg.ok && cfg.roles && cfg.modo ? (
         <ImpersonationConfig roles={cfg.roles} modo={cfg.modo} />

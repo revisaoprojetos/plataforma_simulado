@@ -95,9 +95,9 @@ export function ManutencaoSistemaForm({ inicial }: { inicial: ManutencaoSistema 
       </p>
 
       <Tabs defaultValue="bloqueio">
-        <TabsList variant="line" className="gap-4">
-          <TabsTrigger value="bloqueio"><Wrench /> Bloqueio &amp; Período</TabsTrigger>
-          <TabsTrigger value="avisos"><Bell /> Avisos ({avisos.length})</TabsTrigger>
+        <TabsList variant="line">
+          <TabsTrigger value="bloqueio">Bloqueio &amp; Período</TabsTrigger>
+          <TabsTrigger value="avisos">Avisos ({avisos.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bloqueio" className="pt-4">

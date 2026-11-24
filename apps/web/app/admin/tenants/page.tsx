@@ -9,6 +9,7 @@ import { NovoTenantForm } from '@/components/admin/novo-tenant-form'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { Building2, Plus } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
+import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 
 export default async function TenantsPage() {
   // Gestão de plataformas é EXCLUSIVA do super-admin GLOBAL — nenhum admin de tenant
@@ -16,7 +17,7 @@ export default async function TenantsPage() {
   if (!(await isSuperAdmin())) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
+        <CabecalhoArea titulo="Plataformas" />
         <SemPermissao>Área exclusiva do super-administrador global.</SemPermissao>
       </div>
     )
@@ -38,12 +39,10 @@ export default async function TenantsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Plataformas</h1>
-        <p className="text-muted-foreground">
-          Crie e gerencie as plataformas (tenants). Cada uma nasce isolada, com perfis, mensagens e um admin próprio.
-        </p>
-      </div>
+      <CabecalhoArea
+        titulo="Plataformas"
+        descricao="Crie e gerencie as plataformas (tenants). Cada uma nasce isolada, com perfis, mensagens e um admin próprio."
+      />
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader icon={Plus} titulo="Nova plataforma" subtitulo="Já recebe perfis de acesso, mensagens padrão e um admin inicial." />

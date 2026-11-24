@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useOrigem } from '@/components/admin/cronograma/use-origem'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -68,6 +70,7 @@ export function UniformizarDuracao({ d, podeEditar }: { d: DuracaoDivergente; po
 
 /** "Onde esta meta aparece": diálogo com os cronogramas (semana/dia), link para editar e exclusão da ocorrência. */
 export function OndeMeta({ g, podeEditar }: { g: GrupoMeta; podeEditar: boolean }) {
+  const origem = useOrigem()
   const router = useRouter()
   const [aberto, setAberto] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
@@ -94,10 +97,10 @@ export function OndeMeta({ g, podeEditar }: { g: GrupoMeta; podeEditar: boolean 
             <div className="divide-y rounded-lg border">
               {g.cronogramas.map((c) => (
                 <div key={c.meta_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                  <Link href={`/admin/cronogramas/${c.id}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{c.nome}</Link>
+                  <Link href={comVoltar(`/admin/cronogramas/${c.id}`, origem)} className="min-w-0 flex-1 truncate font-medium hover:underline">{c.nome}</Link>
                   <span className="shrink-0 tabular-nums text-xs text-muted-foreground">semana {c.semana} · dia {c.dia}</span>
                   {c.aula && <span className="shrink-0 rounded-md border px-1.5 font-mono text-xs">{c.aula}</span>}
-                  <Link href={`/admin/cronogramas/${c.id}?meta=${c.meta_id}`} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-muted" title="Editar esta meta no cronograma"><Pencil className="h-3 w-3" />Editar</Link>
+                  <Link href={comVoltar(`/admin/cronogramas/${c.id}?meta=${c.meta_id}`, origem)} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-muted" title="Editar esta meta no cronograma"><Pencil className="h-3 w-3" />Editar</Link>
                   {podeEditar && (
                     <Button size="icon-sm" variant="ghost" title="Excluir esta ocorrência" aria-label="Excluir esta ocorrência" disabled={ocupado === c.meta_id} onClick={() => remover(c.meta_id, c.nome)}>
                       {ocupado === c.meta_id ? <Loader2 className="animate-spin" /> : <Trash2 className="text-destructive" />}

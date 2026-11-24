@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderInput, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { CronogramaTabs } from '@/components/admin/cronograma-tabs'
 import { AlertBox } from '@/components/ui/alert-box'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -29,7 +28,8 @@ import {
 import { CronogramaAcessoSecao, type ResumoAcesso } from '@/components/admin/cronograma-acesso-secao'
 import type { CategoriaRow, CronogramaLista, EntradaCronograma } from './actions-tipos'
 import { alternarLiberacao, alternarLiberacaoEmLote, atualizarCategoria, atualizarCronograma, criarCategoria, criarCronograma, excluirCategoria, excluirCronograma } from './actions'
-import { BarraSetorSlot } from '@/components/admin/barra-setor-slot'
+import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
+import { comVoltar } from '@/lib/admin/cronogramas-nav'
 
 // Feedback de interação padrão do catálogo. O `Button` base já tem `active:scale-[0.97]`
 // (press) + transição; aqui reforçamos o HOVER com um "pop" (escala) + fundo tintado da marca,
@@ -148,6 +148,9 @@ export function CronogramasClient({
   }
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const router = useRouter()
+  const pathnameAtual = usePathname()
+  const qsAtual = useSearchParams().toString()
+  const origem = qsAtual ? `${pathnameAtual}?${qsAtual}` : pathnameAtual
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
   // Pop-up "Mover para outra divisão" (substitui o dropdown que dava tela preta).
@@ -491,16 +494,11 @@ export function CronogramasClient({
   return (
     <>
       <div className="space-y-5">
-      {/* HEADER: breadcrumb + título + ações (Categorias / Novo) no topo-direito, como na referência. */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Cronogramas de estudo</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            O catálogo que o aluno escolhe. Cada cronograma é uma grade fixa de semanas; o aluno informa a
-            data de início e o sistema reprograma a grade para ele.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      <TituloTela
+        titulo="Catálogo"
+        descricao="O catálogo que o aluno escolhe. Cada cronograma é uma grade fixa de semanas; o aluno informa a data de início e o sistema reprograma a grade para ele."
+        acoes={
+          <>
           <Button variant="outline" onClick={() => setCategoriasAberto(true)}>
             <Tags className="mr-1 h-4 w-4" /> Divisões
           </Button>
@@ -510,19 +508,16 @@ export function CronogramasClient({
           {/* Botão "Novo cronograma" com brilho: gradiente + glow (cor dedicada --crono-cor). */}
           <button
             type="button"
-            onClick={() => router.push('/admin/cronogramas/criar')}
+            onClick={() => router.push(comVoltar('/admin/cronogramas/criar', origem))}
             className={cn('inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50', CHIP_ANIM)}
             style={{ background: GRAD_MARCA, boxShadow: GLOW_BTN }}
           >
             <Plus className="h-4 w-4" />
             <span className="whitespace-nowrap">Novo cronograma</span>
           </button>
-        </div>
-      </div>
-
-      <BarraSetorSlot />
-      {/* ABAS da seção Cronograma (componente único, idêntico às subpáginas). */}
-      <CronogramaTabs catalogoCount={itens.length} />
+          </>
+        }
+      />
 
       {/* Lista + filtros (o gerador rápido foi removido; o "Novo cronograma" leva ao assistente). */}
       <div className="min-w-0 space-y-4" style={{ marginTop: '1.25rem' }}>
@@ -706,7 +701,7 @@ export function CronogramasClient({
             Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
           </p>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={() => router.push('/admin/cronogramas/criar')}>
+            <Button onClick={() => router.push(comVoltar('/admin/cronogramas/criar', origem))}>
               <Plus className="mr-1 h-4 w-4" />
               Criar o primeiro
             </Button>
@@ -811,7 +806,7 @@ export function CronogramasClient({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-2">
                           <Link
-                            href={`/admin/cronogramas/${c.id}`}
+                            href={comVoltar(`/admin/cronogramas/${c.id}`, origem)}
                             className="truncate font-medium decoration-primary/40 underline-offset-4 group-hover/linha:underline"
                           >
                             {c.nome}
@@ -914,7 +909,7 @@ export function CronogramasClient({
                           )}
                         </Button>
                         <Link
-                          href={`/admin/cronogramas/${c.id}`}
+                          href={comVoltar(`/admin/cronogramas/${c.id}`, origem)}
                           className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), ACAO_BTN)}
                           title="Metas e pacotes"
                         >
