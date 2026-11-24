@@ -8,15 +8,16 @@
  * (modo avançado: arquivo individual por documento, remover, reatribuir, publicar ou deixar como rascunho).
  */
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AlertTriangle, CheckCircle2, FileText, Loader2, RotateCcw, UploadCloud, Wand2, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { publicarNovaVersao } from '@/app/admin/biblioteca/actions'
+import { publicarNovaVersao, infoSubstituicaoDocumentos } from '@/app/admin/biblioteca/actions'
 
 export interface DocSubst { id: string; titulo: string; versao: number | null }
+type Info = { tipo: string | null; metas: number; grifos: number; planosAtivos: number }
 type Estado = 'pendente' | 'enviando' | 'ok' | 'erro'
 type Modo = 'nome' | 'ordem'
 
@@ -31,6 +32,9 @@ function lerDataUrl(f: File): Promise<string> {
   })
 }
 
+const extDe = (nome: string) => nome.split('.').pop()?.toLowerCase() ?? ''
+/** Formato do arquivo comparável ao tipo do documento (pdf | docx), ou null se não comparável. */
+const formatoDe = (ext: string) => (ext === 'pdf' ? 'pdf' : ext === 'docx' || ext === 'doc' ? 'docx' : null)
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 const tokens = (s: string) => new Set(semAcento(s.replace(/\.[a-z0-9]{2,5}$/i, '')).toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1))
 const natural = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
@@ -81,6 +85,16 @@ export function SubstituirLoteDialog({ docs, onFechar, onConcluido }: {
   const [arrastando, setArrastando] = useState(false)
   const [rodando, setRodando] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [infos, setInfos] = useState<Record<string, Info>>({})
+  useEffect(() => {
+    let vivo = true
+    infoSubstituicaoDocumentos(docs.map((d) => d.id)).then((r) => {
+      if (!vivo || !r.ok || !r.itens) return
+      setInfos(Object.fromEntries(r.itens.map((i) => [i.id, { tipo: i.tipo, metas: i.metas, grifos: i.grifos, planosAtivos: i.planosAtivos }])))
+    }).catch(() => {})
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Todos os arquivos já soltos (para re-casar ao trocar o modo).
   const pool = useRef<File[]>([])
 
@@ -201,7 +215,7 @@ export function SubstituirLoteDialog({ docs, onFechar, onConcluido }: {
               <span>Documento atual</span><span>Novo arquivo</span><span className="w-24 text-right">Situação</span>
             </div>
             <div className="divide-y">
-              {docs.map((d) => <LinhaPar key={d.id} doc={d} arquivo={pares[d.id] ?? null} sobras={sobras} est={estado[d.id]} travado={rodando}
+              {docs.map((d) => <LinhaPar key={d.id} doc={d} info={infos[d.id]} arquivo={pares[d.id] ?? null} sobras={sobras} est={estado[d.id]} travado={rodando}
                 onArquivo={(f) => atribuir(d.id, f)} onSobra={(f) => atribuir(d.id, f)} />)}
             </div>
           </div>
@@ -239,13 +253,15 @@ export function SubstituirLoteDialog({ docs, onFechar, onConcluido }: {
   )
 }
 
-function LinhaPar({ doc, arquivo, sobras, est, travado, onArquivo, onSobra }: {
-  doc: DocSubst; arquivo: File | null; sobras: File[]; est?: { e: Estado; msg?: string }; travado: boolean
+function LinhaPar({ doc, info, arquivo, sobras, est, travado, onArquivo, onSobra }: {
+  doc: DocSubst; info?: Info; arquivo: File | null; sobras: File[]; est?: { e: Estado; msg?: string }; travado: boolean
   onArquivo: (f: File | null) => void; onSobra: (f: File) => void
 }) {
   const ref = useRef<HTMLInputElement>(null)
   const [sobre, setSobre] = useState(false)
   const fixo = est?.e === 'ok' || est?.e === 'enviando'
+  const fmtArq = arquivo ? formatoDe(extDe(arquivo.name)) : null
+  const formatoDiferente = !!(info?.tipo && fmtArq && (info.tipo === 'pdf' || info.tipo === 'docx') && info.tipo !== fmtArq)
   return (
     <div
       onDragOver={(e) => { if (!fixo && !travado) { e.preventDefault(); setSobre(true) } }}
@@ -255,7 +271,17 @@ function LinhaPar({ doc, arquivo, sobras, est, travado, onArquivo, onSobra }: {
     >
       <div className="min-w-0">
         <div className="truncate font-medium" title={doc.titulo}>{doc.titulo}</div>
-        {doc.versao != null && <div className="text-xs text-muted-foreground">v{doc.versao}{est?.e === 'ok' ? ` → v${doc.versao + 1}` : ''}</div>}
+        <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+          {doc.versao != null && <span>v{doc.versao}{est?.e === 'ok' ? ` → v${doc.versao + 1}` : ''}</span>}
+          {info && (info.metas > 0 || info.grifos > 0) && (
+            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary" title="Ficam ligados ao mesmo documento após a substituição">
+              {info.metas > 0 && `${info.metas} ${info.metas === 1 ? 'meta' : 'metas'}`}{info.planosAtivos > 0 && ` · ${info.planosAtivos} ${info.planosAtivos === 1 ? 'plano ativo' : 'planos ativos'}`}{info.grifos > 0 && `${info.metas > 0 ? ' · ' : ''}${info.grifos} ${info.grifos === 1 ? 'grifo' : 'grifos'}`} mantidos
+            </span>
+          )}
+        </div>
+        {formatoDiferente && (
+          <div className="mt-0.5 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />O documento é {info!.tipo!.toUpperCase()} e o arquivo novo é {fmtArq!.toUpperCase()}: as metas seguem ligadas, mas as páginas e o tempo estimado mudam. Prefira o mesmo formato.</div>
+        )}
       </div>
       <div className="flex min-w-0 items-center gap-1.5">
         {arquivo ? (

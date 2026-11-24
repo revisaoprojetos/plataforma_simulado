@@ -125,13 +125,11 @@ export async function montarFolhaAtualizacaoPdf(d: DadosFolhaAtualizacao, tamanh
     return true
   }
 
-  // Cabeça: última atualização (data) e tipo (rótulo)
-  entrada('ÚLTIMA ATUALIZAÇÃO', d.tag, { font: neg, size: 13, recuo: util * 0.04 })
-  if (d.tipoNome) entrada(d.tipoNome.toUpperCase(), d.rotulo && d.rotulo !== d.tipoNome ? d.rotulo : null, { font: neg, size: 11 })
-  else if (d.rotulo) entrada(d.rotulo.toUpperCase(), null, { font: neg, size: 11 })
-  y -= 4
+  // Cabeça: UMA linha — "Data da versão ........ 10/11/2026" (só o dia; sem rótulo/tipo). Data oculta = sem cabeça.
+  const dataVersao = d.tag ? d.tag.trim().split(/\s+/)[0] : null
+  if (dataVersao) { entrada('Data da versão', dataVersao, { font: neg, size: 13 }); y -= 4 }
 
-  // Resumo (itálico, como os subitens do índice)
+  // Resumo = só o texto do relatório (itálico, como os subitens do índice)
   const resumo = (d.texto ?? '').trim()
   if (resumo) {
     for (const par of resumo.split(/\n+/).filter(Boolean)) if (!entrada(par, null, { font: ita, size: 11, gap: 6 })) break

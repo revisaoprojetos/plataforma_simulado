@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.1 — 2026-11-24
+
+### Biblioteca › Substituir arquivos
+- Cada documento mostra o que fica ligado após a troca (metas, planos ativos e grifos — a nova versão entra no mesmo documento, então os vínculos são preservados).
+- Aviso quando o formato do arquivo novo difere do documento (PDF × DOCX), pois páginas e tempo estimado mudam.
+- Nova action somente leitura `infoSubstituicaoDocumentos`.
+- Ajustes menores em exibição/folha de atualização.
+
 ## 4.30.0 — 2026-11-24
 
 ### Biblioteca

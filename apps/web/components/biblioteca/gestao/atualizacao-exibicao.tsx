@@ -43,6 +43,13 @@ export function CamposQuando({ v, onChange, rotulo, tipo, texto, disponivel }: {
           {v.exibirRotulo ? <div className="mb-0.5 font-semibold">{t.rotulo ?? NOME_TIPO_ATUALIZACAO[tipo]}</div> : null}
           <div className="break-words">{t.tag ? <><b>{t.tag}</b>{texto.trim() ? ': ' : ''}{texto.trim() ? corpo : ''}</> : corpo}</div>
         </div>
+        <div className="rounded-md bg-muted/50 px-2.5 py-2 text-sm">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia na folha do PDF</div>
+          {v.exibirData && v.data ? (
+            <div className="flex items-baseline gap-1 font-semibold"><span>Data da versão</span><span className="min-w-4 flex-1 border-b border-dotted border-foreground/60" /><span>{v.data.split('-').reverse().join('/')}</span></div>
+          ) : null}
+          <div className="mt-1 break-words italic">{corpo}</div>
+        </div>
       </div>
     </div>
   )

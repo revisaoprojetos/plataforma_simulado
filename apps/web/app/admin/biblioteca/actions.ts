@@ -24,7 +24,7 @@ import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-p
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { normalizarMetadados, type Metadados } from '@/lib/conteudo/metadados'
 import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
-import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas } from '@/lib/conteudo/dependencias-documento'
+import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas, dependenciasDocumentos } from '@/lib/conteudo/dependencias-documento'
 import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
@@ -710,6 +710,23 @@ export async function publicarDocumento(documentoId: string, versaoId?: string, 
   await gerarThumbDocumento(g.tenantId, documentoId, { forcar: true }).catch(() => {})
   revalidatePath('/admin/biblioteca')
   return { ok: true }
+}
+
+/** Antes de substituir: o que está ligado a cada documento (metas/planos/grifos) e o formato atual. Só leitura. */
+export async function infoSubstituicaoDocumentos(ids: string[]): Promise<{ ok: boolean; error?: string; itens?: { id: string; tipo: string | null; metas: number; grifos: number; planosAtivos: number }[] }> {
+  const g = await guard('update')
+  if (!g.ok) return g
+  const lista = [...new Set(ids)].slice(0, 500)
+  if (!lista.length) return { ok: true, itens: [] }
+  try {
+    const svc = createAdminClient()
+    const [deps, { data: docs }] = await Promise.all([
+      dependenciasDocumentos(svc, g.tenantId, lista),
+      svc.from('simulado_conteudo_documentos').select('id, tipo_origem').eq('tenant_id', g.tenantId).in('id', lista.slice(0, 80)),
+    ])
+    const tipoDe = new Map(((docs ?? []) as { id: string; tipo_origem: string | null }[]).map((d) => [d.id, d.tipo_origem]))
+    return { ok: true, itens: lista.map((id) => { const d = deps.get(id); return { id, tipo: tipoDe.get(id) ?? null, metas: (d?.porTipo as any)?.metas ?? 0, grifos: (d?.porTipo as any)?.grifos ?? 0, planosAtivos: d?.planosAtivos ?? 0 } }) }
+  } catch (e: any) { return { ok: false, error: e?.message || 'Não foi possível verificar os vínculos.' } }
 }
 
 export async function removerDocumento(documentoId: string): Promise<{ ok: boolean; error?: string; bloqueado?: boolean }> {
