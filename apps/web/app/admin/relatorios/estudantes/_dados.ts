@@ -118,7 +118,7 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
     const teste = new Set<string>()
     if (tSessIds.length) {
       const ts = await fetchAllByIn<any>(tSessIds, (chunk) =>
-        svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', chunk))
+        svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', chunk).order('id'))
       for (const s of ts) if (s.is_teste || s.deletado) teste.add(s.id)
     }
     for (const r of tArr) {

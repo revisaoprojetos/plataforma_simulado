@@ -84,7 +84,7 @@ export const guruAdapter: ProviderAdapter = {
     let ultimo = 0
     for (const path of rotas) {
       try {
-        const r = await fetch(`${base}${path}`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const r = await fetch(`${base}${path}`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(15000) })
         if (r.ok) return { ok: true }
         if (r.status === 401 || r.status === 403) return { ok: false, error: `Token inválido (${r.status}). Confira o User Token na Guru.` }
         ultimo = r.status // 404/400 → endpoint pode diferir; tenta o próximo
@@ -100,7 +100,7 @@ export const guruAdapter: ProviderAdapter = {
     await aguardarVaga('guru', key, RATE)
     try {
       // ⚠️ VERIFICAR endpoint real de produtos da Guru.
-      const r = await fetch(`${cfg.baseUrl}/api/v2/products`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      const r = await fetch(`${cfg.baseUrl}/api/v2/products`, { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(15000) })
       if (!r.ok) return []
       const j: any = await r.json()
       const arr: any[] = Array.isArray(j) ? j : (j.data ?? j.products ?? j.items ?? [])
@@ -135,7 +135,7 @@ export const guruAdapter: ProviderAdapter = {
       if (cursor) url.searchParams.set('cursor', cursor)
       let j: any
       try {
-        const r = await fetch(url.toString(), { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const r = await fetch(url.toString(), { headers: { accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(15000) })
         if (!r.ok) break
         j = await r.json()
       } catch { break }

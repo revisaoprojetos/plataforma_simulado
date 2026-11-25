@@ -36,7 +36,7 @@ export async function baixarDocxLeitura(tenantId: string, documentoId: string): 
   const bucket = await resolverBucketConteudo()
   try {
     const url = await getStorage().getSignedUrl(bucket, caminhoOfficeLeitura(tenantId, documentoId), 600)
-    const r = await fetch(url)
+    const r = await fetch(url, { signal: AbortSignal.timeout(30000) })
     if (!r.ok) return null
     return Buffer.from(await r.arrayBuffer())
   } catch { return null }

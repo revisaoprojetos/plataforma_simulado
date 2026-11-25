@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { rankearSimulado } from '@/lib/ranking'
@@ -174,7 +175,7 @@ async function processar() {
   return { ok: true, simuladosEncerrados, sessoesEncerradas, simuladosAfetados: afetados.size }
 }
 
-export async function POST(req: NextRequest) {
+async function executar(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   try {
     return NextResponse.json(await processar())
@@ -183,3 +184,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Falha.' }, { status: 500 })
   }
 }
+
+// Lock compartilhado: se a rodada anterior ainda roda (qualquer réplica), responde 200 { skipped: true }.
+export const POST = (req: NextRequest) => comLockCron(req, 'encerrar-expirados', () => executar(req))

@@ -4,6 +4,7 @@ import { missoesDoDia } from './rodizio'
 import { diaLocal, inicioDaSemanaISO, inicioDoMesISO, janelaDiaUtc } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
+import { chaveXpDia } from './xp-dia'
 import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
 
@@ -95,7 +96,8 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
   const [xpSemana, xpMes, xpHoje, streak] = await Promise.all([
     somaPeriodo(svc, tenantId, estudanteId, inicioDaSemanaISO()),
     somaPeriodo(svc, tenantId, estudanteId, inicioDoMesISO()),
-    svc.rpc('rpc_xp_dia', { p_tenant: tenantId, p_estudante: estudanteId, p_tz: config.timezone }).then((r: any) => Number(r?.data ?? 0)).catch(() => 0),
+    // XP do dia: cache curto (60s) por (tenant, estudante); invalidado em awardXp (xp.ts) quando o ledger recebe XP novo.
+    remember(chaveXpDia(tenantId, estudanteId), 60, () => Promise.resolve(svc.rpc('rpc_xp_dia', { p_tenant: tenantId, p_estudante: estudanteId, p_tz: config.timezone })).then((r: any) => Number(r?.data ?? 0)).catch(() => 0)),
     streakLedgerGlobal(svc, tenantId, estudanteId, config.timezone),
   ])
   // Streak recomputado do ledger imutável (casa com ranking/áreas); fallback ao armazenado p/ legado sem ledger.

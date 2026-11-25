@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.3 — 2026-11-25
+
+### Auditoria de lentidão: correções de infra, crons, banco e documentos
+- **Documentos (OnlyOffice):** ao salvar, o texto guardado (`html_rico`) e o cache do leitor da versão são refeitos; conversão vazia não publica mais o salvamento. Timeout nos downloads do editor.
+- **Crons:** o worker não sobrepõe rodadas e tem timeout; 13 rotas pesadas ganharam trava em Redis (`lib/cron/lock.ts`).
+- **Compose:** web com 2 réplicas e limites de memória; limites no worker/api/gotenberg; healthcheck no Redis de cache; novo `redis-filas` (`noeviction`) para o BullMQ, com fallback para `REDIS_URL`.
+- **Timeouts** nos `fetch` externos (PDFs, OnlyOffice, Guru, `paginas-sync`).
+- **Aluno/cronograma:** consultas em paralelo. **Relatórios:** `.order('id')` que faltava em sessões. **Questões:** checagem de uso sem baixar todas as respostas. **Grupos:** contagem por RPC (`simulado_grupos_contagem`) com fallback.
+- **Gamificação/cronograma:** cache de `rpc_xp_dia` e agrupamento de espelhos da grade seguidos do mesmo plano.
+- **Migrações novas:** `20261204000000_contagem_grupos`, `20261204000100_manutencao_retencao_indices` (índices de FK, índice duplicado, autovacuum e funções de purga não agendadas).
+
 ## 4.30.2 — 2026-11-25
 
 ### Estabilidade e desempenho (banco + servidor)

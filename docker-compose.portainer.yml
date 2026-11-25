@@ -85,6 +85,10 @@ services:
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379
+      # Fila BullMQ (produtor) em Redis dedicado/noeviction; sem isto a app cai no REDIS_URL (cache) como antes.
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-redis://redis-filas:6379}
+      # Heap do Node abaixo do limite de 2G do container (evita OOM-kill do cgroup antes do GC agir).
+      - NODE_OPTIONS=--max-old-space-size=1536
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       # Storage (Hetzner S3). Ativa SÓ quando STORAGE_PROVIDER=s3 no stack; default 'supabase' mantém tudo como está.
       - STORAGE_PROVIDER=${STORAGE_PROVIDER:-supabase}
@@ -178,7 +182,14 @@ services:
       start_period: 45s
     logging: *video-logging
     deploy:
-      replicas: 1
+      # 2 réplicas: o estado compartilhado (rate limit, pubsub, handoff, locks de cron) vive no Redis; caches em Map
+      # por processo são só otimização (TTL curto). start-first + healthcheck seguem valendo.
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
       # Deploy SEGURO (sem downtime): sobe a task NOVA antes de derrubar a antiga (start-first) e, se a
       # nova não ficar saudável (imagem ruim/inexistente/crash), REVERTE p/ a anterior automaticamente.
       # Isso evita o "404 do Traefik" que acontece com o stop-first padrão quando a imagem não sobe.
@@ -249,6 +260,11 @@ services:
     logging: *video-logging
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 128M
       restart_policy:
         condition: any
       placement:
@@ -264,6 +280,8 @@ services:
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_URL=redis://redis:6379
+      # Fila BullMQ (consumidor) no Redis dedicado; sem a env cai no REDIS_URL.
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-redis://redis-filas:6379}
       - GOTENBERG_URL=http://gotenberg:3000
       - WEB_INTERNAL_URL=http://web:3000
       # Auto-encerramento: mesmo valor do CRON_SECRET do web (worker chama /api/cron/encerrar-expirados a cada 60s)
@@ -286,6 +304,11 @@ services:
     logging: *video-logging
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 128M
       restart_policy:
         condition: any
       placement:
@@ -304,13 +327,18 @@ services:
     logging: *video-logging
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 256M
       restart_policy:
         condition: any
       placement:
         constraints:
           - node.role == worker
 
-  # Fila (compartilhada web=produtor / worker=consumidor)
+  # Cache/rate limit/pubsub do web (descartável: allkeys-lru pode evictar). A FILA fica no `redis-filas`.
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -319,6 +347,34 @@ services:
     networks:
       - default
     logging: *video-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+
+  # Fila BullMQ (web=produtor / worker=consumidor): noeviction p/ NUNCA descartar jobs sob pressão de memória.
+  # Retrocompatível: web/worker usam REDIS_QUEUE_URL (default redis://redis-filas:6379); sem ela, caem no REDIS_URL.
+  redis-filas:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redis_filas_data:/data
+    networks:
+      - default
+    logging: *video-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     deploy:
       replicas: 1
       restart_policy:
@@ -852,6 +908,7 @@ networks:
 
 volumes:
   redis_data:
+  redis_filas_data:
   video_pgdata:
   video_redisdata:
   video_worker_tmp:

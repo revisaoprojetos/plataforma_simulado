@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resumosSimulados } from '@/app/admin/relatorios/_resumos'
 import { montarRelatorioGrafico } from '@/app/admin/relatorios/graficos/_dados'
@@ -25,7 +26,7 @@ function autorizado(req: NextRequest): boolean {
   return cronAutorizado(req)
 }
 
-export async function POST(req: NextRequest) {
+async function executar(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   const svc = createAdminClient()
   const agoraIso = new Date().toISOString()
@@ -82,3 +83,6 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true, tenants: tenants.length, aquecidos, graficos, simuladosAquecidos })
 }
+
+// Lock compartilhado: se a rodada anterior ainda roda (qualquer réplica), responde 200 { skipped: true }.
+export const POST = (req: NextRequest) => comLockCron(req, 'warm-cache', () => executar(req), 30 * 60_000)

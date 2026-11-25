@@ -12,7 +12,7 @@ let connection: IORedis | null = null
 
 export function getRecorrecaoQueue(): Queue<RecorrecaoJob> {
   if (queue) return queue
-  connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
+  connection = new IORedis(process.env.REDIS_QUEUE_URL ?? process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null })
   queue = new Queue<RecorrecaoJob>('re-correcao', { connection })
   return queue
 }

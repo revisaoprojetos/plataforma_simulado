@@ -36,6 +36,12 @@ Registro simples de tudo que deu errado (histórico de **02/11/2026 em diante**)
 | 16 | Importar cronogramas: erro "reading 'sheets'" | O leitor de .xlsx quebrava com arquivo de outro programa. O novo leitor (`ler-xlsx.ts`) existe, mas falta testar com o arquivo real "PE 2027". | Testar com o arquivo real e fazer o "cpi". | 18/11/2026 | Testar e subir |
 | 17 | Aviso "cronogramas liberados que ninguém recebe" | O aviso ignorava o acesso geral do grupo. A correção ("Liberar para todos") está feita e a migração foi aplicada, mas ainda não subiu. | Fazer o "cpi". | 18/11/2026 | Subir versão |
 
+| 18 | Edição do documento não aparece / histórico só diz "atualizado" (25/11/2026) | O salvamento do OnlyOffice sobrescreve a mesma versão e não guarda o que mudou; saves de 19/11 não têm evento no log. O texto guardado (`html_rico`) e o cache do leitor não eram refeitos. | Corrigido o callback (v4.30.3). Falta registrar um diff por salvamento ("Art. 7º, XIII alterado") e mostrar no histórico. | A definir | Implementar |
+| 19 | Lentidão e Bad Gateway (auditoria 25/11/2026) | Web com 1 réplica sem limites; banco em us-east-1 e app na Alemanha (~90–100 ms por consulta); `proxy.ts` chama `getUser()` em toda página; sem CDN (~0,9 s por arquivo estático); Redis de fila e cache juntos em LRU. | Réplicas, limites e Redis de filas no compose (v4.30.3, falta deploy). Pendentes: aproximar app e banco, CDN (Cloudflare), trocar `getUser()` por validação local depois de atualizar `@supabase/ssr`. | A definir | Infra |
+| 20 | Outbox de conteúdo parado | 11.515 eventos `documento.atualizado` sem processar desde 19/10; nenhum cron chama `/api/conteudo/outbox/processar`. | Agendar o processamento no worker e só então limpar. | A definir | Implementar |
+| 21 | Tabelas sem retenção | `audit_logs` 1,28 GB (+24 mil linhas/dia), `webhook_inbox` 223 MB, `conteudo_versoes` 3,3 GB de TOAST. | Funções de purga criadas na migração 20261204000100 (não agendadas). Decidir prazo e agendar. | A definir | Decisão sua |
+| 22 | Badge "N resposta(s)" em questões | A checagem de uso passou a devolver 0 ou 1. | Trocar por RPC de contagem se quiser o número exato. | A definir | Opcional |
+
 ---
 
 ## 2. Migrações que ainda faltam
@@ -46,6 +52,7 @@ Só aparece aqui o que **não foi feito**. Quando uma migração for aplicada e 
 | Status | Migração | Razão do problema | Ação para correção | Prazo de correção |
 |---|---|---|---|---|
 | ⏳ | Numeração duplicada | Dois pares de arquivos com o mesmo número (`20261119060000` e `20261120010000`). | Renomear um de cada par. | 19/11/2026 |
+| ⏳ | Pendentes confirmadas no banco (25/11/2026) | Objetos ausentes: `20261105020000` (disciplina_aliases), `20261110010000` (video_*), `20261112010000` (download_log), `20261120010000` (aluno_metricas), `20261124000000` (índices audit_logs, só via psql por ser CONCURRENTLY), `20261125020000` (doc_* em plano_meta), `20261203000000` (contagens). Novas: `20261204000000_contagem_grupos` e `20261204000100_manutencao_retencao_indices`. | Aplicar na ordem, fora do pico. | 26/11/2026 |
 | ⏳ | Não conferidas | Migrações antigas marcadas na memória com "⚠️" que não foram verificadas no banco: `20261029010000`, `20261029020000`, `20261028040000`, `20261008*`, `20261021000000`, `20261022100000`, `20261031120000`, `20261104140000`, `20261105010000`, `20261106020000`, `20261030000000`, `20260922*`, `20261031*` (Estúdio) e `050000/060000/061000` do adaptativo. | Conferir cada uma no banco, aplicar o que faltar e apagar da lista o que já estiver feito. | 24/11/2026 |
 
 ---

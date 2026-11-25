@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!seguro) return new Response('forbidden', { status: 403 })
 
   let up: Response
-  try { up = await fetch(seguro, { cache: 'no-store', redirect: 'manual' }) } catch { return new Response('bad gateway', { status: 502 }) }
+  try { up = await fetch(seguro, { cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(30000) }) } catch { return new Response('bad gateway', { status: 502 }) }
   if (!up.ok || !up.body) return new Response('not found', { status: up.status && up.status >= 300 && up.status < 400 ? 404 : (up.status || 404) })
 
   return new Response(up.body, {

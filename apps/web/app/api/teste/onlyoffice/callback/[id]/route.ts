@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // 2 = pronto p/ salvar; 6 = force-save (ex.: Ctrl+S). Nos dois casos baixamos e gravamos.
   if ((body?.status === 2 || body?.status === 6) && typeof body?.url === 'string' && /^https?:\/\//i.test(body.url)) {
     try {
-      const r = await fetch(body.url)
+      const r = await fetch(body.url, { signal: AbortSignal.timeout(30000) })
       if (!r.ok) throw new Error(`download ${r.status}`) // nunca gravar página de erro por cima do doc
       const ab = await r.arrayBuffer()
       if (ab.byteLength < 100) throw new Error('arquivo vazio')

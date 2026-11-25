@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 import { processarTransicoesGrants } from '@/lib/integracoes/liberacao/engine'
 import { LIBERACAO_REGRAS_ATIVO } from '@/lib/flags'
@@ -16,7 +17,7 @@ function autorizado(req: NextRequest): boolean {
   return cronAutorizado(req)
 }
 
-export async function POST(req: NextRequest) {
+async function executar(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   // KILL-SWITCH: liberação desligada (default) → no-op (não toca nas tabelas de grants).
   if (!LIBERACAO_REGRAS_ATIVO) return NextResponse.json({ ok: true, desligado: true, tenants: 0, resultados: [] })
@@ -47,3 +48,6 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true, tenants: tenantIds.length, resultados })
 }
+
+// Lock compartilhado: se a rodada anterior ainda roda (qualquer réplica), responde 200 { skipped: true }.
+export const POST = (req: NextRequest) => comLockCron(req, 'liberacao-transicoes', () => executar(req))

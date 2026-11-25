@@ -278,7 +278,18 @@ export async function espelharLote(svc: SupabaseClient, tenantId: string, limite
 }
 
 /** Dispara o espelho sem bloquear a resposta (o servidor Node segue rodando a promise). Nunca lança. */
+// Coalescência por plano (por processo): salvar várias vezes seguidas (iframe edita a cada ação) disparava 1 espelho (RPC pesada, ~575ms) por save.
+// Se já há um espelho do plano em andamento, apenas marca "sujo"; ao terminar roda UMA vez mais (lê o plano atual) → estado final idêntico, menos chamadas.
+const espelhoEmAndamento = new Map<string, { sujo: boolean }>()
 export function espelharEmSegundoPlano(svc: SupabaseClient, planoId: string | null | undefined): void {
   if (!planoId) return
-  void espelharPlanoMetas(svc, planoId).then(() => {}, () => {})
+  const atual = espelhoEmAndamento.get(planoId)
+  if (atual) { atual.sujo = true; return }
+  const est = { sujo: false }
+  espelhoEmAndamento.set(planoId, est)
+  void (async () => {
+    try {
+      do { est.sujo = false; await espelharPlanoMetas(svc, planoId).catch(() => {}) } while (est.sujo)
+    } finally { espelhoEmAndamento.delete(planoId) }
+  })()
 }

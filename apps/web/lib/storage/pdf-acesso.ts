@@ -73,7 +73,7 @@ export async function baixarPdfPorUrl(url: string): Promise<Buffer | null> {
   }
   if (!/^https?:\/\//i.test(url)) return null
   try {
-    const r = await fetch(url, { cache: 'no-store' })
+    const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(30000) })
     return r.ok ? Buffer.from(await r.arrayBuffer()) : null
   } catch {
     return null

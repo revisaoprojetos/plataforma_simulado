@@ -6,7 +6,8 @@ import { pdfCadernoProcessor } from './processors/pdf-caderno'
 import { importProcessor } from './processors/import'
 import { reCorrecaoProcessor } from './processors/re-correcao'
 
-const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+// Fila BullMQ em Redis dedicado (noeviction) quando REDIS_QUEUE_URL existe; senão cai no REDIS_URL (retrocompatível).
+const connection = new IORedis(process.env.REDIS_QUEUE_URL ?? process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
 })
 
@@ -48,80 +49,88 @@ workers.forEach((w) => {
 // então múltiplas réplicas do worker chamando em paralelo são seguras.
 const WEB_INTERNAL_URL = process.env.WEB_INTERNAL_URL
 const CRON_SECRET = process.env.CRON_SECRET
-async function chamarCron(caminho: string, rotulo: string, relevante: (j: any) => boolean) {
+// Guarda de sobreposição por rota: se a rodada anterior ainda roda, pula (evita empilhar chamadas pesadas).
+const emVoo = new Set<string>()
+async function chamarCron(caminho: string, rotulo: string, relevante: (j: any) => boolean, intervaloMs = 60_000) {
   if (!WEB_INTERNAL_URL || !CRON_SECRET) return
+  if (emVoo.has(caminho)) { console.warn(`[${rotulo}] rodada anterior ainda em andamento — pulada`); return }
+  emVoo.add(caminho)
+  // Timeout do fetch: min(intervalo, 280s), mínimo 60s (a rota continua no web mesmo se abortarmos aqui).
+  const timeoutMs = Math.max(60_000, Math.min(intervaloMs, 280_000))
   try {
-    const r = await fetch(`${WEB_INTERNAL_URL}${caminho}`, { method: 'POST', headers: { 'x-cron-secret': CRON_SECRET } })
+    const r = await fetch(`${WEB_INTERNAL_URL}${caminho}`, { method: 'POST', headers: { 'x-cron-secret': CRON_SECRET }, signal: AbortSignal.timeout(timeoutMs) })
     if (!r.ok) { console.error(`[${rotulo}] HTTP ${r.status}`); return }
     const j: any = await r.json().catch(() => null)
     if (j && relevante(j)) console.log(`[${rotulo}]`, j)
   } catch (e) {
     console.error(`[${rotulo}] erro:`, (e as Error).message)
+  } finally {
+    emVoo.delete(caminho)
   }
 }
 if (WEB_INTERNAL_URL && CRON_SECRET) {
   // EGRESS: intervalos aumentados (2026-09-26). O auto-encerramento lê sessões+respostas em_andamento a
   // cada tick; a validação server-side por acesso a questão (U1) já auto-finaliza no estouro, então o cron
   // é só a REDE DE SEGURANÇA — 180s cobre bem sem varrer o banco a cada minuto.
-  setInterval(() => { void chamarCron('/api/cron/encerrar-expirados', 'cron encerramento', (j) => !!(j.sessoesEncerradas || j.simuladosEncerrados)) }, 180_000)
-  setInterval(() => { void chamarCron('/api/cron/curseduca-jobs', 'cron curseduca', (j) => !!j.processados) }, 60_000)
+  setInterval(() => { void chamarCron('/api/cron/encerrar-expirados', 'cron encerramento', (j) => !!(j.sessoesEncerradas || j.simuladosEncerrados), 180_000) }, 180_000)
+  setInterval(() => { void chamarCron('/api/cron/curseduca-jobs', 'cron curseduca', (j) => !!j.processados, 60_000) }, 60_000)
   // curseduca-sync lê ~18k canais/tick no modo agrupamento → 300s (não precisa ser a cada minuto).
-  setInterval(() => { void chamarCron('/api/cron/curseduca-sync', 'cron curseduca-sync', (j) => !!j.rodadas) }, 300_000)
-  setInterval(() => { void chamarCron('/api/cron/integracoes-eventos', 'cron integracoes-eventos', (j) => !!(j.processados || j.erros)) }, 60_000)
+  setInterval(() => { void chamarCron('/api/cron/curseduca-sync', 'cron curseduca-sync', (j) => !!j.rodadas, 300_000) }, 300_000)
+  setInterval(() => { void chamarCron('/api/cron/integracoes-eventos', 'cron integracoes-eventos', (j) => !!(j.processados || j.erros), 60_000) }, 60_000)
   // Leitura: publica as aulas AGENDADAS cuja data (publicarEm) já chegou → publicado=true. Idempotente.
   // 300s: 5 min de atraso máx. p/ publicar uma aula agendada é aceitável.
-  setInterval(() => { void chamarCron('/api/cron/leitura-publicar', 'cron leitura-publicar', (j) => !!j.publicadas) }, 300_000)
+  setInterval(() => { void chamarCron('/api/cron/leitura-publicar', 'cron leitura-publicar', (j) => !!j.publicadas, 300_000) }, 300_000)
   // JurisClub: publica as edições AGENDADAS cuja data já chegou (status agendado→publicado + aviso). Idempotente.
-  setInterval(() => { void chamarCron('/api/cron/jurisclub-publicar', 'cron jurisclub-publicar', (j) => !!j.publicadas) }, 300_000)
+  setInterval(() => { void chamarCron('/api/cron/jurisclub-publicar', 'cron jurisclub-publicar', (j) => !!j.publicadas, 300_000) }, 300_000)
   // Self-healing do elo grupo→banco (lê vínculos+membros+matrículas inteiros). Não precisa ser rápido →
   // 30 min (o webhook de entrada no grupo já matricula na hora; isto é só a rede de segurança).
-  setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas)) }, 1_800_000)
+  setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas), 1_800_000) }, 1_800_000)
   // Warm-up de cache de relatórios: 60 min (antes 30). Recomputar com mais frequência que o TTL só gasta
   // egress; o remember() serve do cache enquanto não expira.
-  setInterval(() => { void chamarCron('/api/cron/warm-cache', 'cron warm-cache', (j) => !!j.aquecidos) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/warm-cache', 'cron warm-cache', (j) => !!j.aquecidos, 3_600_000) }, 3_600_000)
   // Reconciliação Guru (rede de segurança): reaplica liberações das assinaturas ativas ALTERADAS
   // nas últimas 48h (incremental → barato). A cada 6h: robusto a restart do worker (não depende de
   // um único disparo diário) e a janela de 48h cobre qualquer buraco entre execuções. Só concede.
-  setInterval(() => { void chamarCron('/api/cron/guru-reconcile', 'cron guru-reconcile', (j) => !!(j.resultados?.length)) }, 21_600_000)
+  setInterval(() => { void chamarCron('/api/cron/guru-reconcile', 'cron guru-reconcile', (j) => !!(j.resultados?.length), 21_600_000) }, 21_600_000)
   // Liberação de acesso (regras de venda): promove scheduled→active e expira active→expired pela DATA,
   // reconciliando o acesso efetivo. A cada 5 min (idempotente, bounded — só tenants com grants pendentes).
-  setInterval(() => { void chamarCron('/api/cron/liberacao-transicoes', 'cron liberacao-transicoes', (j) => !!(j.resultados?.some((r: any) => r.ativados || r.expirados))) }, 300_000)
+  setInterval(() => { void chamarCron('/api/cron/liberacao-transicoes', 'cron liberacao-transicoes', (j) => !!(j.resultados?.some((r: any) => r.ativados || r.expirados)), 300_000) }, 300_000)
   // Gamificação: zera a sequência (streak) de quem não teve atividade ontem. De hora em hora (idempotente).
-  setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados, 3_600_000) }, 3_600_000)
   // Engajamento: webhook de inatividade (aluno parou de entrar). De hora em hora (idempotente pelo log).
-  setInterval(() => { void chamarCron('/api/cron/gamificacao-engajamento', 'cron gamificacao-engajamento', (j) => !!j.enviados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/gamificacao-engajamento', 'cron gamificacao-engajamento', (j) => !!j.enviados, 3_600_000) }, 3_600_000)
   // Engajamento da LEITURA: webhook de inatividade POR MÓDULO. Lê respostas de leitura em massa → 3h
   // (inatividade não precisa de granularidade de 1h).
-  setInterval(() => { void chamarCron('/api/cron/leitura-engajamento', 'cron leitura-engajamento', (j) => !!j.enviados) }, 10_800_000)
+  setInterval(() => { void chamarCron('/api/cron/leitura-engajamento', 'cron leitura-engajamento', (j) => !!j.enviados, 10_800_000) }, 10_800_000)
   // Armazenamento: BFS de TODO o Storage (caro). A cada 24h (idempotente); o console dispara sob demanda
   // quando precisa reconciliar na hora.
-  setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos)) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos), 86_400_000) }, 86_400_000)
   // Lixeira: purga DEFINITIVAMENTE os itens soft-deletados vencidos (retenção LIXEIRA_PURGE_DIAS, default 30),
   // removendo também o Storage dos documentos. Destrutivo → `?aplicar=1`. A cada 24h (idempotente).
-  setInterval(() => { void chamarCron('/api/cron/lixeira-purge?aplicar=1', 'cron lixeira-purge', (j) => !!j.totalPurgados) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/lixeira-purge?aplicar=1', 'cron lixeira-purge', (j) => !!j.totalPurgados, 86_400_000) }, 86_400_000)
   // Retenção LGPD do registro de acessos do aluno (IP/UA): purga > ACESSOS_RETENCAO_DIAS (180). 24h, idempotente.
-  setInterval(() => { void chamarCron('/api/cron/acessos-purge', 'cron acessos-purge', (j) => !!(j.atividades || j.acessos)) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/acessos-purge', 'cron acessos-purge', (j) => !!(j.atividades || j.acessos), 86_400_000) }, 86_400_000)
   // Retenção do rastreio de uso da API (IP/UA): purga > API_USO_RETENCAO_DIAS (180). 24h, idempotente.
-  setInterval(() => { void chamarCron('/api/cron/api-uso-purge', 'cron api-uso-purge', (j) => !!j.apagadas) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/api-uso-purge', 'cron api-uso-purge', (j) => !!j.apagadas, 86_400_000) }, 86_400_000)
   // Retenção do rastreio de acessos da EQUIPE (IP/UA): purga > ADMIN_RASTREIO_RETENCAO_DIAS (180). 24h, idempotente.
-  setInterval(() => { void chamarCron('/api/cron/admin-rastreio-purge', 'cron admin-rastreio-purge', (j) => !!(j.atividades || j.sessoes)) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/admin-rastreio-purge', 'cron admin-rastreio-purge', (j) => !!(j.atividades || j.sessoes), 86_400_000) }, 86_400_000)
   // O4 — monitor de egress: alerta se o SQL agregado cair (causa do incidente) ou o Redis sumir. A cada 6h;
   // o worker só destaca no log quando NÃO está saudável (o web loga sempre).
-  setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false) }, 21_600_000)
+  setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false, 21_600_000) }, 21_600_000)
   // Varredura de segurança (runtime: banco/config/headers/probes/sinais + CVEs OSV). Diária (idempotente, dedupe por fingerprint).
-  setInterval(() => { void chamarCron('/api/cron/seguranca-varredura', 'cron seguranca-varredura', (j) => !!(j.novos || j.notificados)) }, 86_400_000)
+  setInterval(() => { void chamarCron('/api/cron/seguranca-varredura', 'cron seguranca-varredura', (j) => !!(j.novos || j.notificados), 86_400_000) }, 86_400_000)
   // Alerta de silêncio do webhook do Guru: a cada 15min; destaca no log só quando há silêncio (o web loga o detalhe).
-  setInterval(() => { void chamarCron('/api/cron/guru-silencio', 'cron guru-silencio', (j) => j && j.ok === false) }, 900_000)
+  setInterval(() => { void chamarCron('/api/cron/guru-silencio', 'cron guru-silencio', (j) => j && j.ok === false, 900_000) }, 900_000)
   // Backend-first: rola o snapshot do Painel (metas de hoje) de quem já usou, p/ a 1ª abertura do dia vir
   // pronta. De hora em hora (idempotente, bounded). Ver docs/ARQUITETURA-BACKEND-FIRST.md.
-  setInterval(() => { void chamarCron('/api/cron/painel-roll', 'cron painel-roll', (j) => !!j.rolados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/painel-roll', 'cron painel-roll', (j) => !!j.rolados, 3_600_000) }, 3_600_000)
   // Backend-first (Fase 1): roll dos snapshots do aluno (Início/Desempenho/Cursos), gated por atividade, 1h.
-  setInterval(() => { void chamarCron('/api/cron/home-roll', 'cron home-roll', (j) => !!j.rolados) }, 3_600_000)
-  setInterval(() => { void chamarCron('/api/cron/desempenho-roll', 'cron desempenho-roll', (j) => !!j.rolados) }, 3_600_000)
-  setInterval(() => { void chamarCron('/api/cron/cursos-roll', 'cron cursos-roll', (j) => !!j.rolados) }, 3_600_000)
-  setInterval(() => { void chamarCron('/api/cron/perfil-roll', 'cron perfil-roll', (j) => !!j.rolados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/home-roll', 'cron home-roll', (j) => !!j.rolados, 3_600_000) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/desempenho-roll', 'cron desempenho-roll', (j) => !!j.rolados, 3_600_000) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/cursos-roll', 'cron cursos-roll', (j) => !!j.rolados, 3_600_000) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/perfil-roll', 'cron perfil-roll', (j) => !!j.rolados, 3_600_000) }, 3_600_000)
   // Cronograma Adaptativo: refresh do agregado diário da aba admin "Análise de uso" (idempotente, bounded). 1h.
-  setInterval(() => { void chamarCron('/api/cron/adaptativo-agg', 'cron adaptativo-agg', (j) => j && j.ok === false) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/adaptativo-agg', 'cron adaptativo-agg', (j) => j && j.ok === false, 3_600_000) }, 3_600_000)
   console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h; lixeira-purge 24h; egress-monitor 6h; painel/home/desempenho/cursos-roll 1h')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
@@ -134,3 +143,4 @@ process.on('SIGTERM', async () => {
 })
 
 console.log('Worker iniciado — filas: pdf-relatorio, pdf-caderno, import, re-correcao')
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reconciliarGruposBancos } from '@/lib/simulado/reconciliar-grupos-bancos'
 
@@ -16,7 +17,7 @@ function autorizado(req: NextRequest): boolean {
   return cronAutorizado(req)
 }
 
-export async function POST(req: NextRequest) {
+async function executar(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   const svc = createAdminClient()
   try {
@@ -26,3 +27,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Falha na reconciliação.' }, { status: 500 })
   }
 }
+
+// Lock compartilhado: se a rodada anterior ainda roda (qualquer réplica), responde 200 { skipped: true }.
+export const POST = (req: NextRequest) => comLockCron(req, 'sincronizar-grupos-bancos', () => executar(req), 30 * 60_000)

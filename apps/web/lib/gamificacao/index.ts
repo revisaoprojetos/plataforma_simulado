@@ -47,15 +47,23 @@ function multiplicadorDia(config: GamConfig, dia: string): number {
 }
 
 // Bônus de meta diária: ao cruzar o alvo de XP no dia, concede o bônus (uma vez por dia).
+const metaDiaAtingida = new Set<string>()
 async function verificarMetaDiaria(svc: any, config: GamConfig, tenantId: string, estudanteId: string): Promise<void> {
   const md = config.xp_regras.meta_dia
   if (!md?.xp || !md.bonus) return
   const hoje = diaLocal(config.timezone)
+  // Bônus já concedido/atingido hoje (ledger imutável: o XP do dia nunca diminui) → dispensa a RPC pelo resto do dia neste processo.
+  const kDia = `${tenantId}:${estudanteId}:${hoje}`
+  if (metaDiaAtingida.has(kDia)) return
   let xpHoje = 0
   try {
     const { data } = await svc.rpc('rpc_xp_dia', { p_tenant: tenantId, p_estudante: estudanteId, p_tz: config.timezone })
     xpHoje = Number(data ?? 0)
   } catch { return } // RPC ainda não migrada → recurso inerte
+  if (xpHoje >= md.xp) {
+    if (metaDiaAtingida.size > 20000) metaDiaAtingida.clear()
+    metaDiaAtingida.add(kDia)
+  }
   if (xpHoje >= md.xp) await awardXp(svc, { tenantId, estudanteId, origem: 'meta_dia', refId: hoje, xp: md.bonus, meta: { xpHoje, alvo: md.xp } })
 }
 

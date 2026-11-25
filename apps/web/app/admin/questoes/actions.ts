@@ -394,6 +394,18 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
 }
 
 
+/** Quais questões têm ao menos 1 resposta: `select id limit 1` por questão (índice por questao_id), 8 em paralelo. */
+async function questoesComResposta(svc: ReturnType<typeof createAdminClient>, tid: string, qids: string[]): Promise<string[]> {
+  const com: string[] = []
+  for (let i = 0; i < qids.length; i += 8) {
+    await Promise.all(qids.slice(i, i + 8).map(async (id) => {
+      const { data } = await svc.from('simulado_respostas_objetivas').select('id').eq('tenant_id', tid).eq('questao_id', id).limit(1)
+      if (data && data.length) com.push(id)
+    }))
+  }
+  return com
+}
+
 /**
  * Salvaguarda de exclusão: dentre as questões informadas, retorna SÓ as que estão EM USO — em algum
  * BANCO (simulado_questao_pasta → nome), em algum SIMULADO (simulado_prova_questoes → título) ou já
@@ -410,7 +422,7 @@ export async function verificarUsoQuestoes(ids: string[]): Promise<{ ok: boolean
   const [vincBanco, vincSim, resp, meta] = await Promise.all([
     fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).in('questao_id', chunk)),
     fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_prova_questoes').select('questao_id, simulado_id').eq('tenant_id', tid).in('questao_id', chunk)),
-    fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_respostas_objetivas').select('questao_id').eq('tenant_id', tid).in('questao_id', chunk)),
+    questoesComResposta(svc, tid, qids),
     fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, codigo, enunciado').eq('tenant_id', tid).in('id', chunk)),
   ])
 
@@ -427,8 +439,9 @@ export async function verificarUsoQuestoes(ids: string[]): Promise<{ ok: boolean
   for (const v of vincBanco) { if (!v.questao_id) continue; const s = bancosPorQ.get(v.questao_id) ?? new Set<string>(); const n = nomeBanco.get(v.pasta_id); if (n) s.add(n); bancosPorQ.set(v.questao_id, s) }
   const simsPorQ = new Map<string, Set<string>>()
   for (const v of vincSim) { if (!v.questao_id) continue; const s = simsPorQ.get(v.questao_id) ?? new Set<string>(); const n = nomeSim.get(v.simulado_id); if (n) s.add(n); simsPorQ.set(v.questao_id, s) }
+  // Só EXISTÊNCIA (não baixa respostas): 1 = "tem resposta". O contador exato não é necessário para a salvaguarda.
   const respPorQ = new Map<string, number>()
-  for (const r of resp) { if (!r.questao_id) continue; respPorQ.set(r.questao_id, (respPorQ.get(r.questao_id) ?? 0) + 1) }
+  for (const id of resp) respPorQ.set(id, 1)
   const metaMap = new Map(meta.map((m: any) => [m.id, m]))
 
   const itens: UsoQuestao[] = []

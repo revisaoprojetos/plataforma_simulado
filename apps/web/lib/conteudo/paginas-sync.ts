@@ -71,7 +71,7 @@ export async function sincronizarPaginasDocumento(svc: SupabaseClient, tenantId:
       const depois = (await lerVer())?.paginas ?? null
       if (depois != null && depois !== anterior) n = depois // gravado pela própria conversão
       else {
-        const r = await fetch(url)
+        const r = await fetch(url, { signal: AbortSignal.timeout(30000) })
         if (!r.ok) return falha('download_pdf_falhou', null, anterior)
         n = await contarPaginasPdf(new Uint8Array(await r.arrayBuffer()))
       }

@@ -1,5 +1,6 @@
 import type { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 
 /**
  * Grupo mestre (pasta) × grupo comum.
@@ -77,10 +78,21 @@ export async function contarMembrosGrupos(svc: Svc, tenantId: string, opts?: { f
   const tid = tenantId || '00000000-0000-0000-0000-000000000000'
   const hit = _contagemCache.get(tid)
   if (!opts?.forcar && hit && Date.now() - hit.at < CONTAGEM_TTL_MS) return hit.counts
-  const membros = await fetchAll<{ grupo_id: string }>(() =>
-    svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', tid).order('grupo_id', { ascending: true }))
   const counts: Record<string, number> = {}
-  for (const m of membros) counts[m.grupo_id] = (counts[m.grupo_id] ?? 0) + 1
+  let viaRpc = false
+  // RPC com GROUP BY (migração 20261204000000); ausente → cai no caminho antigo (varredura das filiações).
+  if (!recursoAusente('rpc:simulado_grupos_contagem')) {
+    const r = await svc.rpc('simulado_grupos_contagem', { p_tenant: tid })
+    if (!r.error && Array.isArray(r.data)) {
+      for (const x of r.data as { grupo_id: string; total: number }[]) counts[x.grupo_id] = Number(x.total) || 0
+      viaRpc = true
+    } else if (r.error) marcarSeAusente('rpc:simulado_grupos_contagem', r.error.message)
+  }
+  if (!viaRpc) {
+    const membros = await fetchAll<{ grupo_id: string }>(() =>
+      svc.from('simulado_grupo_membros').select('grupo_id').eq('tenant_id', tid).order('grupo_id', { ascending: true }))
+    for (const m of membros) counts[m.grupo_id] = (counts[m.grupo_id] ?? 0) + 1
+  }
   _contagemCache.set(tid, { at: Date.now(), counts })
   return counts
 }

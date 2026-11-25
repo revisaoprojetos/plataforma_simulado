@@ -31,17 +31,19 @@ export default async function CronogramaAlunoPage({ searchParams }: { searchPara
 
   if (um(sp.novo) === '1') redirect('/aluno/cronograma?criar')
 
-  const it = await resolverInterno()
   const ord: OrdemMeus = ['recentes', 'antigos', 'nome'].includes(um(sp.ord) ?? '') ? (um(sp.ord) as OrdemMeus) : 'recentes'
   const q = (um(sp.q) ?? '').trim().slice(0, 80)
   const pagina = Math.max(0, parseInt(um(sp.pg) ?? '0', 10) || 0)
-  const dados = await carregarMeusCronogramas(sessao.tenantId, sessao.estudanteId, { q, ord, pagina })
-
   const criar = sp.criar !== undefined ? (um(sp.criar) ?? '') : null
   const ver = um(sp.ver)
 
   // Interruptor de downloads do tenant (tema.downloads_aluno; ausente = bloqueado) → botões Baixar/PDF/DOCX do iframe. O servidor barra de qualquer forma.
-  const dlOk = (ver === 'adaptativo' || criar === 'adaptativo') ? await downloadsAlunoLiberados(createAdminClient(), sessao.tenantId, sessao.estudanteId) : false
+  // Independentes entre si → em paralelo.
+  const [it, dados, dlOk] = await Promise.all([
+    resolverInterno(),
+    carregarMeusCronogramas(sessao.tenantId, sessao.estudanteId, { q, ord, pagina }),
+    (ver === 'adaptativo' || criar === 'adaptativo') ? downloadsAlunoLiberados(createAdminClient(), sessao.tenantId, sessao.estudanteId) : Promise.resolve(false),
+  ])
 
   // ── Adaptativo: visualizar o plano fixado ──
   if (ver === 'adaptativo' && dados.tipos.adaptativo) {

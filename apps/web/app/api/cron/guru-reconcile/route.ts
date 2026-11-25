@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reaplicarLiberacoes } from '@/lib/integracoes/engine'
 import { reconciliarPull } from '@/lib/integracoes/orquestrador'
@@ -22,7 +23,7 @@ function autorizado(req: NextRequest): boolean {
   return cronAutorizado(req)
 }
 
-export async function POST(req: NextRequest) {
+async function executar(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   const svc = createAdminClient()
   const sp = new URL(req.url).searchParams
@@ -70,3 +71,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, modo: 'reaplicar', tenants: tenantIds.length, resultados })
 }
+
+// Lock compartilhado: se a rodada anterior ainda roda (qualquer réplica), responde 200 { skipped: true }.
+export const POST = (req: NextRequest) => comLockCron(req, 'guru-reconcile', () => executar(req), 30 * 60_000)

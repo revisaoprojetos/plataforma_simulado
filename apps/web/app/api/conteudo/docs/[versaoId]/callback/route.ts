@@ -7,6 +7,7 @@ import { gerarThumbDocumento } from '@/lib/conteudo/thumb'
 import { registroVersoesAtivo } from '@/lib/conteudo/atualizacoes-registro'
 import { emitirEvento } from '@/lib/conteudo/outbox'
 import { sincronizarPaginasDocumento } from '@/lib/conteudo/paginas-sync'
+import { esquecer } from '@/lib/cache/relatorio-cache'
 
 // Hosts de onde o Document Server pode servir o .docx editado (anti-SSRF: `body.url` tem que vir dele).
 function hostsPermitidos(): Set<string> {
@@ -45,18 +46,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
       .select('id, tenant_id, documento_id, numero').eq('id', versaoId).maybeSingle()
     if (!v) return NextResponse.json({ error: 0 })
 
-    const r = await fetch(body.url)
+    const r = await fetch(body.url, { signal: AbortSignal.timeout(30000) })
     const bytes = Buffer.from(await r.arrayBuffer())
 
     const guardado = await guardarOriginal({ tenantId: v.tenant_id, documentoId: v.documento_id, numeroVersao: v.numero, tipo: 'docx', data: bytes, nome: 'edicao.docx' })
     if ('erro' in guardado) { console.error('[conteudo/callback] storage:', guardado.erro); return NextResponse.json({ error: 1 }) }
     await svc.from('simulado_conteudo_versoes').update({ arquivo_key: guardado.arquivoKey, hash_arquivo: guardado.hash, paginas: null }).eq('id', v.id) // arquivo mudou → contagem de páginas invalida (recontada abaixo)
 
+    // O leitor serve o `html_rico` da versão (e o atalho LegProc `<!--lp4-->` nem reconverte): sem zerar aqui o aluno
+    // continuava vendo o texto ANTIGO após salvar. Zerado → o leitor regenera do .docx novo. Tolerante a coluna ausente.
+    try { await svc.from('simulado_conteudo_versoes').update({ html_rico: null }).eq('id', v.id) } catch { /* coluna ausente: leitor cai no arquivo_key */ }
+    // Caches do leitor (chave por versão, que não muda ao salvar a mesma versão) → senão servem o HTML velho até 5 min.
+    await esquecer(`leitura-doc:s1:${v.tenant_id}:${v.documento_id}:${v.id}`).catch(() => {})
+
     const { html } = await converterParaHtml(bytes, 'docx')
     const { data: anterior } = await svc.from('simulado_conteudo_versoes')
       .select('id, numero').eq('tenant_id', v.tenant_id).eq('documento_id', v.documento_id).lt('numero', v.numero)
       .order('numero', { ascending: false }).limit(1).maybeSingle()
-    if (html.trim()) await reconciliarVersao({ documentoId: v.documento_id, versaoNovaId: v.id, versaoAnteriorId: anterior?.id ?? null, html, forcar: true, tenantId: v.tenant_id })
+    if (!html.trim()) { console.error('[conteudo/callback] conversão vazia — salvamento não publicado', v.id); return NextResponse.json({ error: 1 }) }
+    await reconciliarVersao({ documentoId: v.documento_id, versaoNovaId: v.id, versaoAnteriorId: anterior?.id ?? null, html, forcar: true, tenantId: v.tenant_id })
     // REGRA: salvar no editor PUBLICA a versão editada como a ATUAL — o documento NÃO pode ficar preso
     // numa versão anterior. (callback é server-to-server, sem sessão → atualiza direto com o tenant da versão.)
     // EXCEÇÃO (tenant com `tema.registro_versoes_ativo`): o REGISTRO DE VERSÕES é a fonte de publicação — salvar grava só

@@ -20,7 +20,7 @@ let connection: IORedis | null = null
 
 export function getPdfQueue(): Queue<PdfCadernoJob> {
   if (queue) return queue
-  connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+  connection = new IORedis(process.env.REDIS_QUEUE_URL ?? process.env.REDIS_URL ?? 'redis://localhost:6379', {
     maxRetriesPerRequest: null,
   })
   queue = new Queue<PdfCadernoJob>('pdf-caderno', { connection })

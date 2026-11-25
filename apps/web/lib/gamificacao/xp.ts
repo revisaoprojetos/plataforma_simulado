@@ -1,3 +1,5 @@
+import { esquecer } from '@/lib/cache/relatorio-cache'
+import { chaveXpDia } from './xp-dia'
 import { recomputarCache } from './cache'
 
 export type OrigemXp = 'simulado' | 'pratica' | 'streak' | 'chest' | 'missao' | 'conquista' | 'meta_dia' | 'backfill' | 'leitura'
@@ -46,6 +48,7 @@ export async function awardXp(svc: any, { tenantId, estudanteId, origem, refId, 
     .select('id')
   if (error) throw error
   if (!data || data.length === 0) return { awarded: false } // duplicado → já contabilizado
+  void esquecer(chaveXpDia(tenantId, estudanteId)).catch(() => {}) // XP do dia mudou → derruba o cache de 60s do resumo
   const cache = await recomputarCache(svc, tenantId, estudanteId)
   return { awarded: true, xpTotal: cache.xp_total }
 }

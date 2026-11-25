@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const svc = createAdminClient()
     const { data: doc } = await svc.from('simulado_documentos').select('id, tenant_id').eq('id', id).maybeSingle()
     if (!doc) return NextResponse.json({ error: 0 })
-    const r = await fetch(body.url)
+    const r = await fetch(body.url, { signal: AbortSignal.timeout(30000) })
     const bytes = Buffer.from(await r.arrayBuffer())
     await salvarDocxEditado((doc as any).tenant_id, id, bytes)
   } catch (e) {

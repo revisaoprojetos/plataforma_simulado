@@ -83,7 +83,7 @@ async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tena
     const sessInfo = new Map<string, { simulado_id: string; estudante_id: string; data: string | null; teste: boolean }>()
     if (sessIds.length) {
       const sess = await fetchAllByIn<any>(sessIds, (chunk) =>
-        svc.from('simulado_sessoes_prova').select('id, simulado_id, estudante_id, iniciado_em, is_teste, deletado').in('id', chunk))
+        svc.from('simulado_sessoes_prova').select('id, simulado_id, estudante_id, iniciado_em, is_teste, deletado').in('id', chunk).order('id'))
       for (const s of sess) if (!s.deletado) sessInfo.set(s.id, { simulado_id: s.simulado_id, estudante_id: s.estudante_id, data: s.iniciado_em, teste: !!s.is_teste })
     }
     for (const r of respArr) {
