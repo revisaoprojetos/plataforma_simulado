@@ -176,6 +176,7 @@ services:
       timeout: 5s
       retries: 6
       start_period: 45s
+    logging: *video-logging
     deploy:
       replicas: 1
       # Deploy SEGURO (sem downtime): sobe a task NOVA antes de derrubar a antiga (start-first) e, se a
@@ -245,6 +246,7 @@ services:
       - APP_ENCRYPTION_KEY_OLD=${APP_ENCRYPTION_KEY_OLD}
     networks:
       - default
+    logging: *video-logging
     deploy:
       replicas: 1
       restart_policy:
@@ -281,6 +283,7 @@ services:
       - PDF_PUBLIC_BASE=${PDF_PUBLIC_BASE}
     networks:
       - default
+    logging: *video-logging
     deploy:
       replicas: 1
       restart_policy:
@@ -298,6 +301,7 @@ services:
       - --api-timeout=120s
     networks:
       - default
+    logging: *video-logging
     deploy:
       replicas: 1
       restart_policy:
@@ -314,6 +318,7 @@ services:
       - redis_data:/data
     networks:
       - default
+    logging: *video-logging
     deploy:
       replicas: 1
       restart_policy:

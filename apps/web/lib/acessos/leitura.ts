@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
+import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { calcularAlertas, sessaoAtiva, JANELA_ATIVA_MS, type Alerta, type AcessoMin } from './alertas'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
@@ -240,9 +241,11 @@ export interface MetricasPainel {
 /** Métricas agregadas NO BANCO (RPC `simulado_aluno_metricas_painel`), cache 2 min. Sem a migração → null (a UI esconde o bloco). */
 export async function metricasPainel(tenantId: string, periodo?: string): Promise<MetricasPainel | null> {
   const chave = PERIODOS[periodo ?? ''] ? (periodo as string) : '7d'
+  if (recursoAusente('rpc:aluno_metricas_painel')) return null
   try {
     return await remember<MetricasPainel | null>(`acessos-metricas:${tenantId}:${chave}`, 120, async () => {
       const { data, error } = await createAdminClient().rpc('simulado_aluno_metricas_painel', { p_tenant: tenantId, p_desde: desdePeriodo(chave) })
+      if (error) marcarSeAusente('rpc:aluno_metricas_painel', error.message)
       if (error || !data) return null
       return data as MetricasPainel
     })

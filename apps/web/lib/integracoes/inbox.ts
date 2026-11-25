@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { Provider } from '@/lib/integracoes/tipos'
+import { recursoAusente, marcarAusente } from '@/lib/db/recurso-ausente'
 
 // Headers que NÃO devem ser persistidos em claro (contêm credenciais/segredos que a origem manda).
 const HEADERS_SENSIVEIS = /^(authorization|cookie|x-.*-secret|x-guru-signature|x-webhook-secret|x-api-key|api_key|api_token)$/i
@@ -65,9 +66,11 @@ export async function registrarInbox(dados: {
       status_resp: dados.status,
       resultado: dados.resultado,
     }
+    // Coluna `fonte` pode não existir ainda (migration 3 pendente) → regrava sem ela (e só tenta a coluna 1x/10 min).
+    if (recursoAusente('webhook_inbox.fonte')) delete linha.fonte
     const { error } = await svc.from('simulado_webhook_inbox').insert(linha)
-    // Coluna `fonte` pode não existir ainda (migration 3 pendente) → regrava sem ela.
     if (error && /fonte|column|schema cache/i.test(error.message ?? '')) {
+      marcarAusente('webhook_inbox.fonte')
       delete linha.fonte
       await svc.from('simulado_webhook_inbox').insert(linha)
     }

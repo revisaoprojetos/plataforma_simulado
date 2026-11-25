@@ -8,8 +8,19 @@ WORKDIR /app
 
 # ---- Builder ----
 FROM base AS builder
+# Camada de dependências: só manifests + lockfile (cache só invalida se dependências mudarem).
+# Não há scripts preinstall/postinstall/prepare nem patches/.npmrc que dependam de arquivos copiados depois;
+# os build scripts de deps (sharp, esbuild etc.) são governados por allowBuilds no pnpm-workspace.yaml.
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/worker/package.json ./apps/worker/package.json
+COPY packages/data/package.json ./packages/data/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+ENV npm_config_store_dir=/pnpm/store
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# Código-fonte só depois do install (o .dockerignore evita trazer node_modules do host).
 COPY . .
-RUN pnpm install --frozen-lockfile
 
 # Variáveis NEXT_PUBLIC_* são embutidas no bundle do cliente em build-time.
 ARG NEXT_PUBLIC_SUPABASE_URL

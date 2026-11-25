@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.2 — 2026-11-25
+
+### Estabilidade e desempenho (banco + servidor)
+- **Erros de Postgres (~1.000/h):** leituras de colunas/tabelas de migrações pendentes agora são detectadas uma vez e lembradas por 10 min (`lib/db/recurso-ausente.ts`) em vez de falhar a cada request (metas do cronograma, espelho do plano, relink, linhagem, taxonomia, métricas de acesso, download_log, eventos da Guru).
+- **Upserts corrigidos:** `simulado_questao_pasta` (onConflict compatível com a PK, sem fallback que gerava 23505) e cadernos do aluno (sem upsert em constraint inexistente).
+- **Carga por repetição:** auto-atualizar da Integridade com backoff/pausa em aba oculta; `use-swr-get` pausa com aba oculta e recua em falha; disparo da auditoria não repete após erro recente; disjuntor (`lib/util/circuit-breaker.ts`) nos logs de geração.
+- **Curseduca:** promoção de e-mail sem ping-pong (no máximo 1 UPDATE por estudante/rodada, estável) e 3 das 4 buscas por canal só para quem não casou por matrícula.
+- **Análise de uso:** erro/timeout mostra aviso com "Tentar de novo" (nunca cards zerados); erro não vai para o cache; resumo compacto; Integridade abre na hora (auditoria em segundo plano, só anomalias).
+- **Leituras do admin:** contagens de bancos/pastas por RPC (com fallback); matrícula por banco lê todos os estudantes (antes cortava em 1.000).
+- **Servidor:** `proxy.ts` com cache de 60 s do `frame-ancestors` do embed (e tabela correta `simulado_tenants`), matcher sem estáticos/health, `createAdminClient` singleton; `next.config` (poweredByHeader off, cache de assets de `public/`, optimizePackageImports); gráficos do /admin sob demanda.
+- **Build/deploy:** Dockerfile com cache de dependências, `.dockerignore` ampliado, cache GHA por imagem, rotação de logs no stack.
+- **Migrações (aplicação manual):** `20261202000001_indices_seqscan_h2_sem_concurrently.sql`, `20261203000000_otimizacoes_contagens.sql`, `20261203000001_otimizacoes_banco_h2b.sql` (aplicar antes `20261125020000_meta_documento_snapshot.sql`); `20261202000000_...` e `20261124000000_...` são as versões CONCURRENTLY (só via psql).
+
 ## 4.30.1 — 2026-11-24
 
 ### Biblioteca › Substituir arquivos

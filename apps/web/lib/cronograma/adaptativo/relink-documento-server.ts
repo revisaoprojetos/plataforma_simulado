@@ -1,4 +1,5 @@
 import 'server-only'
+import { recursoAusente, marcarAusente } from '@/lib/db/recurso-ausente'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { docIdDaChave, type AssinaturaAS } from './remap-as'
 import { calcularRelinks, normalizarTituloDoc, type DocAntigo, type DocCandidato, type ResultadoRelinks } from './relink-documento'
@@ -46,6 +47,8 @@ async function snapshotsGravados(svc: SupabaseClient, tenantId: string, ids: str
   const out = new Map<string, { titulo: string; titulo_norm: string; pasta_id: string | null }>()
   if (!ids.length) return out
   for (const [tabela, filtro] of [[T_PM, planoId], [T_DEF, undefined]] as const) {
+    const chaveAus = `col:snap_doc:${tabela}`
+    if (recursoAusente(chaveAus)) continue
     try {
       type R = { documento_id: string; doc_titulo: string | null; doc_titulo_norm: string | null; doc_pasta_id: string | null }
       const rows = await emLotes<R>(ids.filter((i) => !out.has(i)), (chunk) => {
@@ -54,7 +57,7 @@ async function snapshotsGravados(svc: SupabaseClient, tenantId: string, ids: str
         return q.limit(1000)
       })
       for (const r of rows) if (r.doc_titulo && !out.has(r.documento_id)) out.set(r.documento_id, { titulo: r.doc_titulo, titulo_norm: r.doc_titulo_norm || normalizarTituloDoc(r.doc_titulo), pasta_id: r.doc_pasta_id })
-    } catch { /* colunas ausentes */ }
+    } catch { marcarAusente(chaveAus) /* colunas ausentes (migração 20261125020000 pendente) */ }
   }
   return out
 }

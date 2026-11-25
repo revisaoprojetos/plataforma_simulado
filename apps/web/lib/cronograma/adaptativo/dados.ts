@@ -15,6 +15,7 @@ import { lerParamsMotor } from './config-metas'
 import { lerRegrasMotor } from './config-regras'
 import { hashRegras } from './regras'
 import { catalogoIdDoTenant, lerPaginasReais } from './catalogo-override-db'
+import { recursoAusente, marcarAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { espelharEmSegundoPlano, lerDetalhesMetas, gravarDetalhesMetas } from './plano-metas'
 import { sanearDetalhes, dataConclusao, certValido } from './meta-ids'
 import { diagnosticarInsuficiencia, ehInsuficiencia, maxSemanasEfetivo, ErroPlanoInviavel } from './diagnostico-insuficiencia'
@@ -115,11 +116,20 @@ async function lerPlanoRow(svc: SupabaseClient, tenantId: string, estId: string,
 }
 async function lerMetas(svc: SupabaseClient, tenantId: string, planoId: string): Promise<MetaRow[]> {
   const COLS = 'meta_id,estado,parcial_v,parcial_em,grau,estrelas,res,err,tempo_seg,modo,nota,atualizado_em'
-  const r0 = await svc.from(T_META).select(COLS + ',concluido_em,cert,aula_key').eq('tenant_id', tenantId).eq('plano_id', planoId)
-  if (!r0.error) return (r0.data as unknown as MetaRow[]) || []
-  // migração 20261129000000 pendente (sem aula_key): lê como antes
-  const r = await svc.from(T_META).select(COLS + ',concluido_em,cert').eq('tenant_id', tenantId).eq('plano_id', planoId)
-  if (!r.error) return (r.data as unknown as MetaRow[]) || []
+  // Colunas opcionais de migrações pendentes (aula_key: 20261129000000; concluido_em/cert: 20261110020000): a ausência é memorizada
+  // 10 min (recursoAusente) — assim NÃO se tenta a query com a coluna a cada request (cada tentativa = 1 ERROR no Postgres).
+  const temCert = !recursoAusente('col:meta.cert'), temAula = !recursoAusente('col:meta.aula_key')
+  if (temCert) {
+    const cols = COLS + ',concluido_em,cert' + (temAula ? ',aula_key' : '')
+    const r0 = await svc.from(T_META).select(cols).eq('tenant_id', tenantId).eq('plano_id', planoId)
+    if (!r0.error) return (r0.data as unknown as MetaRow[]) || []
+    if (temAula && /aula_key/i.test(r0.error.message)) {
+      marcarAusente('col:meta.aula_key')
+      const r = await svc.from(T_META).select(COLS + ',concluido_em,cert').eq('tenant_id', tenantId).eq('plano_id', planoId)
+      if (!r.error) return (r.data as unknown as MetaRow[]) || []
+      marcarSeAusente('col:meta.cert', r.error.message)
+    } else marcarSeAusente('col:meta.cert', r0.error.message)
+  }
   // migração 20261110020000 pendente (sem concluido_em/cert): lê como antes
   const { data } = await svc.from(T_META).select(COLS).eq('tenant_id', tenantId).eq('plano_id', planoId)
   return (data as unknown as MetaRow[]) || []

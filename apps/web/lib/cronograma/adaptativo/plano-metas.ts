@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { recursoAusente, marcarAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { dParse, dDow, semDe } from './motor28'
 import { chavesUnicas } from './catalogo-override'
@@ -20,7 +21,7 @@ import type { Detalhe } from './motor28'
 const T_PLANO = 'simulado_cronograma_adaptativo_plano'
 const T_PM = 'simulado_cronograma_adaptativo_plano_meta'
 /** false depois que o banco recusar as colunas de snapshot (migração 20261125020000 pendente) — evita tentar de novo a cada lote. */
-let SNAP_COLS = true
+const SNAP_COLS = true
 
 export interface LinhaPlanoMeta {
   tenant_id: string; estudante_id: string; plano_id: string
@@ -168,9 +169,10 @@ export function linhasDaGrade(
 
 /** Mapa { meta_id: detalhe } do plano (coluna `detalhes_metas`). Migração pendente / erro → {} (nunca lança). */
 export async function lerDetalhesMetas(svc: SupabaseClient, planoId: string): Promise<Record<string, Detalhe>> {
+  if (recursoAusente('col:plano.detalhes_metas')) return {}
   try {
     const { data, error } = await svc.from(T_PLANO).select('detalhes_metas').eq('id', planoId).maybeSingle()
-    if (error) return {}
+    if (error) { marcarSeAusente('col:plano.detalhes_metas', error.message); return {} }
     const d = (data as { detalhes_metas?: unknown } | null)?.detalhes_metas
     return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, Detalhe>) : {}
   } catch { return {} }
@@ -180,9 +182,10 @@ export async function lerDetalhesMetas(svc: SupabaseClient, planoId: string): Pr
 export async function gravarDetalhesMetas(svc: SupabaseClient, planoId: string, detalhes: Record<string, unknown>, grade?: Record<string, unknown> | null): Promise<boolean> {
   try {
     const limpo = sanearDetalhes(detalhes)
-    if (!limpo) return false
+    if (!limpo || recursoAusente('col:plano.detalhes_metas')) return false
     if (grade) for (const id of Object.keys(limpo)) if (!(id in grade)) delete limpo[id]
     const { error } = await svc.from(T_PLANO).update({ detalhes_metas: limpo }).eq('id', planoId)
+    if (error) marcarSeAusente('col:plano.detalhes_metas', error.message)
     return !error
   } catch { return false }
 }
@@ -236,15 +239,20 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
     for (let k = 0; k < sairam.length; k += 150) await svc.from(T_PM).delete().eq('plano_id', row.id).in('meta_id', sairam.slice(k, k + 150))
     const agora = new Date().toISOString()
     for (let k = 0; k < linhas.length; k += 500) {
-      const lote = linhas.slice(k, k + 500).map(({ doc_titulo, doc_titulo_norm, doc_pasta_id, ...l }) => ({ ...l, ...(SNAP_COLS ? { doc_titulo, doc_titulo_norm, doc_pasta_id } : {}), atualizado_em: agora }))
-      let { error: e3 } = await svc.from(T_PM).upsert(lote, { onConflict: 'plano_id,meta_id' })
-      // migração 20261125020000 (snapshot do documento) ainda não aplicada → grava sem essas colunas
-      if (e3 && /doc_titulo|doc_pasta_id/i.test(e3.message)) { SNAP_COLS = false; ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ doc_titulo: _a, doc_titulo_norm: _b, doc_pasta_id: _c, ...r }) => r), { onConflict: 'plano_id,meta_id' })) }
-      // migração 20261106030000 (aula_key) ainda não aplicada → grava sem a coluna, sem derrubar o espelho
-      if (e3 && /aula_key/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ aula_key: _k, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
-      // migração 20261110020000 (detalhes/semana_origem) ainda não aplicada → grava sem essas colunas
-      if (e3 && /detalhes|semana_origem/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ detalhes: _d, semana_origem: _s, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
-      if (e3 && /aula_key/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ aula_key: _k, detalhes: _d, semana_origem: _s, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
+      // colunas opcionais de migrações pendentes (snapshot do doc: 20261125020000; aula_key: 20261129000000; detalhes/semana_origem: 20261110020000):
+      // a ausência é memorizada 10 min (recursoAusente) → não se tenta o upsert com a coluna a cada espelhamento.
+      const montar = (sn: boolean, dt: boolean, au: boolean) => linhas.slice(k, k + 500).map(({ doc_titulo, doc_titulo_norm, doc_pasta_id, detalhes, semana_origem, aula_key, ...l }) => ({
+        ...l, ...(sn ? { doc_titulo, doc_titulo_norm, doc_pasta_id } : {}), ...(dt ? { detalhes, semana_origem } : {}), ...(au ? { aula_key } : {}), atualizado_em: agora,
+      }))
+      let sn = SNAP_COLS && !recursoAusente('col:pm.doc_titulo'), dt = !recursoAusente('col:pm.detalhes'), au = !recursoAusente('col:pm.aula_key')
+      let { error: e3 } = await svc.from(T_PM).upsert(montar(sn, dt, au), { onConflict: 'plano_id,meta_id' })
+      for (let t = 0; t < 3 && e3; t++) {
+        if (sn && /doc_titulo|doc_pasta_id/i.test(e3.message)) { sn = false; marcarAusente('col:pm.doc_titulo') }
+        else if (au && /aula_key/i.test(e3.message)) { au = false; marcarAusente('col:pm.aula_key') }
+        else if (dt && /detalhes|semana_origem/i.test(e3.message)) { dt = false; marcarAusente('col:pm.detalhes') }
+        else break
+        ;({ error: e3 } = await svc.from(T_PM).upsert(montar(sn, dt, au), { onConflict: 'plano_id,meta_id' }))
+      }
       if (e3) return { ok: false, motivo: e3.message }
     }
     if (cfgOk) await svc.from(T_PLANO).update({ grade_espelhada_hash: hash, grade_espelhada_em: agora }).eq('id', row.id)

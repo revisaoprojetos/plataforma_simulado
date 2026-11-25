@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
+import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { decidirDownloadAluno, modoDownloadsDoTema, patchTemaDownloads, MOTIVO_DOWNLOADS_DESATIVADOS } from './downloads-aluno-pura'
 
@@ -105,13 +106,15 @@ const limpar = (v: string | null | undefined, max: number) => (v ? String(v).sli
 
 /** Registra (best-effort — nunca atrasa nem derruba o download). */
 export async function registrarDownload(svc: SupabaseClient, e: EntradaDownload): Promise<void> {
+  if (recursoAusente('tab:download_log')) return
   try {
-    await svc.from('simulado_download_log').insert({
+    const { error } = await svc.from('simulado_download_log').insert({
       tenant_id: e.tenantId, estudante_id: e.estudanteId,
       documento_id: e.documentoId && UUID.test(e.documentoId) ? e.documentoId : null,
       titulo: limpar(e.titulo, 300), origem: e.origem, meta_id: limpar(e.metaId, 120),
       produto_id: e.produtoId && UUID.test(e.produtoId) ? e.produtoId : null,
       tipo_origem: limpar(e.tipoOrigem, 20), resultado: e.resultado, motivo: limpar(e.motivo, 40),
     })
+    if (error) marcarSeAusente('tab:download_log', error.message)
   } catch { /* tabela ausente / falha de rede: ignora */ }
 }

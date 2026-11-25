@@ -9,6 +9,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { brtLocalParaIso } from '@/lib/brt'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { criarBanco, criarPastaFolder, adicionarQuestoes, confirmarImportQuestoes, atualizarBanco } from '@/app/admin/banco-questoes/actions'
 import { vincularEstudantes, vincularGrupoAoBanco } from '@/app/admin/banco-questoes/estudantes-actions'
 import { criarCadernoParaSlot } from '@/app/admin/cadernos-teste/actions'
@@ -158,8 +159,8 @@ export async function criarSimuladoCompletoAction(p: CriarSimuladoPayload): Prom
   // 7) matriculas (roster do banco + individuais; upsert idempotente).
   {
     const aMatricular = new Set<string>((p.estudanteIds ?? []).filter(Boolean))
-    const { data: alunos } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId)
-    for (const a of (alunos ?? []) as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
+    const alunos = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('estudante_id', { ascending: true }))
+    for (const a of alunos as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
     const estIds = [...aMatricular]
     for (let i = 0; i < estIds.length; i += 500) {
       const lote = estIds.slice(i, i + 500).map((estudante_id) => ({ tenant_id: tenantId, estudante_id, simulado_id: simulado.id, liberado: true }))

@@ -25,10 +25,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Caderno não encontrado.' }, { status: 403 })
   }
 
-  const { error } = await svc
-    .from('simulado_aluno_caderno_questoes')
-    .upsert({ caderno_id: body.caderno_id, questao_id: body.questao_id }, { onConflict: 'caderno_id,questao_id' })
-  if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  // Idempotente sem depender de unique inexistente (tabela só tem PK(id)).
+  // Ideal: CREATE UNIQUE INDEX ON simulado_aluno_caderno_questoes (caderno_id, questao_id) (após deduplicar).
+  const { data: jaExiste } = await svc
+    .from('simulado_aluno_caderno_questoes').select('id')
+    .eq('caderno_id', body.caderno_id).eq('questao_id', body.questao_id).limit(1).maybeSingle()
+  if (!jaExiste) {
+    const { error } = await svc
+      .from('simulado_aluno_caderno_questoes')
+      .insert({ caderno_id: body.caderno_id, questao_id: body.questao_id })
+    if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

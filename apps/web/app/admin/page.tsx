@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, ClipboardList, Users, Activity, Trophy, ArrowRight, Plus } from 'lucide-react'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { montarDashboardSerie } from '@/lib/admin/dashboard-serie'
-import { DashboardCharts } from '@/components/admin/dashboard-charts'
+import { DashboardCharts } from '@/components/admin/dashboard-charts-lazy'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 
 async function getDados(tenantId: string) {

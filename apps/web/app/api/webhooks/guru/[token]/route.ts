@@ -5,6 +5,7 @@ import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { processarEvento } from '@/lib/integracoes/orquestrador'
 import { dentroDoLimite } from '@/lib/integracoes/ratelimit'
 import { registrarInbox } from '@/lib/integracoes/inbox'
+import { recursoAusente, marcarAusente } from '@/lib/db/recurso-ausente'
 import { avaliarWebhook, estritoAtivo } from '@/lib/integracoes/webhook-seguranca'
 
 /**
@@ -94,9 +95,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // 4) Idempotência: grava o evento (event_id UNIQUE). Se já existe → 200 sem reprocessar.
   const base = { tenant_id: tenantId, provider: 'guru', event_id: evento.eventId, tipo: evento.tipo, status: 'recebido', payload }
   let insErr: any
-  ;({ error: insErr } = await svc.from('simulado_integracao_eventos').insert({ ...base, headers: { headers, query } }))
-  if (insErr && /headers|column|schema cache/i.test(insErr.message ?? '')) {
-    ;({ error: insErr } = await svc.from('simulado_integracao_eventos').insert(base)) // coluna headers ainda não migrada
+  // Coluna `headers` pode não estar migrada: tenta só 1x por 10 min (evita 1 erro 42703 por evento no log do PG).
+  if (recursoAusente('integracao_eventos.headers')) {
+    ;({ error: insErr } = await svc.from('simulado_integracao_eventos').insert(base))
+  } else {
+    ;({ error: insErr } = await svc.from('simulado_integracao_eventos').insert({ ...base, headers: { headers, query } }))
+    if (insErr && /headers|column|schema cache/i.test(insErr.message ?? '')) {
+      marcarAusente('integracao_eventos.headers')
+      ;({ error: insErr } = await svc.from('simulado_integracao_eventos').insert(base)) // coluna headers ainda não migrada
+    }
   }
   if (insErr) {
     if (/duplicate|unique|23505/i.test(insErr.message)) return finish(200, { ok: true, jaRecebido: true }, 'evento repetido (já recebido)')

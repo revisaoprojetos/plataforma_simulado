@@ -19,7 +19,12 @@ const nextConfig: NextConfig = {
   // @aws-sdk/* (provider S3 do storage): externo + importado por literal → o tracer do standalone os INCLUI
   // (antes, com especificador indireto, ficavam de fora da imagem e o s3 quebrava em runtime no web).
   serverExternalPackages: ["mammoth", "pdfjs-dist", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"],
+  // Não anuncia "X-Powered-By: Next.js" (menos bytes/headers, menos superfície).
+  poweredByHeader: false,
   images: {
+    // Imagens otimizadas ficam 30 dias no cache do /_next/image (default 60s → reotimizava/reprocessava no VPS).
+    // Só afeta URLs imutáveis/versionadas; logos trocados por URL nova continuam aparecendo. Formato mantém o default (webp).
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "https",
@@ -47,6 +52,12 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: seguranca },
+      // Assets estáticos de public/ (sem hash no nome): cache curto no navegador + SWR. Exclui _next (já imutável/hash),
+      // api (dinâmico) e os plugins do OnlyOffice (oo-plugin*, mudam sem hash).
+      {
+        source: "/((?!_next|api|oo-plugin).*)\\.(svg|png|jpg|jpeg|webp|avif|woff2)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
       {
         source: "/oo-plugin/:path*",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
@@ -67,6 +78,8 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
+    // Barrel imports de libs grandes → só os módulos usados entram no bundle (lucide-react/date-fns/recharts já são default).
+    optimizePackageImports: ["lucide-react", "date-fns", "recharts", "@base-ui/react", "@dnd-kit/core"],
     // Turbopack no Windows: a escrita/compactação do cache PERSISTENTE de disco em dev estoura a RAM
     // (chega a ~20GB e trava o PC). Com TURBOPACK_FS_CACHE=off o dev roda SEM esse cache — cold start
     // fica um pouco mais lento, mas sem o pico de memória. Inerte para CI/build (usa outra flag) e p/

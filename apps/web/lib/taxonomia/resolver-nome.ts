@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recursoAusente, marcarAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveSemantica } from './disciplina-semantica'
 
@@ -57,12 +58,12 @@ async function carregar(svc: SupabaseClient, table: TabelaTaxonomia, tenantId: s
   }
   // aliases (nomes já unificados numa disciplina) — só disciplinas; tabela ausente (migração pendente) = sem aliases
   const aliases = new Map<string, string>()
-  if (table === 'simulado_disciplinas') {
+  if (table === 'simulado_disciplinas' && !recursoAusente('tab:disciplina_aliases')) {
     try {
       const ids = new Set(rows.map((r) => r.id))
       const al = (await fetchAll<{ alias_norm: string; disciplina_id: string }>(() => (svc.from('simulado_disciplina_aliases').select('alias_norm, disciplina_id') as any).eq('tenant_id', tenantId).order('alias_norm', { ascending: true }))) ?? []
       for (const a of al) if (ids.has(a.disciplina_id)) aliases.set(a.alias_norm, a.disciplina_id)
-    } catch { /* sem a tabela */ }
+    } catch { marcarAusente('tab:disciplina_aliases') /* sem a tabela */ }
   }
   const e: Entrada = { t: Date.now(), porChave, porSem, aliases }
   CACHE.set(k, e)
@@ -125,7 +126,7 @@ async function resolverUnico(
     if (achou.via === 'semantica' && opc.criar !== false) {
       // aprende: esse texto passa a apontar p/ a disciplina existente (próxima importação resolve direto, sem recalcular)
       e.aliases.set(chave, achou.id)
-      void Promise.resolve(svc.from('simulado_disciplina_aliases').upsert({ tenant_id: tenantId, alias_norm: chave, disciplina_id: achou.id, alias_texto: n }, { onConflict: 'tenant_id,alias_norm' })).then(() => {}, () => {})
+      if (!recursoAusente('tab:disciplina_aliases')) void Promise.resolve(svc.from('simulado_disciplina_aliases').upsert({ tenant_id: tenantId, alias_norm: chave, disciplina_id: achou.id, alias_texto: n }, { onConflict: 'tenant_id,alias_norm' })).then((r: { error?: { message?: string } | null }) => { if (r?.error) marcarSeAusente('tab:disciplina_aliases', r.error.message) }, () => {})
     }
     return achou.id
   }

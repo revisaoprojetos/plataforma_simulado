@@ -74,8 +74,8 @@ jobs:
             NEXT_PUBLIC_LEITURA_ATIVA=true
             NEXT_PUBLIC_MODELOS_CADERNO_ATIVO=true
             NEXT_PUBLIC_JURISPRUDENCIA_ATIVA=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
       - name: Build e push (worker BullMQ — apps/worker)
         uses: docker/build-push-action@v6
@@ -84,8 +84,8 @@ jobs:
           file: ./apps/worker/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.wk }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
 
       - name: Build e push (API NestJS — apps/api)
         # A API é Fase 3 (skeleton, ainda NÃO deployada). Se o build dela falhar, NÃO pode
@@ -98,8 +98,8 @@ jobs:
           file: ./apps/api/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.api }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
       - name: Redeploy automático no Portainer (SÓ na main, se os webhooks estiverem configurados)
         # Auto-deploy sem colar SHA na mão: o Portainer re-pulla a tag `latest` e reinicia o serviço.

@@ -32,6 +32,7 @@ export function useSWRGet<T = unknown>(key: string | null, opts?: { intervalo?: 
   const [erro, setErro] = useState(false)
   const [desatualizado, setDesatualizado] = useState(false)
   const vivo = useRef(true)
+  const cacheFalhou = useRef(false)
 
   const buscar = useCallback(async () => {
     if (!key) return
@@ -42,8 +43,10 @@ export function useSWRGet<T = unknown>(key: string | null, opts?: { intervalo?: 
       const json = (await res.json()) as T
       if (!vivo.current) return
       cache.set(key, { data: json, ts: Date.now() })
+      cacheFalhou.current = false
       setData(json); setErro(false); setDesatualizado(false)
     } catch {
+      cacheFalhou.current = true
       if (!vivo.current) return
       // Falhou: se já tem dado (cache), mantém com aviso; senão, erro.
       setDesatualizado((prev) => (data != null || cache.get(key ?? '')?.data != null) ? true : prev)
@@ -58,9 +61,19 @@ export function useSWRGet<T = unknown>(key: string | null, opts?: { intervalo?: 
     // Mostra o cache na hora e SEMPRE revalida ao montar.
     if (key) { const c = cache.get(key); if (c) setData(c.data as T) }
     void buscar()
-    let t: ReturnType<typeof setInterval> | undefined
-    if (opts?.intervalo && key) t = setInterval(() => void buscar(), opts.intervalo)
-    return () => { vivo.current = false; if (t) clearInterval(t) }
+    // Polling com aba oculta pausado e backoff exponencial (até 8x) enquanto a rede falha.
+    let t: ReturnType<typeof setTimeout> | undefined
+    if (opts?.intervalo && key) {
+      const base = opts.intervalo
+      let falhas = 0
+      const ciclo = async () => {
+        if (!vivo.current) return
+        if (!document.hidden) { await buscar(); falhas = cacheFalhou.current ? Math.min(falhas + 1, 3) : 0 }
+        if (vivo.current) t = setTimeout(() => void ciclo(), base * 2 ** falhas)
+      }
+      t = setTimeout(() => void ciclo(), base)
+    }
+    return () => { vivo.current = false; if (t) clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, opts?.intervalo])
 

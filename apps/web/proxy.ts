@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { createClient as createDirectSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createDirectSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
 import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
@@ -7,6 +7,19 @@ import { dominioCookieDeHost } from '@/lib/supabase/cookie-domain'
 import { avaliarOrigem, deveVerificarOrigem, modoCsrf } from '@/lib/seguranca/origem-csrf'
 import { frameAncestorsFallback, registrarOrigensBoas, sanearOrigens } from '@/lib/seguranca/frame-ancestors'
 import { anexarEnforce, cspEnforce, diretivasScript, gerarNonce, ignoraCspScript, valorReportOnly } from '@/lib/seguranca/csp'
+
+// Cache do CSP de /embed/* por host (60s). Mudança em origens_permitidas propaga em até 1 min por instância.
+const CSP_EMBED_TTL_MS = 60_000
+const cspEmbedCache = new Map<string, { csp: string; ate: number }>()
+// Client service-role reutilizado (sem sessão; stateless) — evita recriar a cada request.
+let _adminProxy: SupabaseClient<any, 'public', any> | null = null
+function adminProxy() {
+  return (_adminProxy ??= createDirectSupabaseClient(
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  ))
+}
 
 // Superfícies do ALUNO cobertas pelo guard de visualização (impersonation). Inclui /lgpd para
 // permitir bloquear consentimento/solicitação LGPD no modo operável (identidade do titular).
@@ -180,13 +193,16 @@ export async function proxy(request: NextRequest) {
     supabaseResponse.headers.delete('X-Frame-Options')
     const host = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '').split(':')[0]
     let motivoFalha = 'tenant não encontrado'
+    // Cache em memória (TTL curto) do CSP frame-ancestors por host: evita 2 queries (simulado_tenants +
+    // simulado_embed_config) a CADA request /embed/*. Só SUCESSO é cacheado; falha continua fail-closed e sem cache.
+    const hit = cspEmbedCache.get(host)
+    if (hit && hit.ate > Date.now()) {
+      supabaseResponse.headers.set('Content-Security-Policy', hit.csp)
+      return finalizar(supabaseResponse)
+    }
     try {
-      const admin = createDirectSupabaseClient(
-        process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false, autoRefreshToken: false } },
-      )
-      const { data: tenantRow, error: errT } = await admin.from('tenants').select('id').eq('dominio', host).maybeSingle()
+      const admin = adminProxy()
+      const { data: tenantRow, error: errT } = await admin.from('simulado_tenants').select('id').eq('dominio', host).maybeSingle()
       if (errT) throw errT
       if (tenantRow?.id) {
         const { data: ec, error: errC } = await admin.from('simulado_embed_config')
@@ -199,6 +215,8 @@ export async function proxy(request: NextRequest) {
         if (Array.isArray(ec?.origens_permitidas) && ec.origens_permitidas.length > 0 && origens.length === 0) throw new Error('origens_permitidas inválidas')
         if (origens.length > 0) registrarOrigensBoas(host, origens)
         const csp = origens.length > 0 ? `frame-ancestors 'self' ${origens.join(' ')}` : "frame-ancestors *"
+        if (cspEmbedCache.size > 200) cspEmbedCache.clear()
+        cspEmbedCache.set(host, { csp, ate: Date.now() + CSP_EMBED_TTL_MS })
         supabaseResponse.headers.set('Content-Security-Policy', csp)
         return finalizar(supabaseResponse)
       }
@@ -245,6 +263,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/health|oo-plugin|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|js|css|map|woff2?|ttf|mp3|mp4|webm)$).*)',
   ],
 }

@@ -7,6 +7,7 @@ import { hojeCal } from './dados'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { lerParamsMotor } from './config-metas'
 import { lerRegrasMotor } from './config-regras'
+import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { lerDetalhesMetas } from './plano-metas'
 import { verificarInvariantes } from './invariantes'
 import { horasDia, VERSAO_MOTOR, type Prog30 } from './motor30'
@@ -49,8 +50,11 @@ export interface MetaMin { meta_id: string; estado: string | null; parcial_v: st
 
 export async function lerMetasMin(svc: SupabaseClient, tenantId: string, planoId: string): Promise<MetaMin[]> {
   const base = 'meta_id,estado,parcial_v,tempo_seg,grau,res,err'
-  const r0 = await svc.from(T_META).select(base + ',concluido_em,cert').eq('tenant_id', tenantId).eq('plano_id', planoId)
-  if (!r0.error) return (r0.data as unknown as MetaMin[]) ?? []
+  if (!recursoAusente('col:meta.cert')) {
+    const r0 = await svc.from(T_META).select(base + ',concluido_em,cert').eq('tenant_id', tenantId).eq('plano_id', planoId)
+    if (!r0.error) return (r0.data as unknown as MetaMin[]) ?? []
+    marcarSeAusente('col:meta.cert', r0.error.message)
+  }
   const r1 = await svc.from(T_META).select(base).eq('tenant_id', tenantId).eq('plano_id', planoId)
   return (r1.data as unknown as MetaMin[]) ?? []
 }

@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 import { cookies, headers } from 'next/headers'
 import { dominioCookieDeHost } from './cookie-domain'
 
@@ -26,12 +26,15 @@ function comDominio(options: Record<string, unknown> | undefined, dom: string | 
  * onboarding, seeds). O createServiceClient abaixo herda a sessão dos cookies
  * e por isso NÃO bypassa o RLS quando há usuário logado.
  */
-export function createAdminClient() {
-  return createSupabaseClient(
+// Singleton por processo: o client service-role é stateless (sem sessão/cookies), então reusar é seguro
+// e evita reconstruir o PostgREST/GoTrue client (e re-ler env) a cada chamada.
+const g = globalThis as unknown as { __adminSb?: SupabaseClient<any, 'public', any> }
+export function createAdminClient(): SupabaseClient<any, 'public', any> {
+  return (g.__adminSb ??= createSupabaseClient(
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } },
-  )
+  ))
 }
 
 export async function createClient() {

@@ -3,6 +3,7 @@ import type { ConfigDTO, MapeamentoDTO, EventoDTO, EventoDetalhe, ReconciliacaoD
 
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
+import { recursoAusente, marcarAusente } from '@/lib/db/recurso-ausente'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
@@ -271,8 +272,10 @@ export async function getEventoDetalhe(provider: string, id: string): Promise<{ 
   const svc = createAdminClient()
   // headers pode não existir (migration pendente) → busca tolerante.
   let data: any
-  const r = await svc.from('simulado_integracao_eventos').select('event_id, tipo, status, erro, recebido_em, processado_em, payload, headers').eq('id', id).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
+  const semHeaders = recursoAusente('integracao_eventos.headers')
+  const r: any = semHeaders ? { error: { message: 'headers' } } : await svc.from('simulado_integracao_eventos').select('event_id, tipo, status, erro, recebido_em, processado_em, payload, headers').eq('id', id).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
   if (r.error && /headers|column/i.test(r.error.message)) {
+    if (!semHeaders) marcarAusente('integracao_eventos.headers')
     const r2 = await svc.from('simulado_integracao_eventos').select('event_id, tipo, status, erro, recebido_em, processado_em, payload').eq('id', id).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
     data = r2.data
   } else data = r.data

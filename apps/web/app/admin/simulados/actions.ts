@@ -19,6 +19,7 @@ import { estudantesLinkadosSql } from '@/lib/data/relatorios.repo'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { contagensBancosRpc } from '@/lib/db/contagens-bancos'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
 // 0 linhas (fail-closed). Toda query por id/simulado_id filtra .eq('tenant_id', tenantId ?? SEM_TENANT)
@@ -98,8 +99,9 @@ export async function createSimuladoAction(data: SimuladoData) {
     const svc = await createServiceClient()
     const aMatricular = new Set<string>((data.estudanteIds ?? []).filter(Boolean))
     if (data.bancoBaseId) {
-      const { data: alunos } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', data.bancoBaseId).eq('tenant_id', tenantId)
-      for (const a of (alunos ?? []) as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
+      const bancoBase = data.bancoBaseId
+      const alunos = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoBase).eq('tenant_id', tenantId).order('estudante_id', { ascending: true }))
+      for (const a of alunos as any[]) if (a.estudante_id) aMatricular.add(a.estudante_id)
     }
 
     const estIds = [...aMatricular]
@@ -697,6 +699,9 @@ export async function contarBancosWizard(bancoIds: string[]): Promise<{ ok: bool
   const ids = [...new Set((bancoIds ?? []).filter(Boolean))].slice(0, 40)
   if (!ids.length) return { ok: true, counts: {} }
   const svc = createAdminClient()
+  // 1 RPC agregada (até 40 pastas) em vez de 80 HEAD counts; fallback ao caminho antigo se a migração 20261203000000 faltar.
+  const viaRpc = await contagensBancosRpc(svc as any, tenantId, ids)
+  if (viaRpc) return { ok: true, counts: viaRpc }
   const out: Record<string, { q: number; e: number }> = {}
   await Promise.all(ids.map(async (id) => {
     const [q, e] = await Promise.all([
@@ -807,8 +812,7 @@ export async function adicionarQuestoesSimulado(simuladoId: string, questaoIds: 
   const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
   if (banco) {
     try {
-      const r = await svc.from('simulado_questao_pasta').upsert(novos.map((questao_id) => ({ tenant_id: tenantId, pasta_id: banco, questao_id })), { onConflict: 'tenant_id,pasta_id,questao_id', ignoreDuplicates: true })
-      if (r.error && /no unique|on conflict|42P10/i.test(r.error.message)) await svc.from('simulado_questao_pasta').insert(novos.map((questao_id) => ({ tenant_id: tenantId, pasta_id: banco, questao_id })))
+      await svc.from('simulado_questao_pasta').upsert(novos.map((questao_id) => ({ tenant_id: tenantId, pasta_id: banco, questao_id })), { onConflict: 'pasta_id,questao_id', ignoreDuplicates: true })
     } catch { /* espelho best-effort */ }
   }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { questoes_adicionadas: novos.length } })

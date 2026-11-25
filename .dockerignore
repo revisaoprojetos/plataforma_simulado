@@ -11,3 +11,23 @@ dist-ssr
 .env.*
 .git
 .claude
+
+# --- Build/deploy performance (contexto = raiz do monorepo) ---
+**/node_modules
+**/.next
+**/.next-build*
+**/.turbo
+**/*.log
+_build.log
+coverage
+**/coverage
+**/*.tsbuildinfo
+**/.env.local*
+**/.teste-docs
+.dev-last-bundler
+**/.dev-last-bundler
+playwright-report
+test-results
+**/test-results
+migracao
+postman

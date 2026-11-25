@@ -1,6 +1,7 @@
 import 'server-only'
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
 
 /**
@@ -46,14 +47,18 @@ function linhagemCopia(origemRow: any, origemTenant: string): Record<string, unk
 // Insert TOLERANTE à Fase 2: tenta com os campos de linhagem; se o destino ainda não aplicou a migração
 // (coluna inexistente), repete sem eles — nunca bloqueia a cópia.
 async function inserirComLinhagem(svc: SupabaseClient, table: string, base: Record<string, unknown>, lin: Record<string, unknown>) {
+  if (recursoAusente(`col:linhagem:${table}`)) return svc.from(table).insert(base).select('id').single()
   let r = await svc.from(table).insert({ ...base, ...lin }).select('id').single()
+  if (r.error) marcarSeAusente(`col:linhagem:${table}`, r.error.message)
   if (r.error) r = await svc.from(table).insert(base).select('id').single()
   return r
 }
 // Leitura TOLERANTE das colunas de linhagem (podem não existir se a migração Fase 2 não foi aplicada).
 async function lerLinhagem(svc: SupabaseClient, table: string, id: string, tenantId: string): Promise<any> {
+  if (recursoAusente(`col:linhagem:${table}`)) return {}
   try {
-    const { data } = await svc.from(table).select('linhagem_id, origem_tenant_id').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+    const { data, error } = await svc.from(table).select('linhagem_id, origem_tenant_id').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+    if (error) marcarSeAusente(`col:linhagem:${table}`, error.message)
     return data ?? {}
   } catch { return {} }
 }

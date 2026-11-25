@@ -70,9 +70,9 @@ describe('hrefs gerados para as telas donas (rotas reais)', () => {
     for (const a of ['conteudos', 'grupos', 'visibilidade', 'informacoes']) expect(ABAS).toContain(new URL(hrefProduto('p1', a), 'http://x').searchParams.get('aba'))
     expect(new URL(hrefMapaRegras('p1'), 'http://x').searchParams.get('aba')).toBe('regras')
   })
-  it('liberação de aulas aponta para Gerador > liberacao-aulas > ?vis=', () => {
+  it('liberação de aulas aponta para Gerador > Acesso e liberação > ?v=liberacao-aulas&vis=', () => {
     const u = new URL(hrefLiberacaoAulas('p1', 'excecoes'), 'http://x')
     expect(u.pathname).toBe('/admin/revisao/cronograma'); expect(u.searchParams.get('aba')).toBe('gerador')
-    expect(u.searchParams.get('sub')).toBe('liberacao-aulas'); expect(u.searchParams.get('vis')).toBe('excecoes'); expect(u.searchParams.get('produto')).toBe('p1')
+    expect(u.searchParams.get('sub')).toBe('acesso'); expect(u.searchParams.get('v')).toBe('liberacao-aulas'); expect(u.searchParams.get('vis')).toBe('excecoes'); expect(u.searchParams.get('produto')).toBe('p1')
   })
 })

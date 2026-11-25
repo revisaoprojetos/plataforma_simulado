@@ -120,8 +120,8 @@ export async function garantirBancoDoSimulado(
     const rows = ordenadas.map((questao_id) => ({ tenant_id: tenantId, pasta_id: bancoId, questao_id }))
     for (let i = 0; i < rows.length; i += 500) {
       const lote = rows.slice(i, i + 500)
-      const { error } = await svc.from('simulado_questao_pasta').upsert(lote, { onConflict: 'tenant_id,pasta_id,questao_id', ignoreDuplicates: true })
-      if (error && /no unique|on conflict|42P10/i.test(error.message)) await svc.from('simulado_questao_pasta').insert(lote)
+      // PK real = (questao_id, pasta_id); tenant_id segue nas linhas mas não entra no conflito.
+      await svc.from('simulado_questao_pasta').upsert(lote, { onConflict: 'pasta_id,questao_id', ignoreDuplicates: true })
     }
     // Ordem manual do banco (tolerante à coluna).
     const { error: eOrd } = await svc.from('simulado_pastas').update({ ordem_questoes: ordenadas }).eq('id', bancoId).eq('tenant_id', tenantId)

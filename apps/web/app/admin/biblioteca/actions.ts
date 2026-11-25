@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getStorage } from '@/lib/storage'
 import { getCurrentAccess, checkPermission, getAuthUser, isSuperAdmin } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { pastasComEstudantesRpc } from '@/lib/db/contagens-bancos'
 import { registrarAudit } from '@/lib/audit'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import {
@@ -927,12 +928,15 @@ export async function carregarArvoreAcesso(raizId: string | null, categoria: Cat
   // restrito = tem alguma atribuição. ESCOPADO por .in() + fetchAllByIn (SEM o truncamento de 1000 da query crua).
   const pastaRestr = new Set<string>()
   if (subPastaIds.length) try {
-    const [pg, pe] = await Promise.all([
-      fetchAllByIn<any>(subPastaIds, (c) => svc.from('simulado_pasta_grupos').select('pasta_id').eq('tenant_id', g.tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
-      fetchAllByIn<any>(subPastaIds, (c) => svc.from('simulado_pasta_estudantes').select('pasta_id').eq('tenant_id', g.tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
+    // Só precisa saber QUAIS pastas têm estudante (distinto): RPC agregada; fallback = varredura paginada (caminho antigo).
+    const [pg, peSet] = await Promise.all([
+      fetchAllByIn<any>(subPastaIds, (c) => svc.from('simulado_pasta_grupos').select('pasta_id').eq('tenant_id', g.tenantId).in('pasta_id', c).order('id', { ascending: true })),
+      pastasComEstudantesRpc(svc as any, g.tenantId, subPastaIds),
     ])
+    const pe = peSet ? [] : await fetchAllByIn<any>(subPastaIds, (c) => svc.from('simulado_pasta_estudantes').select('pasta_id').eq('tenant_id', g.tenantId).in('pasta_id', c).order('id', { ascending: true }))
     for (const r of pg as any[]) pastaRestr.add(r.pasta_id)
     for (const r of pe as any[]) pastaRestr.add(r.pasta_id)
+    if (peSet) for (const id of peSet) pastaRestr.add(id)
   } catch { /* tabelas ausentes → nada restrito */ }
   const docRestr = new Set<string>()
   if (docIds.length) try {

@@ -67,6 +67,8 @@ export async function lerIntegridade(tenantId: string): Promise<LeituraIntegrida
 export async function dispararAuditoria(svc: SupabaseClient, tenantId: string): Promise<void> {
   const e = await espiar<EstadoJob>(chaveEstadoIntegridade(tenantId))
   if (e?.estado === 'calculando' && Date.now() - e.desde < MAX_CALCULANDO_MS) return
+  // Backoff: após falha, não re-audita (varredura pesada + queries que erram) por 10 min — cada visita/refresh disparava de novo.
+  if (e?.estado === 'erro' && Date.now() - e.em < 10 * 60 * 1000) return
   await gravar<EstadoJob>(chaveEstadoIntegridade(tenantId), 900, { estado: 'calculando', desde: Date.now() })
   try {
     const r = await calcular(svc, tenantId)

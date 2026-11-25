@@ -1,5 +1,6 @@
 import 'server-only'
 import { sqlQuery } from '@/lib/data/sql'
+import { recursoAusente, marcarAusente } from '@/lib/db/recurso-ausente'
 
 /**
  * ANÁLISE DE DOWNLOADS (admin). Tudo é SQL agregado no banco (egress mínimo, paginação no servidor), tenant SEMPRE explícito.
@@ -56,6 +57,7 @@ const REF_AULA = `CASE WHEN l.meta_id ~ '^(pf|pp|fl|qu):[0-9]{1,6}' THEN split_p
                        WHEN l.meta_id ~ '^(rf|rq):[0-9]+:[0-9]{1,6}$' THEN split_part(l.meta_id, ':', 3)::int END`
 
 export async function resumoDownloads(tenantId: string, f: Pick<FiltroDownloads, 'dias' | 'origem' | 'resultado' | 'busca'>): Promise<{ migrado: boolean; resumo: ResumoDownloads }> {
+  if (recursoAusente('tab:download_log')) return { migrado: false, resumo: { baixados: 0, bloqueados: 0, alunos: 0, conteudos: 0, metas: 0 } }
   const { where, params } = filtroBase(tenantId, f)
   const rows = await sqlQuery<{ baixados: string; bloqueados: string; alunos: string; conteudos: string; metas: string }>(
     `SELECT count(*) FILTER (WHERE l.resultado = 'baixado')::text AS baixados,
@@ -65,6 +67,7 @@ export async function resumoDownloads(tenantId: string, f: Pick<FiltroDownloads,
             count(DISTINCT l.meta_id)::text AS metas
        FROM simulado_download_log l LEFT JOIN simulado_estudantes e ON e.id = l.estudante_id
       WHERE ${where}`, params)
+  if (rows === null) marcarAusente('tab:download_log')
   if (rows === null) return { migrado: false, resumo: { baixados: 0, bloqueados: 0, alunos: 0, conteudos: 0, metas: 0 } }
   const r = rows[0]
   return { migrado: true, resumo: { baixados: Number(r?.baixados ?? 0), bloqueados: Number(r?.bloqueados ?? 0), alunos: Number(r?.alunos ?? 0), conteudos: Number(r?.conteudos ?? 0), metas: Number(r?.metas ?? 0) } }
@@ -97,6 +100,7 @@ export async function listarDownloads(tenantId: string, f: FiltroDownloads): Pro
                   0 AS alunos, count(DISTINCT l.documento_id)::int AS conteudos, count(*) OVER ()::int AS total
              ${from} WHERE ${where} GROUP BY l.estudante_id ORDER BY ${col} ${dir} NULLS LAST, chave ${lim}`
   }
+  if (recursoAusente('tab:download_log')) return { migrado: false, itens: [], total: 0 }
   let rows = await sqlQuery<Record<string, unknown>>(sql, params)
   // visão por meta depende da tabela de definições (opcional): sem ela, repete sem o JOIN
   if (rows === null && f.visao === 'meta') {

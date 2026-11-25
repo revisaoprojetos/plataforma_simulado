@@ -11,6 +11,7 @@ import { configDoEnv, listarMembrosDoGrupo, mapaMatriculasGrupo, detalheMembro, 
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
 import { colunasCpfCripto } from '@/lib/privacidade/cpf-cripto'
+import { planejarPromocaoEmail } from '@/lib/curseduca/promocao-email'
 
 /**
  * Núcleo do import da Curseduca — server-only, NÃO 'use server' (não vira endpoint RPC).
@@ -128,16 +129,23 @@ export async function executarImport(
     // no MESMO tick, então continua deduplicando corretamente (não recria quem já existe).
     const COLS_EST = 'id, email, emails_secundarios, cpf, telefone, classificacao, matricula_externa'
     const idsMembros = [...new Set(membros.map((m) => String(m.id)))]
-    const emailsMembros = [...new Set(membros.map((m) => (m.email ?? '').trim().toLowerCase()).filter(Boolean))]
-    const cpfsMembros = [...new Set(membros.map((m) => String(m.cpf ?? '').replace(/\D/g, '')).filter((x) => x.length === 11))]
     const achadosPorId = new Map<string, any>()
     const merge = (rows: any[] | null) => { for (const e of rows ?? []) achadosPorId.set((e as any).id, e) }
     // matrícula_externa = id da Curseduca é o match PRINCIPAL (todo membro já sincronizado tem).
     if (idsMembros.length) merge(await fetchAllByIn<any>(idsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('matricula_externa', ch).order('id', { ascending: true })))
     // dedup cross-provider (Guru/manual): casa por e-mail principal, CPF ou e-mail SECUNDÁRIO (overlap do array).
-    if (emailsMembros.length) merge(await fetchAllByIn<any>(emailsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('email', ch).order('id', { ascending: true })))
-    if (cpfsMembros.length) merge(await fetchAllByIn<any>(cpfsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', ch).order('id', { ascending: true })))
-    if (emailsMembros.length) merge(await fetchAllByIn<any>(emailsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).overlaps('emails_secundarios', ch).order('id', { ascending: true })))
+    // REDUÇÃO DE QUERIES: acharExistente dá prioridade a matricula_externa (porExt). Quem já casou por
+    // matrícula NÃO precisa das 3 buscas seguintes (e-mail/CPF/secundário) — só os NÃO casados (novos ou
+    // cross-provider). Mesmo resultado de "quem casa com quem"; no estado estável (todos já sincronizados)
+    // as 3 buscas viram 0.
+    const extAchados = new Set<string>()
+    for (const e of achadosPorId.values()) if (e.matricula_externa) extAchados.add(String(e.matricula_externa))
+    const naoCasados = membros.filter((m) => !extAchados.has(String(m.id)))
+    const emailsBusca = [...new Set(naoCasados.map((m) => (m.email ?? '').trim().toLowerCase()).filter(Boolean))]
+    const cpfsBusca = [...new Set(naoCasados.map((m) => String(m.cpf ?? '').replace(/\D/g, '')).filter((x) => x.length === 11))]
+    if (emailsBusca.length) merge(await fetchAllByIn<any>(emailsBusca, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('email', ch).order('id', { ascending: true })))
+    if (cpfsBusca.length) merge(await fetchAllByIn<any>(cpfsBusca, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', ch).order('id', { ascending: true })))
+    if (emailsBusca.length) merge(await fetchAllByIn<any>(emailsBusca, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).overlaps('emails_secundarios', ch).order('id', { ascending: true })))
     const existentes = [...achadosPorId.values()]
     const porEmail = new Map<string, string>(), porCpf = new Map<string, string>(), porExt = new Map<string, string>()
     const recPorId = new Map<string, any>()
@@ -171,6 +179,7 @@ export async function executarImport(
     let novos = 0, jaExistiam = 0, semIdentificador = 0, semAcesso = 0
     const novosMembros: MembroCurseduca[] = []
     const paraBackfill: { estudanteId: string; curseducaId: number }[] = []
+    const emailsPorEstudante = new Map<string, string[]>()
     for (const m of membros) {
       const ex = acharExistente(m)
       if (ex) {
@@ -180,17 +189,11 @@ export async function executarImport(
         const rec = recPorId.get(ex)
         // Promoção de e-mail: o e-mail que veio da Curseduca vira o PRINCIPAL e o anterior vai para
         // secundários (mesmo perfil/nota). Preserva secundários já existentes (não perde nenhum).
+        // (acumula por estudante; aplicado UMA vez após o laço — evita ping-pong A→B→A e UPDATEs repetidos)
         if (rec && m.email) {
-          const novo = String(m.email).toLowerCase().trim()
-          const atual = String(rec.email ?? '').toLowerCase().trim()
-          if (novo && novo !== atual) {
-            const sec = new Set<string>(((rec.emails_secundarios as string[]) ?? []).map((s) => String(s).toLowerCase()))
-            if (atual) sec.add(atual)
-            sec.delete(novo)
-            const { error: ePromo } = await svc.from('simulado_estudantes')
-              .update({ email: novo, emails_secundarios: [...sec] }).eq('id', ex).eq('tenant_id', g.tenantId)
-            if (!ePromo) { rec.email = novo; rec.emails_secundarios = [...sec]; porEmail.set(novo, ex); if (atual) porEmail.set(atual, ex) }
-          }
+          const lst = emailsPorEstudante.get(ex) ?? []
+          lst.push(m.email)
+          emailsPorEstudante.set(ex, lst)
         }
         if (rec && (!rec.cpf || !rec.telefone || !rec.classificacao)) paraBackfill.push({ estudanteId: ex, curseducaId: m.id })
         continue
@@ -199,6 +202,22 @@ export async function executarImport(
       if (expirado(m)) { semAcesso++; continue }      // acesso expirado na Curseduca → não cria (política do tenant)
       novosMembros.push(m)
     }
+    // Aplica no MÁXIMO 1 UPDATE por estudante, só se algo realmente muda (decisão pura em promocao-email.ts).
+    let promocoesEmail = 0, promocoesPuladas = 0
+    for (const [estId, emails] of emailsPorEstudante) {
+      const rec = recPorId.get(estId)
+      const plano = planejarPromocaoEmail(rec, emails)
+      if (plano.acao === 'pular') { promocoesPuladas++; continue }
+      const atual = String(rec.email ?? '').toLowerCase().trim()
+      const { error: ePromo } = await svc.from('simulado_estudantes')
+        .update({ email: plano.email, emails_secundarios: plano.secundarios }).eq('id', estId).eq('tenant_id', g.tenantId)
+      if (!ePromo) {
+        promocoesEmail++
+        rec.email = plano.email; rec.emails_secundarios = plano.secundarios
+        porEmail.set(plano.email, estId); if (atual) porEmail.set(atual, estId)
+      }
+    }
+    if (promocoesPuladas || promocoesEmail) console.log(`[curseduca-import] promoção de e-mail: ${promocoesEmail} aplicadas, ${promocoesPuladas} puladas (já principal/secundário)`)
 
     // CORREÇÃO DE CAUSA-RAIZ: a LISTA /members?groupId= JÁ retorna, por membro, `document` (CPF),
     // `phone` e `groups` (todos os produtos do aluno). Logo, CPF/telefone/classificação saem da lista
@@ -352,7 +371,7 @@ export async function executarImport(
       await entrarNoGrupo('Passaporte Vitalício', vitIds)    // grupo Vitalício (só os vitalícios)
     }
 
-    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, semAcesso, restante } })
+    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, semAcesso, restante, promocoesEmail, promocoesPuladas } })
     // 'layout' cobre também o detalhe /admin/grupos/[id] (senão os membros recém-vinculados
     // ficam invisíveis por cache até o TTL — foi o que pareceu "não foi pro grupo").
     revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos', 'layout')

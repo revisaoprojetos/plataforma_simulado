@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lerCfgMetas } from './config-metas'
+import { criarCircuitBreaker } from '@/lib/util/circuit-breaker'
 import { diffGrade, mudancaGrande, LIMIAR_AUDITORIA_GRADE, LIMIAR_SNAPSHOT_GRADE, type Grade } from './grade-diff'
 
 // REGISTRO do Cronograma Adaptativo (aba admin "Análise de uso"). TUDO best-effort: nunca lança, nunca atrasa a resposta
@@ -28,8 +29,13 @@ export interface RegistroGeracao {
 }
 
 /** Roda `fn` depois da resposta quando há request ativo (after); fora de request, dispara solto. Nunca lança. */
+// Circuit breaker: 5 falhas seguidas de gravação (tabela/coluna ausente, banco saturado) → pausa 60 s sem martelar o Postgres.
+const breakerLog = criarCircuitBreaker({ limite: 5, pausaMs: 60_000 })
 function depois(fn: () => Promise<void>): void {
-  const seguro = () => fn().catch(() => {})
+  const seguro = async () => {
+    if (!breakerLog.permitir()) return
+    try { await fn(); breakerLog.sucesso() } catch { breakerLog.falha() }
+  }
   try { after(seguro) } catch { void seguro() }
 }
 
@@ -54,6 +60,7 @@ export function registrarGeracao(svc: SupabaseClient, r: RegistroGeracao): void 
       ms: r.ms != null ? Math.max(0, Math.round(r.ms)) : null, n_metas: r.nMetas ?? null, fim: r.fim ?? null,
     }
     const { error } = await svc.from('simulado_cronograma_adaptativo_geracao_log').insert(linha)
+    if (error && r.acao !== 'remap_as') throw error
     // 'remap_as' só existe no CHECK depois da migração 20261125000000: antes dela, registra como 'migrar' com o rótulo no texto.
     if (error && r.acao === 'remap_as') await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({ ...linha, acao: 'migrar', erro: ('[remap_as] ' + (r.erro ?? '')).slice(0, 500) })
   })
@@ -101,11 +108,12 @@ export function registrarSync(svc: SupabaseClient, r: {
     }
     const cfg = (r.depois.cfg ?? {}) as { motor?: string; catalogo?: string }
     const params_hash = await hashParamsTenant(svc, r.tenantId)
-    await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({
+    const { error: eSync } = await svc.from('simulado_cronograma_adaptativo_geracao_log').insert({
       tenant_id: r.tenantId, estudante_id: r.estudanteId, plano_id: r.planoId ?? null, acao: 'sync', origem: 'iframe',
       motor: cfg.motor ?? null, catalogo: cfg.catalogo ?? null, params_hash, ok, erro: r.erro ? String(r.erro).slice(0, 500) : null, ms,
       n_metas: Object.keys((r.depois.plano ?? {}) as object).length, fim: r.depois.fim ?? null,
     })
+    if (eSync) throw eSync
   })
 }
 
@@ -117,6 +125,7 @@ export function registrarEventoMeta(svc: SupabaseClient, e: { tenantId: string; 
   depois(async () => {
     const base = { tenant_id: e.tenantId, plano_id: e.planoId, estudante_id: e.estudanteId, meta_id: e.metaId, de: e.de, para: e.para }
     const r = await svc.from('simulado_cronograma_adaptativo_meta_evento').insert({ ...base, origem: e.origem ?? 'outro' })
-    if (r.error && /origem/i.test(String(r.error.message))) await svc.from('simulado_cronograma_adaptativo_meta_evento').insert(base)
+    if (r.error && /origem/i.test(String(r.error.message))) { const r2 = await svc.from('simulado_cronograma_adaptativo_meta_evento').insert(base); if (r2.error) throw r2.error }
+    else if (r.error) throw r.error
   })
 }
