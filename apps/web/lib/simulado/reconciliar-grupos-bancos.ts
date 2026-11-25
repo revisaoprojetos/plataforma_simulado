@@ -1,4 +1,4 @@
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { matricularEmSimuladosDoBanco } from './matricular-banco'
 
 export interface ReconcileResult {
@@ -33,25 +33,39 @@ export async function reconciliarGruposBancos(
   let pastaInseridos = 0
   let matriculasInseridas = 0
 
+  // Caches por rodada: grupo com N bancos / banco com N grupos não relê o mesmo conjunto.
+  // `pastaSet`: UMA leitura paginada (1000/pág) da pasta inteira em vez de 1 SELECT por chunk de 80 do grupo
+  // (12x menos queries; leitura de simulado_pasta_estudantes era o 2º maior consumo de CPU).
+  const membrosPorGrupo = new Map<string, string[]>()
+  const pastaSet = new Map<string, Set<string>>()
+
   for (const l of links) {
     const { tenant_id: tenantId, pasta_id: pastaId, grupo_id: grupoId } = l
     if (!tenantId || !pastaId || !grupoId) continue
 
     // Membros do grupo (paginado).
-    const membros = await fetchAll<{ estudante_id: string }>(() =>
-      svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
-    const estIds = [...new Set(membros.map((m) => m.estudante_id).filter(Boolean))]
+    let estIds = membrosPorGrupo.get(grupoId)
+    if (!estIds) {
+      const membros = await fetchAll<{ estudante_id: string }>(() =>
+        svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+      estIds = [...new Set(membros.map((m) => m.estudante_id).filter(Boolean))]
+      membrosPorGrupo.set(grupoId, estIds)
+    }
     if (!estIds.length) continue
 
     // Quem já está na pasta (chunked) → insere os que faltam.
-    const ja = await fetchAllByIn<{ estudante_id: string }>(estIds, (chunk) =>
-      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
-    const jaSet = new Set(ja.map((r) => r.estudante_id))
-    const novos = estIds.filter((id) => !jaSet.has(id))
+    let jaSet = pastaSet.get(pastaId)
+    if (!jaSet) {
+      const ja = await fetchAll<{ estudante_id: string }>(() =>
+        svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).order('estudante_id', { ascending: true }))
+      jaSet = new Set(ja.map((r) => r.estudante_id))
+      pastaSet.set(pastaId, jaSet)
+    }
+    const novos = estIds.filter((id) => !jaSet!.has(id))
     for (let i = 0; i < novos.length; i += 500) {
       const lote = novos.slice(i, i + 500)
       const { error } = await svc.from('simulado_pasta_estudantes').insert(lote.map((estudante_id) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id })))
-      if (!error) pastaInseridos += lote.length
+      if (!error) { pastaInseridos += lote.length; for (const id of lote) jaSet.add(id) }
     }
 
     // Matrícula nos simulados do banco (idempotente + chunked). Reconcilia TODOS os membros,

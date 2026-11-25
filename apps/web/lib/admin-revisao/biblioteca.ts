@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -40,7 +41,7 @@ export async function temColunaOculto(svc: SupabaseClient): Promise<boolean> {
 export interface PastaInfo { id: string; nome: string; paiId: string | null; tipo: string | null; disciplina: string | null; area: string; cor?: string | null; disciplinaId?: string | null; tipoProprio?: string | null; restrito?: boolean }
 
 /** Pastas das duas áreas (Biblioteca e JurisClub) com tipo de material e disciplina JÁ resolvidos pela herança. */
-const _pastasCache = new Map<string, { at: number; v: Map<string, PastaInfo> }>()
+const _pastasCache = new MapLru<string, { at: number; v: Map<string, PastaInfo> }>(50)
 const _pastasVoo = new Map<string, Promise<Map<string, PastaInfo>>>()
 /** Limpa o cache (30 s) das pastas — chamado após criar/mover/renomear/excluir pasta pela tela de gestão. */
 export function limparCachePastas(tenantId?: string) { if (tenantId) _pastasCache.delete(tenantId); else _pastasCache.clear() }

@@ -1,10 +1,11 @@
+import { MapLru } from '@/lib/util/lru'
 /**
  * Detecta UMA vez que um objeto de migração PENDENTE (coluna/tabela/RPC) não existe e evita re-tentar a query a cada request
  * (cada tentativa vira um ERROR no log do Postgres). A ausência fica memorizada por 10 min por processo; depois disso
  * tenta de novo UMA vez (se a migração já foi aplicada, passa a funcionar sozinho). Só em memória: nunca lança.
  */
 const TTL_MS = 10 * 60 * 1000
-const AUSENTES = new Map<string, number>()
+const AUSENTES = new MapLru<string, number>(500)
 
 /** `true` se o recurso foi dado como ausente há menos de 10 min (não tente a query). */
 export function recursoAusente(chave: string): boolean {

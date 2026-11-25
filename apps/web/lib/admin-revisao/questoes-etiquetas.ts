@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
@@ -17,8 +18,8 @@ import type {
 const TTL = 45_000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 type Ent<T> = { at: number; v: T }
-const cacheLista = new Map<string, Ent<{ itens: EtiquetaQ[]; ind: Omit<IndicadoresEtiquetas, 'duplicadas'>; degradado: boolean }>>()
-const cacheDet = new Map<string, Ent<DetalheEtiqueta>>()
+const cacheLista = new MapLru<string, Ent<{ itens: EtiquetaQ[]; ind: Omit<IndicadoresEtiquetas, 'duplicadas'>; degradado: boolean }>>(50)
+const cacheDet = new MapLru<string, Ent<DetalheEtiqueta>>(300)
 export function limparCacheEtiquetas(tenantId: string) {
   cacheLista.delete(tenantId)
   for (const k of [...cacheDet.keys()]) if (k.startsWith(tenantId + ':')) cacheDet.delete(k)

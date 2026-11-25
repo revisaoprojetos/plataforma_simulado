@@ -21,9 +21,15 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["mammoth", "pdfjs-dist", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"],
   // Não anuncia "X-Powered-By: Next.js" (menos bytes/headers, menos superfície).
   poweredByHeader: false,
+  // gzip no próprio Node (o Traefik não comprime): menos bytes/egress; custo de CPU baixo p/ HTML/JSON.
+  compress: true,
+  // Menos variantes de imagem no cache do otimizador (cada largura distinta = 1 reprocessamento sharp + 1 arquivo).
+  // Cobertura mobile→desktop mantida (o Image escolhe o próximo tamanho disponível).
   images: {
     // Imagens otimizadas ficam 30 dias no cache do /_next/image (default 60s → reotimizava/reprocessava no VPS).
     // Só afeta URLs imutáveis/versionadas; logos trocados por URL nova continuam aparecendo. Formato mantém o default (webp).
+    deviceSizes: [480, 768, 1080, 1440, 1920],
+    imageSizes: [32, 64, 128, 256],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
@@ -78,6 +84,8 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
+    // `next build` (CI/Docker): nº de workers pela memória livre em vez de 1 por CPU (evita OOM no runner). Não afeta runtime.
+    memoryBasedWorkersCount: true,
     // Barrel imports de libs grandes → só os módulos usados entram no bundle (lucide-react/date-fns/recharts já são default).
     optimizePackageImports: ["lucide-react", "date-fns", "recharts", "@base-ui/react", "@dnd-kit/core"],
     // Turbopack no Windows: a escrita/compactação do cache PERSISTENTE de disco em dev estoura a RAM

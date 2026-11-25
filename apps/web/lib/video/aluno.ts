@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { getSessaoAluno, type AlunoSession } from '@/lib/aluno-session'
@@ -23,7 +24,7 @@ export async function contextoAluno(): Promise<
   return { ok: true, sessao, slug }
 }
 
-const slugCache = new Map<string, { slug: string; exp: number }>()
+const slugCache = new MapLru<string, { slug: string; exp: number }>(500)
 async function slugDoTenant(tenantId: string): Promise<string | null> {
   const c = slugCache.get(tenantId)
   if (c && c.exp > Date.now()) return c.slug

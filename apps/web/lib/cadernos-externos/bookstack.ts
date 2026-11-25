@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 
 /**
@@ -15,7 +16,7 @@ export type ResultadoBookStack =
 type Args = { tenantId: string; estudanteId: string; email?: string | null; nome?: string | null }
 
 const TTL_MS = 10 * 60 * 1000
-const cache = new Map<string, { ate: number; v: ResultadoBookStack & { ok: true } }>()
+const cache = new MapLru<string, { ate: number; v: ResultadoBookStack & { ok: true } }>(2000)
 const emVoo = new Map<string, Promise<ResultadoBookStack>>()
 
 function cfg() {

@@ -42,6 +42,29 @@ function redis(): IORedis | null {
   return client
 }
 
+/** Cliente Redis do cache (singleton compartilhado) — usado pela limpeza/manutenção (lib/cache/limpeza.ts). */
+export function redisCache(): IORedis | null { return redis() }
+
+/** Entradas vivas do cache em memória deste processo (chave, bytes estimados do JSON, expiração em ms epoch). */
+export function listarMemoria(): { chave: string; bytes: number; exp: number }[] {
+  const agora = Date.now()
+  const out: { chave: string; bytes: number; exp: number }[] = []
+  for (const [chave, m] of mem) {
+    if (m.exp <= agora) continue
+    let bytes = 0
+    try { bytes = chave.length + (JSON.stringify(m.v)?.length ?? 0) } catch { /* ignora */ }
+    out.push({ chave, bytes, exp: m.exp })
+  }
+  return out
+}
+
+/** Remove do Map em memória do processo as chaves que começam com `prefixo` (completo, ex.: `relatorio:<t>:`). Devolve quantas. */
+export function limparMemoriaPorPrefixo(prefixo: string): number {
+  let n = 0
+  for (const k of [...mem.keys()]) if (k.startsWith(prefixo)) { mem.delete(k); n++ }
+  return n
+}
+
 /** Chave canônica de relatório, sempre escopada por tenant (para invalidação em massa). */
 export function chaveRelatorio(tenantId: string | null, ...partes: (string | number)[]): string {
   return `relatorio:${tenantId ?? 'none'}:${partes.join(':')}`

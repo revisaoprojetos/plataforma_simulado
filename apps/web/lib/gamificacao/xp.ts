@@ -28,11 +28,15 @@ export async function awardXp(svc: any, { tenantId, estudanteId, origem, refId, 
   let xpFinal = Math.round(xp)
   // Teto diário: só concede o que ainda cabe no dia (não é atômico — best-effort, aceita leve corrida).
   if (dia && limiteDia && limiteDia > 0) {
-    const { data: hoje } = await svc
+    let qHoje = svc
       .from('simulado_xp_eventos')
       .select('xp')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
       .filter('meta->>dia', 'eq', dia)
+    // janela temporal: só eventos recentes (dia local ± fuso) — não varre todo o ledger do aluno.
+    const t0 = Date.parse(dia + 'T00:00:00Z')
+    if (Number.isFinite(t0)) qHoje = qHoje.gte('criado_em', new Date(t0 - 36 * 3600_000).toISOString())
+    const { data: hoje } = await qHoje
     const somaHoje = (hoje ?? []).reduce((s: number, r: any) => s + (Number(r.xp) || 0), 0)
     const restante = limiteDia - somaHoje
     if (restante <= 0) return { awarded: false, capado: true }

@@ -1,3 +1,4 @@
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { matricularEmSimuladosDoBanco } from './matricular-banco'
 
 /**
@@ -22,12 +23,10 @@ export async function propagarGrupoAosBancos(
     const bancoIds = [...new Set((links ?? []).map((l: any) => l.pasta_id).filter(Boolean))] as string[]
     for (const pastaId of bancoIds) {
       // Quem já está na pasta (checado em chunks p/ respeitar o teto do PostgREST no .in()).
-      const ja = new Set<string>()
-      for (let i = 0; i < ids.length; i += 300) {
-        const chunk = ids.slice(i, i + 300)
-        const { data } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).in('estudante_id', chunk)
-        for (const r of (data ?? []) as any[]) ja.add(r.estudante_id)
-      }
+      // chunk 80 + order por coluna única (padrão do projeto; .in grande pendura o proxy).
+      const jaRows = await fetchAllByIn<{ estudante_id: string }>(ids, (chunk) =>
+        svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+      const ja = new Set<string>(jaRows.map((r) => r.estudante_id))
       const novos = ids.filter((id) => !ja.has(id))
       for (let i = 0; i < novos.length; i += 500) {
         const base = novos.slice(i, i + 500).map((estudante_id: string) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id }))

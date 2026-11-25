@@ -73,4 +73,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME="0.0.0.0"
+# Base alpine (musl): MALLOC_ARENA_MAX não se aplica. Limita o paralelismo do libvips/sharp (otimizador de imagens)
+# p/ não multiplicar threads+buffers por CPU. NODE_OPTIONS (heap) fica no compose.
+ENV VIPS_CONCURRENCY=1
 CMD ["node", "apps/web/server.js"]

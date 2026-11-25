@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ManutencaoSistemaForm } from '@/components/admin/manutencao-sistema-form'
 import { ManutencaoPaginasForm } from '@/components/admin/manutencao-paginas-form'
 import { ChecklistSistema } from '@/components/admin/checklist-sistema'
+import { CacheSistema } from '@/components/admin/cache-sistema'
 import { WorkspaceForm } from '@/components/admin/workspace-form'
 import { AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
 import type { ManutencaoSistema } from '@/lib/sistema/manutencao'
@@ -15,7 +16,8 @@ import type { WorkspaceGrupo } from './actions-tipos'
 type BlocoManutencao = { ativos: ManutencaoAreas; liberados: ManutencaoLiberados; nomes: PessoaItem[]; modos?: ManutencaoModos }
 type WorkspaceBloco = { emails: string[]; grupos: string[]; gruposDisponiveis: WorkspaceGrupo[]; podeEditar: boolean }
 
-export function SistemaTabs({ manutencao, admin, aluno, workspace }: {
+export function SistemaTabs({ manutencao, admin, aluno, workspace, superAdmin = false }: {
+  superAdmin?: boolean
   manutencao: ManutencaoSistema
   admin: BlocoManutencao
   aluno: BlocoManutencao
@@ -27,6 +29,7 @@ export function SistemaTabs({ manutencao, admin, aluno, workspace }: {
         <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
         <TabsTrigger value="areas">Páginas em manutenção</TabsTrigger>
         <TabsTrigger value="workspace">Workspace</TabsTrigger>
+        <TabsTrigger value="cache">Cache e banco</TabsTrigger>
         <TabsTrigger value="checklist">Checklist do sistema</TabsTrigger>
       </TabsList>
       <TabsContent value="manutencao"><ManutencaoSistemaForm inicial={manutencao} /></TabsContent>
@@ -53,6 +56,7 @@ export function SistemaTabs({ manutencao, admin, aluno, workspace }: {
           podeEditar={workspace.podeEditar}
         />
       </TabsContent>
+      <TabsContent value="cache"><CacheSistema superAdmin={superAdmin} /></TabsContent>
       <TabsContent value="checklist"><ChecklistSistema /></TabsContent>
     </Tabs>
   )

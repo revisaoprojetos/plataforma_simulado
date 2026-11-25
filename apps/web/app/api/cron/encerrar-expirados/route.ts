@@ -150,7 +150,8 @@ async function processar() {
         await dadosProgressao(svc as any, { id: s.id, simulado_id: s.simulado_id, estudante_id: s.estudante_id }, { nota, motivo: 'auto_encerramento' }))
     }
   }
-  for (let i = 0; i < lista.length; i += 25) await Promise.all(lista.slice(i, i + 25).map(finalizar))
+  // CPU/DB: lotes de 8 (antes 25) — suaviza o pico pós-data_fim sem perder a janela (o loop continua até acabar).
+  for (let i = 0; i < lista.length; i += 8) await Promise.all(lista.slice(i, i + 8).map(finalizar))
 
   // Eventos de auditoria em UM insert (antes era 1 por sessão).
   if (eventos.length) await svc.from('simulado_sessao_eventos').insert(eventos)

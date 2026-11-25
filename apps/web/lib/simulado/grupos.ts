@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { recursoAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
@@ -70,7 +71,7 @@ export async function selecionarGrupos(
 // abertura do seletor de grupos (banco e criação) é o que deixava tudo lento. Aqui a contagem é
 // calculada UMA vez e reaproveitada por TTL curto → números "pré setados", carregamento rápido.
 type ContagemCache = { at: number; counts: Record<string, number> }
-const _contagemCache = new Map<string, ContagemCache>()
+const _contagemCache = new MapLru<string, ContagemCache>(100)
 const CONTAGEM_TTL_MS = 5 * 60_000 // 5 min
 
 /** Mapa grupo_id → nº de membros do tenant, memorizado (TTL 5 min). `forcar` recalcula. */

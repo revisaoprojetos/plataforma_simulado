@@ -45,6 +45,38 @@ function getPool(): Pool | null {
   return pool
 }
 
+/**
+ * Leitura SEGURA p/ diagnóstico: transação READ ONLY com `SET LOCAL statement_timeout=10000`. Devolve `{ rows, erro }`
+ * (erro como texto, p/ distinguir "objeto ausente"/"permissão" de "SQL desligado").
+ */
+export async function sqlLeitura<T = any>(text: string, params: any[] = []): Promise<{ rows: T[] | null; erro?: string }> {
+  const p = getPool()
+  if (!p) return { rows: null, erro: 'DATABASE_URL ausente (SQL direto desligado)' }
+  let client
+  try {
+    client = await p.connect()
+    await client.query('BEGIN READ ONLY')
+    await client.query('SET LOCAL statement_timeout = 10000')
+    const r = await client.query(text, params)
+    await client.query('COMMIT')
+    return { rows: r.rows as T[] }
+  } catch (e) {
+    try { await client?.query('ROLLBACK') } catch { /* ignora */ }
+    return { rows: null, erro: (e as Error).message }
+  } finally {
+    client?.release()
+  }
+}
+
+/** Host e usuário da conexão (NUNCA a senha) — p/ confirmar qual banco/projeto o app usa. */
+export function sqlConexaoInfo(): { host: string | null; usuario: string | null; banco: string | null } {
+  if (!URL) return { host: null, usuario: null, banco: null }
+  try {
+    const u = new globalThis.URL(URL)
+    return { host: u.hostname, usuario: decodeURIComponent(u.username), banco: u.pathname.replace(/^\//, '') || null }
+  } catch { return { host: null, usuario: null, banco: null } }
+}
+
 /** Métricas do pool de conexões (observabilidade — Fase 4). */
 export function poolStats(): { total: number; idle: number; waiting: number; replica: boolean } | null {
   if (!pool) return { total: 0, idle: 0, waiting: 0, replica: !!process.env.DATABASE_URL_REPLICA }

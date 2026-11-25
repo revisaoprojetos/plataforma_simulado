@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
@@ -16,9 +17,9 @@ import {
 
 const TTL = 30_000
 type Entrada<T> = { at: number; v: T }
-const cacheArvore = new Map<string, Entrada<ArvoreBib>>()
-const cacheOpcoes = new Map<string, Entrada<OpcoesFiltroBib>>()
-const cacheResumo = new Map<string, Entrada<ResumoBib>>()
+const cacheArvore = new MapLru<string, Entrada<ArvoreBib>>(200)
+const cacheOpcoes = new MapLru<string, Entrada<OpcoesFiltroBib>>(200)
+const cacheResumo = new MapLru<string, Entrada<ResumoBib>>(200)
 const fresco = <T,>(m: Map<string, Entrada<T>>, k: string): T | undefined => { const e = m.get(k); return e && Date.now() - e.at < TTL ? e.v : undefined }
 // single-flight: página (SSR) + API + prefetch pedem o mesmo dado ao mesmo tempo — uma só ida ao banco para todos.
 const voo = new Map<string, Promise<any>>()

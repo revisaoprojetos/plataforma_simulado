@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
@@ -45,7 +46,7 @@ interface Entry {
   ign: Set<string> | null; ignServidor: boolean; ignVer: number; memo: Map<string, Comp[]>
 }
 const chaveDet = (tenantId: string) => `unif:dup:${tenantId}`
-const IGN_VER = new Map<string, number>()
+const IGN_VER = new MapLru<string, number>(200)
 
 export function limparCacheUnificar(tenantId: string) { invalidarDeteccao(chaveDet(tenantId)); limparCacheDuplicadas(tenantId); limparCacheQuestoes(tenantId) }
 /** Aquece a detecção em segundo plano (chame em qualquer entrada da Biblioteca › Questões; custo zero se já estiver quente). */

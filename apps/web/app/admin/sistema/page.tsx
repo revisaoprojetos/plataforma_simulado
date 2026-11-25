@@ -1,4 +1,4 @@
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getCurrentAccess, isSuperAdmin } from '@/lib/auth/permissions'
 import { getManutencaoSistema } from '@/lib/sistema/manutencao'
 import { getManutencaoAreas, getManutencaoAreasLiberados, getManutencaoAluno } from '@/lib/sistema/manutencao-areas-server'
 import { getTestadoresGlobais, getWorkspaceGrupos } from '@/lib/sistema/testadores-globais'
@@ -38,6 +38,7 @@ export default async function SistemaPage() {
         manutencao={manutencao}
         admin={{ ativos: adminAtivos, liberados: adminLiberados, nomes: nomesAdmin }}
         aluno={{ ativos: alunoBloco.ativos, liberados: alunoBloco.liberados, nomes: nomesAluno, modos: alunoBloco.modos }}
+        superAdmin={await isSuperAdmin()}
         workspace={{ emails: wsEmails, grupos: wsGrupos, gruposDisponiveis: wsGruposDisp, podeEditar: podeEditarWorkspace }}
       />
     </div>

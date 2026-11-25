@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
@@ -15,9 +16,9 @@ import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const TTL = 30_000
 type Entrada<T> = { at: number; v: T }
-const cArvore = new Map<string, Entrada<ArvoreBib>>()
-const cOpcoes = new Map<string, Entrada<OpcoesQ>>()
-const cTotal = new Map<string, Entrada<number>>()
+const cArvore = new MapLru<string, Entrada<ArvoreBib>>(200)
+const cOpcoes = new MapLru<string, Entrada<OpcoesQ>>(200)
+const cTotal = new MapLru<string, Entrada<number>>(200)
 const fresco = <T,>(m: Map<string, Entrada<T>>, k: string): T | undefined => { const e = m.get(k); return e && Date.now() - e.at < TTL ? e.v : undefined }
 
 export function limparCacheQuestoes(tenantId: string) {

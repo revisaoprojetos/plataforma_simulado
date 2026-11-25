@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.4 — 2026-11-25
+
+### Redução de CPU e memória + limpeza de cache e estado do banco
+- **Admin › Sistema › Cache e banco:** cache em Redis e em memória do processo (grupos, tamanho, TTL, simular e limpar por grupo/tenant, auditado) e seção Banco (super admin: maiores tabelas com selo de bloat, candidatos à retenção com "Limpar lote", verificação de migrações e projeto conectado, consultas mais pesadas).
+- **Rotina automática** (`/api/cron/cache-manutencao`, a cada 30 min): limpa só chaves reconstruíveis quando o Redis passa de 80% ou há evicções, e roda a purga de retenção uma vez por dia (se a migração existir).
+- **Worker:** crons pesados em fila serial com jitter; rolls e streak só na janela noturna; intervalos maiores (curseduca-jobs 120 s, integracoes-eventos 180 s, publicar 600 s, grupos 2 h); lotes de encerramento 25→8; concorrência BullMQ 2.
+- **Memória:** LRU com teto em 12 caches que cresciam sem limite; menos variantes de imagem; `VIPS_CONCURRENCY=1`.
+- **Banco:** import Curseduca sem releitura de classificação; consulta de eventos de integração indexável; `pasta_estudantes` lida uma vez por rodada; cache de gamificação só grava quando muda; teto diário olha 36 h.
+- **Migração nova:** `20261205000000_reducao_cpu_indices.sql`.
+
 ## 4.30.3 — 2026-11-25
 
 ### Auditoria de lentidão: correções de infra, crons, banco e documentos

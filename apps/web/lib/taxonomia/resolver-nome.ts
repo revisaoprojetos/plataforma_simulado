@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { recursoAusente, marcarAusente, marcarSeAusente } from '@/lib/db/recurso-ausente'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -37,7 +38,7 @@ export function escolherCanonica<T extends Linha>(linhas: T[]): T {
 
 // Cache curto por (tenant, tabela): uma importação chama isto por linha da planilha. Atualizado ao criar/aprender.
 interface Entrada { t: number; porChave: Map<string, Linha[]>; porSem: Map<string, Linha[]>; aliases: Map<string, string> }
-const CACHE = new Map<string, Entrada>()
+const CACHE = new MapLru<string, Entrada>(100)
 const TTL_MS = 15_000
 
 async function carregar(svc: SupabaseClient, table: TabelaTaxonomia, tenantId: string): Promise<Entrada> {

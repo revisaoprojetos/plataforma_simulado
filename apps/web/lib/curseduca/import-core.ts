@@ -258,7 +258,7 @@ export async function executarImport(
       if (!rec?.classificacao) patch.classificacao = classificar(gruposDe(m))
       if (Object.keys(patch).length) {
         const { error } = await svc.from('simulado_estudantes').update(patch).eq('id', b.estudanteId).eq('tenant_id', g.tenantId)
-        if (!error) atualizados++
+        if (!error) { atualizados++; if (rec) Object.assign(rec, patch) }
       }
     }
 
@@ -272,10 +272,14 @@ export async function executarImport(
       matricula_externa: String(m.id),
     }))
 
+    // Classificação já conhecida por estudante (existentes via recPorId; novos via retorno do INSERT) →
+    // evita re-ler `classificacao` de todos os resolvidos na etapa 6 (antes: 1 SELECT por chunk de 80, todo import).
+    const classPorId = new Map<string, string | null>()
+    for (const id of new Set(idsResolvidos)) { const r = recPorId.get(id); if (r) classPorId.set(id, r.classificacao ?? null) }
     for (let i = 0; i < paraInserir.length; i += 200) {
       const lote = paraInserir.slice(i, i + 200)
-      const { data, error } = await svc.from('simulado_estudantes').insert(lote).select('id')
-      if (!error && data) { idsResolvidos.push(...data.map((r: any) => r.id)); novos += data.length; continue }
+      const { data, error } = await svc.from('simulado_estudantes').insert(lote).select('id, classificacao')
+      if (!error && data) { idsResolvidos.push(...data.map((r: any) => r.id)); for (const r of data as any[]) classPorId.set(r.id, r.classificacao ?? null); novos += data.length; continue }
       // Lote falhou (ex.: conflito de e-mail/CPF) → insere um a um, pulando/vinculando conflitos.
       for (const row of lote) {
         const { data: d1, error: e1 } = await svc.from('simulado_estudantes').insert(row).select('id').single()
@@ -349,8 +353,11 @@ export async function executarImport(
     // 6) Passaporte E vitalício entram no grupo "Passaporte"; vitalício entra TAMBÉM no "Passaporte Vitalício".
     if (idsResolvidos.length) {
       const unicos = [...new Set(idsResolvidos)]
-      const classDe = await fetchAllByIn<{ id: string; classificacao: string | null }>(unicos, (chunk) =>
-        svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).eq('tenant_id', g.tenantId).order('id', { ascending: true }))
+      const faltam = unicos.filter((id) => !classPorId.has(id)) // só quem não tem classificação em memória (inseridos 1 a 1)
+      const lidos = faltam.length ? await fetchAllByIn<{ id: string; classificacao: string | null }>(faltam, (chunk) =>
+        svc.from('simulado_estudantes').select('id, classificacao').in('id', chunk).eq('tenant_id', g.tenantId).order('id', { ascending: true })) : []
+      for (const r of lidos) classPorId.set(r.id, r.classificacao)
+      const classDe = unicos.map((id) => ({ id, classificacao: classPorId.get(id) ?? null }))
       const passIds = classDe.filter((p) => p.classificacao === 'passaporte' || p.classificacao === 'vitalicio').map((p) => p.id)
       const vitIds = classDe.filter((p) => p.classificacao === 'vitalicio').map((p) => p.id)
 

@@ -418,6 +418,13 @@ export async function pagamentosAlunoSql(tenantId: string, email: string | null,
   const mail = (email ?? '').trim().toLowerCase()
   const doc = (cpf ?? '').replace(/\D/g, '')
   if (!mail && !doc) return []
+  // Predicado montado só com os ramos presentes (sem `$n <> ''`): o planner usa BitmapOr nos índices de
+  // expressão (tenant_id, lower(email)) e (tenant_id, regexp_replace(doc)) — migração 20261205000000 —
+  // em vez de varrer/avaliar o jsonb de todos os eventos do tenant.
+  const params: unknown[] = [tenantId]
+  const ramos: string[] = []
+  if (mail) { params.push(mail); ramos.push(`lower(payload->'contact'->>'email') = $${params.length}`) }
+  if (doc) { params.push(doc); ramos.push(`regexp_replace(COALESCE(payload->'contact'->>'doc', ''), '\\D', '', 'g') = $${params.length}`) }
   return sqlQuery<PagamentoAlunoRow>(
     `SELECT event_id AS id,
             COALESCE(payload->'dates'->>'confirmed_at', payload->'dates'->>'ordered_at', payload->'dates'->>'created_at') AS pago_em,
@@ -433,11 +440,10 @@ export async function pagamentosAlunoSql(tenantId: string, email: string | null,
        FROM simulado_integracao_eventos
       WHERE tenant_id = $1
         AND payload->'contact' IS NOT NULL
-        AND ( ($2 <> '' AND lower(payload->'contact'->>'email') = $2)
-           OR ($3 <> '' AND regexp_replace(COALESCE(payload->'contact'->>'doc', ''), '\\D', '', 'g') = $3) )
+        AND ( ${ramos.join(' OR ')} )
       ORDER BY COALESCE(payload->'dates'->>'confirmed_at', payload->'dates'->>'ordered_at', recebido_em::text) DESC
       LIMIT 500`,
-    [tenantId, mail, doc],
+    params,
   )
 }
 

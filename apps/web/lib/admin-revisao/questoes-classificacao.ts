@@ -1,3 +1,4 @@
+import { MapLru } from '@/lib/util/lru'
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
@@ -25,7 +26,7 @@ interface Lista {
   itens: Record<TipoTaxG, ItemTaxG[]>; dist: Distribuicao; disciplinas: { id: string; nome: string }[]
   assuntos: { id: string; nome: string; disc: string | null }[]; bancas: Map<string, string>; orgaos: Map<string, string>; discNome: Map<string, string>
 }
-const LISTAS = new Map<string, { at: number; v: Lista }>()
+const LISTAS = new MapLru<string, { at: number; v: Lista }>(20)
 const PEND = new Map<string, Promise<Lista | null>>()
 const SUG = new Map<string, { at: number; v: Record<string, SugestaoQ> }>()
 

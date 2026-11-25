@@ -26,7 +26,7 @@ export async function recomputarCache(svc: any, tenantId: string, estudanteId: s
 
   const { data: existing } = await svc
     .from('simulado_gamificacao_estudante')
-    .select('streak_atual, streak_maior, ultimo_dia_ativo')
+    .select('xp_total, nivel, liga, streak_atual, streak_maior, ultimo_dia_ativo')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
     .maybeSingle()
 
@@ -40,6 +40,9 @@ export async function recomputarCache(svc: any, tenantId: string, estudanteId: s
     streak_maior: existing?.streak_maior ?? 0,
     ultimo_dia_ativo: existing?.ultimo_dia_ativo ?? null,
   }
+  // Escrita só quando algo mudou (diff): o recompute roda a cada evento/rebuild e a maioria não altera
+  // xp/nível/liga — evita UPDATE+WAL desnecessário (e o upsert que reescreve a linha toda).
+  if (existing && Number(existing.xp_total) === xpTotal && Number(existing.nivel) === nivel && existing.liga === liga) return row
   await svc
     .from('simulado_gamificacao_estudante')
     .upsert({ ...row, atualizado_em: new Date().toISOString() }, { onConflict: 'tenant_id,estudante_id' })

@@ -28,11 +28,16 @@ async function executar(req: NextRequest) {
   if (alvo) {
     tenantIds = [alvo]
   } else {
-    // Só tenants com grants pendentes de transição (agendados ou ativos com prazo).
+    // Só tenants com transição VENCIDA (scheduled com início<=agora OU active com fim<=agora). Antes lia o
+    // tenant_id de TODOS os grants ativos a cada 5 min; agora 2 queries limitadas e quase sempre vazias.
+    const agoraIso = new Date().toISOString()
     let data: any[] = []
     try {
-      const r = await svc.from('simulado_access_grants').select('tenant_id').in('status', ['scheduled', 'active'])
-      data = r.data ?? []
+      const [a, b] = await Promise.all([
+        svc.from('simulado_access_grants').select('tenant_id').eq('status', 'scheduled').lte('inicio_em', agoraIso).limit(500),
+        svc.from('simulado_access_grants').select('tenant_id').eq('status', 'active').not('fim_em', 'is', null).lte('fim_em', agoraIso).limit(500),
+      ])
+      data = [...(a.data ?? []), ...(b.data ?? [])]
     } catch { data = [] }
     tenantIds = [...new Set(data.map((r) => r.tenant_id).filter(Boolean))]
   }
