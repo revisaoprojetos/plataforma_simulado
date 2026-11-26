@@ -127,4 +127,14 @@ describe('simularRegrasPuro (motor da action simularRegras): diff proposto × vi
     expect(d.proposto.erro).toMatch(/semanas/)
     expect(d.vigente.erro).toBeUndefined()
   })
+  it('gx: sem gx no conteúdo, regra de tipo personalizado dá diff zero; com gx, "ativo:false" remove as metas gx', () => {
+    const GX = Array.from({ length: 12 }, (_, k) => ({ id: `gx:comentarios:${String(k).padStart(8, '0')}`, slug: 'comentarios', nomeTipo: 'Comentários', disc: 'Direito Administrativo', titulo: `Doc ${k}`, doc: null, min: 20, prioridade: 5, ordem: k }))
+    const regra = { tiposGx: { comentarios: { ativo: false } } }
+    const sem = simularRegrasPuro(cfg, { AS, LP, ordem: CAT.ordem }, regra, {}, '2026-01-05')
+    expect(sem.idsComDataDiferente + sem.idsApenasProposto + sem.idsApenasVigente).toBe(0)
+    const com = simularRegrasPuro(cfg, { AS, LP, ordem: CAT.ordem, gx: GX }, regra, {}, '2026-01-05')
+    expect(com.vigente.metasPorTipo.gx ?? 0).toBeGreaterThan(0)
+    expect(com.proposto.metasPorTipo.gx ?? 0).toBe(0)
+    expect(com.deltaPorTipo.gx).toBeLessThan(0)
+  })
 })

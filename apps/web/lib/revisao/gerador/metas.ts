@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import type { DuracaoDivergente, VarianteAula } from '@/app/admin/cronogramas/metas/actions-tipos'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { sqlQuery } from '@/lib/data/sql'
 
 // Dados das sub-abas Gerador > Metas (Tipos de meta + Auditoria de metas). Tudo resolvido no servidor:
 // busca, filtro, ordenação e página. As leituras reaproveitam as mesmas tabelas/RPCs das telas atuais.
@@ -42,6 +43,22 @@ function chipsTipo(t: TipoMetaDef): string[] {
   return xs
 }
 
+/**
+ * Metas por tipo (slug) numa leitura só: GROUP BY no banco (uma ida) em vez de N contagens (uma por tipo) ou de varrer as ~17 mil metas.
+ * Sem DATABASE_URL / SQL falhando: uma contagem head por slug pedido (comportamento anterior).
+ */
+export async function usosPorTipo(tenantId: string, slugs: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  const rows = await sqlQuery<{ tipo: string; n: number }>(`SELECT tipo, count(*)::int n FROM simulado_cronograma_metas WHERE tenant_id = $1 GROUP BY 1`, [tenantId])
+  if (rows) { for (const r of rows) out.set(r.tipo, Number(r.n) || 0); return out }
+  const svc = createAdminClient()
+  await Promise.all(slugs.map(async (slug) => {
+    const r = await svc.from('simulado_cronograma_metas').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('tipo', slug)
+    out.set(slug, r.count ?? 0)
+  }))
+  return out
+}
+
 const COLUNAS_ORDEM_TIPO: Record<string, string> = { ordem: 'ordem', nome: 'nome', slug: 'slug', status: 'ativo', docx: 'rotulo_docx' }
 
 export async function paginarTipos(tenantId: string, o: { q?: string; status?: string; ord?: string; dir?: 'asc' | 'desc'; pagina: number; por: number }) {
@@ -58,10 +75,9 @@ export async function paginarTipos(tenantId: string, o: { q?: string; status?: s
   const { data, count, error } = await q.order(col, { ascending: o.dir !== 'desc' }).order('id').range(from, from + o.por - 1)
   if (error) return { ok: false as const, error: error.message }
   const base = (data ?? []) as unknown as (TipoMetaDef & { ativo: boolean })[]
-  // Uso por tipo: contagem agregada (head) só dos tipos desta página, em paralelo.
-  const usos = await Promise.all(base.map((b) =>
-    svc.from('simulado_cronograma_metas').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('tipo', b.slug).then((r) => r.count ?? 0)))
-  const linhas: TipoLinha[] = base.map((b, i) => ({ ...b, usos: usos[i], chips: chipsTipo(b) }))
+  // Uso por tipo: um GROUP BY só (antes: uma contagem por tipo da página).
+  const usos = await usosPorTipo(tenantId, base.map((b) => b.slug))
+  const linhas: TipoLinha[] = base.map((b) => ({ ...b, usos: usos.get(b.slug) ?? 0, chips: chipsTipo(b) }))
   return { ok: true as const, linhas, total: count ?? 0 }
 }
 

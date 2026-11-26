@@ -19,6 +19,7 @@ import { RegistrarAtualizacaoLote } from '@/components/biblioteca/registrar-atua
 import { SubstituirLoteDialog } from '@/components/biblioteca/substituir-lote-dialog'
 import { MetadadosLoteDialog } from '@/components/biblioteca/metadados-lote-dialog'
 import { arquivarConteudo, salvarLeituraLegproc } from './gestao-actions'
+import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
 import type { AlvoLote, AcaoLote, ResultadoLote } from './lote-actions-tipos'
 import type { AlvoCP } from './capa-actions-tipos'
 import {
@@ -307,9 +308,10 @@ export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria
     carregar(pastaAtual)
   }
   async function arquivarSelecionados() {
-    const n = selDocs.sel.size
-    if (!(await confirmar({ titulo: `Arquivar ${n} ${n === 1 ? 'material' : 'materiais'}`, mensagem: 'O status vira “Arquivado”. Os documentos continuam na Biblioteca.', confirmar: 'Arquivar' }))) return
-    await loteSimples('Arquivando', 'Arquivados', arquivarConteudo)
+    const titulos = Object.fromEntries(docs.map((d) => [d.id, d.titulo]))
+    const prep = await prepararArquivamento([...selDocs.sel], titulos)
+    if (!prep) return
+    await loteSimples('Arquivando', 'Arquivados', prep.fn)
   }
   function configurarPasta(p: PastaConteudo) {
     setLoteDlg({
@@ -578,8 +580,9 @@ export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria
     toast.success('Documento movido.'); carregar(pastaAtual)
   }
   async function arquivarDoc(d: Doc) {
-    if (!(await confirmar({ titulo: 'Arquivar documento?', mensagem: `"${d.titulo}" deixa de aparecer para os alunos.`, confirmar: 'Arquivar', destrutivo: true }))) return
-    const r = await removerDocumento(d.id); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
+    const prep = await prepararArquivamento([d.id], { [d.id]: d.titulo })
+    if (!prep) return
+    const r = await prep.fn(d.id); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
     toast.success('Documento arquivado.'); carregar(pastaAtual)
   }
   async function duplicarDoc(d: Doc) {

@@ -11,6 +11,7 @@
  * `regras-validacao.ts` (só servidor/testes). Sem Date.now/Math.random.
  */
 import { prioridadesPadrao } from './tipos-meta'
+import { MAX_TIPOS_GX_REGRAS, REGRA_TIPO_GX_PADRAO, SLUG_TIPO_GX_RE, type RegraTipoGx } from './gx-tipos'
 import {
   FAIXAS_PADRAO, MAX_FAIXAS, MAX_MINUTOS_SEMANA, MODOS_QUESTOES, MODOS_REVISAO, SECOES_OVERRIDE, classeDaFaixa, faixaDoTeto, faixaPorMinutos, indiceDaFaixa,
   type FaixaCarga, type OverridesFaixa, type SecaoOverride,
@@ -202,6 +203,8 @@ export interface RegrasMotor {
   adaptacao: AdaptacaoRegras
   /** Constantes numéricas que eram estruturais no motor (padrão = comportamento anterior). */
   constantes: ConstantesMotor
+  /** FASE 3a: regras de elegibilidade por tipo personalizado do catálogo (chave = slug). Padrão `{}` = comportamento anterior (e fora do hash). */
+  tiposGx: Record<string, RegraTipoGx>
 }
 /** Constantes estruturais expostas como regra. */
 export interface ConstantesMotor {
@@ -250,6 +253,7 @@ export const REGRAS_PADRAO: RegrasMotor = {
   restricoes: [],
   adaptacao: { ...ADAPTACAO_PADRAO },
   constantes: CONSTANTES_PADRAO,
+  tiposGx: {},
 }
 
 // ── normalização (merge com o padrão + clamp) ────────────────────────────────────────────────────────
@@ -408,6 +412,26 @@ export function normalizarConstantes(raw: unknown): ConstantesMotor {
   }
 }
 
+/** Regras por tipo gx: slug inválido descartado; máx. MAX_TIPOS_GX_REGRAS chaves (ordem alfabética, determinística); campos com clamp. */
+export function normalizarTiposGx(raw: unknown): Record<string, RegraTipoGx> {
+  const src = obj(raw), out: Record<string, RegraTipoGx> = {}
+  const D = REGRA_TIPO_GX_PADRAO
+  const lim = (v: unknown, max: number): number | null => { const n = int(v, 0, 0, max); return v === null || v === undefined || v === '' || n < 1 ? null : n }
+  for (const slug of Object.keys(src).sort()) {
+    if (!SLUG_TIPO_GX_RE.test(slug) || Object.keys(out).length >= MAX_TIPOS_GX_REGRAS) continue
+    const g = obj(src[slug])
+    out[slug] = {
+      ativo: bool(g.ativo, D.ativo ?? true),
+      maxPorDia: lim(g.maxPorDia, 20),
+      maxPorSemana: lim(g.maxPorSemana, 100),
+      dias: listaInt(g.dias, [], 0, 6),
+      faixas: listaInt(g.faixas, [], 1, MAX_FAIXAS),
+      aPartirDaSemana: int(g.aPartirDaSemana, D.aPartirDaSemana, 0, 600),
+    }
+  }
+  return out
+}
+
 /** Faixa de carga (objeto) para a carga semanal em minutos. */
 export const resolverFaixaCarga = (minutosSemana: number, regras: RegrasMotor = REGRAS_PADRAO): FaixaCarga => faixaPorMinutos(regras.faixas, minutosSemana)
 /** Índice (0-based) da faixa para a carga semanal. */
@@ -528,6 +552,7 @@ export function normalizarRegras(raw: unknown): RegrasMotor {
     },
     restricoes: normalizarRestricoes(r.restricoes),
     constantes: normalizarConstantes(r.constantes),
+    tiposGx: normalizarTiposGx(r.tiposGx),
     adaptacao: (() => { const a = obj(r.adaptacao), A = ADAPTACAO_PADRAO; return { dominoAtivo: bool(a.dominoAtivo, A.dominoAtivo), reforcoAtivo: bool(a.reforcoAtivo, A.reforcoAtivo), semanaEspecialAtiva: bool(a.semanaEspecialAtiva, A.semanaEspecialAtiva), antecipaRetornoAtivo: bool(a.antecipaRetornoAtivo, A.antecipaRetornoAtivo) } })(),
   }
 }
@@ -554,7 +579,8 @@ export function hashRegras(regras: unknown): string {
   const semRestr = Array.isArray(n.restricoes) && n.restricoes.length === 0, semAdapt = jsonEstavel(n.adaptacao) === jsonEstavel(ADAPTACAO_PADRAO)
   const semConst = jsonEstavel(n.constantes) === jsonEstavel(CONSTANTES_PADRAO)
   const faixasPadrao = jsonEstavel(n.faixas) === jsonEstavel(FAIXAS_PADRAO)
-  const base: Record<string, unknown> = Object.fromEntries(Object.entries(n).filter(([k]) => !(k === 'restricoes' && semRestr) && !(k === 'adaptacao' && semAdapt) && !(k === 'constantes' && semConst)))
+  const semGx = !n.tiposGx || Object.keys(n.tiposGx as object).length === 0
+  const base: Record<string, unknown> = Object.fromEntries(Object.entries(n).filter(([k]) => !(k === 'tiposGx' && semGx) && !(k === 'restricoes' && semRestr) && !(k === 'adaptacao' && semAdapt) && !(k === 'constantes' && semConst)))
   if (faixasPadrao) {
     // faixas no padrão ≡ formato legado (faixas{} + tetosPdf[] + revisao.cicloAteMin) → mesmo hash de antes das faixas dinâmicas
     base.faixas = { faixa1AteMinExclusivo: 900, faixa2AteMinInclusivo: 1470 }

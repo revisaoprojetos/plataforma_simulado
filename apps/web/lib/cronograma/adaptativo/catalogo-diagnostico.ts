@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember } from '@/lib/cache/relatorio-cache'
-import { carregarConteudoBanco } from './conteudo-banco'
+import { conteudoBancoCache } from './conteudo-cache'
 import { lerCfgMetas } from './config-metas'
 import { chaveDisciplina } from './catalogo-html'
 
@@ -34,7 +34,7 @@ export interface CatalogoMotor {
 
 export async function diagnosticarCatalogo(svc: SupabaseClient, tenantId: string): Promise<CatalogoMotor> {
   return remember<CatalogoMotor>(`crono-catalogo-diag:${tenantId}`, 60, async () => {
-    const [c, cfg] = await Promise.all([carregarConteudoBanco(svc, tenantId), lerCfgMetas(svc, tenantId)])
+    const [c, cfg] = await Promise.all([conteudoBancoCache(svc, tenantId), lerCfgMetas(svc, tenantId)])
     const semFlash = new Set(cfg.semFlash.map((d) => chaveDisciplina(d)))
     const ordem = c.ordem && c.ordem.length ? c.ordem : c.AS.map((_, i) => i)
     const porDisc = new Map<string, LinhaDisciplina>()

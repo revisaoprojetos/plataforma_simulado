@@ -19,6 +19,7 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { garantirPlataformaPdf } from '@/lib/cronograma/plataforma-video'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { sqlQuery } from '@/lib/data/sql'
 
 const AREA = 'cronograma_conteudo'
 
@@ -93,28 +94,33 @@ export async function listarConteudos(
       }
     }
     const aulaIds = aulas.map((a) => a.id)
-    // Contar questões por conjunto exige varrer os vínculos aula→questão. Fazer isso com
-    // fetchAllByIn(aulaIds) gera dezenas de lotes .in() (round-trips à Supabase) mesmo quando não
-    // há vínculo nenhum — o que fazia esta aba levar segundos. Primeiro um head-count barato: se o
-    // tenant não tem NENHUM vínculo, pula tudo; se tem, pagina com lotes maiores (menos round-trips).
-    let totalVinculos = 0
-    if (aulaIds.length) {
-      const { count } = await svc
-        .from('simulado_cronograma_conjunto_aula_questoes')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', g.tenantId)
-      totalVinculos = count ?? 0
-    }
-    if (totalVinculos > 0) {
-      const qs = await fetchAllByIn<any>(
-        aulaIds,
-        (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any,
-        { chunk: 200 },
-      )
-      const conjuntoDaAula = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
-      for (const q of qs) {
-        const cid = conjuntoDaAula.get(q.aula_id)
-        if (cid) questoesPorConjunto.set(cid, (questoesPorConjunto.get(cid) ?? 0) + 1)
+    // Questões por conjunto: UM GROUP BY no banco (uma ida). Antes: head-count + `.in()` em lotes de 200 ids por aula (round-trips em série).
+    // Sem DATABASE_URL / SQL falhando: o caminho antigo (mesmo resultado).
+    const agreg = aulaIds.length
+      ? await sqlQuery<{ conjunto_id: string; n: number }>(
+          `SELECT a.conjunto_id, count(*)::int n FROM simulado_cronograma_conjunto_aula_questoes q JOIN simulado_cronograma_conjunto_aulas a ON a.id = q.aula_id
+            WHERE q.tenant_id = $1 AND a.conjunto_id = ANY($2::uuid[]) GROUP BY 1`, [g.tenantId, ids])
+      : []
+    if (agreg) { for (const r of agreg) questoesPorConjunto.set(r.conjunto_id, Number(r.n) || 0) }
+    else {
+      let totalVinculos = 0
+      if (aulaIds.length) {
+        const { count } = await svc
+          .from('simulado_cronograma_conjunto_aula_questoes')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', g.tenantId)
+        totalVinculos = count ?? 0
+      }
+      if (totalVinculos > 0) {
+        const qs = await fetchAllByIn<any>(
+          aulaIds,
+          (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any,
+        )
+        const conjuntoDaAula = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
+        for (const q of qs) {
+          const cid = conjuntoDaAula.get(q.aula_id)
+          if (cid) questoesPorConjunto.set(cid, (questoesPorConjunto.get(cid) ?? 0) + 1)
+        }
       }
     }
   }
@@ -449,27 +455,33 @@ export async function carregarConjunto(id: string): Promise<{ ok: boolean; dados
   const g = await guard('cronogramas:view')
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data: c } = await svc
-    .from('simulado_cronograma_conjuntos')
-    .select('id, nome, disciplina, disciplina_id, descricao, cor, pasta_id')
-    .eq('id', id)
-    .eq('tenant_id', g.tenantId)
-    .eq('deletado', false)
-    .maybeSingle()
-  if (!c) return { ok: false, error: 'Conjunto não encontrado.' }
-
+  // Conjunto, aulas e plataformas são independentes → UMA onda (antes: 3 idas em série, mais as de URLs/questões).
   // `titulo_aula` vem de migração posterior: sem ela, cai no select antigo (editor segue funcionando).
   const colsAula = 'id, tipo, aula, conteudo, duracao, video_url, tema, ordem'
-  let aulasRaw: any[]
-  try {
-    aulasRaw = await fetchAll<any>(() =>
-      svc.from('simulado_cronograma_conjunto_aulas').select(`${colsAula}, titulo_aula`).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
-    )
-  } catch {
-    aulasRaw = await fetchAll<any>(() =>
-      svc.from('simulado_cronograma_conjunto_aulas').select(colsAula).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
-    )
+  const lerAulas = async (): Promise<any[]> => {
+    try {
+      return await fetchAll<any>(() =>
+        svc.from('simulado_cronograma_conjunto_aulas').select(`${colsAula}, titulo_aula`).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
+      )
+    } catch {
+      return await fetchAll<any>(() =>
+        svc.from('simulado_cronograma_conjunto_aulas').select(colsAula).eq('tenant_id', g.tenantId).eq('conjunto_id', id).order('ordem').order('id') as any,
+      )
+    }
   }
+  const [{ data: c }, aulasRaw, { data: plats }] = await Promise.all([
+    svc
+      .from('simulado_cronograma_conjuntos')
+      .select('id, nome, disciplina, disciplina_id, descricao, cor, pasta_id')
+      .eq('id', id)
+      .eq('tenant_id', g.tenantId)
+      .eq('deletado', false)
+      .maybeSingle(),
+    lerAulas().catch(() => null),
+    svc.from('simulado_cronograma_plataformas').select('id, nome, slug').eq('tenant_id', g.tenantId).eq('ativo', true).order('ordem').order('nome'),
+  ])
+  if (!c) return { ok: false, error: 'Conjunto não encontrado.' }
+  if (!aulasRaw) return { ok: false, error: 'Não foi possível carregar as aulas do conjunto.' }
   const aulaIds = aulasRaw.map((a) => a.id)
 
   const urlsPorAula = new Map<string, { plataforma_id: string; url: string }[]>()
@@ -498,14 +510,6 @@ export async function carregarConjunto(id: string): Promise<{ ok: boolean; dados
       questoesPorAula.set(r.aula_id, l)
     }
   }
-
-  const { data: plats } = await svc
-    .from('simulado_cronograma_plataformas')
-    .select('id, nome, slug')
-    .eq('tenant_id', g.tenantId)
-    .eq('ativo', true)
-    .order('ordem')
-    .order('nome')
 
   const aulas: AulaBanco[] = aulasRaw.map((a) => ({
     id: a.id,

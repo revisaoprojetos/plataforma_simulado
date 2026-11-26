@@ -8,9 +8,11 @@ import { RevisaoHead } from '@/components/admin/revisao/ui'
 import { EYEBROW_CRONOGRAMAS, grupoDaRota, hrefDaVista, hrefNoShell, normalizarShell, type ModalidadeId } from '@/lib/admin/cronogramas-nav'
 import type { QS } from '../_comp/lista'
 import { SalvarVersaoBotao } from './acoes-client'
+import { EsqueletoTela } from '@/components/admin/cronograma/esqueleto-tela'
 import { SUBS_ADAPTATIVO, type SubAdaptativo } from './adaptativo/comum'
 import AdaptativoCobertura from './adaptativo/cobertura'
-import AdaptativoDisciplinas from './adaptativo/disciplinas'
+import DisciplinasEMetas from './adaptativo/disciplinas-e-metas'
+import TiposConteudo from './adaptativo/tipos-conteudo'
 import AdaptativoRegras from './adaptativo/regras'
 import AdaptativoSprints from './adaptativo/sprints'
 import AdaptativoVersoes from './adaptativo/versoes'
@@ -24,6 +26,7 @@ import GeradorImportacao from './gerador/importacao'
 import GeradorRelatorios from './gerador/relatorios'
 import GeradorLiberacao from './gerador/liberacao'
 import GeradorLiberacaoAulas from './liberacao-aulas'
+import { LimiteAba } from './gerador/limite'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +42,8 @@ const DESC_GERADOR = 'O cronograma padrão da plataforma: catálogo, metas, cont
 const DESC_ADAPTATIVO = 'O cronograma monta as metas de cada aluno a partir dos materiais e das regras cadastrados aqui. As regras começam com os valores do Cronograma Adaptativo 2.0.'
 
 // Vista (id da nav) → sub-aba do Adaptativo implementada neste shell.
-const SUB_ADAPTATIVO_DA_VISTA: Record<string, SubAdaptativo> = {
-  cobertura: 'mat', disciplinas: 'disc', regras: 'regras', faixas: 'faixas', especial: 'especial', sprint: 'sprint', versoes: 'ver',
+const SUB_ADAPTATIVO_DA_VISTA: Record<string, SubAdaptativo | 'metaspasta' | 'tiposconteudo'> = {
+  cobertura: 'mat', 'metas-pasta': 'metaspasta', 'tipos-conteudo': 'tiposconteudo', regras: 'regras', faixas: 'faixas', especial: 'especial', sprint: 'sprint', versoes: 'ver',
 }
 const VISTAS_AUDITORIA = ['aula', 'duracao', 'buscar']
 
@@ -92,14 +95,14 @@ export default async function CronogramaRevisaoPage({ searchParams }: { searchPa
     return (
       <div className="w-full">
         <RevisaoHead secao={EYEBROW_CRONOGRAMAS} titulo={titulo} subtitulo={vista.id === 'visao' ? DESC_GERADOR : undefined} />
-        {vista.id === 'visao' && <GeradorVisao {...props} />}
-        {vista.id === 'catalogo' && <GeradorCatalogo {...props} />}
-        {(vista.id === 'conjuntos' || vista.id === 'links') && <GeradorConteudos {...props} />}
-        {(vista.id === 'tipos' || vista.id === 'auditoria-metas') && <GeradorMetas {...props} />}
-        {vista.id === 'acessos' && <GeradorAcessos {...props} />}
-        {vista.id === 'importacao' && <GeradorImportacao {...props} />}
-        {vista.id === 'relatorios' && <GeradorRelatorios {...props} />}
-        {vista.id === 'liberacao' && <GeradorLiberacao {...props} />}
+        {vista.id === 'visao' && <LimiteAba aba="Visão geral" carregar={() => GeradorVisao(props)} />}
+        {vista.id === 'catalogo' && <LimiteAba aba="Catálogo" carregar={() => GeradorCatalogo(props)} />}
+        {(vista.id === 'conjuntos' || vista.id === 'links') && <LimiteAba aba="Conteúdos" carregar={() => GeradorConteudos(props)} />}
+        {(vista.id === 'tipos' || vista.id === 'auditoria-metas') && <LimiteAba aba="Metas" carregar={() => GeradorMetas(props)} />}
+        {vista.id === 'acessos' && <LimiteAba aba="Acessos" carregar={() => GeradorAcessos(props)} />}
+        {vista.id === 'importacao' && <LimiteAba aba="Importação" carregar={() => GeradorImportacao(props)} />}
+        {vista.id === 'relatorios' && <LimiteAba aba="Relatórios" carregar={() => GeradorRelatorios(props)} />}
+        {vista.id === 'liberacao' && <LimiteAba aba="Liberação" carregar={() => GeradorLiberacao(props)} />}
         {vista.id === 'liberacao-aulas' && <GeradorLiberacaoAulas {...props} />}
       </div>
     )
@@ -118,12 +121,16 @@ export default async function CronogramaRevisaoPage({ searchParams }: { searchPa
           <SalvarVersaoBotao podeEditar={podeEditar} />
         </>}
       />
+      {/* Cabeçalho/abas já estão na tela; só o corpo da vista espera os dados (streaming). `key` = remonta o fallback a cada troca de vista/filtro. */}
+      <Suspense key={q.toString()} fallback={<EsqueletoTela linhas={8} />}>
       {subAd === 'mat' && <AdaptativoCobertura {...prop} />}
-      {subAd === 'disc' && <AdaptativoDisciplinas {...prop} />}
+      {subAd === 'metaspasta' && <DisciplinasEMetas podeEditar={podeEditar} abaInicial={sp.tab === 'pasta' || sp.pasta ? 'pasta' : 'matriz'} pastaInicial={/^[0-9a-f-]{36}$/i.test(sp.pasta ?? '') ? (sp.pasta as string) : null} />}
+      {subAd === 'tiposconteudo' && <TiposConteudo podeEditar={podeEditar} />}
       {subAd === 'regras' && <AdaptativoRegras {...prop} />}
       {subAd === 'sprint' && <AdaptativoSprints {...prop} />}
       {subAd === 'ver' && <AdaptativoVersoes {...prop} />}
       {(subAd === 'faixas' || subAd === 'especial') && <AdaptativoParametros grupo={subAd} sp={sp} tenantId={tenantId} />}
+      </Suspense>
     </div>
   )
 }

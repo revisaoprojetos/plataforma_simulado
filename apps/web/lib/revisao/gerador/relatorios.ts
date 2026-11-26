@@ -1,15 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { Geral, LinhaAluno, LinhaCronograma, LinhaDia } from '@/app/admin/cronogramas/relatorios/actions-tipos'
+import { chaveRelatorio, remember } from '@/lib/cache/relatorio-cache'
 import { limparBusca, norm, ordenarPor, paginarMemoria } from './comum-ger3'
 
 // Sub-aba "Relatórios" do Gerador: tudo por RPC agregada ou consulta paginada (.range()+count). Nada de varrer emissões
 // na aplicação (a plataforma tem ~14 mil alunos; o PostgREST corta em 1.000 linhas).
 
 const n = (v: unknown): number => (typeof v === 'number' ? v : Number(v ?? 0))
+// Agregados (RPC) pesados e iguais para todo admin do tenant: cache curto (60 s). Erro NÃO é cacheado (remember só guarda sucesso).
+const TTL = 60
 const ZERO: Geral = { emissoes: 0, alunos: 0, cronogramas_usados: 0, concluidas: 0, planejadas: 0, emissoes_7d: 0, emissoes_30d: 0, alunos_30d: 0 }
 
-export async function lerGeral(svc: SupabaseClient, tenantId: string): Promise<Geral> {
+export const lerGeral = (svc: SupabaseClient, tenantId: string): Promise<Geral> => remember(chaveRelatorio(tenantId, 'cron-rel', 'geral'), TTL, () => lerGeralSql(svc, tenantId))
+async function lerGeralSql(svc: SupabaseClient, tenantId: string): Promise<Geral> {
   const { data, error } = await svc.rpc('simulado_cronograma_relatorio_geral', { p_tenant: tenantId })
   if (error) throw error
   const b = ((data ?? [])[0] ?? null) as Record<string, unknown> | null
@@ -17,14 +21,16 @@ export async function lerGeral(svc: SupabaseClient, tenantId: string): Promise<G
   return { emissoes: n(b.emissoes), alunos: n(b.alunos), cronogramas_usados: n(b.cronogramas_usados), concluidas: n(b.concluidas), planejadas: n(b.planejadas), emissoes_7d: n(b.emissoes_7d), emissoes_30d: n(b.emissoes_30d), alunos_30d: n(b.alunos_30d) }
 }
 
-export async function lerSerieDias(svc: SupabaseClient, tenantId: string, dias = 30): Promise<LinhaDia[]> {
+export const lerSerieDias = (svc: SupabaseClient, tenantId: string, dias = 30): Promise<LinhaDia[]> => remember(chaveRelatorio(tenantId, 'cron-rel', `dias:${dias}`), TTL, () => lerSerieDiasSql(svc, tenantId, dias))
+async function lerSerieDiasSql(svc: SupabaseClient, tenantId: string, dias: number): Promise<LinhaDia[]> {
   const { data, error } = await svc.rpc('simulado_cronograma_relatorio_por_dia', { p_tenant: tenantId, p_dias: dias })
   if (error) throw error
   return ((data ?? []) as Record<string, unknown>[]).map((d) => ({ dia: String(d.dia), emissoes: n(d.emissoes), concluidas: n(d.concluidas) }))
 }
 
 /** Um cronograma por linha (RPC; uma linha por cronograma do catálogo, poucas dezenas) — busca/ordem/página no servidor. */
-export async function lerPorCronograma(svc: SupabaseClient, tenantId: string): Promise<LinhaCronograma[]> {
+export const lerPorCronograma = (svc: SupabaseClient, tenantId: string): Promise<LinhaCronograma[]> => remember(chaveRelatorio(tenantId, 'cron-rel', 'por-cron'), TTL, () => lerPorCronogramaSql(svc, tenantId))
+async function lerPorCronogramaSql(svc: SupabaseClient, tenantId: string): Promise<LinhaCronograma[]> {
   const { data, error } = await svc.rpc('simulado_cronograma_relatorio_por_cronograma', { p_tenant: tenantId })
   if (error) throw error
   return ((data ?? []) as Record<string, unknown>[]).map((c) => ({

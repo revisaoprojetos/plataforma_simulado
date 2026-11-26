@@ -324,7 +324,7 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row0: P
     const regras = await lerRegrasMotor(svc, tenantId) // regras do motor como dados (padrão = comportamento 3.2.0)
     const cfg2 = { ...carimbar({ ...cfgBase, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] }, undefined, catId, legado ? (cfg.motor || '2.8.1') : (cfg.motor || VERSAO_MOTOR)), ...(legado ? {} : { regrasHash: hashRegras(regras) }) } as CfgPlano
     // manterMotor: a correção automática do catálogo não promove o plano à regra nova (rev. 23 só vale ao recalcular/gerar de novo)
-    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { legado, manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), regras, params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas), prog: progDeMetas(metas), hoje, planoAtual: row.plano as Plano, detalhes: detalhesAtuais })
+    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { legado, manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), regras, params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas), prog: progDeMetas(metas), hoje, planoAtual: row.plano as Plano, detalhes: detalhesAtuais, ...(banco.GX?.length ? { gx: banco.GX } : {}) })
     const revs = Object.fromEntries(Object.entries(row.revs || {}).filter(([k]) => semInicio(cfg2.start, +k) <= hoje))
     try {
       const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs })], { type: 'application/json' })
@@ -417,6 +417,7 @@ async function gerarAdaptativoBase(
       detalhes: detalhesAtuais, regras,
       ordem: conteudo.ordem, feitas: metasAlvo.filter((m) => m.estado === 'done').map((m) => m.meta_id), usados: metasAlvo.map((m) => m.meta_id),
       params: paramsMotor, notas: notasDeMetas(metasAlvo), prog: progDeMetas(metasAlvo), hoje: opc.ancora || hojeCal(), planoAtual: (alvo?.plano || {}) as Plano,
+      ...(conteudo.GX?.length ? { gx: conteudo.GX } : {}),
     })
   } catch (e) {
     // Só COMUNICAÇÃO: explica a causa provável do ErroInsuficiencia (estimativa pura); o motor não é tocado e nada é gravado.

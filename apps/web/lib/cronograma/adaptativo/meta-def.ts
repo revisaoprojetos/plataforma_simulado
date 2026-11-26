@@ -5,6 +5,8 @@ import { chaveBaseAula } from './catalogo-override'
 import { carregarInfoDocs } from './relink-documento-server'
 import { normalizarTituloDoc } from './relink-documento'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { sqlQuery } from '@/lib/data/sql'
+import { remember } from '@/lib/cache/relatorio-cache'
 
 /**
  * DEFINIÇÃO DAS METAS (visão do admin, por plataforma). Tabela `simulado_cronograma_adaptativo_meta_def`:
@@ -106,27 +108,99 @@ export interface DefAnalise extends DefLinha {
 }
 const COLUNAS_ORDEM = new Set(['disciplina', 'numero', 'titulo', 'tipo', 'ordem', 'criado_em', 'alunos', 'planos', 'concluidas', 'tempo_total_seg', 'paginas'])
 
-export async function listarMetaDef(svc: SupabaseClient, tenantId: string, f: FiltroDef): Promise<{ ok: boolean; motivo?: string; itens: DefAnalise[]; total: number; disciplinas: string[] }> {
+const COLUNAS_ORDEM_AGREGADA = new Set(['alunos', 'planos', 'concluidas', 'tempo_total_seg'])
+const ZERO_AGG = { planos: 0, alunos: 0, metas_nos_planos: 0, concluidas: 0, nao_realizadas: 0, tempo_total_seg: 0, questoes_resolvidas: 0, questoes_erradas: 0 }
+
+/**
+ * Agregados (planos/alunos/concluídas/tempo/questões) de SÓ as definições da página: a mesma conta da visão `…_meta_def_analise`,
+ * mas sem agregar as ~1,6 mi linhas de plano_meta de TODAS as ~1000 definições (a visão levava 8–18 s por página; aqui ~1 s).
+ * `null` = SQL direto indisponível → o chamador cai na visão.
+ */
+async function agregadosDasDefs(tenantId: string, ids: string[]): Promise<Map<string, typeof ZERO_AGG> | null> {
+  if (!ids.length) return new Map()
+  const rows = await sqlQuery<Record<string, unknown>>(
+    `WITH alvo AS (SELECT id, tipo, ref_pos, chave, tenant_id FROM ${T} WHERE tenant_id = $1 AND id = ANY($2::uuid[])),
+     mp AS (
+       SELECT d.id AS def_id, pm.plano_id, pm.estudante_id, pm.meta_id FROM alvo d
+         JOIN simulado_cronograma_adaptativo_plano_meta pm ON pm.tenant_id = d.tenant_id AND pm.ref_aula = d.ref_pos WHERE d.tipo = 'aula'
+       UNION ALL
+       SELECT d.id, pm.plano_id, pm.estudante_id, pm.meta_id FROM alvo d
+         JOIN simulado_cronograma_adaptativo_plano_meta pm ON pm.tenant_id = d.tenant_id AND pm.meta_id = d.chave WHERE d.tipo = 'legproc')
+     SELECT mp.def_id::text AS id, count(DISTINCT mp.plano_id)::int AS planos, count(DISTINCT mp.estudante_id)::int AS alunos, count(*)::int AS metas_nos_planos,
+            count(*) FILTER (WHERE m.estado = 'done')::int AS concluidas, count(*) FILTER (WHERE m.estado = 'missed')::int AS nao_realizadas,
+            coalesce(sum(m.tempo_seg), 0)::bigint AS tempo_total_seg, coalesce(sum(m.res), 0)::bigint AS questoes_resolvidas, coalesce(sum(m.err), 0)::bigint AS questoes_erradas
+       FROM mp LEFT JOIN simulado_cronograma_adaptativo_meta m ON m.plano_id = mp.plano_id AND m.meta_id = mp.meta_id
+      GROUP BY mp.def_id`, [tenantId, ids])
+  if (!rows) return null
+  return new Map(rows.map((r) => [String(r.id), {
+    planos: Number(r.planos), alunos: Number(r.alunos), metas_nos_planos: Number(r.metas_nos_planos), concluidas: Number(r.concluidas), nao_realizadas: Number(r.nao_realizadas),
+    tempo_total_seg: Number(r.tempo_total_seg), questoes_resolvidas: Number(r.questoes_resolvidas), questoes_erradas: Number(r.questoes_erradas),
+  }]))
+}
+
+type ListaDef = { ok: boolean; motivo?: string; itens: DefAnalise[]; total: number; disciplinas: string[] }
+
+export async function listarMetaDef(svc: SupabaseClient, tenantId: string, f: FiltroDef): Promise<ListaDef> {
   const por = Math.min(100, Math.max(5, f.porPagina ?? 25)), pag = Math.max(1, f.pagina ?? 1)
-  let q = svc.from(V).select('*', { count: 'exact' }).eq('tenant_id', tenantId)
+  const col = COLUNAS_ORDEM.has(f.ordenar ?? '') ? (f.ordenar as string) : 'disciplina'
+  // Caminho rápido: filtra/ordena/pagina a TABELA de definições (barata) e calcula os agregados só das linhas da página.
+  // Ordenar por coluna agregada (alunos/planos/concluídas/tempo) precisa da visão inteira → caminho antigo.
+  if (COLUNAS_ORDEM_AGREGADA.has(col)) return listarBase(svc, V, tenantId, f, col, por, pag)
+  const r = await listarBase(svc, T, tenantId, f, col, por, pag)
+  if (!r.ok || !r.itens.length) return r
+  const agg = await agregadosDasDefs(tenantId, r.itens.map((i) => i.id))
+  if (!agg) return listarBase(svc, V, tenantId, f, col, por, pag) // sem SQL direto: caminho antigo (visão)
+  return { ...r, itens: r.itens.map((i) => ({ ...i, ...(agg.get(i.id) ?? ZERO_AGG) })) }
+}
+
+async function listarBase(svc: SupabaseClient, fonte: string, tenantId: string, f: FiltroDef, col: string, por: number, pag: number): Promise<ListaDef> {
+  let q = svc.from(fonte).select('*', { count: 'exact' }).eq('tenant_id', tenantId)
   if (f.tipo) q = q.eq('tipo', f.tipo)
   if (f.disciplina) q = q.eq('disciplina', f.disciplina)
   if (f.situacao === 'ativa') q = q.eq('ativa', true)
   if (f.situacao === 'inativa') q = q.eq('ativa', false)
   const b = sanearBusca(f.busca ?? '').replace(/_/g, ' ')
   if (b) q = q.or(`titulo.ilike.%${b}%,disciplina.ilike.%${b}%,numero.ilike.%${b}%,texto.ilike.%${b}%`)
-  const col = COLUNAS_ORDEM.has(f.ordenar ?? '') ? (f.ordenar as string) : 'disciplina'
   q = q.order(col, { ascending: (f.dir ?? 'asc') === 'asc', nullsFirst: false }).order('ordem', { ascending: true, nullsFirst: false }).order('id', { ascending: true })
-  const { data, count, error } = await q.range((pag - 1) * por, pag * por - 1)
+  const [{ data, count, error }, { data: ds }] = await Promise.all([
+    q.range((pag - 1) * por, pag * por - 1),
+    svc.from(T).select('disciplina').eq('tenant_id', tenantId).not('disciplina', 'is', null).order('disciplina', { ascending: true }).limit(2000),
+  ])
   if (error) return { ok: false, motivo: /does not exist|schema cache/i.test(error.message) ? 'migracao_pendente' : error.message, itens: [], total: 0, disciplinas: [] }
-  const { data: ds } = await svc.from(T).select('disciplina').eq('tenant_id', tenantId).not('disciplina', 'is', null).order('disciplina', { ascending: true }).limit(2000)
   const disciplinas = [...new Set(((ds ?? []) as Array<{ disciplina: string }>).map((r) => r.disciplina))]
-  return { ok: true, itens: (data ?? []) as DefAnalise[], total: count ?? 0, disciplinas }
+  return { ok: true, itens: (data ?? []) as unknown as DefAnalise[], total: count ?? 0, disciplinas }
 }
 
-export async function resumoMetaDef(svc: SupabaseClient, tenantId: string): Promise<{ definicoes: number; aulas: number; legprocs: number; ativas: number; semAluno: number; atualizadoEm: string | null } | null> {
+export type ResumoDef = { definicoes: number; aulas: number; legprocs: number; ativas: number; semAluno: number; atualizadoEm: string | null }
+export const chaveResumoMetaDef = (tenantId: string) => `crono-metadef-resumo:${tenantId}`
+
+/**
+ * Resumo das definições. Antes lia a visão inteira (todas as definições × 1,6 mi de linhas ≈ 18 s) só para contar; agora conta na tabela
+ * ("sem aluno" = definição ativa sem NENHUMA linha de plano_meta, pelos índices (tenant, ref_aula)/(tenant, meta_id)). Cache 10 min; a sincronização invalida.
+ */
+export async function resumoMetaDef(svc: SupabaseClient, tenantId: string): Promise<ResumoDef | null> {
+  try {
+    return await remember<ResumoDef>(chaveResumoMetaDef(tenantId), 600, async () => {
+      const rows = await sqlQuery<Record<string, unknown>>(
+        `SELECT count(*)::int AS definicoes, count(*) FILTER (WHERE tipo = 'aula')::int AS aulas, count(*) FILTER (WHERE tipo = 'legproc')::int AS legprocs,
+                count(*) FILTER (WHERE ativa)::int AS ativas,
+                count(*) FILTER (WHERE ativa AND NOT EXISTS (SELECT 1 FROM simulado_cronograma_adaptativo_plano_meta pm WHERE pm.tenant_id = d.tenant_id
+                  AND ((d.tipo = 'aula' AND pm.ref_aula = d.ref_pos) OR (d.tipo = 'legproc' AND pm.meta_id = d.chave))))::int AS sem_aluno,
+                max(atualizado_em) AS atualizado_em
+           FROM ${T} d WHERE d.tenant_id = $1`, [tenantId])
+      if (!rows) return resumoMetaDefViaVisao(svc, tenantId)
+      const r = rows[0] ?? {}
+      return {
+        definicoes: Number(r.definicoes ?? 0), aulas: Number(r.aulas ?? 0), legprocs: Number(r.legprocs ?? 0), ativas: Number(r.ativas ?? 0), semAluno: Number(r.sem_aluno ?? 0),
+        atualizadoEm: r.atualizado_em ? new Date(r.atualizado_em as string).toISOString() : null,
+      }
+    })
+  } catch { return null }
+}
+
+async function resumoMetaDefViaVisao(svc: SupabaseClient, tenantId: string): Promise<ResumoDef> {
   const { data, error } = await svc.from(V).select('tipo, ativa, alunos, atualizado_em').eq('tenant_id', tenantId).limit(5000)
-  if (error) return null
+  if (error) throw new Error(error.message)
   const r = (data ?? []) as Array<{ tipo: string; ativa: boolean; alunos: number; atualizado_em: string }>
   return {
     definicoes: r.length, aulas: r.filter((x) => x.tipo === 'aula').length, legprocs: r.filter((x) => x.tipo === 'legproc').length,

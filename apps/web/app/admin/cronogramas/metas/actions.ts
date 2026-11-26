@@ -17,6 +17,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveAula } from '@/lib/cronograma/aula'
+import { chaveRelatorio, esquecer, remember } from '@/lib/cache/relatorio-cache'
 
 async function guard(perm = 'cronogramas:view') {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
@@ -32,12 +33,21 @@ async function guard(perm = 'cronogramas:view') {
 
 const n = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0))
 
+// As duas auditorias varrem ~17 mil metas no banco (variantes ~1,1 s). Cache curto por tenant; toda mutação deste arquivo invalida.
+const TTL_AUDITORIA = 60
+const kAud = (t: string, q: string) => chaveRelatorio(t, 'cron-auditoria', q)
+async function esquecerAuditoria(t: string) { await Promise.all([esquecer(kAud(t, 'variantes')), esquecer(kAud(t, 'duracoes'))]) }
+
 export async function carregarVariantesAula(): Promise<{ ok: boolean; itens?: VarianteAula[]; error?: string }> {
   const g = await guard()
   if (!g.ok) return { ok: false, error: g.error }
-  const { data, error } = await createAdminClient().rpc('simulado_cronograma_aulas_variantes', {
-    p_tenant: g.tenantId,
-  })
+  let rpcErro: string | null = null
+  const data = await remember<Record<string, unknown>[] | null>(kAud(g.tenantId, 'variantes'), TTL_AUDITORIA, async () => {
+    const r = await createAdminClient().rpc('simulado_cronograma_aulas_variantes', { p_tenant: g.tenantId })
+    if (r.error) throw new Error(r.error.message)
+    return (r.data ?? []) as Record<string, unknown>[]
+  }).catch((e: unknown) => { rpcErro = e instanceof Error ? e.message : 'Falha ao carregar.'; return null })
+  const error = rpcErro ? { message: rpcErro } : null
   if (error) return { ok: false, error: error.message }
   return {
     ok: true,
@@ -54,9 +64,13 @@ export async function carregarVariantesAula(): Promise<{ ok: boolean; itens?: Va
 export async function carregarDuracoes(): Promise<{ ok: boolean; itens?: DuracaoDivergente[]; error?: string }> {
   const g = await guard()
   if (!g.ok) return { ok: false, error: g.error }
-  const { data, error } = await createAdminClient().rpc('simulado_cronograma_duracoes_divergentes', {
-    p_tenant: g.tenantId,
-  })
+  let rpcErro: string | null = null
+  const data = await remember<Record<string, unknown>[] | null>(kAud(g.tenantId, 'duracoes'), TTL_AUDITORIA, async () => {
+    const r = await createAdminClient().rpc('simulado_cronograma_duracoes_divergentes', { p_tenant: g.tenantId })
+    if (r.error) throw new Error(r.error.message)
+    return (r.data ?? []) as Record<string, unknown>[]
+  }).catch((e: unknown) => { rpcErro = e instanceof Error ? e.message : 'Falha ao carregar.'; return null })
+  const error = rpcErro ? { message: rpcErro } : null
   if (error) return { ok: false, error: error.message }
   return {
     ok: true,
@@ -167,6 +181,7 @@ export async function padronizarFormatoAula(
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
+  await esquecerAuditoria(g.tenantId)
   return { ok: true, alterados }
 }
 
@@ -248,6 +263,7 @@ export async function padronizarFormatoDisciplina(
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
+  await esquecerAuditoria(g.tenantId)
   return { ok: true, alterados }
 }
 
@@ -283,6 +299,7 @@ export async function padronizarDuracao(
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
+  await esquecerAuditoria(g.tenantId)
   return { ok: true, alterados: (data ?? []).length }
 }
 
@@ -315,5 +332,6 @@ export async function excluirMetaAvulsa(metaId: string): Promise<{ ok: boolean; 
     atorId: g.atorId,
     tenantId: g.tenantId,
   })
+  await esquecerAuditoria(g.tenantId)
   return { ok: true }
 }

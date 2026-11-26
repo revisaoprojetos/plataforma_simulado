@@ -9,8 +9,8 @@
  * Os VALORES CONFIGURÁVEIS por tenant continuam em params.ts / regras.ts — aqui ficam só os padrões e o vocabulário.
  */
 
-export type SlugMeta = 'pf' | 'pp' | 'fl' | 'qu' | 'lp' | 'rf' | 'rq' | 'jp'
-export type FamiliaMeta = 'pf' | 'fl' | 'qu' | 'lp' | 'jp'
+export type SlugMeta = 'pf' | 'pp' | 'fl' | 'qu' | 'lp' | 'rf' | 'rq' | 'jp' | 'gx'
+export type FamiliaMeta = 'pf' | 'fl' | 'qu' | 'lp' | 'jp' | 'gx'
 /** Campo de ParamsAdaptativo que guarda a duração (min) do tipo; `null` = duração calculada (PDFull: páginas ÷ ritmo). */
 export type ParamDuracao = 'durFl' | 'durQu' | 'durLp' | 'durRf' | 'durRq' | 'jurisprudenciaMin' | null
 export type ParamDeslocamento = 'offsetRevisao' | 'offsetQuestoes' | null
@@ -43,6 +43,7 @@ export const TIPOS_META: Readonly<Record<SlugMeta, TipoMeta>> = {
   rf: { slug: 'rf', rotulo: 'Revisão PDFlash', nomeAluno: 'Revisão', familia: 'fl', duracaoPadraoMin: 60, paramDuracao: 'durRf', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 1, ordem: 4 },
   rq: { slug: 'rq', rotulo: 'Revisão Questões', nomeAluno: 'Questões', familia: 'qu', duracaoPadraoMin: 30, paramDuracao: 'durRq', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 2, ordem: 4 },
   jp: { slug: 'jp', rotulo: 'Jurisprudência', nomeAluno: 'Jurisprudência', familia: 'jp', duracaoPadraoMin: 60, paramDuracao: 'jurisprudenciaMin', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 6, ordem: 4 },
+  gx: { slug: 'gx', rotulo: 'Personalizado', nomeAluno: 'Personalizado', familia: 'gx', duracaoPadraoMin: 30, paramDuracao: null, deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 5, ordem: 5 },
 }
 
 export const SLUGS_META = Object.keys(TIPOS_META) as SlugMeta[]

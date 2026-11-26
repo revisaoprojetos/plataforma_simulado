@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { HistoricoRegras } from '@/app/admin/cronogramas/adaptativo/versoes/historico'
 import { createAdminClient } from '@/lib/supabase/server'
 import { formatBrt } from '@/lib/brt'
+import { comLimite } from '@/lib/admin/com-limite'
 import { crAlteradas } from '@/lib/revisao/cronograma-schema'
 import { listarVersoes, resumoExportacao } from '@/lib/revisao/cronograma'
 import { RevisaoCard } from '@/components/admin/revisao/ui'
@@ -19,10 +20,13 @@ export default async function AdaptativoVersoes({ sp, tenantId, podeEditar }: Pr
   const aulas = k?.aulas ?? 0
   const regrasAlteradas = k?.alteradas ?? crAlteradas(regras.valores).length
   const migrado = regras.migrado
-  const resumo = await resumoExportacao(svc, tenantId, regras.valores, aulas)
   const por = porPagina(qs.pps)
   const pagina = ParamsInt(qs.pag, 1)
-  const r = await listarVersoes(svc, tenantId, { q: qs.q, ordem: qs.ord, dir: qs.dir === 'desc' ? 'desc' : 'asc', pagina, por })
+  // independentes: a exportação (catálogo/cobertura) e a lista de versões vão juntas, com limite de tempo (erro → boundary com "Tentar de novo")
+  const [resumo, r] = await comLimite(Promise.all([
+    resumoExportacao(svc, tenantId, regras.valores, aulas),
+    listarVersoes(svc, tenantId, { q: qs.q, ordem: qs.ord, dir: qs.dir === 'desc' ? 'desc' : 'asc', pagina, por }),
+  ]), 30_000, 'As versões do cronograma')
   return (
     <div className="space-y-6">
     <div className="grid gap-4 xl:grid-cols-2">

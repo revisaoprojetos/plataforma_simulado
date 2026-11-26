@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
-import { carregarConteudoBanco } from './conteudo-banco'
+import { conteudoBancoCache } from './conteudo-cache'
 import { chaveDisciplina } from './catalogo-html'
 import { metaDoAlvo as metaDoAlvoPuro } from './meta-alvo'
 
@@ -97,7 +97,7 @@ const normDisc = (s: string) => chaveDisciplina(s) // "Eleitoral" = "Direito Ele
 export async function mapaDocsCronograma(svc: SupabaseClient, tenantId: string): Promise<MapaDocs> {
   return remember<MapaDocs>(kMapa(tenantId), 300, async () => {
     const vazio: MapaDocs = { docs: {}, aulas: 0, legproc: 0, materiais: 0, titulos: {} }
-    const c = await carregarConteudoBanco(svc, tenantId).catch(() => null)
+    const c = await conteudoBancoCache(svc, tenantId).catch(() => null)
     if (!c || c.vazio) return vazio
     const docs: Record<string, AlvoDoc> = {}; const titulos: Record<string, string> = {}
     const porDiscNum = new Map<string, number>() // "disciplina|nºaula" → índice em AS

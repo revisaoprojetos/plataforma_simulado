@@ -19,6 +19,8 @@ import { listarDownloads, resumoDownloads, detalheDownloads, type FiltroDownload
 import { lerCfgMetas, lerDiscSemTipo, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { diagnosticarCatalogo, type CatalogoMotor } from '@/lib/cronograma/adaptativo/catalogo-diagnostico'
 import { carregarConteudoBancoBase } from '@/lib/cronograma/adaptativo/conteudo-banco'
+import { conteudoBancoBaseCache, chaveConteudo, chaveConteudoBase } from '@/lib/cronograma/adaptativo/conteudo-cache'
+import { comLimite } from '@/lib/admin/com-limite'
 import { lerOverrideRow, salvarOverride } from '@/lib/cronograma/adaptativo/catalogo-override-db'
 import { chavesUnicas, normalizarOverride, partirTexto, OVERRIDE_VAZIO, type CatalogoOverride } from '@/lib/cronograma/adaptativo/catalogo-override'
 import { CATALOGO_HTML, chaveLeiHTML, chaveDisciplina } from '@/lib/cronograma/adaptativo/catalogo-html'
@@ -112,12 +114,12 @@ export async function obterEditorCatalogo(): Promise<{ ok: boolean; error?: stri
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const svc = createAdminClient()
   try {
-    const [c, row, planos, tab] = await Promise.all([
-      carregarConteudoBancoBase(svc, g.tenantId),
+    const [c, row, planos, tab] = await comLimite(Promise.all([
+      conteudoBancoBaseCache(svc, g.tenantId),
       lerOverrideRow(svc, g.tenantId),
       contarAlunosComPlano(svc, g.tenantId),
       svc.from('simulado_cronograma_adaptativo_catalogo').select('tenant_id').limit(1),
-    ])
+    ]), 30_000, 'O catálogo')
     const baseAS = c.base?.AS ?? c.AS, baseOrdem = c.base?.ordem ?? c.ordem ?? baseAS.map((_, i) => i), baseLP = c.base?.LP ?? c.LP ?? []
     const modeloIdx = c.base?.modeloIdx ?? c.modeloIdx ?? []
     const chaves = chavesUnicas(baseAS)
@@ -182,6 +184,7 @@ export async function salvarEditorCatalogo(draft: unknown, versaoBase: number): 
     }).catch(() => {})
     await esquecer(`crono-alunos-com-plano:${g.tenantId}`).catch(() => {})
     await esquecer(`crono-catalogo-diag:${g.tenantId}`).catch(() => {})
+    await Promise.all([esquecer(chaveConteudo(g.tenantId)), esquecer(chaveConteudoBase(g.tenantId)), esquecer(`revisao-cron:aulas2:${g.tenantId}`), esquecer(`revisao-cron:kpis:${g.tenantId}`)]).catch(() => {})
     revalidatePath('/admin/cronogramas/adaptativo/catalogo')
     return { ok: true, versao: r.versao, alunosComPlano: await contarAlunosComPlano(svc, g.tenantId) }
   } catch (e) {
@@ -280,12 +283,13 @@ export async function espelharPlanosLote(): Promise<{ ok: boolean; error?: strin
 }
 
 // ── DEFINIÇÃO DAS METAS (cadastro do admin, por plataforma) + ANÁLISE ───────────────────────────────────────────
-import { sincronizarMetaDef, listarMetaDef, resumoMetaDef, type FiltroDef, type DefAnalise } from '@/lib/cronograma/adaptativo/meta-def'
+import { sincronizarMetaDef, listarMetaDef, resumoMetaDef, chaveResumoMetaDef, type FiltroDef, type DefAnalise } from '@/lib/cronograma/adaptativo/meta-def'
 
 export async function sincronizarDefinicoesMetas(): Promise<{ ok: boolean; error?: string; aulas?: number; legprocs?: number; desativadas?: number }> {
   const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const r = await sincronizarMetaDef(createAdminClient(), g.tenantId)
   if (!r.ok) return { ok: false, error: r.motivo === 'migracao_pendente' ? 'Aplique a migração 20261105070000_cronograma_adaptativo_meta_def.sql no Supabase.' : (r.motivo || 'Falha ao sincronizar.') }
+  await esquecer(chaveResumoMetaDef(g.tenantId)).catch(() => {})
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cronograma_adaptativo_meta_def', entidadeId: g.tenantId, tenantId: g.tenantId, atorId: g.userId, depois: { aulas: r.aulas, legprocs: r.legprocs, desativadas: r.desativadas } }).catch(() => {})
   revalidatePath('/admin/cronogramas/adaptativo/definicoes')
   return { ok: true, aulas: r.aulas, legprocs: r.legprocs, desativadas: r.desativadas }
@@ -294,7 +298,9 @@ export async function sincronizarDefinicoesMetas(): Promise<{ ok: boolean; error
 export async function listarDefinicoesMetas(f: FiltroDef): Promise<{ ok: boolean; error?: string; migrado: boolean; itens: DefAnalise[]; total: number; disciplinas: string[]; resumo: Awaited<ReturnType<typeof resumoMetaDef>> }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.', migrado: true, itens: [], total: 0, disciplinas: [], resumo: null }
   const svc = createAdminClient()
-  const [lista, resumo] = await Promise.all([listarMetaDef(svc, g.tenantId, f), resumoMetaDef(svc, g.tenantId)])
+  let lista: Awaited<ReturnType<typeof listarMetaDef>>, resumo: Awaited<ReturnType<typeof resumoMetaDef>>
+  try { [lista, resumo] = await comLimite(Promise.all([listarMetaDef(svc, g.tenantId, f), resumoMetaDef(svc, g.tenantId)]), 45_000, 'A análise das metas') }
+  catch (e) { return { ok: false, error: (e as Error)?.message || 'Falha ao carregar.', migrado: true, itens: [], total: 0, disciplinas: [], resumo: null } }
   if (!lista.ok) return { ok: lista.motivo === 'migracao_pendente', error: lista.motivo === 'migracao_pendente' ? undefined : lista.motivo, migrado: lista.motivo !== 'migracao_pendente', itens: [], total: 0, disciplinas: [], resumo: null }
   return { ok: true, migrado: true, itens: lista.itens, total: lista.total, disciplinas: lista.disciplinas, resumo }
 }

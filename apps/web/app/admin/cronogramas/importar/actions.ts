@@ -49,9 +49,11 @@ export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: Est
         .eq('deletado', false)
         .order('slug') as any,
     ),
-    fetchAll<{ cronograma_id: string }>(() =>
-      svc.from('simulado_cronograma_metas').select('cronograma_id').eq('tenant_id', g.tenantId).order('id') as any,
-    ),
+    // Contagem AGREGADA no banco (25 linhas) — antes varria ~17 mil metas em ~17 idas sequenciais ao PostgREST só para contar.
+    svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId }).then((r) => {
+      if (r.error) throw new Error(r.error.message)
+      return (r.data ?? []) as { cronograma_id: string; total: number | string }[]
+    }),
     fetchAll<{ disciplina: string; aula: string }>(() =>
       svc.from('simulado_cronograma_links').select('disciplina, aula').eq('tenant_id', g.tenantId).order('disciplina').order('aula') as any,
     ),
@@ -64,7 +66,7 @@ export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: Est
   ])
 
   const porCron = new Map<string, number>()
-  for (const m of metas) porCron.set(m.cronograma_id, (porCron.get(m.cronograma_id) ?? 0) + 1)
+  for (const m of metas) porCron.set(m.cronograma_id, Number(m.total))
 
   return {
     ok: true,

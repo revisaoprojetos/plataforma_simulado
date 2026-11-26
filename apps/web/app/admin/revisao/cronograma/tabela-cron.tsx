@@ -104,7 +104,7 @@ export function TabelaCron({ tipo, head, rows, total, page, pp, podeEditar, colu
               <Button size="sm" variant="outline" disabled={executando} onClick={disc('pdfight', true, 'PDFight ligado')}><Eye />PDFight: exigir</Button>
               <Button size="sm" variant="outline" disabled={executando} onClick={disc('pdfight', false, 'PDFight desligado')}><EyeOff />PDFight: dispensar</Button>
               <Button size="sm" variant="destructive" disabled={executando} onClick={async () => {
-                if (await confirmar({ titulo: 'Tirar do cronograma', mensagem: `Tirar ${alvo.length} disciplina(s) do cronograma? As aulas ficam guardadas e voltam ao ligar “No cronograma” na aba Disciplinas.`, confirmar: 'Tirar', destrutivo: true })) disc('ativa', false, 'Retiradas do cronograma')()
+                if (await confirmar({ titulo: 'Tirar do cronograma', mensagem: `Tirar ${alvo.length} disciplina(s) do cronograma? As aulas ficam guardadas e voltam ao ligar “No cronograma” em Disciplinas e metas.`, confirmar: 'Tirar', destrutivo: true })) disc('ativa', false, 'Retiradas do cronograma')()
               }}><Trash2 />Tirar do cronograma</Button>
             </>
           )}

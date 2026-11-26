@@ -49,7 +49,9 @@ export function DefinicoesClient() {
   const carregar = useCallback(async (busca_: string) => {
     const id = ++seq.current
     setCarregando(true)
-    const r = await listarDefinicoesMetas({ busca: busca_, tipo, disciplina, situacao, ordenar, dir, pagina, porPagina: POR_PAGINA })
+    let r: Awaited<ReturnType<typeof listarDefinicoesMetas>>
+    try { r = await listarDefinicoesMetas({ busca: busca_, tipo, disciplina, situacao, ordenar, dir, pagina, porPagina: POR_PAGINA }) }
+    catch { if (id === seq.current) { setCarregando(false); setErro('Não foi possível carregar agora. Tente de novo.') } return }
     if (id !== seq.current) return // resposta velha
     setCarregando(false)
     if (!r.ok) { setErro(r.error ?? 'Falha ao carregar.'); return }
@@ -84,7 +86,7 @@ export function DefinicoesClient() {
 
   return (
     <div className="space-y-4">
-      {erro && <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{erro}</div>}
+      {erro && <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><span>{erro}</span><button type="button" onClick={() => carregar(busca)} className="font-medium underline underline-offset-2">Tentar de novo</button></div>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card rotulo="Definições" valor={(resumo?.definicoes ?? 0).toLocaleString('pt-BR')} />

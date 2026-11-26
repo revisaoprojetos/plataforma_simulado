@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { funcaoEtiquetaPorQuestao } from './etiqueta-funcao'
+import { erroDeObjetoAusente } from '@/lib/db/recurso-ausente'
 
 const strip = (x: unknown) => String(x ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -28,7 +29,9 @@ export type TentativaResumo = {
   porDisc: DiscStat[]
 }
 
-export type AltAgregada = { letra: string; texto: string; correta: boolean; escolhas: number }
+export type AltAgregada = { letra: string; texto: string; correta: boolean; escolhas: number; /** só no modo edição admin */ id?: string }
+/** Marcação de UMA tentativa numa questão (só no modo edição admin). letra null = em branco. */
+export type MarcacaoSessao = { sessaoId: string; n: number; letra: string | null; editada: boolean; originalLetra: string | null }
 export type QuestaoAgregada = {
   ordem: number
   questaoId: string
@@ -40,6 +43,8 @@ export type QuestaoAgregada = {
   errou: number
   branco: number
   anulada: boolean
+  /** Só no modo edição admin: marcação de cada tentativa (com a original preservada, se editada). */
+  marcacoes?: MarcacaoSessao[]
 }
 
 /**
@@ -52,8 +57,11 @@ export async function montarResultadoAluno(
   simuladoId: string,
   sessoes: SessaoInput[],
   revelarGabarito: boolean,
-): Promise<{ tentativas: TentativaResumo[]; questoes: QuestaoAgregada[]; totalQuestoes: number }> {
+  /** Admin: inclui a marcação por tentativa + a original preservada (edição). Nunca passar no portal do aluno. */
+  opts?: { edicao?: boolean },
+): Promise<{ tentativas: TentativaResumo[]; questoes: QuestaoAgregada[]; totalQuestoes: number; edicaoDisponivel: boolean }> {
   const sessaoIds = sessoes.map((s) => s.id)
+  let edicaoDisponivel = false
 
   // As questões da prova (+ funções de etiqueta, que dependem delas) são INDEPENDENTES das respostas
   // do aluno (estas só dependem de `sessaoIds`, vindo do parâmetro). Rodam em paralelo.
@@ -72,6 +80,15 @@ export async function montarResultadoAluno(
     })(),
     (async (): Promise<any[]> => {
       if (!sessaoIds.length) return []
+      if (opts?.edicao) {
+        const r = await svc
+          .from('simulado_respostas_objetivas')
+          .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito, marcacao_editada, marcacao_original_alternativa_id')
+          .in('sessao_id', sessaoIds)
+        if (!r.error) { edicaoDisponivel = true; return r.data ?? [] }
+        if (!erroDeObjetoAusente(r.error.message)) return r.data ?? []
+        // colunas da migração 20261208000000 ainda não existem → cai no SELECT antigo, sem edição.
+      }
       const { data } = await svc
         .from('simulado_respostas_objetivas')
         .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito')
@@ -135,7 +152,7 @@ export async function montarResultadoAluno(
     const altsOut: AltAgregada[] = alts.map((a: any, i: number) => {
       const letra = String.fromCharCode(65 + i)
       letraDe.set(a.id, letra)
-      return { letra, texto: strip(a.texto), correta: revelarGabarito && !!a.correta, escolhas: 0 }
+      return { letra, texto: strip(a.texto), correta: revelarGabarito && !!a.correta, escolhas: 0, ...(edicaoDisponivel ? { id: a.id as string } : {}) }
     })
     let acertou = 0, errou = 0, branco = 0
     if (anulada) {
@@ -151,6 +168,14 @@ export async function montarResultadoAluno(
         if (resp.correta) acertou++; else errou++
       }
     }
+    const marcacoes: MarcacaoSessao[] | undefined = edicaoDisponivel
+      ? sessoes.map((s) => {
+          const resp = (bySessao.get(s.id) ?? new Map<string, any>()).get(q.id)
+          const marc = resp?.alternativa_id ? letraDe.get(resp.alternativa_id) ?? null : null
+          const editada = resp?.marcacao_editada === true
+          return { sessaoId: s.id, n: s.tentativa_num ?? 1, letra: marc, editada, originalLetra: editada && resp?.marcacao_original_alternativa_id ? letraDe.get(resp.marcacao_original_alternativa_id) ?? null : null }
+        }).sort((a, b) => a.n - b.n)
+      : undefined
     // desconsiderada: fica 0/0/0 (fora do total) — badge de anulada só sinaliza que está fora de jogo.
     return {
       ordem: (r.ordem ?? 0) + 1,
@@ -158,9 +183,9 @@ export async function montarResultadoAluno(
       enunciado: strip(q.enunciado) || '(sem enunciado)',
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelarGabarito ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,
-      alternativas: altsOut, acertou, errou, branco, anulada: anulada || desconsiderada,
+      alternativas: altsOut, acertou, errou, branco, anulada: anulada || desconsiderada, ...(marcacoes ? { marcacoes } : {}),
     }
   })
 
-  return { tentativas, questoes, totalQuestoes }
+  return { tentativas, questoes, totalQuestoes, edicaoDisponivel }
 }

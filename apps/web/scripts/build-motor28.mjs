@@ -32,6 +32,9 @@ ${compilar('restricoes')}
   defs['rastro'] = function (module, exports, require) {
 ${compilar('rastro')}
   };
+  defs['gx-tipos'] = function (module, exports, require) {
+${compilar('gx-tipos')}
+  };
   defs['motor28'] = function (module, exports, require) {
 ${compilar('motor28')}
   };

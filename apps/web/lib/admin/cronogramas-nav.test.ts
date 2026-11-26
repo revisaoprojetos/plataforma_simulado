@@ -74,10 +74,10 @@ describe('grupoDaRota — shell /admin/revisao/cronograma (?sub=<aba>&v=<vista>)
   })
   it('Adaptativo: padrão = Visão geral; ?sub=&v= e links antigos', () => {
     expect(id(B, { aba: 'adaptativo' })).toBe('adaptativo/visao/analise')
-    for (const [sub, v, esperado] of [['conteudo', 'cobertura', 'conteudo/cobertura'], ['conteudo', 'disciplinas', 'conteudo/disciplinas'], ['regras', 'faixas', 'regras/faixas'], ['regras', 'especial', 'regras/especial'], ['versoes', 'versoes', 'versoes/versoes'], ['versoes', 'sprint', 'versoes/sprint'], ['fluxo', 'mapa', 'fluxo/mapa']]) {
+    for (const [sub, v, esperado] of [['conteudo', 'cobertura', 'conteudo/cobertura'], ['conteudo', 'metas-pasta', 'conteudo/metas-pasta'], ['conteudo', 'disciplinas', 'conteudo/metas-pasta'], ['regras', 'faixas', 'regras/faixas'], ['regras', 'especial', 'regras/especial'], ['versoes', 'versoes', 'versoes/versoes'], ['versoes', 'sprint', 'versoes/sprint'], ['fluxo', 'mapa', 'fluxo/mapa']]) {
       expect(id(B, { aba: 'adaptativo', sub, v }), sub + '/' + v).toBe('adaptativo/' + esperado)
     }
-    for (const [s, v] of [['mat', 'conteudo/cobertura'], ['disc', 'conteudo/disciplinas'], ['regras', 'regras/regras'], ['faixas', 'regras/faixas'], ['especial', 'regras/especial'], ['ver', 'versoes/versoes'], ['sprint', 'versoes/sprint']]) {
+    for (const [s, v] of [['mat', 'conteudo/cobertura'], ['disc', 'conteudo/metas-pasta'], ['regras', 'regras/regras'], ['faixas', 'regras/faixas'], ['especial', 'regras/especial'], ['ver', 'versoes/versoes'], ['sprint', 'versoes/sprint']]) {
       expect(id(B, { aba: 'adaptativo', sub: s }), s).toBe('adaptativo/' + v)
     }
   })
@@ -86,6 +86,8 @@ describe('grupoDaRota — shell /admin/revisao/cronograma (?sub=<aba>&v=<vista>)
     expect(normalizarShell('adaptativo', 'ver', q())).toEqual({ sub: 'versoes', v: 'versoes', legado: true })
     expect(normalizarShell('adaptativo', 'conteudo', q({ v: 'cobertura' }))).toEqual({ sub: 'conteudo', v: 'cobertura', legado: false })
     expect(normalizarShell('gerador', 'visao', q())).toEqual({ sub: 'visao', v: null, legado: false })
+    // "Disciplinas" foi fundida em "Disciplinas e metas": o link antigo é reescrito para a vista única.
+    expect(normalizarShell('adaptativo', 'conteudo', q({ v: 'disciplinas' }))).toEqual({ sub: 'conteudo', v: 'metas-pasta', legado: true })
   })
 })
 

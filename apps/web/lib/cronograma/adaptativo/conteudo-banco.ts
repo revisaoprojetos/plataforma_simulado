@@ -11,6 +11,9 @@ import { descontarPaginaInicial } from '@/lib/conteudo/paginas-efetivas'
 import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
 import { lerOverride } from './catalogo-override-db'
 import { lerDiscSemTipo } from './config-metas'
+import { mapaCompatTipos, mapaGeraMeta } from '@/lib/cronograma/tipos-conteudo-server'
+import { montarGX, type DocGX } from './gx-montar'
+import type { ItemGX } from './gx-tipos'
 import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, disciplinaRetirada, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
 // Loader de CONTEÚDO REAL do Cronograma Adaptativo. As aulas e matérias são as da Biblioteca; os dados do
@@ -42,6 +45,8 @@ export interface ConteudoBanco extends Conteudo {
   materiais?: Array<{ id: string; titulo: string; disc: string }>
   /** LegProc 2.8: metas de ~30 min por lei, vinculadas à disciplina (ver lp-catalogo.ts). */
   LP?: ItemLP[]
+  /** Metas próprias (gx) dos tipos personalizados com geraMeta no catálogo. [] quando nenhum tipo gera meta (comportamento de sempre). */
+  GX?: ItemGX[]
   /** Ordem de distribuição das aulas (índices em AS) — a do modelo, + aulas da Biblioteca fora dele no fim. */
   ordem?: number[]
   /** Chave estável de cada aula (paralelo a AS). Liga a aula ao filtro de questões da plataforma. */
@@ -135,9 +140,11 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
     const pilha = [p.id]
     while (pilha.length) { const cur = pilha.pop()!; if (!discDaPasta.has(cur)) { discDaPasta.set(cur, p.disciplina_id); (filhos.get(cur) || []).forEach((f) => pilha.push(f)) } }
   }
-  if (discDaPasta.size === 0) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
+  if (discDaPasta.size === 0) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, GX: [], modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
 
   // tipo de material herdado: subpasta-tipada mais próxima subindo a árvore (com memoização + anti-ciclo)
+  // tipos PERSONALIZADOS do catálogo: tratados pelo PAPEL (slug equivalente do vocabulário antigo)
+  const [compatTipos, geraMeta] = await Promise.all([mapaCompatTipos(svc, tenantId), mapaGeraMeta(svc, tenantId)])
   const tipoCache = new Map<string, string | null>()
   const tipoHerdado = (pastaId: string): string | null => {
     const caminho: string[] = []
@@ -149,7 +156,8 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
       if (tipoCache.has(cur)) { achado = tipoCache.get(cur)!; break }
       caminho.push(cur)
       const t = tipoPorPasta.get(cur)
-      if (t && TIPOS_MATERIAL.has(t)) { achado = t; break }
+      const tc = t ? (TIPOS_MATERIAL.has(t) ? t : geraMeta.has(t) ? `gx:${t}` : (compatTipos.get(t) ?? null)) : null
+      if (tc) { achado = tc; break }
       cur = paiPorPasta.get(cur) ?? null
     }
     for (const c of caminho) tipoCache.set(c, achado)
@@ -170,10 +178,12 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   const aulaDocs: Array<{ id: string; titulo: string; versaoId: string | null; discNome: string }> = []
   const legprocDocs: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }> = []
   const materiais: Array<{ id: string; titulo: string; disc: string }> = []
+  const gxDocs: DocGX[] = []
   for (const d of docs) {
     const discId = discDaPasta.get(d.pasta_id); if (!discId) continue
     const disc = discById.get(discId); if (!disc) continue
     const tipo = tipoHerdado(d.pasta_id)
+    if (tipo?.startsWith('gx:')) { gxDocs.push({ id: d.id, titulo: d.titulo, disc: nomeDisciplina(disc.nome), slug: tipo.slice(3) }); continue } // tipo personalizado que gera meta própria
     if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo, disc: disc.nome, versaoId: d.versao_atual_id }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)
     // e Questões são MATERIAIS ligados às metas que o engine JÁ gera (qu/fl) — não contam como aula nova.
@@ -241,7 +251,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
       }
     })
   }
-  if (!ASout.length) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
+  if (!ASout.length) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, GX: montarGX(gxDocs, geraMeta), modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
   const ordem = encaixarSemPlanilha(CATALOGO_HTML.ordem.flatMap((h) => (daPlanilha.has(h) ? [daPlanilha.get(h)!] : [])), semPlanilha, ASout)
 
   // 6) WLP (lei seca por semana)
@@ -283,7 +293,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   // Overlay do admin (Catálogo de metas): edita/ativa/reordena aulas e metas sem mexer nas posições-base de AS.
   const ap = aplicarOverride({ AS: ASout, ordem, LP }, ov)
   return {
-    AS: ap.AS, ordem: ap.ordem ?? ordem, chaves: ap.chaves, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP: ap.LP,
+    AS: ap.AS, ordem: ap.ordem ?? ordem, chaves: ap.chaves, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP: ap.LP, GX: montarGX(gxDocs, geraMeta),
     disciplinas: disciplinasDoConteudo(disciplinas, ap.AS, ap.ordem ?? ordem), lpDocs, vazio: false,
     modeloIdx, base: { AS: ASout, ordem, LP, modeloIdx },
   }

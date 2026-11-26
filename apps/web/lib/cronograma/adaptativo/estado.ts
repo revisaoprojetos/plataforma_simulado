@@ -36,7 +36,7 @@ export const hojeISO = (): DataISO => new Intl.DateTimeFormat('en-CA', { timeZon
 
 /** Gera plano+fim a partir do cfg (engine puro). */
 export function gerarEstadoPlano(cfg: Cfg, conteudo: _C, fixos?: Record<string, [DataISO, number]>, ancora?: DataISO | null) {
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP, { ordem: conteudo.ordem, params: conteudo.params })
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP, { ordem: conteudo.ordem, params: conteudo.params, ...(conteudo.GX?.length ? { gx: conteudo.GX } : {}) })
   return { plano: r.plano, fim: r.fim }
 }
 
@@ -98,7 +98,15 @@ function lpMapa(c: _C) {
   if (!m) { m = { ...(c.LPdesc || {}), ...Object.fromEntries((c.LP || []).map((x) => [x.id, x])) }; _lpMapas.set(chave, m) }
   return m
 }
-export const info = (id: string, conteudo: _C) => descrever(id, conteudo.AS, conteudo.WLP, lpMapa(conteudo))
+// Mapa id→item gx (memoizado por lista) p/ descrever metas "gx:<slug>:<d8>".
+const _gxMapas = new WeakMap<object, Record<string, NonNullable<_C['GX']>[number]>>()
+function gxMapa(c: _C) {
+  if (!c.GX?.length) return null
+  let m = _gxMapas.get(c.GX)
+  if (!m) { m = Object.fromEntries(c.GX.map((x) => [x.id, x])); _gxMapas.set(c.GX, m) }
+  return m
+}
+export const info = (id: string, conteudo: _C) => descrever(id, conteudo.AS, conteudo.WLP, lpMapa(conteudo), gxMapa(conteudo))
 
 /** Metas atrasadas: antes de hoje (ou da pausa) e não concluídas. */
 export function atrasadas(st: Estado, hoje: DataISO = hojeISO()): string[] {

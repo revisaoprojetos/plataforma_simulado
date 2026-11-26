@@ -3,7 +3,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { TituloTela } from '@/components/admin/cronograma/titulo-tela'
 import { createAdminClient } from '@/lib/supabase/server'
 import { hojeBrtISO } from '@/lib/brt'
-import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
+import { conteudoBancoCache } from '@/lib/cronograma/adaptativo/conteudo-cache'
 import { TIPOS_META } from '@/lib/cronograma/adaptativo/tipos-meta'
 import { carregarPaginaRegras } from '../regras-pagina'
 import { SimulacaoClient } from './simulacao-client'
@@ -27,6 +27,6 @@ export default async function SimulacaoPage() {
 }
 
 async function CorpoSimulacao({ tenantId, podeEditar, vigente, rotulos }: { tenantId: string; podeEditar: boolean; vigente: React.ComponentProps<typeof SimulacaoClient>['vigente']; rotulos: Record<string, string> }) {
-  const disciplinas = podeEditar ? (await carregarConteudoBanco(createAdminClient(), tenantId)).disciplinas.map((d) => d.nome) : []
+  const disciplinas = podeEditar ? (await conteudoBancoCache(createAdminClient(), tenantId)).disciplinas.map((d) => d.nome) : []
   return <SimulacaoClient podeSimular={podeEditar} disciplinas={disciplinas} vigente={vigente} inicioPadrao={hojeBrtISO()} rotulos={rotulos} />
 }

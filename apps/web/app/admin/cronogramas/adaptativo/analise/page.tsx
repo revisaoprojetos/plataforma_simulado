@@ -77,6 +77,9 @@ function ResumoUso({ resumo, totais, dias, desde }: { resumo: Awaited<ReturnType
   )
 }
 
+type Resumo = Awaited<ReturnType<typeof carregarResumo>>
+type Totais = Awaited<ReturnType<typeof carregarTotais>>
+
 async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
   const sec = secaoDe(qs.sec)
   const vis = visaoDe(sec, qs.vis)
@@ -86,13 +89,11 @@ async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
   const porPagina = ParamsInt(qs.pps, 14, 5, 100)
 
   const svc = createAdminClient()
-  const [resumo, totais, opcoes, grupos, lista] = await Promise.all([
-    carregarResumo(svc, tenantId, filtro),
-    carregarTotais(svc, tenantId),
-    carregarOpcoes(svc, tenantId),
-    listarGruposFiltro(tenantId),
-    consultarVisao(svc, tenantId, vis, filtro, { q: qs.q, ord: qs.ord, dir: qs.dir, pag: pagina, pp: porPagina }),
-  ])
+  // Resumo (varre plano_meta: pesado, cache 15 min) e totais NÃO bloqueiam a tela: começam já e chegam por streaming (cada bloco com seu <Suspense>);
+  // só as opções dos filtros (leves) seguram o corpo. As abas/filtros ficam clicáveis mesmo enquanto uma consulta pesada roda.
+  const resumoP = carregarResumo(svc, tenantId, filtro)
+  const totaisP = carregarTotais(svc, tenantId).catch(() => null)
+  const [opcoes, grupos] = await Promise.all([carregarOpcoes(svc, tenantId), listarGruposFiltro(tenantId)])
 
   // links: troca de seção/visão preserva só os filtros globais
   const globais: QS = { periodo: qs.periodo, grupo: qs.grupo, disc: qs.disc, tipo: qs.tipo, motor: qs.motor, dias: qs.dias }
@@ -109,6 +110,54 @@ async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
     ...(vis.param === 'dias' ? [{ nome: 'dias', rotulo: 'Parado há 7+ dias', opcoes: DIAS_PARADO.map((d) => ({ v: String(d), l: `Parado há ${d}+ dias` })) }] : []),
   ]
 
+  return (
+    <div className="space-y-4">
+      <Suspense fallback={<div className="skeleton-shimmer h-24 rounded-2xl bg-muted/70" />}>
+        <BlocoResumo resumoP={resumoP} totaisP={totaisP} dias={filtro.dias} hrefTentar={hrefCom(BASE, qs, {})} />
+      </Suspense>
+
+      <Abas nivel={1} atual={sec.id} itens={SECOES.map((s) => ({ id: s.id, rotulo: s.rotulo, href: hrefSec(s.id) }))} />
+      <div>
+        <Abas nivel={2} atual={vis.id} itens={sec.visoes.map((v) => ({ id: v.id, rotulo: v.rotulo, href: hrefVis(v.id) }))} />
+        {vis.dica && <p className="mb-3 text-xs text-muted-foreground">{vis.dica}</p>}
+        <BarraBusca base={BASE} qs={qs} preservar={['sec', 'vis']} placeholder={vis.busca ? 'Buscar nesta tabela' : 'Filtros desta análise'} filtros={filtros} />
+        <Suspense fallback={<EsqueletoTela linhas={6} />}>
+          <TabelaAnalise tenantId={tenantId} qs={qs} sec={sec} vis={vis} filtro={filtro} pagina={pagina} porPagina={porPagina} resumoP={resumoP} csvHref={csvHref} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+/** Avisos de migração/erro + faixa de uso. Aguarda o resumo (pesado) SEM segurar o resto da tela. */
+async function BlocoResumo({ resumoP, totaisP, dias, hrefTentar }: { resumoP: Promise<Resumo>; totaisP: Promise<Totais>; dias: number; hrefTentar: string }) {
+  const [resumo, totais] = await Promise.all([resumoP, totaisP])
+  const logDesde = dia(resumo.log_desde), evDesde = dia(resumo.eventos_desde)
+  return (
+    <>
+      {!resumo.migrado && <Nota tipo="aviso">Aplique a migração <b>20261119030000_adaptativo_log_analise.sql</b> no Supabase para ativar esta análise. Enquanto isso o cronograma dos alunos segue funcionando normalmente; só o registro e os números desta aba ficam indisponíveis.</Nota>}
+      {resumo.erro && <Nota tipo="aviso">Não foi possível calcular os indicadores agora ({resumo.erro}). Nada foi estimado. <Link href={hrefTentar} className="ml-1 font-medium underline" prefetch={false}>Tentar de novo</Link></Nota>}
+      {resumo.migrado && !resumo.erro && (
+        <>
+          <Nota tipo="info">
+            {logDesde ? <>O registro de gerações começa em <b>{logDesde}</b>{evDesde && evDesde !== logDesde ? <> e o de marcações em <b>{evDesde}</b></> : null}; antes disso existem apenas os dados atuais dos cronogramas (progresso, configuração, desempenho e atraso são lidos direto deles e cobrem todo o período).</>
+              : <>Ainda não há gerações registradas — o histórico começa quando o código novo entrar em produção. Progresso, configuração, desempenho e atraso já aparecem porque são lidos dos cronogramas existentes.</>}
+          </Nota>
+          {resumo.agg_linhas === 0 && <Nota tipo="aviso">O agregado diário ainda não foi calculado. O cron <b>adaptativo-agg</b> roda de hora em hora; para preencher o passado, chame <b>POST /api/cron/adaptativo-agg?dias=120</b> (com o CRON_SECRET). Até lá, as tabelas de Progresso por turma/matéria/tipo/semana e Tempo ficam vazias.</Nota>}
+          <ResumoUso resumo={resumo} totais={totais} dias={dias} desde={totais?.desde ? dia(totais.desde) : null} />
+        </>
+      )}
+    </>
+  )
+}
+
+/** Tabela da visão ativa. A consulta (RPC) pode ser pesada; fica em Suspense próprio e com limite de tempo (erro visível + "Tentar de novo"). */
+async function TabelaAnalise({ tenantId, qs, sec, vis, filtro, pagina, porPagina, resumoP, csvHref }: {
+  tenantId: string; qs: QS; sec: ReturnType<typeof secaoDe>; vis: ReturnType<typeof visaoDe>; filtro: ReturnType<typeof normalizarFiltro>
+  pagina: number; porPagina: number; resumoP: Promise<Resumo>; csvHref: string
+}) {
+  const lista = await consultarVisao(createAdminClient(), tenantId, vis, filtro, { q: qs.q, ord: qs.ord, dir: qs.dir, pag: pagina, pp: porPagina })
+
   const celula = (c: ColAn, r: Record<string, unknown>): React.ReactNode => {
     const txt = formatarValor(c.f, r[c.k])
     if (c.aluno && r.estudante_id) return <Link href={`/admin/estudantes/${String(r.estudante_id)}`} className="font-medium text-primary underline-offset-2 hover:underline">{txt}</Link>
@@ -123,7 +172,9 @@ async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
     })}</>
   )
 
-  const logDesde = dia(resumo.log_desde), evDesde = dia(resumo.eventos_desde)
+  // As datas de "histórico começa em" só importam quando a tabela vem vazia; aí sim espera o resumo (que já está em andamento).
+  const resumo = lista.rows.length === 0 && !lista.erro ? await resumoP : null
+  const logDesde = dia(resumo?.log_desde ?? null), evDesde = dia(resumo?.eventos_desde ?? null)
   const vazio = !lista.migrado ? 'A migração ainda não foi aplicada — veja o aviso acima.'
     : vis.fonte === 'log' ? `Nenhuma geração registrada neste filtro${logDesde ? ` — o histórico começa em ${logDesde}` : ' — o histórico começa quando o registro novo entrar em produção'}.`
     : vis.fonte === 'evento' ? `Nenhuma marcação registrada neste filtro${evDesde ? ` — o histórico começa em ${evDesde}` : ' — o histórico começa quando o registro novo entrar em produção'}.`
@@ -131,32 +182,12 @@ async function CorpoAnalise({ tenantId, qs }: { tenantId: string; qs: QS }) {
     : 'Nada encontrado com esses filtros.'
 
   return (
-    <div className="space-y-4">
-      {!resumo.migrado && <Nota tipo="aviso">Aplique a migração <b>20261119030000_adaptativo_log_analise.sql</b> no Supabase para ativar esta análise. Enquanto isso o cronograma dos alunos segue funcionando normalmente; só o registro e os números desta aba ficam indisponíveis.</Nota>}
-      {resumo.erro && <Nota tipo="aviso">Não foi possível calcular os indicadores agora ({resumo.erro}). Nada foi estimado. <Link href={hrefCom(BASE, qs, {})} className="ml-1 font-medium underline" prefetch={false}>Tentar de novo</Link></Nota>}
-      {resumo.migrado && !resumo.erro && (
-        <>
-          <Nota tipo="info">
-            {logDesde ? <>O registro de gerações começa em <b>{logDesde}</b>{evDesde && evDesde !== logDesde ? <> e o de marcações em <b>{evDesde}</b></> : null}; antes disso existem apenas os dados atuais dos cronogramas (progresso, configuração, desempenho e atraso são lidos direto deles e cobrem todo o período).</>
-              : <>Ainda não há gerações registradas — o histórico começa quando o código novo entrar em produção. Progresso, configuração, desempenho e atraso já aparecem porque são lidos dos cronogramas existentes.</>}
-          </Nota>
-          {resumo.agg_linhas === 0 && <Nota tipo="aviso">O agregado diário ainda não foi calculado. O cron <b>adaptativo-agg</b> roda de hora em hora; para preencher o passado, chame <b>POST /api/cron/adaptativo-agg?dias=120</b> (com o CRON_SECRET). Até lá, as tabelas de Progresso por turma/matéria/tipo/semana e Tempo ficam vazias.</Nota>}
-        </>
-      )}
-
-      {resumo.migrado && !resumo.erro && <ResumoUso resumo={resumo} totais={totais} dias={filtro.dias} desde={totais?.desde ? dia(totais.desde) : null} />}
-
-      <Abas nivel={1} atual={sec.id} itens={SECOES.map((s) => ({ id: s.id, rotulo: s.rotulo, href: hrefSec(s.id) }))} />
-      <div>
-        <Abas nivel={2} atual={vis.id} itens={sec.visoes.map((v) => ({ id: v.id, rotulo: v.rotulo, href: hrefVis(v.id) }))} />
-        {vis.dica && <p className="mb-3 text-xs text-muted-foreground">{vis.dica}</p>}
-        <BarraBusca base={BASE} qs={qs} preservar={['sec', 'vis']} placeholder={vis.busca ? 'Buscar nesta tabela' : 'Filtros desta análise'} filtros={filtros} />
-        {lista.erro && <Nota tipo="aviso">Não foi possível carregar esta tabela agora ({lista.erro}).</Nota>}
-        <div className="mb-2 flex justify-end">
-          <a href={csvHref} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border bg-background px-3 text-[13px] font-medium transition hover:bg-muted"><Download className="h-3.5 w-3.5" />Exportar CSV</a>
-        </div>
-        <TabelaCron tipo="leitura" podeEditar={false} colunas={vis.cols.length} total={lista.total} page={pagina} pp={porPagina} vazio={vazio} head={head} rows={rows} />
+    <>
+      {lista.erro && <Nota tipo="aviso">Não foi possível carregar esta tabela agora ({lista.erro}). <Link href={hrefCom(BASE, qs, {})} className="ml-1 font-medium underline" prefetch={false}>Tentar de novo</Link></Nota>}
+      <div className="mb-2 flex justify-end">
+        <a href={csvHref} className="inline-flex h-8 items-center gap-1.5 rounded-[10px] border bg-background px-3 text-[13px] font-medium transition hover:bg-muted"><Download className="h-3.5 w-3.5" />Exportar CSV</a>
       </div>
-    </div>
+      <TabelaCron tipo="leitura" podeEditar={false} colunas={vis.cols.length} total={lista.total} page={pagina} pp={porPagina} vazio={vazio} head={head} rows={rows} />
+    </>
   )
 }

@@ -14,6 +14,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
+import { usosPorTipo } from '@/lib/revisao/gerador/metas'
 
 
 async function guard(perm: string) {
@@ -37,15 +38,10 @@ function gerarSlug(nome: string): string {
 export async function listarTipos(): Promise<{ ok: boolean; itens?: TipoComUso[]; error?: string }> {
   const g = await guard('cronogramas:view')
   if (!g.ok) return { ok: false, error: g.error }
-  const svc = createAdminClient()
 
-  const [tipos, { data: metas }] = await Promise.all([
-    listarTiposMeta(g.tenantId, true),
-    svc.from('simulado_cronograma_metas').select('tipo').eq('tenant_id', g.tenantId),
-  ])
-
-  const conta = new Map<string, number>()
-  for (const m of (metas ?? []) as any[]) conta.set(m.tipo, (conta.get(m.tipo) ?? 0) + 1)
+  // Antes: `select tipo` de TODAS as metas (cortava em 1.000 → usos errados). Agora um GROUP BY só.
+  const tipos = await listarTiposMeta(g.tenantId, true)
+  const conta = await usosPorTipo(g.tenantId, tipos.map((t) => t.slug))
   return { ok: true, itens: tipos.map((t) => ({ ...(t as any), usos: conta.get(t.slug) ?? 0 })) }
 }
 

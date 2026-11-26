@@ -4,6 +4,7 @@
  */
 import { REGRAS_PADRAO, normalizarRegras, type RegrasMotor } from './regras'
 import { TIPOS_META, SLUGS_META, type SlugMeta } from './tipos-meta'
+import { REGRA_TIPO_GX_PADRAO, type RegraTipoGx } from './gx-tipos'
 import { descreverRestricao } from './restricoes'
 
 /** Chave do rascunho (sessionStorage) compartilhado entre a aba Faixas e a aba Simulação. Só rascunho local. */
@@ -125,10 +126,18 @@ const ROTULO_CAMPO_FAIXA: Record<string, string> = {
   nome: 'nome', minMin: 'carga mínima (min)', maxMin: 'carga máxima (min)', tetoPdf: 'teto de PDFull novo/semana', soRegra23: 'teto só com a regra 23', equilibra: 'equilibrada', revisaoModo: 'modo de revisão',
   cicloSemanas: 'periodicidade do ciclo', opcoesNovas: 'opções de periodicidade', padrao: 'periodicidade padrão', modoQuestoes: 'modo de questões', id: 'identificador',
 }
+const ROTULO_CAMPO_GX: Record<string, string> = {
+  ativo: 'ativo', maxPorDia: 'máximo por dia', maxPorSemana: 'máximo por semana', dias: 'dias permitidos (0 = segunda)', faixas: 'faixas de carga (1-based)', aPartirDaSemana: 'a partir da semana',
+}
 /** Rótulo legível de qualquer caminho de `RegrasMotor` (inclui `faixas.N.campo` e `faixas.N.overrides.secao.campo`). */
-export function rotuloDoCaminho(path: string): string {
+export function rotuloDoCaminho(path: string, nomesGx?: Record<string, string>): string {
   const fixo = TODOS_CAMPOS.find((c) => c.path === path)?.rotulo
   if (fixo) return fixo
+  const g = /^tiposGx\.([^.]+)(?:\.(.+))?$/.exec(path)
+  if (g) {
+    const nome = nomesGx?.[g[1]] ?? g[1]
+    return g[2] ? `Tipo "${nome}": ${ROTULO_CAMPO_GX[g[2]] ?? g[2]}` : `Tipo "${nome}"`
+  }
   const m = /^faixas\.(\d+)\.(.+)$/.exec(path)
   if (m) {
     const k = Number(m[1]) + 1, resto = m[2]
@@ -144,13 +153,20 @@ function achatar(o: unknown, pre: string, out: Record<string, unknown>) {
   else out[pre] = o
 }
 /** Campos que diferem entre duas regras (ambas normalizadas). `de` = a, `para` = b. */
-export function diffRegras(a: unknown, b: unknown): DifCampo[] {
+export function diffRegras(a: unknown, b: unknown, nomesGx?: Record<string, string>): DifCampo[] {
   const fa: Record<string, unknown> = {}, fb: Record<string, unknown> = {}
   achatar(normalizarRegras(a), '', fa); achatar(normalizarRegras(b), '', fb)
   const out: DifCampo[] = []
-  for (const k of Object.keys(fa)) {
+  // união das chaves: um tipo personalizado (tiposGx.<slug>.*) adicionado/removido só existe de um lado.
+  for (const k of new Set([...Object.keys(fa), ...Object.keys(fb)])) {
     if (k === 'versaoSchema') continue
-    if (JSON.stringify(fa[k]) !== JSON.stringify(fb[k])) out.push({ path: k, rotulo: rotuloDe(k), de: formatarValor(fa[k]), para: formatarValor(fb[k]) })
+    const va = fa[k], vb = fb[k]
+    const vazioObj = (v: unknown) => v !== null && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v as object).length
+    if (vazioObj(va) || vazioObj(vb)) continue
+    if (JSON.stringify(va) !== JSON.stringify(vb)) {
+      const fmt = (v: unknown, lado: Record<string, unknown>) => (k in lado ? formatarValor(v) : 'não definido')
+      out.push({ path: k, rotulo: k.startsWith('tiposGx.') ? rotuloDoCaminho(k, nomesGx) : rotuloDe(k), de: fmt(va, fa), para: fmt(vb, fb) })
+    }
   }
   return out
 }
@@ -166,6 +182,25 @@ export interface FichaTipo {
   restricoes?: string[]
 }
 const h = (min: number) => (min % 60 === 0 ? `${min / 60}h` : `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`)
+const DIA_PT = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo']
+/**
+ * Ficha de um tipo PERSONALIZADO do catálogo (família gx). Só descreve as regras de elegibilidade de `regras.tiposGx[slug]`;
+ * duração/prioridade/ordem/ativo-do-catálogo ficam no catálogo. Sem regra salva = comportamento padrão (sobra do dia).
+ */
+export function fichaDoTipoGx(slug: string, regras: RegrasMotor, nome?: string): FichaTipo {
+  const r = (regras as { tiposGx?: Record<string, Partial<RegraTipoGx>> }).tiposGx?.[slug] ?? {}
+  const p = { ...REGRA_TIPO_GX_PADRAO, ...r }
+  const tipo = nome || slug
+  const f: FichaTipo = { avanca: [], recua: [], teto: [], editavel: [`tiposGx.${slug}.*`] }
+  if (p.ativo === false) f.teto.push(`Tipo "${tipo}" desligado nas regras: o motor não agenda metas dele.`)
+  f.teto.push(p.maxPorDia == null ? 'Sem limite por dia (entra só na sobra do dia).' : `No máximo ${p.maxPorDia} meta(s) por dia.`)
+  f.teto.push(p.maxPorSemana == null ? 'Sem limite por semana.' : `No máximo ${p.maxPorSemana} meta(s) por semana.`)
+  f.avanca.push(p.aPartirDaSemana > 0 ? `Só começa a partir da semana ${p.aPartirDaSemana} do plano.` : 'Pode começar desde a 1ª semana.')
+  f.recua.push(p.dias.length ? `Só nos dias: ${p.dias.map((d) => DIA_PT[d] ?? d).join(', ')}.` : 'Todos os dias da semana.', p.faixas.length ? `Só nas faixas de carga: ${p.faixas.join(', ')}.` : 'Todas as faixas de carga.')
+  f.chefao = undefined
+  f.restricoes = ['Vale ao gerar/regenerar o plano; planos já gerados só mudam quando regenerados (metas passadas/feitas nunca se movem).']
+  return f
+}
 export function fichaDoTipo(slug: SlugMeta, regras: RegrasMotor): FichaTipo {
   const R = regras, t = TIPOS_META[slug]
   const prio = `Prioridade no reagendamento: ${R.prioridades.porTipo[slug] ?? R.prioridades.outros} (menor = primeiro).`

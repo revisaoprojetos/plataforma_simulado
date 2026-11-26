@@ -7,6 +7,7 @@
 import seed from './conteudo-seed.json'
 import type { AS, WLP } from './engine'
 import type { ItemLP } from './motor28'
+import type { ItemGX } from './gx-tipos'
 import type { ParamsAdaptativo } from './params'
 import { GRUPOS_HTML } from './catalogo-html'
 
@@ -19,6 +20,8 @@ export interface Conteudo {
   params?: ParamsAdaptativo
   /** descrição de metas de LegProc antigas (fora do catálogo atual), por id — só exibição */
   LPdesc?: Record<string, ItemLP>
+  /** metas próprias de tipos personalizados do catálogo (Fase 2); ausente/vazio = comportamento anterior */
+  GX?: ItemGX[]
 }
 
 /** Conteúdo-semente (modelo). AS: [disc, aula, tema, pags, nomeQuestoes, nomeTEC]; WLP[semana][j]. */

@@ -27,7 +27,7 @@ export const ehRevisaoAdaptativa = (id: string) => subtipoMeta(id) === 'revisao'
 export function indiceAulaDaMeta(id: string): number | null {
   const p = id.split(':')
   const t = p[0]
-  if (t === 'lp' || t === 'jp') return null
+  if (t === 'lp' || t === 'jp' || t === 'gx') return null
   const bruto = t === 'rf' || t === 'rq' ? p[2] : p[1]
   return bruto != null && /^\d{1,6}$/.test(bruto) ? Number(bruto) : null
 }
@@ -53,7 +53,7 @@ export function rotuloMeta(id: string): string | null {
 }
 
 // ── detalhes por meta (persistidos em `detalhes_metas` / `plano_meta.detalhes`) ──────────────────────
-const ID_META = /^(pf|pp|fl|qu|lp|rf|rq|jp):[A-Za-z0-9:_-]{1,60}$/
+const ID_META = /^(pf|pp|fl|qu|lp|rf|rq|jp|gx):[A-Za-z0-9:_-]{1,60}$/
 const CAMPOS_BOOL = ['semanaRevisao', 'essencialNaoSelecionada', 'continuacao', 'deslocada', 'jurisprudencia', 'historico', 'reforco'] as const
 const CAMPOS_NUM = ['semanaOrigemRevisao', 'ordemAlternancia', 'percentualOrigem', 'paginaInicio', 'paginaFim', 'totalPaginas'] as const
 const CAMPOS_TXT = ['material', 'origem', 'pai', 'artigo', 'geracao'] as const

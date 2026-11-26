@@ -16,6 +16,7 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { ErroPlanoInviavel, diagnosticarInsuficiencia, maxSemanasEfetivo } from '@/lib/cronograma/adaptativo/diagnostico-insuficiencia'
 import { registrarGeracao, type AcaoGeracao } from '@/lib/cronograma/adaptativo/log-geracao'
 import type { Cfg, DataISO } from '@/lib/cronograma/adaptativo/engine'
+import { MAX_ITENS_GX } from '@/lib/cronograma/adaptativo/gx-tipos'
 import { CATALOGO_HTML, GRUPOS_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
 
 // POST /api/aluno/cronograma/adaptativo — mutações do Cronograma Adaptativo 2.0.
@@ -63,7 +64,13 @@ export async function GET() {
   // ordem = distribuição das aulas do modelo; agu = grupos de disciplinas específicas (pares, ex.: Internacional).
   const nomes = new Set(conteudo.disciplinas.map((d) => d.nome))
   const agu = GRUPOS_HTML.agu.map((g) => g.filter((n) => nomes.has(n))).filter((g) => g.length)
-  return NextResponse.json({ ok: true, ...docs, estudanteId: sessao.estudanteId, docsBloqueados, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, regras, tiposMeta: nomesAlunoPorSlug(), qfAulas } })
+  // Fase 2 — metas de tipos personalizados (gx): SÓ entram na resposta quando há itens (sem itens o JSON fica idêntico ao anterior).
+  // O iframe monta `ctx.gx` a partir deste mapa (mesmos campos do ItemGX) e descreve a meta por ele.
+  const gxItens = (conteudo.GX ?? []).slice(0, MAX_ITENS_GX)
+  const GX = gxItens.length ? Object.fromEntries(gxItens.map((g) => [g.id, { slug: g.slug, nome: g.nomeTipo, disc: g.disc, titulo: g.titulo, doc: g.doc, min: g.min, prioridade: g.prioridade, ordem: g.ordem }])) : null
+  const { gx: nomeGx, ...tiposBase } = nomesAlunoPorSlug() // `gx` (registro) só vai ao iframe quando há itens
+  const tiposMeta = GX ? { ...tiposBase, gx: nomeGx || 'Personalizado' } : tiposBase
+  return NextResponse.json({ ok: true, ...docs, estudanteId: sessao.estudanteId, docsBloqueados, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], JPdoc: conteudo.JPdoc ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, regras, tiposMeta, qfAulas, ...(GX ? { GX } : {}) } })
 }
 
 export async function POST(req: NextRequest) {

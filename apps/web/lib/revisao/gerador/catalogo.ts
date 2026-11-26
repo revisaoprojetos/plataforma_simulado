@@ -57,10 +57,34 @@ export async function carregarCatalogo(tenantId: string, p: ParamsCatalogo): Pro
   const svc = createAdminClient()
 
   try {
-    const [rpcMetas, rpcPac, leves] = await Promise.all([
+    const filtrar = (qb: any) => {
+      qb = qb.eq('tenant_id', tenantId).eq('deletado', false)
+      if (p.status === 'liberados') qb = qb.eq('status', 'liberado')
+      else if (p.status === 'rascunhos') qb = qb.neq('status', 'liberado')
+      if (p.carga != null) qb = qb.eq('carga_horaria', p.carga)
+      if (p.cat === 'sem') qb = qb.is('categoria_id', null)
+      else if (p.cat) qb = qb.eq('categoria_id', p.cat)
+      for (const t of p.q.toLowerCase().split(/\s+/).filter(Boolean)) qb = qb.ilike('nome', `%${t.replace(/[%_,()]/g, ' ')}%`)
+      return qb
+    }
+    const memoria = p.status === 'sem_pacote' || p.status === 'sem_metas' || p.status === 'invisiveis' || p.ord === 'metas' || p.ord === 'pacotes'
+    const asc = p.dir !== 'desc'
+    const de = (p.pag - 1) * p.pps
+    // Tudo independente numa ONDA só (antes: 3 idas em sequência — contagens, categorias, página): a página SQL
+    // (filtro/ordem/.range()) não depende das contagens, que só entram no `montar` abaixo.
+    const paginaSql = !memoria ? (() => {
+      let qb = filtrar(svc.from('simulado_cronogramas').select(COLS, { count: 'exact' }))
+      const col = COL_ORD[p.ord]
+      if (col) qb = qb.order(col, { ascending: asc })
+      else { qb = qb.order('ordem').order('carga_horaria').order('nome') }
+      return qb.order('id').range(de, de + p.pps - 1) as PromiseLike<{ data: any[] | null; count: number | null; error: { message: string } | null }>
+    })() : Promise.resolve(null)
+    const [rpcMetas, rpcPac, leves, catsRes, pagina] = await Promise.all([
       svc.rpc('simulado_cronograma_contar_metas', { p_tenant: tenantId }),
       svc.rpc('simulado_cronograma_contar_pacotes', { p_tenant: tenantId }),
       buscarTodas(() => svc.from('simulado_cronogramas').select('id, status, carga_horaria').eq('tenant_id', tenantId).eq('deletado', false)),
+      svc.from('simulado_cronograma_categorias').select('id, nome').eq('tenant_id', tenantId),
+      paginaSql,
     ])
     const metas = new Map<string, number>()
     for (const m of ((rpcMetas.data ?? []) as any[])) metas.set(m.cronograma_id, Number(m.total))
@@ -77,19 +101,7 @@ export async function carregarCatalogo(tenantId: string, p: ParamsCatalogo): Pro
       if (!(metas.get(l.id))) kpis.semMetas++
     }
 
-    const { data: cats } = await svc.from('simulado_cronograma_categorias').select('id, nome').eq('tenant_id', tenantId)
-    const nomeCat = new Map(((cats ?? []) as any[]).map((c) => [c.id as string, c.nome as string]))
-
-    const filtrar = (qb: any) => {
-      qb = qb.eq('tenant_id', tenantId).eq('deletado', false)
-      if (p.status === 'liberados') qb = qb.eq('status', 'liberado')
-      else if (p.status === 'rascunhos') qb = qb.neq('status', 'liberado')
-      if (p.carga != null) qb = qb.eq('carga_horaria', p.carga)
-      if (p.cat === 'sem') qb = qb.is('categoria_id', null)
-      else if (p.cat) qb = qb.eq('categoria_id', p.cat)
-      for (const t of p.q.toLowerCase().split(/\s+/).filter(Boolean)) qb = qb.ilike('nome', `%${t.replace(/[%_,()]/g, ' ')}%`)
-      return qb
-    }
+    const nomeCat = new Map(((catsRes.data ?? []) as any[]).map((c) => [c.id as string, c.nome as string]))
     const montar = (c: any): CronogramaLista => ({
       ...c,
       categoria_nome: c.categoria_id ? (nomeCat.get(c.categoria_id) ?? null) : null,
@@ -102,16 +114,8 @@ export async function carregarCatalogo(tenantId: string, p: ParamsCatalogo): Pro
       pacotes: pacotes.get(c.id) ?? 0,
     })
 
-    const memoria = p.status === 'sem_pacote' || p.status === 'sem_metas' || p.status === 'invisiveis' || p.ord === 'metas' || p.ord === 'pacotes'
-    const asc = p.dir !== 'desc'
-    const de = (p.pag - 1) * p.pps
-
     if (!memoria) {
-      let qb = filtrar(svc.from('simulado_cronogramas').select(COLS, { count: 'exact' }))
-      const col = COL_ORD[p.ord]
-      if (col) qb = qb.order(col, { ascending: asc })
-      else { qb = qb.order('ordem').order('carga_horaria').order('nome') }
-      const { data, count, error } = await qb.order('id').range(de, de + p.pps - 1)
+      const { data, count, error } = pagina!
       if (error) return { ...vazio, error: error.message }
       return { ok: true, itens: (data ?? []).map(montar), total: count ?? 0, kpis, cargas: [...setCargas].sort((a, b) => a - b) }
     }

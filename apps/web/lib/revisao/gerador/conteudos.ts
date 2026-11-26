@@ -1,8 +1,10 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { sqlQuery } from '@/lib/data/sql'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
+import { metasQuestPorAula } from './uso-links'
 
 // Sub-aba "Conteúdos" do Gerador (cronograma padrão): leitura paginada no servidor de
 // (a) conjuntos de aulas do Banco de Conteúdos e (b) links de aula. Só LEITURA — as mutações
@@ -15,7 +17,6 @@ const T_AQ = 'simulado_cronograma_conjunto_aula_questoes'
 const T_LINKS = 'simulado_cronograma_links'
 const T_ALINKS = 'simulado_cronograma_aula_links'
 const T_PLAT = 'simulado_cronograma_plataformas'
-const T_METAS = 'simulado_cronograma_metas'
 
 /** Mesma normalização de "dia de aula" do banco de conteúdos (1, 01 → "1"). */
 const chaveAula = (a: string | null) => {
@@ -101,11 +102,18 @@ export async function listarConjuntosPag(svc: SupabaseClient, tenantId: string, 
       if (a.tipo === 'legproc') { if (!leg.has(a.conjunto_id)) leg.set(a.conjunto_id, new Set()); leg.get(a.conjunto_id)!.add(k) }
     }
     if (aulas.length) {
-      const { count } = await svc.from(T_AQ).select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId)
-      if ((count ?? 0) > 0) {
-        const dono = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
-        const vs = await fetchAllByIn<any>(aulas.map((a) => a.id), (chunk) => svc.from(T_AQ).select('aula_id').eq('tenant_id', tenantId).in('aula_id', chunk).order('id') as any, { chunk: 200 })
-        for (const v of vs) { const c = dono.get(v.aula_id); if (c) quest.set(c, (quest.get(c) ?? 0) + 1) }
+      // Questões por conjunto: UM GROUP BY (uma ida) em vez de head-count + `.in()` em lotes por aula.
+      const g = await sqlQuery<{ conjunto_id: string; n: number }>(
+        `SELECT a.conjunto_id, count(*)::int n FROM ${T_AQ} q JOIN ${T_AULAS} a ON a.id = q.aula_id
+          WHERE q.tenant_id = $1 AND a.conjunto_id = ANY($2::uuid[]) GROUP BY 1`, [tenantId, ids])
+      if (g) { for (const r of g) quest.set(r.conjunto_id, Number(r.n) || 0) }
+      else {
+        const { count } = await svc.from(T_AQ).select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+        if ((count ?? 0) > 0) {
+          const dono = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
+          const vs = await fetchAllByIn<any>(aulas.map((a) => a.id), (chunk) => svc.from(T_AQ).select('aula_id').eq('tenant_id', tenantId).in('aula_id', chunk).order('id') as any)
+          for (const v of vs) { const c = dono.get(v.aula_id); if (c) quest.set(c, (quest.get(c) ?? 0) + 1) }
+        }
       }
     }
   }
@@ -151,7 +159,7 @@ export async function listarLinksPag(svc: SupabaseClient, tenantId: string, p: P
   if (p.situ === 'pend') {
     const [links, metas] = await Promise.all([
       fetchAll<{ disciplina: string; aula: string }>(() => svc.from(T_LINKS).select('disciplina, aula').eq('tenant_id', tenantId).order('id') as any),
-      fetchAll<{ disciplina: string; aula: string | null }>(() => svc.from(T_METAS).select('disciplina, aula').eq('tenant_id', tenantId).eq('tipo', 'quest').not('aula', 'is', null).order('id') as any),
+      metasQuestPorAula(svc, tenantId),
     ])
     const tem = new Set<string>()
     for (const l of links) { const k = chaveLink(l.disciplina, l.aula); if (k) tem.add(k) }
@@ -159,7 +167,7 @@ export async function listarLinksPag(svc: SupabaseClient, tenantId: string, p: P
     for (const m of metas) {
       const k = chaveLink(m.disciplina, m.aula); if (!k || tem.has(k)) continue
       const e = cont.get(k)
-      if (e) e.metas++; else cont.set(k, { disciplina: m.disciplina, aula: m.aula as string, metas: 1 })
+      if (e) e.metas += m.n; else cont.set(k, { disciplina: m.disciplina, aula: m.aula as string, metas: m.n })
     }
     let lista = [...cont.values()]
     const t = q.toLowerCase()
@@ -193,7 +201,7 @@ export async function listarLinksPag(svc: SupabaseClient, tenantId: string, p: P
   const [urls, metas] = await Promise.all([
     ids.length ? fetchAllByIn<any>(ids, (c) => svc.from(T_ALINKS).select('link_id, plataforma_id, url').eq('tenant_id', tenantId).in('link_id', c).order('id') as any) : Promise.resolve([] as any[]),
     // Usos: metas de questões das disciplinas desta página (casamento pela MESMA chaveLink do motor).
-    discs.length ? fetchAllByIn<any>(discs, (c) => svc.from(T_METAS).select('disciplina, aula').eq('tenant_id', tenantId).eq('tipo', 'quest').not('aula', 'is', null).in('disciplina', c).order('id') as any) : Promise.resolve([] as any[]),
+    metasQuestPorAula(svc, tenantId, discs),
   ])
   const porLink = new Map<string, { plataforma_id: string; url: string }[]>()
   for (const u of urls) {
@@ -201,7 +209,7 @@ export async function listarLinksPag(svc: SupabaseClient, tenantId: string, p: P
     if (l) l.push({ plataforma_id: u.plataforma_id, url: u.url }); else porLink.set(u.link_id, [{ plataforma_id: u.plataforma_id, url: u.url }])
   }
   const usoChave = new Map<string, number>()
-  for (const m of metas) { const k = chaveLink(m.disciplina, m.aula); if (k) usoChave.set(k, (usoChave.get(k) ?? 0) + 1) }
+  for (const m of metas) { const k = chaveLink(m.disciplina, m.aula); if (k) usoChave.set(k, (usoChave.get(k) ?? 0) + m.n) }
   const linhas: LinkLinha[] = raw.map((l) => {
     const k = chaveLink(l.disciplina, l.aula)
     return { id: l.id, disciplina: l.disciplina, aula: l.aula, tema: l.tema ?? null, urls: porLink.get(l.id) ?? [], usos: k ? (usoChave.get(k) ?? 0) : 0 }

@@ -68,55 +68,50 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
 
-  const { data, error } = await svc
-    .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, ordem')
-    .eq('tenant_id', g.tenantId)
-    .eq('deletado', false)
-    .order('ordem')
-    .order('carga_horaria')
-    .order('nome')
-  if (error) return { ok: false, error: error.message }
-
   /**
-   * Contagem AGREGADA no banco, não com select + contar aqui.
-   *
-   * O `select cronograma_id` esbarrava no teto de 1.000 linhas do PostgREST: com 16.697
-   * metas, só as primeiras voltavam, e os demais cronogramas apareciam como "sem metas"
-   * — o que ainda desabilitava o botão de liberar. Paginar corrigiria, mas puxaria
-   * 16.697 linhas a cada abertura da tela para produzir 25 números.
+   * Contagem AGREGADA no banco, não com select + contar aqui (o `select cronograma_id` esbarrava no teto de 1.000
+   * linhas do PostgREST: com 16.697 metas, os demais cronogramas apareciam como "sem metas").
+   * Tudo abaixo é independente → UMA onda paralela (antes: 5 idas em sequência, ~160 ms cada).
+   * Acesso geral: pacote ATIVO com acesso_gratuito entrega seus cronogramas a todos os alunos, então o cronograma dele
+   * não é "invisível" mesmo sem grupo/avulso; a RPC só conta vínculos.
    */
-  const { data: contagemMetas } = await svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId })
+  const acessoGeral = async (): Promise<Set<string>> => {
+    const out = new Set<string>()
+    const gratuitos = await fetchAll<{ id: string }>(() =>
+      svc.from('simulado_cronograma_pacotes').select('id').eq('tenant_id', g.tenantId).eq('ativo', true).eq('acesso_gratuito', true).order('id') as any,
+    )
+    if (!gratuitos.length) return out
+    const idsGrat = gratuitos.map((p) => p.id)
+    const lotes: string[][] = []
+    for (let i = 0; i < idsGrat.length; i += 80) lotes.push(idsGrat.slice(i, i + 80))
+    const partes = await Promise.all(lotes.map((lote) =>
+      fetchAll<{ cronograma_id: string }>(() =>
+        svc.from('simulado_cronograma_pacote_itens').select('cronograma_id').eq('tenant_id', g.tenantId).in('pacote_id', lote).order('id') as any,
+      )))
+    for (const itensGrat of partes) for (const it of itensGrat) out.add(it.cronograma_id)
+    return out
+  }
+  const [{ data, error }, { data: contagemMetas }, { data: cats }, { data: contagemPacotes }, cronsComAcessoGeral] = await Promise.all([
+    svc
+      .from('simulado_cronogramas')
+      .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, ordem')
+      .eq('tenant_id', g.tenantId)
+      .eq('deletado', false)
+      .order('ordem')
+      .order('carga_horaria')
+      .order('nome'),
+    svc.rpc('simulado_cronograma_contar_metas', { p_tenant: g.tenantId }),
+    svc.from('simulado_cronograma_categorias').select('id, nome').eq('tenant_id', g.tenantId),
+    // Vínculos com pacotes: é por eles que o aluno recebe acesso. Um cronograma liberado mas fora de qualquer pacote não chega a ninguém (salvo gratuito).
+    svc.rpc('simulado_cronograma_contar_pacotes', { p_tenant: g.tenantId }),
+    acessoGeral(),
+  ])
+  if (error) return { ok: false, error: error.message }
   const totais = new Map<string, number>()
   for (const m of ((contagemMetas ?? []) as any[])) totais.set(m.cronograma_id, Number(m.total))
-
-  const { data: cats } = await svc
-    .from('simulado_cronograma_categorias')
-    .select('id, nome')
-    .eq('tenant_id', g.tenantId)
-
-  // Vínculos com pacotes: é por eles que o aluno recebe acesso. Um cronograma
-  // liberado mas fora de qualquer pacote não chega a ninguém (salvo gratuito).
-  const { data: contagemPacotes } = await svc.rpc('simulado_cronograma_contar_pacotes', { p_tenant: g.tenantId })
   const pacotesPorCron = new Map<string, number>()
   for (const v of ((contagemPacotes ?? []) as any[])) pacotesPorCron.set(v.cronograma_id, Number(v.total))
   const nomeCategoria = new Map(((cats ?? []) as any[]).map((c) => [c.id, c.nome as string]))
-
-  // Acesso geral: pacote ATIVO com acesso_gratuito entrega seus cronogramas a todos os alunos,
-  // então o cronograma dele não é "invisível" mesmo sem grupo/avulso. A RPC só conta vínculos.
-  const gratuitos = await fetchAll<{ id: string }>(() =>
-    svc.from('simulado_cronograma_pacotes').select('id').eq('tenant_id', g.tenantId).eq('ativo', true).eq('acesso_gratuito', true).order('id') as any,
-  )
-  const cronsComAcessoGeral = new Set<string>()
-  if (gratuitos.length) {
-    const idsGrat = gratuitos.map((p) => p.id)
-    for (let i = 0; i < idsGrat.length; i += 80) {
-      const itensGrat = await fetchAll<{ cronograma_id: string }>(() =>
-        svc.from('simulado_cronograma_pacote_itens').select('cronograma_id').eq('tenant_id', g.tenantId).in('pacote_id', idsGrat.slice(i, i + 80)).order('id') as any,
-      )
-      for (const it of itensGrat) cronsComAcessoGeral.add(it.cronograma_id)
-    }
-  }
 
   const itens = (data ?? []).map((c: any) => ({
     ...c,

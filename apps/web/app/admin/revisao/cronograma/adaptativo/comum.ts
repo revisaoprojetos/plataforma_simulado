@@ -22,7 +22,7 @@ export interface PropsAbaAdaptativo { sp: QS; tenantId: string; podeEditar: bool
 
 /** Aba + vista (`?sub=<aba>&v=<vista>`) de cada sub-aba implementada no shell (ver lib/admin/cronogramas-nav.ts). */
 const ABA_VISTA: Record<SubAdaptativo, { sub: string; v: string }> = {
-  mat: { sub: 'conteudo', v: 'cobertura' }, disc: { sub: 'conteudo', v: 'disciplinas' }, regras: { sub: 'regras', v: 'regras' },
+  mat: { sub: 'conteudo', v: 'cobertura' }, disc: { sub: 'conteudo', v: 'metas-pasta' }, regras: { sub: 'regras', v: 'regras' },
   faixas: { sub: 'regras', v: 'faixas' }, especial: { sub: 'regras', v: 'especial' }, sprint: { sub: 'versoes', v: 'sprint' }, ver: { sub: 'versoes', v: 'versoes' },
 }
 

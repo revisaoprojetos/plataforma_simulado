@@ -18,7 +18,7 @@ export const TIPOS_PARAMETRO: readonly TipoParametro[] = ['limite', 'limiar', 'p
 export const ROTULO_TIPO_PARAMETRO: Readonly<Record<TipoParametro, string>> = {
   limite: 'Limite', limiar: 'Limiar', prioridade: 'Prioridade', interruptor: 'Interruptor', restricao: 'Restrição', constante: 'Constante',
 }
-export const GRUPOS_MAPA = ['Horizonte', 'Faixas', 'Revisão', 'Limites por dia', 'Divisão', 'LegProc', 'Desempenho', 'Reta final', 'Juris', 'Histórico', 'Rotina', 'Rodízio', 'Equilíbrio', 'Prioridades', 'Adaptação', 'Constantes', 'Restrições'] as const
+export const GRUPOS_MAPA = ['Horizonte', 'Faixas', 'Revisão', 'Limites por dia', 'Divisão', 'LegProc', 'Desempenho', 'Reta final', 'Juris', 'Histórico', 'Rotina', 'Rodízio', 'Equilíbrio', 'Prioridades', 'Adaptação', 'Constantes', 'Restrições', 'Tipos personalizados'] as const
 export type GrupoMapa = (typeof GRUPOS_MAPA)[number]
 
 /** As 8 camadas da precedência (mesmos nomes do diagrama "Precedência" da aba Fluxo). */
@@ -161,6 +161,9 @@ export const METADADOS_MAPA: Record<string, MetaCampo> = {
   // ── Restrições ──
   'restricoes': d('Restrições', 'restricao', 'Restrições declarativas por personagem', 'Regras como "máximo por dia", "não no mesmo dia que…", "só na sobra do dia", aplicadas a cada candidata do dia.', 'Cada restrição ativa bloqueia posições no plano; sem restrições o motor se comporta como o padrão.', 3, on('rs:restricaoQueBloqueia', 'm30:gerarPlanoBase30'), { href: HREF_RESTR, testes: [T_GOLD, T_RES] }),
 
+  // ── Tipos personalizados do catálogo (FASE 3a): `tiposGx.<slug>` = { ativo, maxPorDia, maxPorSemana, dias, faixas, aPartirDaSemana } ──
+  'tiposGx': d('Tipos personalizados', 'restricao', 'Regras por tipo personalizado do catálogo', 'Para cada tipo personalizado que "gera meta" (slug do catálogo): ativo, máximo por dia/semana, dias permitidos, faixas de carga e a partir de qual semana. O motor lê `regras.tiposGx[slug]` ao agendar as metas gx na sobra do dia.', 'Só ADIA metas do tipo (elegibilidade); nunca cria metas nem muda as de outros tipos. Sem regra = entra na sobra do dia por prioridade do catálogo. Vale ao gerar/regenerar o plano.', 8, on('m30:gerarPlanoBase30'), { href: HREF_PERS, testes: [T_GOLD, T_REG] }),
+
   // ── Adaptação ──
   'adaptacao.dominoAtivo': d('Adaptação', 'interruptor', 'Dominó (refluxo ao não fazer/mover)', 'Liga o refluxo do plano quando o aluno adia ou não faz uma meta.', 'Desligado: a meta só é adiada, sem reorganizar as seguintes.', null, on('m30:calcularDominoE', 'm30:adiarSemDomino'), { testes: [T_GOLD, T_AR] }),
   'adaptacao.reforcoAtivo': d('Adaptação', 'interruptor', 'Reforço do diagnóstico (metas :reforco:)', 'Liga a criação de metas de reforço por acerto baixo no diagnóstico.', 'Desligado: nenhuma meta de reforço é criada.', null, on('m30:registrarReforcos216'), { testes: [T_GOLD, T_AR] }),
@@ -220,6 +223,11 @@ export function montarMapa(regras: RegrasMotor): EntradaMapa[] {
       for (const r of regras.restricoes) {
         out.push({ ...base(chave, m), path: `restricoes.${r.id}`, nome: r.rotulo || `Restrição ${r.id}`, valorPadrao: 'nenhuma', valorVigente: `${r.ativa ? 'ativa' : 'desligada'} · ${descreverRestricao(r)}`, diferePadrao: true })
       }
+    } else if (chave === 'tiposGx') {
+      const tg = (regras as { tiposGx?: Record<string, unknown> }).tiposGx ?? {}
+      const slugs = Object.keys(tg)
+      if (!slugs.length) out.push({ ...base(chave, m), path: 'tiposGx', nome: m.nome, valorPadrao: 'nenhuma', valorVigente: 'nenhuma', diferePadrao: false })
+      for (const s of slugs) out.push({ ...base(chave, m), path: `tiposGx.${s}`, nome: `Tipo personalizado: ${s}`, valorPadrao: 'sem regras', valorVigente: JSON.stringify(tg[s]), diferePadrao: true })
     } else {
       const vig = lerCaminho(regras, chave), pad = lerCaminho(REGRAS_PADRAO, chave)
       out.push({ ...base(chave, m), path: chave, nome: m.nome, valorPadrao: formatarValor(pad), valorVigente: formatarValor(vig), diferePadrao: !igual(vig, pad) })

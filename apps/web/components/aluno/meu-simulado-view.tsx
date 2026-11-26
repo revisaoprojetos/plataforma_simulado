@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
-import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2, Trash2 } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Users, BarChart3, Target, Clock, Crown, BookOpen, Lock, Check, MessageSquare, ListChecks, FileText, ScrollText, Award, TrendingUp, MoreVertical, Download, Loader2, Trash2, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { EditarMarcacaoAdmin } from './editar-marcacao-admin'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { excluirSessaoAction } from '@/app/admin/estudantes/actions'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -25,7 +26,7 @@ const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
 const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, comparativoEndpoint, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
+  tentativas, questoes, comparativo, comparativoEndpoint, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, edicaoMarcacao, ocultarComparativo = false, cadernosInline = false, feedback,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
@@ -43,6 +44,8 @@ export function MeuSimuladoView({
   simuladoTitulo: string
   /** Admin: habilita apagar cada tentativa (o aluno NUNCA vê isso). */
   adminMode?: boolean
+  /** Admin: edição da marcação do aluno ('ok') ou migração pendente ('pendente' → aviso, sem botão). */
+  edicaoMarcacao?: 'ok' | 'pendente'
   /** Esconde a tab "Comparativo" (ex.: simulado PESSOAL do aluno — não há turma). */
   ocultarComparativo?: boolean
   /** Downloads da tentativa INLINE (abaixo do texto) em vez do menu ⋮ + modal (ex.: simulado pessoal). */
@@ -373,7 +376,7 @@ export function MeuSimuladoView({
 
       {/* QUESTÕES */}
       <TabsContent value="questoes" className="space-y-3 pt-1">
-        <QuestoesAgregadas questoes={questoes} totalTentativas={tentativas.length} revelou={gabaritoLiberado} />
+        <QuestoesAgregadas questoes={questoes} totalTentativas={tentativas.length} revelou={gabaritoLiberado} edicao={adminMode ? edicaoMarcacao : undefined} />
       </TabsContent>
 
       {/* COMPARATIVO — oculto p/ simulado pessoal (sem turma). Carregado sob demanda no aluno. */}
@@ -491,8 +494,14 @@ function CheckBox({ on, disabled }: { on: boolean; disabled?: boolean }) {
   )
 }
 
-function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: QuestaoAgregada[]; totalTentativas: number; revelou: boolean }) {
+function QuestoesAgregadas({ questoes, totalTentativas, revelou, edicao }: { questoes: QuestaoAgregada[]; totalTentativas: number; revelou: boolean; edicao?: 'ok' | 'pendente' }) {
   const [filtro, setFiltro] = useState<'todas' | 'erradas' | 'branco'>('todas')
+  // Comentário do professor: PADRÃO RECOLHIDO; estado só no cliente, por questão (+ expandir/recolher todos).
+  const [abertos, setAbertos] = useState<Set<number>>(() => new Set())
+  const comComentario = questoes.filter((q) => q.comentario).length
+  const todosAbertos = comComentario > 0 && questoes.filter((q) => q.comentario).every((q) => abertos.has(q.ordem))
+  const alternarComentario = (ordem: number) => setAbertos((p) => { const n = new Set(p); n.has(ordem) ? n.delete(ordem) : n.add(ordem); return n })
+  const alternarTodos = () => setAbertos(todosAbertos ? new Set() : new Set(questoes.filter((q) => q.comentario).map((q) => q.ordem)))
   const comErro = questoes.filter((q) => q.errou > 0).length
   const comBranco = questoes.filter((q) => q.branco > 0).length
   const lista = useMemo(() => {
@@ -515,7 +524,15 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
               {label}
             </button>
           ))}
+          {comComentario > 0 && (
+            <button type="button" onClick={alternarTodos} className="ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <ChevronsUpDown className="h-3.5 w-3.5" /> {todosAbertos ? 'Recolher comentários' : 'Expandir comentários'}
+            </button>
+          )}
         </div>
+      )}
+      {edicao === 'pendente' && (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">Edição de marcação indisponível: a migração 20261208000000_respostas_marcacao_editada_admin.sql ainda não foi aplicada.</p>
       )}
 
       <div className="space-y-3">
@@ -545,10 +562,17 @@ function QuestoesAgregadas({ questoes, totalTentativas, revelou }: { questoes: Q
               ))}
             </div>
 
+            {edicao === 'ok' && <EditarMarcacaoAdmin q={q} />}
+
             {q.comentario && (
-              <div className="mt-3 flex gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Comentário do professor</p><MarkdownContent className="mt-0.5 text-foreground/90">{q.comentario}</MarkdownContent></div>
+              <div className="mt-3 rounded-lg border bg-muted/30 text-sm">
+                <button type="button" onClick={() => alternarComentario(q.ordem)} aria-expanded={abertos.has(q.ordem)}
+                  className="flex w-full items-center gap-2 p-3 text-left">
+                  <MessageSquare className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Comentário do professor</span>
+                  <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', abertos.has(q.ordem) && 'rotate-180')} />
+                </button>
+                {abertos.has(q.ordem) && <div className="px-3 pb-3 pl-9"><MarkdownContent className="text-foreground/90">{q.comentario}</MarkdownContent></div>}
               </div>
             )}
           </div>

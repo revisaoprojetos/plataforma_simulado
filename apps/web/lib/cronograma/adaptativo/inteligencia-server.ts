@@ -103,7 +103,7 @@ export function gerarComRegras(c: CtxPlano, banco: ConteudoBanco, params: unknow
   try {
     const r = gerarPlano(c.cfg, banco.AS as never, banco.WLP, c.fixos, c.hoje, (banco.LP ?? []) as ItemLP[], {
       manterMotor: true, ordem: banco.ordem, feitas: c.feitas, usados: c.usados, regras, params: params as never, notas: c.notas, prog: c.prog, hoje: c.hoje,
-      planoAtual: c.gravado, detalhes: c.detalhes as never, ...(coletor ? { rastro: coletor } : {}),
+      planoAtual: c.gravado, detalhes: c.detalhes as never, ...(banco.GX?.length ? { gx: banco.GX } : {}), ...(coletor ? { rastro: coletor } : {}),
     })
     let violacoes = 0
     try { violacoes = verificarInvariantes(r.plano, regras, { start: c.cfg.start, horasDia: (d) => horasDia(c.cfg28, d), AS: banco.AS as AulaAS[], ordem: banco.ordem ?? undefined }).length } catch { /* sem invariantes */ }

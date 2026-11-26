@@ -54,7 +54,7 @@ describe('G1 · faixas dinâmicas: padrão = comportamento antigo', () => {
   it('hash do padrão = hash do formato antigo (calculado de forma independente)', () => {
     const estavel = (v: unknown): string => Array.isArray(v) ? '[' + v.map(estavel).join(',') + ']' : v && typeof v === 'object'
       ? '{' + Object.keys(v as object).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined).map((k) => JSON.stringify(k) + ':' + estavel((v as Record<string, unknown>)[k])).join(',') + '}' : (JSON.stringify(v) ?? 'null')
-    const { faixas: _f, constantes: _c, restricoes: _r, adaptacao: _a, ...resto } = JSON.parse(JSON.stringify(REGRAS_PADRAO))
+    const { faixas: _f, constantes: _c, restricoes: _r, adaptacao: _a, tiposGx: _g, ...resto } = JSON.parse(JSON.stringify(REGRAS_PADRAO))
     const velho = {
       ...resto,
       faixas: { faixa1AteMinExclusivo: 900, faixa2AteMinInclusivo: 1470 },

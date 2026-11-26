@@ -20,6 +20,7 @@ import * as M28 from './motor28'
 import * as M30 from './motor30'
 import type { RegrasMotor } from './regras'
 import { subtipoMeta, rotuloMeta, semanaOrigemDaMeta } from './meta-ids'
+import type { ItemGX } from './gx-tipos'
 export type { ItemLP } from './motor28'
 
 export type DataISO = string // 'YYYY-MM-DD' (local, sem fuso)
@@ -182,12 +183,20 @@ export interface MetaDescrita {
   tipo: string; disc?: string; aula?: string; tema?: string; pags?: number; qc?: string; tec?: string
   idx?: number; semRev?: number | null; parte?: number | null; texto?: string; sem?: number
   lei?: string; doc?: string | null
+  /** meta personalizada (gx): slug do tipo no catálogo */
+  slugCat?: string
   /** revisão adaptativa / reforço / diagnóstico (ids pf|fl:i:revisao:s, pf|fl:i:reforco:s, qu:i:hist:s) + rótulo p/ exibição */
   subtipo?: 'revisao' | 'reforco' | 'historico'; rotulo?: string
 }
 /** Descreve uma meta a partir do id. */
-export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M28.ItemLP> | null): MetaDescrita {
+export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M28.ItemLP> | null, GXMAP?: Record<string, ItemGX> | null): MetaDescrita {
   const [t, a, b] = id.split(':')
+  // Fase 2: meta personalizada de tipo do catálogo — `gx:<slug>:<d8>`; não é aula (não consulta o catálogo de aulas).
+  if (t === 'gx') {
+    const g = GXMAP && GXMAP[id]
+    if (g) return { tipo: 'gx', texto: g.titulo, disc: g.disc || undefined, doc: g.doc ?? null, slugCat: g.slug, lei: g.nomeTipo }
+    return { tipo: 'gx', texto: 'Meta personalizada', slugCat: a || undefined }
+  }
   // 2.19: Jurisprudência semanal — `jp:<semana de origem>`; não é aula (não consulta o catálogo).
   if (t === 'jp') return { tipo: 'jp', texto: 'Jurisprudência', disc: 'Jurisprudência', sem: +a || undefined }
   if (t === 'lp') {
@@ -220,4 +229,4 @@ export function saudePlano(plano: Plano, cfg: Cfg) {
   return out
 }
 
-export const ORDEM: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4, jp: 4 }
+export const ORDEM: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4, jp: 4, gx: 5 }

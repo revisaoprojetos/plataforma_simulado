@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { REGRAS_PADRAO, normalizarRegras, normalizarFaixas, TIPOS_RESTRICAO, FAMILIAS_RESTRICAO, type RegrasMotor } from './regras'
 import { MODOS_QUESTOES, MODOS_REVISAO, SECOES_OVERRIDE, validarFaixas, type FaixaCarga } from './faixas-carga'
 import { detectarConflitosRestricoes } from './restricoes'
+import { MAX_TIPOS_GX_REGRAS, SLUG_TIPO_GX_RE } from './gx-tipos'
 
 const n = (rotulo: string, min: number, max: number) =>
   z.number({ invalid_type_error: `${rotulo}: informe um número.` }).int(`${rotulo}: use um número inteiro.`).min(min, `${rotulo}: mínimo ${min}.`).max(max, `${rotulo}: máximo ${max}.`)
@@ -141,6 +142,30 @@ const RESTRICAO = z.object({
 })
 const LISTA_RESTRICOES = z.array(RESTRICAO).max(40, 'No máximo 40 restrições.')
 
+/** Regras por tipo personalizado (gx): uma entrada por slug do catálogo; mensagens citam o slug. */
+function validarTiposGx(v: unknown): string[] {
+  if (v === undefined) return []
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return ['Tipos personalizados: envie um objeto por tipo.']
+  const erros: string[] = []
+  const chaves = Object.keys(v as object)
+  if (chaves.length > MAX_TIPOS_GX_REGRAS) erros.push(`Tipos personalizados: no máximo ${MAX_TIPOS_GX_REGRAS} tipos com regras.`)
+  for (const slug of chaves) {
+    if (!SLUG_TIPO_GX_RE.test(slug)) { erros.push(`Tipo "${slug}": identificador inválido (use 2 a 40 caracteres: letras minúsculas, números, - e _).`); continue }
+    const lim = (rot: string, max: number) => z.number({ invalid_type_error: `Tipo "${slug}": ${rot}: informe um número.` }).int(`Tipo "${slug}": ${rot}: use um número inteiro.`).min(1, `Tipo "${slug}": ${rot}: mínimo 1.`).max(max, `Tipo "${slug}": ${rot}: máximo ${max}.`).nullable().optional()
+    const S = z.object({
+      ativo: z.boolean({ invalid_type_error: `Tipo "${slug}": ativo: informe sim ou não.` }).optional(),
+      maxPorDia: lim('máximo por dia', 20),
+      maxPorSemana: lim('máximo por semana', 100),
+      dias: z.array(n(`Tipo "${slug}": dia da semana`, 0, 6), { invalid_type_error: `Tipo "${slug}": dias: informe uma lista.` }).max(7, `Tipo "${slug}": dias: no máximo 7.`).optional(),
+      faixas: z.array(n(`Tipo "${slug}": faixa`, 1, 8), { invalid_type_error: `Tipo "${slug}": faixas: informe uma lista.` }).max(8, `Tipo "${slug}": faixas: no máximo 8.`).optional(),
+      aPartirDaSemana: n(`Tipo "${slug}": a partir da semana`, 0, 600).optional(),
+    })
+    const p = S.safeParse((v as Record<string, unknown>)[slug])
+    if (!p.success) erros.push(...p.error.issues.map((i) => (i.message.includes(`"${slug}"`) ? i.message : `Tipo "${slug}": regra inválida.`)))
+  }
+  return erros
+}
+
 const ehObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 function fundir(base: unknown, extra: unknown): unknown {
   // listas de objetos (ex.: restrições/faixas) substituem inteiras; objetos fundem por chave com o padrão
@@ -154,7 +179,7 @@ export interface ResultadoValidacao { ok: boolean; erros: string[]; regras: Regr
 /** Valida um objeto (parcial) de regras. `ok` → `regras` já normalizadas/completas; senão `erros` em pt-BR. */
 export function validarRegras(entrada: unknown): ResultadoValidacao {
   if (!ehObj(entrada)) return { ok: false, erros: ['Regras inválidas: envie um objeto.'], regras: null }
-  const { restricoes: restricoesBrutas, faixas: faixasBrutas, ...resto } = entrada
+  const { restricoes: restricoesBrutas, faixas: faixasBrutas, tiposGx: tiposGxBrutos, ...resto } = entrada
   const faixasLegado = faixasBrutas !== undefined && !Array.isArray(faixasBrutas) // formato antigo (objeto) é convertido na normalização
   const p = PARCIAL.safeParse(resto)
   const erros: string[] = p.success ? [] : [...new Set(p.error.issues.map((i) => i.message))]
@@ -162,6 +187,7 @@ export function validarRegras(entrada: unknown): ResultadoValidacao {
     const pr = LISTA_RESTRICOES.safeParse(restricoesBrutas)
     if (!pr.success) erros.push(...new Set(pr.error.issues.map((i) => i.message)))
   }
+  erros.push(...validarTiposGx(tiposGxBrutos))
   if (Array.isArray(faixasBrutas)) {
     const pf = LISTA_FAIXAS.safeParse(faixasBrutas)
     if (!pf.success) erros.push(...new Set(pf.error.issues.map((i) => i.message)))

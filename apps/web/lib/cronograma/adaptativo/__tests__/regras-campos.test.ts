@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { REGRAS_PADRAO, deltaDoPadrao, normalizarRegras } from '../regras'
 import { validarRegras } from '../regras-validacao'
-import { TODOS_CAMPOS, lerCaminho, gravarCaminho, textoParaValor, diffRegras, fichaDoTipo, regrasDoDelta } from '../regras-campos'
+import { TODOS_CAMPOS, lerCaminho, gravarCaminho, textoParaValor, diffRegras, fichaDoTipo, fichaDoTipoGx, regrasDoDelta } from '../regras-campos'
 import { SLUGS_META } from '../tipos-meta'
 
 describe('regras-campos', () => {
@@ -40,5 +40,24 @@ describe('regras-campos', () => {
     for (const s of SLUGS_META) { const f = fichaDoTipo(s, REGRAS_PADRAO); expect(f.teto.length).toBeGreaterThan(0); expect(f.editavel).toContain(`prioridades.porTipo.${s}`) }
     const alt = normalizarRegras({ limitesDia: { questoes: 4 } })
     expect(fichaDoTipo('qu', alt).teto.join(' ')).toContain('4 questões por dia')
+  })
+  it('diff de tiposGx tem rótulo pt-BR legível e vê slug novo (chave só de um lado)', () => {
+    const d = diffRegras(REGRAS_PADRAO, { tiposGx: { comentarios: { maxPorDia: 2, dias: [0, 2] } } }, { comentarios: 'Comentários' })
+    const por = Object.fromEntries(d.map((x) => [x.path, x]))
+    expect(por['tiposGx.comentarios.maxPorDia'].rotulo).toBe('Tipo "Comentários": máximo por dia')
+    expect(por['tiposGx.comentarios.maxPorDia'].de).toBe('não definido')
+    expect(por['tiposGx.comentarios.maxPorDia'].para).toBe('2')
+    expect(d.some((x) => x.path === 'tiposGx')).toBe(false)
+    expect(diffRegras({ tiposGx: {} }, REGRAS_PADRAO)).toEqual([])
+  })
+  it('fichaDoTipoGx descreve as regras do tipo e o padrão sem regra', () => {
+    const padrao = fichaDoTipoGx('comentarios', REGRAS_PADRAO, 'Comentários')
+    expect(padrao.teto.join(' ')).toContain('Sem limite por dia')
+    expect(padrao.editavel).toContain('tiposGx.comentarios.*')
+    const alt = normalizarRegras({ tiposGx: { comentarios: { maxPorDia: 1, maxPorSemana: 3, dias: [0, 4], aPartirDaSemana: 2 } } })
+    const f = fichaDoTipoGx('comentarios', alt, 'Comentários')
+    const txt = [...f.teto, ...f.avanca, ...f.recua].join(' ')
+    expect(txt).toContain('No máximo 1 meta(s) por dia'); expect(txt).toContain('3 meta(s) por semana'); expect(txt).toContain('segunda, sexta'); expect(txt).toContain('semana 2')
+    expect(f.restricoes?.join(' ')).toContain('gerar/regenerar')
   })
 })

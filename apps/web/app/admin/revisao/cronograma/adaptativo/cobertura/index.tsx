@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { BookOpen } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
+import { comLimite } from '@/lib/admin/com-limite'
 import { buttonVariants } from '@/components/ui/button'
 import { crHm } from '@/lib/revisao/cronograma-schema'
 import { montarCobertura, paginarCobertura, preencherQuestoes, type BaseCobertura } from '@/lib/revisao/cronograma'
-import { BarraBusca, Nota, ParamsInt, Pilula, ThFixo, ThOrd } from '../../../_comp/lista'
+import { BarraBusca, Nota, ParamsInt, Pilula, ThFixo, ThOrd, hrefCom } from '../../../_comp/lista'
 import { TabelaCron } from '../../tabela-cron'
 import { AvisoMigracao } from '../aviso-migracao'
 import { BASE, porPagina, qsAdaptativo, regrasDaRequisicao, type PropsAbaAdaptativo } from '../comum'
@@ -17,9 +18,9 @@ export default async function AdaptativoCobertura({ sp, tenantId, podeEditar }: 
   const regras = await regrasDaRequisicao(tenantId)
   let base: BaseCobertura
   try {
-    base = await montarCobertura(svc, tenantId, regras.valores)
+    base = await comLimite(montarCobertura(svc, tenantId, regras.valores), 30_000, 'A leitura do catálogo')
   } catch {
-    return <Nota tipo="aviso">Não foi possível ler o catálogo do cronograma agora. Tente novamente em instantes.</Nota>
+    return <Nota tipo="aviso">Não foi possível ler o catálogo do cronograma agora. <Link href={hrefCom(BASE, qs, {})} className="ml-1 font-medium underline" prefetch={false}>Tentar de novo</Link></Nota>
   }
   const ritmo = Number(regras.valores.ritmoPadrao) || 17
   const pendentes = base.kpis.pendentes

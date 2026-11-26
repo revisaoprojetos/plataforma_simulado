@@ -11,6 +11,7 @@ import { semDe, type Plano, type AulaAS } from './motor28'
 import { normalizarRegras, resolverFaixa, type RegrasMotor, type RestricaoRegra } from './regras'
 import { restricaoBloqueia, descreverRestricao, somaDiasISO } from './restricoes'
 import { familiaDoTipo } from './tipos-meta'
+import { ehIdGx } from './gx-tipos'
 
 export const INVARIANTES_NAO_VERIFICAVEIS: readonly number[] = [6, 7, 8, 9]
 export const ROTULO_INVARIANTE: Readonly<Record<number, string>> = {
@@ -113,6 +114,22 @@ export function verificarInvariantes(plano: Plano, regrasEntrada?: unknown, ctx:
     if (m[1] === 'qu' && plano['fl:' + m[2]] && d < plano['fl:' + m[2]][0]) v.push({ invariante: 5, mensagem: `${id} antes da revisão do mesmo tema.`, data: d, ids: [id, 'fl:' + m[2]] })
   }
 
+  // FASE 3a — limites por tipo gx (maxPorDia / maxPorSemana por slug do catálogo; só quando há regras do tipo)
+  const tg = R.tiposGx ?? {}
+  if (Object.keys(tg).length) {
+    const slugDe = (id: string) => id.split(':')[1]
+    for (const [d, ids] of porDia) {
+      const cont = new Map<string, string[]>()
+      for (const id of ids) if (ehIdGx(id)) { const s = slugDe(id), l = cont.get(s); if (l) l.push(id); else cont.set(s, [id]) }
+      for (const [s, l] of cont) { const max = tg[s]?.maxPorDia; if (max != null && l.length > max) v.push({ invariante: 3, mensagem: `Tipo "${s}": ${l.length} metas no dia (máximo ${max}).`, data: d, ids: l }) }
+    }
+    if (ctx.start) {
+      const sem = new Map<string, string[]>()
+      for (const [id, [d]] of Object.entries(plano)) if (ehIdGx(id)) { const k = slugDe(id) + '|' + semDe(ctx.start, d), l = sem.get(k); if (l) l.push(id); else sem.set(k, [id]) }
+      for (const [k, l] of sem) { const [s, w] = k.split('|'), max = tg[s]?.maxPorSemana; if (max != null && l.length > max) v.push({ invariante: 3, mensagem: `Tipo "${s}": ${l.length} metas na semana ${w} (máximo ${max}).`, ids: l }) }
+    }
+  }
+
   // restrições declarativas ativas
   const ativas = R.restricoes.filter((r) => r.ativa)
   if (ativas.length) v.push(...verificarRestricoes(plano, ativas, porDia, ctx, paiDe, ctx.faixaDe ?? (ctx.horasDia ? faixaPorHoras(ctx.horasDia, R) : () => 3)))
@@ -141,7 +158,7 @@ function verificarRestricoes(plano: Plano, ativas: RestricaoRegra[], porDia: Map
       const bloq = restricaoBloqueia([r], id, d, {
         idsDoDia, dataDe: (k) => plano[k]?.[0], faixa: faixaDe(d), pai: paiDe,
         // "só na sobra": o dia só tem A e há meta de outro tipo (≠ LegProc) planejada em data posterior
-        haOutrosPendentes: (fa) => Object.entries(plano).some(([k, [dk]]) => dk > d && fam(k) !== fa && fam(k) !== 'lp'),
+        haOutrosPendentes: (fa) => Object.entries(plano).some(([k, [dk]]) => dk > d && fam(k) !== fa && fam(k) !== 'lp' && fam(k) !== 'gx'),
       })
       if (!bloq) continue
       const chave = `${r.id}|${dia}|${r.tipo === 'depois_de' ? id : ''}`

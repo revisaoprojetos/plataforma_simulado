@@ -30,7 +30,8 @@ import { useImportarArquivos } from '@/components/biblioteca/use-importar-arquiv
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 import { CAMPOS_META } from '@/lib/conteudo/metadados'
 import type { AlvoCP } from '@/app/admin/biblioteca/capa-actions-tipos'
-import { arquivarConteudo, definirVisibilidadeConteudo, salvarLeituraLegproc } from '@/app/admin/biblioteca/gestao-actions'
+import { definirVisibilidadeConteudo, salvarLeituraLegproc } from '@/app/admin/biblioteca/gestao-actions'
+import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
 import { abrirEdicaoDocx, criarConteudoQuestoes, criarDocumentoBranco, criarPasta, definirCorPasta, moverDocumento, publicarDocumento, removerDocumento, urlDownloadDocumento } from '@/app/admin/biblioteca/actions'
 import { TIPOS_BIB, ehTipoBib, type ArvoreBib, type EstadoBib, type LinhaMaterial, type OpcoesFiltroBib, type RespostaBib, type TipoBib } from '@/lib/admin-revisao/biblioteca-tipos'
 import { ESTADO_Q_PADRAO, SUBABAS_Q, type EstadoQ, type RespostaQ, type SubAbaQ } from '@/lib/admin-revisao/biblioteca-questoes-tipos'
@@ -257,8 +258,10 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
     await lote('Excluindo', ids, removerDocumento, 'Enviados para a Lixeira')
   }
   async function arquivarLote() {
-    if (!(await confirmar({ titulo: `Arquivar ${ids.length} ${ids.length === 1 ? 'material' : 'materiais'}`, mensagem: 'O status vira “Arquivado”. Os documentos continuam na Biblioteca.', confirmar: 'Arquivar' }))) return
-    await lote('Arquivando', ids, arquivarConteudo, 'Arquivados')
+    const titulos = Object.fromEntries([...docsVistos.current].map(([id, v]) => [id, v.titulo]))
+    const prep = await prepararArquivamento(ids, titulos)
+    if (!prep) return
+    await lote('Arquivando', ids, prep.fn, 'Arquivados')
   }
 
   // ── criação (Novo) ──

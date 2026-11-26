@@ -8,7 +8,8 @@ import { formatBrt } from '@/lib/brt'
 import { gestaoDe } from '@/lib/biblioteca/gestao-tipos'
 import { tipoDe, seloStyle } from '@/lib/biblioteca/tipos-conteudo'
 import type { GestaoDados, OrigemAcesso, AlunoAcesso, EventoRegistro } from '@/app/admin/biblioteca/gestao-actions-tipos'
-import { salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCategorias, salvarLeituraLegproc, salvarLegendaTabelaDoc, arquivarConteudo, removerOrigemAcesso, carregarRegistroAluno, carregarAlunosGerenciamento } from '@/app/admin/biblioteca/gestao-actions'
+import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
+import { salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCategorias, salvarLeituraLegproc, salvarLegendaTabelaDoc, removerOrigemAcesso, carregarRegistroAluno, carregarAlunosGerenciamento } from '@/app/admin/biblioteca/gestao-actions'
 import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
 import { AbaFlashcards } from './flashcards-tab'
 import { AbaAreas } from './areas-tab'
@@ -579,7 +580,7 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
   async function toggleLegproc() { const nv = !legproc; setLegproc(nv); const r = await salvarLeituraLegproc(b.id, nv); if (!r.ok) { setLegproc(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Documento marcado como LegProc: leitura em texto com STF/STJ recolhíveis.' : 'Leitura LegProc desativada (volta ao PDF fiel).') }
   async function toggleLegTab() { const nv = !ocultaLegTab; setOcultaLegTab(nv); const r = await salvarLegendaTabelaDoc(b.id, nv); if (!r.ok) { setOcultaLegTab(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Tabela de legenda oculta para o aluno.' : 'Tabela de legenda visível para o aluno.') }
   async function toggleProt(k: keyof typeof prot) { const nv = { ...prot, [k]: !prot[k] }; setProt(nv); setSalvando(true); const r = await salvarProtecaoConteudo(b.id, { [k]: nv[k] }); setSalvando(false); if (!r.ok) { setProt(prot); toast.error(r.error || 'Falha.') } }
-  async function arquivar() { const r = await arquivarConteudo(b.id); if (!r.ok) return toast.error(r.error || 'Falha.'); toast.success('Conteúdo arquivado.') }
+  async function arquivar() { const prep = await prepararArquivamento([b.id]); if (!prep) return; const r = await prep.fn(b.id); if (!r.ok) return toast.error(r.error || 'Falha.'); toast.success('Conteúdo arquivado.') }
   const Sw = ({ on, onClick }: { on: boolean; onClick: () => void }) => <button className={on ? 'sw on' : 'sw'} role="switch" aria-checked={on} onClick={onClick} />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

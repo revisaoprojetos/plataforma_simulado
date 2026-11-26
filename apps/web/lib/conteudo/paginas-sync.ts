@@ -22,6 +22,7 @@ const T_VER = 'simulado_conteudo_versoes'
 export async function invalidarCachesPaginas(tenantId: string): Promise<void> {
   await Promise.all([
     esquecer(`crono-conteudo:${tenantId}`),
+    esquecer(`crono-conteudo-base:${tenantId}`),
     esquecer(`crono-adapt:plano-meta-conteudo:${tenantId}`),
     esquecer(`crono-rev:bib:${tenantId}`),
     esquecer(`revisao-cron:aulas2:${tenantId}`),

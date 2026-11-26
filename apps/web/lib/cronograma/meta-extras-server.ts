@@ -12,6 +12,7 @@ import { paginasEfetivasDocs, type DocParaPaginas, type PaginasDoc } from '@/lib
 import { tipoBaixavel } from '@/lib/conteudo/baixar-pura'
 import { lerPoliticaDownload } from '@/lib/conteudo/politica-download'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { mapaCompatTipos } from './tipos-conteudo-server'
 import { coalescer, lerProgressoReencaixado } from './progresso-emissao'
 import {
   indexarBiblioteca, resolverDocumentoMeta, vinculosPorMeta,
@@ -52,6 +53,7 @@ async function carregarDocsBiblioteca(svc: SupabaseClient, tenantId: string): Pr
     while (pilha.length) { const c = pilha.pop()!; if (!discDaPasta.has(c)) { discDaPasta.set(c, p.disciplina_id); (filhos.get(c) ?? []).forEach((f) => pilha.push(f)) } }
   }
   if (!discDaPasta.size) return []
+  const compatTipos = await mapaCompatTipos(svc, tenantId) // tipos personalizados → vocabulário antigo pelo PAPEL
   const cache = new Map<string, string | null>()
   const tipoHerdado = (id: string): TipoMaterial | null => {
     const caminho: string[] = []
@@ -62,7 +64,8 @@ async function carregarDocsBiblioteca(svc: SupabaseClient, tenantId: string): Pr
       if (cache.has(cur)) { achado = cache.get(cur)!; break }
       caminho.push(cur)
       const t = tipo.get(cur)
-      if (t && TIPOS_MATERIAL.has(t)) { achado = t; break }
+      const tc = t ? (TIPOS_MATERIAL.has(t) ? t : (compatTipos.get(t) ?? null)) : null
+      if (tc) { achado = tc; break }
       cur = pai.get(cur) ?? null
     }
     for (const c of caminho) cache.set(c, achado)

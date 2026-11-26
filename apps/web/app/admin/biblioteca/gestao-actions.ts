@@ -14,7 +14,7 @@ import { registrarAudit } from '@/lib/audit'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { obterDocumento, listarVersoes } from '@/lib/conteudo/documentos'
 import { listarVinculosDoDocumento } from '@/lib/conteudo/vinculos'
-import { recusarSeEmUso } from '@/lib/conteudo/dependencias-documento'
+import { recusarSeEmUso, dependenciasDocumentos, resumoDependencias, temVinculos } from '@/lib/conteudo/dependencias-documento'
 import type { KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 
 async function guard(acao: 'view' | 'update') {
@@ -355,9 +355,50 @@ export async function definirAgendamentoConteudo(documentoId: string, de: string
   revalidatePath('/admin/biblioteca'); return { ok: true }
 }
 
-export async function arquivarConteudo(documentoId: string): Promise<{ ok: boolean; error?: string }> {
+/** Antes de arquivar: documentos COM vínculos (metas, planos ativos, grifos, produtos…) para a confirmação reforçada. Só leitura. */
+export async function vinculosParaArquivar(ids: string[]): Promise<{ ok: boolean; error?: string; itens?: { id: string; titulo: string; resumo: string; planosAtivos: number; emUso: boolean }[] }> {
+  const g = await guard('update'); if (!g.ok) return g
+  const lista = [...new Set(ids ?? [])].slice(0, 500)
+  if (!lista.length) return { ok: true, itens: [] }
+  try {
+    const svc = createAdminClient()
+    const deps = await dependenciasDocumentos(svc, g.tenantId, lista)
+    const comVinc = lista.filter((id) => temVinculos(deps.get(id)))
+    const titulos = new Map<string, string>()
+    for (let i = 0; i < comVinc.length; i += 80) {
+      const { data } = await svc.from('simulado_conteudo_documentos').select('id, titulo').eq('tenant_id', g.tenantId).in('id', comVinc.slice(i, i + 80))
+      for (const d of (data ?? []) as { id: string; titulo: string }[]) titulos.set(d.id, d.titulo)
+    }
+    return { ok: true, itens: comVinc.map((id) => { const d = deps.get(id)!; return { id, titulo: titulos.get(id) ?? 'Documento', resumo: resumoDependencias(d), planosAtivos: d.planosAtivos ?? 0, emUso: !!d.emUso } }) }
+  } catch (e: any) { return { ok: false, error: e?.message || 'Não foi possível verificar os vínculos.' } }
+}
+
+/**
+ * Arquiva (status "arquivado"). Documento com vínculos/em uso é RECUSADO, a menos que o admin tenha passado pela confirmação
+ * reforçada (`confirmado` + um motivo livre): aí arquiva mesmo assim, com registro de auditoria (vínculos + motivo).
+ * Para documento em uso por plano ativo o banco bloqueia o UPDATE; o arquivamento confirmado usa a RPC de exceção controlada.
+ * Nunca apaga nada: o documento, as metas e os grifos continuam no banco; reativar = voltar o status para publicado.
+ */
+export async function arquivarConteudo(documentoId: string, opts?: { confirmado?: boolean; motivo?: string }): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('update'); if (!g.ok) return g
   const svc = createAdminClient()
+  if (opts?.confirmado) {
+    // Motivo livre (qualquer texto curto). A RPC de exceção exige >= 10 caracteres no banco: texto curto ganha um prefixo.
+    const motivoBruto = (opts.motivo ?? '').trim()
+    if (!motivoBruto) return { ok: false, error: 'Informe o motivo do arquivamento.' }
+    const motivo = motivoBruto.length >= 10 ? motivoBruto : `Arquivamento confirmado: ${motivoBruto}`
+    let vinc = ''
+    try { const d = (await dependenciasDocumentos(svc, g.tenantId, [documentoId])).get(documentoId); vinc = d ? resumoDependencias(d) + (d.emUso ? ` · em uso por ${d.planosAtivos ?? 0} plano(s) ativo(s)` : '') : '' } catch { /* segue: o admin já confirmou */ }
+    const { error } = await svc.from('simulado_conteudo_documentos').update({ status: 'arquivado' }).eq('tenant_id', g.tenantId).eq('id', documentoId)
+    if (error) {
+      // Em uso por plano ativo: o trigger do banco recusa → exceção controlada (registra quem/quando/motivo; sem delete físico).
+      if (!g.atorId) return { ok: false, error: error.message }
+      const { error: e2 } = await (svc as any).rpc('executar_override_documentos', { p_motivo: motivo, p_ator: g.atorId, p_tenant: g.tenantId, p_docs: [documentoId], p_acao: 'despublicar', p_valor: 'arquivado' })
+      if (e2) return { ok: false, error: /does not exist|schema cache/i.test(e2.message) ? 'Rode a migração 20261118110000 (bloqueio de documentos).' : e2.message }
+    }
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { status: 'arquivado', arquivamento_confirmado_com_vinculos: true, vinculos: vinc, motivo }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+    revalidatePath('/admin/biblioteca'); return { ok: true }
+  }
   // TRAVA: arquivar/despublicar documento EM USO por plano de aluno ativo é recusado (use Substituir/Ocultar).
   const uso = await recusarSeEmUso(svc, g.tenantId, [{ id: documentoId }], 'despublicar')
   if (uso.bloqueados[0]) return { ok: false, error: uso.bloqueados[0].motivo }

@@ -5,11 +5,12 @@
 //   jp:s  → Jurisprudência semanal: não tem documento do cronograma → nunca bloqueia nada nem libera nada
 import { indiceAulaDaMeta } from './meta-ids'
 
-export type AlvoMeta = { k: 'a'; i: number } | { k: 'lp'; ids: string[] }
+export type AlvoMeta = { k: 'a'; i: number } | { k: 'lp'; ids: string[] } | { k: 'gx'; ids: string[] }
 
 export function metaDoAlvo(metaId: string, alvo: AlvoMeta): boolean {
   const t = metaId.split(':')[0]
   if (alvo.k === 'lp') return t === 'lp' && alvo.ids.includes(metaId)
-  if (t === 'lp' || t === 'jp') return false
+  if (alvo.k === 'gx') return t === 'gx' && alvo.ids.includes(metaId)
+  if (t === 'lp' || t === 'jp' || t === 'gx') return false
   return indiceAulaDaMeta(metaId) === alvo.i
 }

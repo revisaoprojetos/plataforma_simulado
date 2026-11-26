@@ -8,7 +8,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Save, Droplets, Printer, Download, Eye, Highlighter, Archive, Loader2 } from 'lucide-react'
 import type { GestaoBase, ProtecaoConteudo } from '@/app/admin/biblioteca/gestao-actions-tipos'
-import { salvarProtecaoConteudo, definirVisibilidadeConteudo, definirAgendamentoConteudo, arquivarConteudo } from '@/app/admin/biblioteca/gestao-actions'
+import { salvarProtecaoConteudo, definirVisibilidadeConteudo, definirAgendamentoConteudo } from '@/app/admin/biblioteca/gestao-actions'
+import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
 import type { GestaoTipo, ConfigRow } from '@/lib/biblioteca/gestao-tipos'
 import { Secao } from './ui'
 import { isoParaBrtLocal, brtLocalParaIso } from '@/lib/brt'
@@ -64,8 +65,9 @@ export function AbaConfiguracoes({ base, tipo }: { base: GestaoBase; tipo: Gesta
     toast.success('Configurações salvas agora.')
   }
   async function arquivar() {
-    if (!(await confirmar({ titulo: 'Arquivar conteúdo?', mensagem: 'Some da biblioteca dos alunos, mantém histórico e grifos.', confirmar: 'Arquivar', destrutivo: true }))) return
-    const r = await arquivarConteudo(base.id)
+    const prep = await prepararArquivamento([base.id])
+    if (!prep) return
+    const r = await prep.fn(base.id)
     if (!r.ok) return toast.error(r.error || 'Falha ao arquivar.')
     toast.success('Conteúdo arquivado.')
   }

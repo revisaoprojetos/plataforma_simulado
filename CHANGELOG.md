@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.31.0 — 2026-11-26
+
+### Edição de marcação pelo admin, comentário recolhível e tipos de conteúdo do Cronograma Adaptativo
+- **Admin › Aluno › Simulado › Questões:** botão "Editar marcação" por questão (A–E ou em branco, com motivo). Recalcula nota e ranking pela mesma lógica da re-correção, guarda a **marcação original do aluno** (visível só no admin), permite restaurar e registra na auditoria. Rota `POST /api/admin/simulados/editar-marcacao` (`simulados:update`). Sem a migração o botão não aparece.
+- **Comentário do professor** recolhível (padrão recolhido) com "Expandir/Recolher comentários" — vale também na área do aluno (`MeuSimuladoView`).
+- **Script** `apps/web/scripts/_corrigir-marcacoes-aluno.mjs` (dry-run por padrão) para correções pontuais com backup e auditoria.
+- **Cronograma Adaptativo:** catálogo de tipos de conteúdo por tenant (tipos personalizados `gx` com meta própria), matriz de disciplinas/regras por tipo, metas por pasta com herança, cache de conteúdo do adaptativo, análise de uso com RPCs de desempenho, limites no gerador e ajustes nas telas de regras/versões/cobertura.
+- **Migrações novas (aplicar manualmente, nesta ordem):** `20261126010000_cronograma_adaptativo_tipo_gx.sql` (**ANTES do deploy**: amplia o CHECK de tipo `gx`), `20261202000000_conteudo_tipos.sql`, `20261207000000_adaptativo_analise_planos_perf.sql`, `20261208000000_respostas_marcacao_editada_admin.sql`, e `20261206000000_reducao_leituras_pasta_estudantes_respostas.sql` (v4.30.5, ainda pendente).
+
 ## 4.30.6 — 2026-11-26
 
 ### Menos carga no banco: outbox, cache, auditoria, leitura, cronograma e prova

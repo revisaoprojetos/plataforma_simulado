@@ -94,7 +94,9 @@ export const MODALIDADES: Modalidade[] = [
       ] },
       { id: 'conteudo', label: 'Conteúdo', subs: [
         naShell('adaptativo', 'conteudo', 'cobertura', 'Aulas e materiais', { dica: 'Cada aula tem todos os materiais? Veja o que falta e quanto tempo a aula ocupa.' }),
-        naShell('adaptativo', 'conteudo', 'disciplinas', 'Disciplinas', { dica: 'Quais disciplinas entram no cronograma e quais materiais cada uma recebe.' }),
+        // Área ÚNICA (antes: "Disciplinas" + "Metas por pasta"): aba Matriz (disciplinas × tipos × pastas) | aba Por pasta. `?v=disciplinas` é alias.
+        naShell('adaptativo', 'conteudo', 'metas-pasta', 'Disciplinas e metas', { dica: 'Matriz de disciplinas (o que cada uma recebe, com as pastas e documentos que a sustentam) e, por pasta da Biblioteca, qual tipo de material ela representa.' }),
+        naShell('adaptativo', 'conteudo', 'tipos-conteudo', 'Tipos de conteúdo', { dica: 'Catálogo de tipos de material (PDFull, PDFight…) e personalizados: papel no cronograma, duração, prioridade e ordem.' }),
         legada('adaptativo', 'conteudo', 'catalogo-metas', 'Catálogo de metas', `${ADA}/catalogo`, { dica: 'Edite títulos, páginas e links de questões das aulas e das metas de LegProc.' }),
         legada('adaptativo', 'conteudo', 'paginas', 'Páginas divergentes', `${ADA}/catalogo/paginas`, { dica: 'Onde o número de páginas da planilha difere da Biblioteca.' }),
         legada('adaptativo', 'conteudo', 'definicoes', 'Análise das metas', `${ADA}/definicoes`, { dica: 'Cada meta do catálogo cruzada com o que os alunos têm nos planos e já fizeram.' }),
@@ -127,6 +129,12 @@ export const MODALIDADES: Modalidade[] = [
   },
 ]
 
+/** Vistas fundidas em outra (`?v=` antigo → atual), sem quebrar links existentes. */
+const VISTA_RENOMEADA: Record<ModalidadeId, Record<string, string>> = {
+  gerador: {},
+  adaptativo: { disciplinas: 'metas-pasta' },
+}
+
 type Leg = { sub: string; v: string }
 const LEGADO: Record<ModalidadeId, Record<string, Leg | ((q: Consulta) => Leg)>> = {
   gerador: {
@@ -141,7 +149,7 @@ const LEGADO: Record<ModalidadeId, Record<string, Leg | ((q: Consulta) => Leg)>>
   },
   adaptativo: {
     mat: { sub: 'conteudo', v: 'cobertura' },
-    disc: { sub: 'conteudo', v: 'disciplinas' },
+    disc: { sub: 'conteudo', v: 'metas-pasta' },
     regras: { sub: 'regras', v: 'regras' },
     faixas: { sub: 'regras', v: 'faixas' },
     especial: { sub: 'regras', v: 'especial' },
@@ -155,7 +163,8 @@ const LEGADO: Record<ModalidadeId, Record<string, Leg | ((q: Consulta) => Leg)>>
  * (`?sub=conteudos`, `?sub=mat`, `?sub=ver`, `?sub=metas&vista=aula`…) vira (aba, vista). `legado` = a URL precisa ser reescrita.
  */
 export function normalizarShell(aba: ModalidadeId, sub: string | null, q: Consulta): { sub: string | null; v: string | null; legado: boolean } {
-  if (q.get('v')) return { sub, v: q.get('v'), legado: false }
+  const v = q.get('v')
+  if (v) { const novo = VISTA_RENOMEADA[aba][v]; return novo ? { sub, v: novo, legado: true } : { sub, v, legado: false } }
   const l = sub ? LEGADO[aba][sub] : undefined
   if (!l) return { sub, v: null, legado: false }
   const r = typeof l === 'function' ? l(q) : l

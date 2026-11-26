@@ -27,10 +27,12 @@ export default async function AuditoriaMetasPage() {
   /* A busca de metas começa VAZIA — é ferramenta de consulta, não relatório. Só o total vem
      do servidor, para o cartão poder dizer "1.543 metas em mais de um cronograma, e isto é o
      normal". Deixou de baixar 25 grupos que ninguém pediu. */
-  const [variantes, duracoes, grupos] = await Promise.all([
+  const [variantes, duracoes, grupos, tipos] = await Promise.all([
     carregarVariantesAula(),
     carregarDuracoes(),
     buscarGrupos('', 2, null, 0, 1),
+    // Tipos na mesma onda (antes: uma ida a mais depois do Promise.all). getCurrentAccess é memoizado por requisição.
+    getCurrentAccess().then((a) => (a.tenantId ? listarTiposMeta(a.tenantId) : [])).catch(() => []),
   ])
 
   if (!variantes.ok || !grupos.ok) {
@@ -40,9 +42,6 @@ export default async function AuditoriaMetasPage() {
       </div>
     )
   }
-
-  const acesso = await getCurrentAccess()
-  const tipos = acesso.tenantId ? await listarTiposMeta(acesso.tenantId) : []
 
   return (
     <div className="animate-page space-y-6">

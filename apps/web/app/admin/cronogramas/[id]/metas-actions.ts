@@ -58,47 +58,47 @@ export async function carregarDetalhe(id: string): Promise<{
   if (!UUID_RE.test(id)) return { ok: false, error: 'Cronograma não encontrado.' }
   const svc = createAdminClient()
 
-  const { data: c, error } = await svc
-    .from('simulado_cronogramas')
-    .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status')
-    .eq('id', id)
-    .eq('tenant_id', g.tenantId)
-    .eq('deletado', false)
-    .maybeSingle()
-  if (error) return { ok: false, error: error.message }
-  if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
-
-  const metas = await fetchAll<MetaFonte>(() =>
+  // UMA onda paralela (antes: cronograma → metas → links → categoria → tipos → disciplinas → simulados, 7 idas em sequência).
+  // Tudo é filtrado pelo tenant e independe do resultado do cronograma; id inexistente só descarta o resto.
+  const [cRes, metas, links, tipos, { data: disciplinas }, { data: simulados }] = await Promise.all([
     svc
-      .from('simulado_cronograma_metas')
-      .select('id, semana, dia, tipo, disciplina, disciplina_id, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
+      .from('simulado_cronogramas')
+      .select('id, slug, nome, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, simulado_cronograma_categorias(nome)')
+      .eq('id', id)
       .eq('tenant_id', g.tenantId)
-      .eq('cronograma_id', id)
-      .order('semana')
-      .order('dia')
-      .order('ordem')
-      .order('id') as any,
-  )
-
-  // Links do tenant, para apontar quais metas de questões estão órfãs (spec §8).
-  const links = await fetchAll<{ disciplina: string; disciplina_id: string | null; aula: string }>(() =>
-    svc.from('simulado_cronograma_links').select('disciplina, disciplina_id, aula').eq('tenant_id', g.tenantId).order('disciplina').order('aula') as any,
-  )
+      .eq('deletado', false)
+      .maybeSingle(),
+    fetchAll<MetaFonte>(() =>
+      svc
+        .from('simulado_cronograma_metas')
+        .select('id, semana, dia, tipo, disciplina, disciplina_id, aula, conteudo, duracao, ordem, simulado_id, simulado_externo_nome, simulado_externo_url')
+        .eq('tenant_id', g.tenantId)
+        .eq('cronograma_id', id)
+        .order('semana')
+        .order('dia')
+        .order('ordem')
+        .order('id') as any,
+    ),
+    // Links do tenant, para apontar quais metas de questões estão órfãs (spec §8).
+    fetchAll<{ disciplina: string; disciplina_id: string | null; aula: string }>(() =>
+      svc.from('simulado_cronograma_links').select('disciplina, disciplina_id, aula').eq('tenant_id', g.tenantId).order('disciplina').order('aula').order('id') as any,
+    ),
+    listarTiposMeta(g.tenantId),
+    // Reusa o cadastro de disciplinas dos simulados — um vocabulário só para o produto.
+    svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', g.tenantId).order('ordem').order('nome'),
+    // Simulados da própria plataforma, para a meta do tipo `simulado` poder apontar um deles em vez de só um link externo.
+    svc.from('simulado_simulados').select('id, titulo, status').eq('tenant_id', g.tenantId).eq('deletado', false).is('owner_estudante_id', null).order('titulo'),
+  ])
+  if (cRes.error) return { ok: false, error: cRes.error.message }
+  const c = cRes.data as any
+  if (!c) return { ok: false, error: 'Cronograma não encontrado.' }
   const comLink = new Set(
     links.flatMap((l) => [chaveLink(l.disciplina, l.aula, l.disciplina_id), chaveLink(l.disciplina, l.aula)]).filter(Boolean) as string[],
   )
-
-  // A categoria virou cadastro: o cronograma guarda a referência, o nome vem daqui.
-  let categoriaNome: string | null = null
-  if ((c as any).categoria_id) {
-    const { data: cat } = await svc
-      .from('simulado_cronograma_categorias')
-      .select('nome')
-      .eq('id', (c as any).categoria_id)
-      .eq('tenant_id', g.tenantId)
-      .maybeSingle()
-    categoriaNome = (cat as any)?.nome ?? null
-  }
+  // A categoria virou cadastro: o cronograma guarda a referência, o nome vem do join.
+  const catJoin = c.simulado_cronograma_categorias
+  const categoriaNome: string | null = (Array.isArray(catJoin) ? catJoin[0]?.nome : catJoin?.nome) ?? null
+  delete c.simulado_cronograma_categorias
 
   const cron = {
     ...(c as any),
@@ -108,28 +108,6 @@ export async function carregarDetalhe(id: string): Promise<{
     dias_nome: (c as any).dias_nome ?? [],
     semanas_revisao: (c as any).semanas_revisao ?? [],
   } as CronogramaDetalhe
-
-  const tipos = await listarTiposMeta(g.tenantId)
-
-  // Reusa o cadastro de disciplinas dos simulados — um vocabulário só para o produto,
-  // em vez de um segundo cadastro que divergiria do primeiro.
-  const { data: disciplinas } = await svc
-    .from('simulado_disciplinas')
-    .select('id, nome')
-    .eq('tenant_id', g.tenantId)
-    .order('ordem')
-    .order('nome')
-
-  // Simulados da própria plataforma, para a meta do tipo `simulado` poder apontar um
-  // deles em vez de só um link externo. O aluno sem matrícula no simulado apontado vê
-  // a meta com aviso de sem acesso, em vez de a linha sumir da grade dele.
-  const { data: simulados } = await svc
-    .from('simulado_simulados')
-    .select('id, titulo, status')
-    .eq('tenant_id', g.tenantId)
-    .eq('deletado', false)
-    .is('owner_estudante_id', null)
-    .order('titulo')
 
   return {
     ok: true,
@@ -832,40 +810,20 @@ export async function pacotesDoCronograma(cronogramaId: string): Promise<{ ok: b
   if (!UUID_RE.test(cronogramaId)) return { ok: false, error: 'Cronograma não encontrado.' }
   const svc = createAdminClient()
 
-  const [pacotes, itens, vgrupos, vest] = await Promise.all([
+  // Alcance = alunos distintos (grupos vinculados + avulsos): a RPC agrega no banco. Antes baixava os membros de TODOS os
+  // grupos usados (~25 mil linhas = ~25 idas sequenciais ao PostgREST) só para montar Sets na aplicação.
+  const [pacotes, itens, alcances] = await Promise.all([
     fetchAll<any>(() =>
-      svc.from('simulado_cronograma_pacotes').select('id, nome').eq('tenant_id', g.tenantId).eq('ativo', true).order('nome') as any,
+      svc.from('simulado_cronograma_pacotes').select('id, nome').eq('tenant_id', g.tenantId).eq('ativo', true).order('nome').order('id') as any,
     ),
     fetchAll<any>(() =>
       svc.from('simulado_cronograma_pacote_itens').select('pacote_id').eq('tenant_id', g.tenantId).eq('cronograma_id', cronogramaId).order('id') as any,
     ),
-    fetchAll<any>(() => svc.from('simulado_cronograma_pacote_grupos').select('pacote_id, grupo_id').eq('tenant_id', g.tenantId).order('id') as any),
-    fetchAll<any>(() => svc.from('simulado_cronograma_pacote_estudantes').select('pacote_id, estudante_id').eq('tenant_id', g.tenantId).order('id') as any),
+    svc.rpc('simulado_cronograma_pacotes_alcance', { p_tenant: g.tenantId }),
   ])
-
-  // Alcance de cada pacote: membros dos grupos vinculados + avulsos, sem duplicar.
-  const gruposUsados = [...new Set(vgrupos.map((x) => x.grupo_id))]
-  const membrosPorGrupo = new Map<string, string[]>()
-  if (gruposUsados.length) {
-    const membros = await fetchAllByIn<any>(gruposUsados, (chunk) =>
-      svc.from('simulado_grupo_membros').select('grupo_id, estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
-    )
-    for (const m of membros) {
-      const l = membrosPorGrupo.get(m.grupo_id)
-      if (l) l.push(m.estudante_id)
-      else membrosPorGrupo.set(m.grupo_id, [m.estudante_id])
-    }
-  }
-
-  const alcanceDe = (pacoteId: string) => {
-    const s = new Set<string>()
-    for (const vg of vgrupos) {
-      if (vg.pacote_id !== pacoteId) continue
-      for (const e of membrosPorGrupo.get(vg.grupo_id) ?? []) s.add(e)
-    }
-    for (const ve of vest) if (ve.pacote_id === pacoteId) s.add(ve.estudante_id)
-    return s.size
-  }
+  const alcancePorPacote = new Map<string, number>()
+  for (const a of ((alcances.data ?? []) as { pacote_id: string; alcance: number | string }[])) alcancePorPacote.set(a.pacote_id, Number(a.alcance))
+  const alcanceDe = (pacoteId: string) => alcancePorPacote.get(pacoteId) ?? 0
 
   const dentroIds = new Set(itens.map((i) => i.pacote_id))
   const comAlcance = pacotes.map((p) => ({ id: p.id, nome: p.nome, alcance: alcanceDe(p.id) }))

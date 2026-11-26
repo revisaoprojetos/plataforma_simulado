@@ -17,6 +17,7 @@ import { aplicarFaixaEmRegras, baseDeRegras, classeDaFaixa, criarRegrasVivas, pa
 import { restricaoBloqueia, restricaoQueBloqueia, descreverRestricao } from './restricoes'
 import { rotuloMeta, type ColetorRastro } from './rastro'
 import { familiaDoTipo } from './tipos-meta'
+import { ehIdGx, type ItemGX, type RegraTipoGx } from './gx-tipos'
 import type { FamiliaRestricao } from './regras'
 import type { AulaAS, Cfg28, Contexto, Detalhe, ItemLP, NotaTema, ParamsResolvido, Plano, Remanejada, DataISO } from './motor28'
 
@@ -68,6 +69,8 @@ export interface Contexto30 extends Contexto {
   regras?: Partial<RegrasMotor> | null
   /** coletor do RASTRO de decisão (só simulação/diagnóstico sob demanda). Ausente = nenhum custo e saída idêntica. */
   rastro?: ColetorRastro | null
+  /** metas de tipos personalizados do catálogo ('gx'): itens de lista (como o LegProc). Ausente/[] = saída idêntica à anterior. */
+  gx?: ItemGX[]
 }
 
 // ── tipos/ids ───────────────────────────────────────────────────────────────────────────────────────
@@ -224,6 +227,8 @@ export function cotaPDFlash300(dias: DataISO[], livre: (d: DataISO) => number, p
 // ── ambiente (o "S" do modelo) ──────────────────────────────────────────────────────────────────────
 export interface Env {
   AS: AulaAS[]; LP: ItemLP[]; lpMap: Map<string, ItemLP>; lpPos: Map<string, number>; ordem: number[]
+  /** itens 'gx' normalizados e ordenados (prioridade, ordem, posição de entrada) + índice por id. */
+  GX: ItemGX[]; gxMap: Map<string, ItemGX>
   feitas: Set<string>; prog: Record<string, Prog30>; notas: Record<string, NotaTema>
   det: Record<string, Detalhe>; planoAtual: Plano; hoje: DataISO; complementar: boolean; P: ParamsResolvido; bloq: Bloqueios
   /** regras do motor (dados), resolvidas UMA vez por chamada. */
@@ -259,9 +264,25 @@ const hojeLocal = (): DataISO => L.dISO(new Date())
 /** Meta com progresso registrado (tempo ou ponto de parada), concluída ou não. */
 const comDado = (E: Env, id: string) => feito(E, id) || (E.prog[id]?.t || 0) > 0 || !!E.prog[id]?.parou
 
+/** Normaliza `ctx.gx`: só ids `gx:` válidos, sem repetição, duração > 0; ordenado por prioridade, ordem e posição de entrada (estável). */
+export function normalizarGX(gx: unknown): ItemGX[] {
+  if (!Array.isArray(gx) || !gx.length) return []
+  const vistos = new Set<string>(), out: Array<{ x: ItemGX; k: number }> = []
+  gx.forEach((x: ItemGX, k: number) => {
+    if (!x || typeof x.id !== 'string' || !ehIdGx(x.id) || vistos.has(x.id) || typeof x.disc !== 'string' || !x.disc) return
+    const min = Math.round(Number(x.min))
+    if (!Number.isFinite(min) || min <= 0 || min > 600) return
+    vistos.add(x.id)
+    out.push({ x: { ...x, min, prioridade: Number.isFinite(Number(x.prioridade)) ? Number(x.prioridade) : 5, ordem: Number.isFinite(Number(x.ordem)) ? Number(x.ordem) : 0 }, k })
+  })
+  return out.sort((a, b) => a.x.prioridade - b.x.prioridade || a.x.ordem - b.x.ordem || a.k - b.k).map((o) => o.x)
+}
+
 function criarEnv(AS: AulaAS[], LP: ItemLP[], ctx: Contexto30, P: ParamsResolvido): Env {
   const lista = (LP || []).filter((x) => x && x.id)
+  const GX = normalizarGX(ctx.gx ?? [])
   return {
+    GX, gxMap: new Map(GX.map((x) => [x.id, x])),
     AS, LP: lista, lpMap: new Map(lista.map((x) => [x.id, x])), lpPos: new Map(lista.map((x, k) => [x.id, k])),
     ordem: ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i),
     feitas: new Set(ctx.feitas || []), prog: ctx.prog || {}, notas: (ctx.notas || {}) as Record<string, NotaTema>,
@@ -662,6 +683,7 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
   else if (E.bloq.discPf.size) for (const i of E.ordem) if (ativas.has(AS[i]?.[0]) && E.bloq.discPf.has(AS[i][0]) && !plano['pf:' + i]) registrar(i, cfg.start)
   const hist = criarFilaDiagnostico(E, cfg, fixos), histPorSem: Record<number, number> = {}
   const ignorar = new Set<string>(cfg.lpIgnorar || [])
+  const gx: ItemGX[] = E.GX.length && metas.gx !== false ? E.GX.filter((x) => ativas.has(x.disc) && !plano[x.id] && !feita(x.id) && !metaBloqueada(E, x.id)) : []
   const lp: ItemLP[] = metas.lp ? E.LP.filter((x) => ativas.has(x.disc) && !plano[x.id] && !ignorar.has(x.id) && !metaBloqueada(E, x.id)) : []
   const metasLP = E.lpMap
   const rodizio = criarRodizioLP25(cfg.discs, null, P.lpJanelaRodizio)
@@ -808,8 +830,37 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     while (n < limite && totalDia < (extra ? R.legproc.metasDiaMax : R.legproc.metasDiaBase) && livre(d) >= DUR.lp) { const m = lp.find((x) => chaveLei(x) === lei); if (!m || restrito(m.id, d)) break; por(d, m.id, DUR.lp); iniciadas.add(lei); lp.splice(lp.indexOf(m), 1); n++; totalDia++ }
     rodizio.avancar(primeiro.disc)
   }
+  /** Metas 'gx' na sobra do dia, depois do LegProc (prioridade/ordem do item; sem restrição de lei). Sai na hora se não há gx. */
+  const blocoGX = (d: DataISO) => {
+    if (!gx.length) return
+    const TG = R.tiposGx, comRegras = !!TG && Object.keys(TG).length > 0
+    for (let k = 0; k < gx.length; k++) {
+      const x = gx[k]
+      if (livre(d) < x.min) continue
+      if (comRegras && TG[x.slug] && !elegivelGx(x, d, TG[x.slug])) continue
+      por(d, x.id, x.min)
+      if (comRegras) { const ch = x.slug + '|' + semDe(cfg.start, d); gxPorSemana.set(ch, (gxPorSemana.get(ch) || 0) + 1); gxUltimaSem = semDe(cfg.start, d) }
+      gx.splice(k, 1); k--
+    }
+  }
+  // FASE 3a — regras por tipo gx (só elegibilidade). Contagem semanal por slug (inclui metas gx fixas já no plano).
+  const gxPorSemana = new Map<string, number>()
+  for (const id of Object.keys(plano)) if (ehIdGx(id)) { const ch = id.split(':')[1] + '|' + semDe(cfg.start, plano[id][0]); gxPorSemana.set(ch, (gxPorSemana.get(ch) || 0) + 1) }
+  const gxComRegras = !!R.tiposGx && Object.keys(R.tiposGx).length > 0
+  const gxMaxAPartir = gxComRegras ? Math.max(0, ...Object.values(R.tiposGx).map((g) => g.aPartirDaSemana || 0)) : 0
+  let gxUltimaSem = 0
+  const elegivelGx = (x: ItemGX, d: DataISO, g: RegraTipoGx): boolean => {
+    const sem = semDe(cfg.start, d)
+    if (g.ativo === false) return false
+    if (g.aPartirDaSemana > 0 && sem < g.aPartirDaSemana) return false
+    if (g.dias.length && !g.dias.includes(dDow(d))) return false
+    if (g.faixas.length) { const i = rotina.fx ? R.faixas.indexOf(rotina.fx) : -1; if (!g.faixas.includes(i >= 0 ? i + 1 : rotina.faixa)) return false }
+    if (g.maxPorDia != null && idsDoDia(d).filter((id) => ehIdGx(id) && id.split(':')[1] === x.slug).length >= g.maxPorDia) return false
+    if (g.maxPorSemana != null && (gxPorSemana.get(x.slug + '|' + sem) || 0) >= g.maxPorSemana) return false
+    return true
+  }
   let diaAtual = A
-  const temAcademico = () => (metas.pf && (qi < fila.length || curso)) || devidos.length > 0 || hist.tem() || Object.keys(fixos).some((id) => !feita(id) && !id.startsWith('lp:') && !ehJuris219(id) && fixos[id][0] > diaAtual)
+  const temAcademico = () => (metas.pf && (qi < fila.length || curso)) || devidos.length > 0 || hist.tem() || Object.keys(fixos).some((id) => !feita(id) && !id.startsWith('lp:') && !ehIdGx(id) && !ehJuris219(id) && fixos[id][0] > diaAtual)
   const fechar = () => { fechou = true; leisFinais = new Set(lp.map(chaveLei).filter((lei) => E.complementar || iniciadas.has(lei))) }
   const horizonte = MAX * 7
   for (let k = 0, d = A; k < horizonte; k++, d = dAdd(d, 1)) {
@@ -823,7 +874,9 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
     }
     if (sem !== semAtual216) { semAtual216 = sem; rotina = rotina300(cfg, sem, A, R); histPorSem[sem] = Object.keys(plano).filter((id) => questoesHistorico(id) && semDe(cfg.start, plano[id][0]) === sem).length }
     if (!temAcademico() && !fechou) fechar()
-    if (fechou && !lp.some((x) => leisFinais.has(chaveLei(x)))) break
+    if (fechou && !lp.some((x) => leisFinais.has(chaveLei(x))) && !gx.length) break
+    // com regras por tipo gx, pendentes por elegibilidade não prolongam o plano: sem colocar nenhuma por 8 semanas (após a maior aPartirDaSemana) para
+    if (fechou && gxComRegras && !lp.some((x) => leisFinais.has(chaveLei(x))) && sem > gxMaxAPartir + 8 && sem - gxUltimaSem >= 8) break
     if (!Object.keys(plano).some((id) => ehJuris219(id) && semDe(cfg.start, plano[id][0]) === sem)) {
       const reservaJ = reservarJuris219(E, cfg, sem, A, plano)
       if (reservaJ) por(reservaJ.valor[0], reservaJ.id, Math.round(reservaJ.valor[1] * 60), { jurisprudencia: true })
@@ -880,7 +933,9 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
         if (minutosLeitura(fila[qi]) <= livre(d) || (sem > R.retaFinal.semanaEncaixeExtra && repartirParaAvancar(d, livre(d)))) ler(d, livre(d), true)
       }
       blocoLP(d)
+      blocoGX(d)
       blocoLP(d, true)
+      blocoGX(d)
       if (carga[d]) fim = Math.max(fim, sem)
       continue
     }
@@ -904,7 +959,9 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
         if (R23) anterior = ultimoTipoRevisao = proxima.t
       }
       blocoLP(d)
+      blocoGX(d)
       blocoLP(d, true)
+      blocoGX(d)
       if (carga[d]) fim = Math.max(fim, sem)
       continue
     }
@@ -971,10 +1028,12 @@ function gerarPlanoBase30(E: Env, cfg: Cfg28 & Record<string, any>, fixos: Plano
       if (minutosLeitura(fila[qi]) <= livre(d)) ler(d, livre(d), true)
     }
     blocoLP(d, false)
+    blocoGX(d)
     blocoLP(d, true)
+    blocoGX(d)
     if (carga[d]) fim = Math.max(fim, sem)
   }
-  const residuo = temAcademico() || (fechou && lp.some((x) => leisFinais.has(chaveLei(x))))
+  const residuo = temAcademico() || (fechou && lp.some((x) => leisFinais.has(chaveLei(x)))) || (gx.length > 0 && (!gxComRegras || gx.some((x) => !R.tiposGx[x.slug])))
   if (residuo) throw new ErroInsuficiencia('O plano ultrapassa ' + MAX + ' semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data.')
   return { plano, detalhes, fim, legprocRestantes: lp.map((x) => x.id) }
 }
@@ -1045,7 +1104,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
   const ordem = new Map(rodizioPDF.fila.map((i, k) => [i, k]))
   const contadores: Record<string, number> = {}
   for (const id of new Set([...Object.keys(fonte), ...Object.keys(E.prog), ...Object.keys(detalhes)])) if (id.startsWith('pp:')) { const [, i, k] = id.split(':'); contadores[i] = Math.max(contadores[i] || 0, +k || 0) }
-  const disciplinaMeta = (id: string) => tipoEstudo(id) === 'lp' ? E.lpMap.get(id)?.disc : AS[indiceAula(id)]?.[0]
+  const disciplinaMeta = (id: string) => tipoEstudo(id) === 'lp' ? E.lpMap.get(id)?.disc : tipoEstudo(id) === 'gx' ? E.gxMap.get(id)?.disc : AS[indiceAula(id)]?.[0]
   const leiMeta = (id: string) => { const lp = E.lpMap.get(id); return chaveLei(lp) || (lp?.disc + '|meta:' + id) }
   let sequencia = 0
   for (const [id, [data, h]] of Object.entries(fonte)) {
@@ -1055,7 +1114,8 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     const esp = metaRevisao217(id, detalhes) && ((disc != null && cfg.discs.includes(disc)) || (disc != null && ESSENCIAIS.includes(disc)))
     // Revisão obrigatória: PDFlash de essencial externa (rf) não existe mais — limpa o que sobrou de um plano anterior.
     if (t === 'rf' && !(disc != null && cfg.discs.includes(disc)) && revisaoObrigatoria300(cfg, semDe(cfg.start, data), R)) continue
-    if ((!disc || !cfg.discs.includes(disc) || !(cfg.metas as Record<string, boolean | undefined>)[meta]) && !esp && !((questoesHistorico(id) || reforcoHistorico(id)) && disc && cfg.discs.includes(disc))) continue
+    const metaLigada = t === 'gx' ? (cfg.metas as Record<string, boolean | undefined>).gx !== false : !!(cfg.metas as Record<string, boolean | undefined>)[meta]
+    if ((!disc || !cfg.discs.includes(disc) || !metaLigada) && !esp && !((questoesHistorico(id) || reforcoHistorico(id)) && disc && cfg.discs.includes(disc))) continue
     if (minutos <= 0) continue
     const detalhe: Detalhe = ehPdf(t) ? detalhesPdf(E, id, fonte, detalhes) : { ...(detalhes[id] || {}) }
     fila.push({ id, t, data, minutos, detalhe, seq: sequencia++ })
@@ -1085,6 +1145,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     if (opcoes.movida?.id === x.id && opcoes.movida.dia === d) return -2
     if (ehPdf(x.t) && ((x.data > d) || (pdfsDia(d).size > 0 && !pdfsDia(d).has(indiceAula(x.id))))) return R.constantes.prioridadesDomino.rebaixada
     if (x.t === 'lp') return R.prioridades.porTipo.lp ?? R.prioridades.outros // LegProc: ÚLTIMA prioridade em todas as faixas
+    if (x.t === 'gx') return E.gxMap.get(x.id)?.prioridade ?? R.prioridades.outros // tipos personalizados: prioridade do catálogo
     if (rotina.faixa < 3 && !L.ehRev(cfg, semanaRotina, R)) {
       if (R23 && ehPdf(x.t) && !rotina.pdf.has(d)) return R.constantes.prioridadesDomino.rebaixada
       if (rotina.revisao.has(d) && ['fl', 'qu'].includes(x.t)) return x.t === ultimoTipoRevisao ? R.constantes.prioridadesDomino.revisaoRepetida : R.constantes.prioridadesDomino.revisaoDia
@@ -1101,7 +1162,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     if (R.restricoes.length) {
       const c = {
         idsDoDia, dataDe: (k: string) => plano[k]?.[0], faixa: rotina.faixa, pai: (k: string) => detalhes[k]?.pai || (k.startsWith('pp:') ? 'pf:' + indiceAula(k) : k),
-        haOutrosPendentes: (fam: FamiliaRestricao) => fila.some((y) => y !== x && y.t !== 'lp' && familiaDoTipo(y.t) !== fam),
+        haOutrosPendentes: (fam: FamiliaRestricao) => fila.some((y) => y !== x && y.t !== 'lp' && y.t !== 'gx' && familiaDoTipo(y.t) !== fam),
       }
       if (!E.rastro) { if (restricaoBloqueia(R.restricoes, x.id, d, c)) return false }
       else { const r = restricaoQueBloqueia(R.restricoes, x.id, d, c); if (r) { E.rastro.reg(x.id, 'restricao', () => `${rotuloMeta(x.id)} barrado por restrição: ${r.rotulo || descreverRestricao(r)}`, d); return false } }
@@ -1206,7 +1267,7 @@ function calcularDomino219Base(E: Env, fonte0: Plano, cfg: Cfg28 & Record<string
     flashHoje = 0
     cotaFlash = !retaFinal && revObrig ? cotaPDFlash300(rotina.ativos.filter((data) => data >= d), (data) => capacidade(data) - ocupado(data), fila.filter((x) => x.t === 'fl' && !metaRevisao217(x.id, detalhes) && semDe(cfg.start, x.data) <= sem).length) : Infinity
     while (livre > 0) {
-      const disponiveis = fila.filter((x) => liberar(x, d) && (ehPdf(x.t) || x.minutos <= livre)).sort((a, b) => prioridade(a, d) - prioridade(b, d) || (ehPdf(a.t) && ehPdf(b.t) && !a.detalhe.continuacao && !b.detalhe.continuacao && !a.detalhe.reforco && !b.detalhe.reforco ? (ordem.get(indiceAula(a.id)) ?? 1e9) - (ordem.get(indiceAula(b.id)) ?? 1e9) : 0) || (a.t === 'lp' && b.t === 'lp' ? rankRodizio25(a, d) - rankRodizio25(b, d) : 0) || a.data.localeCompare(b.data) || a.seq - b.seq)
+      const disponiveis = fila.filter((x) => liberar(x, d) && (ehPdf(x.t) || x.minutos <= livre)).sort((a, b) => prioridade(a, d) - prioridade(b, d) || (ehPdf(a.t) && ehPdf(b.t) && !a.detalhe.continuacao && !b.detalhe.continuacao && !a.detalhe.reforco && !b.detalhe.reforco ? (ordem.get(indiceAula(a.id)) ?? 1e9) - (ordem.get(indiceAula(b.id)) ?? 1e9) : 0) || (a.t === 'lp' && b.t === 'lp' ? rankRodizio25(a, d) - rankRodizio25(b, d) : 0) || (a.t === 'gx' && b.t === 'gx' ? (E.gxMap.get(a.id)?.ordem ?? 0) - (E.gxMap.get(b.id)?.ordem ?? 0) : 0) || a.data.localeCompare(b.data) || a.seq - b.seq)
       const x = disponiveis[0]; if (!x) break
       if (opcoes.movida?.id === x.id && !inicioMovida) inicioMovida = d
       let m = Math.min(x.minutos, livre)
@@ -1324,9 +1385,10 @@ export function gerarPlano(cfg0: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano
   for (const [id, r] of Object.entries(cfg.remanejadas as Record<string, Remanejada>)) {
     if (presos[id] || (metaBloqueada(E, id) && !feito(E, id)) || ehMetaAnterior(E, id, cfg) || (reforcoHistorico(id) && tipoEstudo(id) === 'pf' && !indicesAnteriores(E, cfg).has(indiceAula(id)))) continue
     const t = tipoEstudo(id), i = indiceAula(id)
-    const disc = t === 'lp' ? E.lpMap.get(id)?.disc : AS[i]?.[0]
+    const disc = t === 'lp' ? E.lpMap.get(id)?.disc : t === 'gx' ? E.gxMap.get(id)?.disc : AS[i]?.[0]
     const tipo = t === 'pp' ? 'pf' : t === 'rf' ? 'fl' : t === 'rq' ? 'qu' : t
-    if ((!disc || !cfg.discs.includes(disc) || !(cfg.metas as Record<string, boolean | undefined>)[tipo]) && !((questoesHistorico(id) || reforcoHistorico(id)) && disc && cfg.discs.includes(disc))) continue
+    const ligada = t === 'gx' ? (cfg.metas as Record<string, boolean | undefined>).gx !== false : !!(cfg.metas as Record<string, boolean | undefined>)[tipo]
+    if ((!disc || !cfg.discs.includes(disc) || !ligada) && !((questoesHistorico(id) || reforcoHistorico(id)) && disc && cfg.discs.includes(disc))) continue
     presos[id] = [r.desde < baseData ? baseData : r.desde, r.minutos / 60]
   }
   const g = gerarPlanoBase30(E, cfg, presos, ancora)
@@ -1361,6 +1423,13 @@ export function pendenciasLegproc(cfg: Cfg28, LP: ItemLP[], plano: Plano, feitas
   if (!cfg.metas.lp) return []
   const f = new Set(feitas), agendadas = new Set(Object.keys(plano).filter((id) => id.startsWith('lp:')))
   return (LP || []).filter((x) => cfg.discs.includes(x.disc) && !agendadas.has(x.id) && !f.has(x.id)).map((x) => x.id)
+}
+
+/** Metas 'gx' ainda sem data nas disciplinas selecionadas (análogo a pendenciasLegproc). */
+export function pendenciasGx(cfg: Cfg28, GX: ItemGX[], plano: Plano, feitas: Iterable<string>): string[] {
+  if ((cfg.metas as Record<string, boolean | undefined>).gx === false) return []
+  const f = new Set(feitas)
+  return normalizarGX(GX).filter((x) => cfg.discs.includes(x.disc) && !plano[x.id] && !f.has(x.id)).map((x) => x.id)
 }
 
 /** Expostos p/ testes/diagnóstico. */

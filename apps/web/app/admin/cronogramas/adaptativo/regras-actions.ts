@@ -65,7 +65,7 @@ export async function simularRegras(regrasPropostas: unknown, cfgExemplo: CfgExe
   const svc = createAdminClient()
   const [vig, banco, params] = await Promise.all([lerRegistroRegras(svc, g.tenantId), carregarConteudoBanco(svc, g.tenantId), lerParamsMotor(svc, g.tenantId)])
   const cfg = { revisao: { ativa: true, cada: REGRAS_PADRAO.revisao.padrao }, metas: { pf: true, fl: true, qu: true, lp: true }, ...c } as unknown as Cfg28
-  const diff = simularRegrasPuro(cfg, { AS: banco.AS as AulaAS[], LP: (banco.LP ?? []) as ItemLP[], ordem: banco.ordem ?? null, params }, v.regras, vig.regras, c.start, { detalhar: true })
+  const diff = simularRegrasPuro(cfg, { AS: banco.AS as AulaAS[], LP: (banco.LP ?? []) as ItemLP[], ordem: banco.ordem ?? null, params, ...(banco.GX?.length ? { gx: banco.GX } : {}) }, v.regras, vig.regras, c.start, { detalhar: true })
   return { ok: true, dados: diff }
 }
 

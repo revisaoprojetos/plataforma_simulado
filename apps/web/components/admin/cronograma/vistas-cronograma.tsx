@@ -7,7 +7,7 @@ import { useCan } from '@/components/auth/can-provider'
 import { grupoDaRota, gruposVisiveis, hrefDaVista, mostraSubabas, modalidadePorId, rotaSemCabecalho } from '@/lib/admin/cronogramas-nav'
 
 /** Badges das vistas do Adaptativo que o shell antigo mostrava (id da vista → campo do endpoint de contagens). */
-const VISTAS_COM_CONTAGEM: Record<string, 'mat' | 'disc' | 'regras'> = { cobertura: 'mat', disciplinas: 'disc', regras: 'regras' }
+const VISTAS_COM_CONTAGEM: Record<string, 'mat' | 'disc' | 'regras'> = { cobertura: 'mat', 'metas-pasta': 'disc', regras: 'regras' }
 type Contagens = Partial<Record<'mat' | 'disc' | 'regras', number | null>>
 
 // Cache de módulo (remonta a cada página): 1 fetch por minuto, fora do caminho de render; falha = sem badge.

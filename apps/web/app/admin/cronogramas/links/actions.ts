@@ -17,6 +17,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
+import { metasQuestPorAula } from '@/lib/revisao/gerador/uso-links'
 
 
 
@@ -70,17 +71,8 @@ export async function listarLinks(): Promise<{
         .order('ordem')
         .order('nome') as any,
     ),
-    // Só metas de questões: são as únicas em que o link aparece para o aluno (R11).
-    fetchAll<{ disciplina: string; aula: string | null }>(() =>
-      svc
-        .from('simulado_cronograma_metas')
-        .select('disciplina, aula')
-        .eq('tenant_id', g.tenantId)
-        .eq('tipo', 'quest')
-        .not('aula', 'is', null)
-        .order('disciplina')
-        .order('aula') as any,
-    ),
+    // Só metas de questões (R11), já agrupadas por (disciplina, aula) no banco.
+    metasQuestPorAula(svc, g.tenantId),
   ])
 
   const urlsPorLink = new Map<string, { plataforma_id: string; url: string }[]>()
@@ -99,7 +91,7 @@ export async function listarLinks(): Promise<{
   for (const m of metas) {
     const k = chaveLink(m.disciplina, m.aula)
     if (!k) continue
-    usoPorChave.set(k, (usoPorChave.get(k) ?? 0) + 1)
+    usoPorChave.set(k, (usoPorChave.get(k) ?? 0) + m.n)
     if (!exemplo.has(k)) exemplo.set(k, { disciplina: m.disciplina, aula: m.aula as string })
   }
 

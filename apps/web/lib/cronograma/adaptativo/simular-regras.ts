@@ -7,10 +7,12 @@ import { gerarPlano as gerarPlanoMotor, horasDia, VERSAO_MOTOR } from './motor30
 import { verificarInvariantes, type Violacao } from './invariantes'
 import type { Cfg28, AulaAS, ItemLP, Plano } from './motor28'
 import { normalizarRegras, type RegrasMotor } from './regras'
+import type { ItemGX } from './gx-tipos'
 import { ColetorRastro, resultadoRastro, type RastroPlano } from './rastro'
 import { resumirPorSemana, type LinhaSemana } from './analise-periodo'
 
-export interface ConteudoSimulacao { AS: AulaAS[]; LP: ItemLP[]; ordem?: number[] | null; params?: unknown }
+/** `gx` = metas de tipos personalizados do catálogo (FASE 3a): sem elas as regras `tiposGx` dariam diff zero. Ausente/[] = como antes. */
+export interface ConteudoSimulacao { AS: AulaAS[]; LP: ItemLP[]; ordem?: number[] | null; params?: unknown; gx?: ItemGX[] }
 export interface ResumoSim {
   semanas: number; fim: number; totalMetas: number; metasPorTipo: Record<string, number>
   primeiraData: string | null; ultimaData: string | null; horasTotais: number; erro?: string
@@ -45,7 +47,7 @@ export function resumirPlano(plano: Plano, fim: number): ResumoSim {
 function rodar(cfg: Cfg28, c: ConteudoSimulacao, regras: RegrasMotor, hoje: string, detalhar = false): { resumo: ResumoSim; plano: Plano | null } {
   try {
     const coletor = detalhar ? new ColetorRastro() : null
-    const r = gerarPlanoMotor(cfg, c.AS, c.LP, {}, null, { ordem: c.ordem ?? undefined, params: (c.params ?? null) as never, regras, hoje, rastro: coletor })
+    const r = gerarPlanoMotor(cfg, c.AS, c.LP, {}, null, { ordem: c.ordem ?? undefined, params: (c.params ?? null) as never, regras, hoje, rastro: coletor, ...(c.gx?.length ? { gx: c.gx } : {}) })
     const resumo = resumirPlano(r.plano, r.fim)
     const v = verificarInvariantes(r.plano, regras, { start: cfg.start, horasDia: (d) => horasDia(cfg, d), AS: c.AS, ordem: c.ordem ?? undefined })
     resumo.violacoes = v.slice(0, 40); resumo.totalViolacoes = v.length

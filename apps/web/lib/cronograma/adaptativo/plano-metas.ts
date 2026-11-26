@@ -38,6 +38,8 @@ export interface ConteudoDescricao {
   AS: Array<[string, string, string, string | null, string]>                          // disciplina, nº da aula, tema, documento, chave estável
   LP: Array<{ id: string; disc: string; lei: string; texto: string; doc: string | null }>
   WLP: string[][]; WLPdoc: Array<Array<string | null>>
+  /** metas próprias gx (tipos personalizados com geraMeta): id → dados p/ descrever */
+  GX?: Array<{ id: string; nomeTipo: string; disc: string; titulo: string; doc: string | null }>
   /** snapshot por documento: t = título, n = título normalizado, p = pasta (opcional → sem snapshot) */
   DOCS?: Record<string, { t: string; n: string; p: string | null }>
 }
@@ -56,9 +58,11 @@ async function conteudoParaDescricao(svc: SupabaseClient, tenantId: string): Pro
       for (const a of AS) if (uuidOu(a[3])) ids.add(a[3] as string)
       for (const l of LP) if (uuidOu(l.doc)) ids.add(l.doc as string)
       for (const r of WLPdoc) for (const d of r ?? []) if (uuidOu(d)) ids.add(d as string)
+      for (const x of c.GX ?? []) if (uuidOu(x.doc)) ids.add(x.doc as string)
       for (const [id, d] of await carregarInfoDocs(svc, tenantId, [...ids])) DOCS[id] = { t: d.titulo ?? '', n: d.titulo_norm || normalizarTituloDoc(d.titulo), p: d.pasta_id ?? null }
     } catch { /* sem snapshot */ }
-    return { AS, LP, WLP: c.WLP ?? [], WLPdoc, DOCS }
+    const GX = (c.GX ?? []).map((x) => ({ id: x.id, nomeTipo: x.nomeTipo, disc: x.disc, titulo: x.titulo, doc: x.doc ?? null }))
+    return { AS, LP, WLP: c.WLP ?? [], WLPdoc, DOCS, ...(GX.length ? { GX } : {}) }
   })
 }
 
@@ -71,6 +75,10 @@ export function descrever(id: string, c: ConteudoDescricao) {
   const tipo = p[0]
   const base = { tipo, tipo_nome: rotuloMeta(id) ?? rotuloTipo(tipo), parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
   const porAula = (i: number) => { const a = c.AS[i]; return a ? { disciplina: a[0] || null, aula: a[1] || null, titulo: a[2] || null, documento_id: uuidOu(a[3]), aula_key: a[4] } : {} }
+  if (tipo === 'gx') {
+    const it = c.GX?.find((x) => x.id === id)
+    return it ? { ...base, tipo_nome: it.nomeTipo || base.tipo_nome, disciplina: it.disc || null, titulo: it.titulo || null, documento_id: uuidOu(it.doc) } : base
+  }
   if (tipo === 'jp') return { ...base, titulo: 'Jurisprudência' } // 2.19: meta semanal, sem aula/documento
   if (tipo === 'pf' || tipo === 'fl' || tipo === 'qu') return { ...base, ...porAula(+p[1]) }
   if (tipo === 'pp') return { ...base, parte: Number.isFinite(+p[2]) ? +p[2] : null, ...porAula(+p[1]) }

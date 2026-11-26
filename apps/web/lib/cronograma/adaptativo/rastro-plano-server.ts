@@ -101,7 +101,7 @@ async function calcular(svc: SupabaseClient, tenantId: string, aluno: AlunoRastr
   for (const [id, v] of Object.entries(gravado)) if (Array.isArray(v) && (feitas.has(id) || v[0] < hoje)) fixos[id] = v
   const coletor = new ColetorRastro()
   try {
-    gerarPlano(cfg, banco.AS as never, banco.WLP, fixos, hoje, (banco.LP ?? []) as ItemLP[], { manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), regras, params, notas, prog, hoje, planoAtual: gravado, detalhes: detalhes as never, rastro: coletor })
+    gerarPlano(cfg, banco.AS as never, banco.WLP, fixos, hoje, (banco.LP ?? []) as ItemLP[], { manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), regras, params, notas, prog, hoje, planoAtual: gravado, detalhes: detalhes as never, ...(banco.GX?.length ? { gx: banco.GX } : {}), rastro: coletor })
   } catch (e) {
     if (ehInsuficiencia(e)) { // causa provável (estimativa pura, só leitura) p/ o suporte
       const d = diagnosticarInsuficiencia({ cfg: cfg as never, AS: banco.AS as never, maxSemanas: maxSemanasEfetivo(params, regras), velPadrao: params.velPadrao, regras })

@@ -4,7 +4,7 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { MAX_SEM, REV_OPCOES_NOVAS, REV_PADRAO } from '@/lib/cronograma/adaptativo/motor30'
 import { paginasEfetivasDocs, type PaginasDoc } from '@/lib/conteudo/paginas-efetivas'
-import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
+import { conteudoBancoCache } from '@/lib/cronograma/adaptativo/conteudo-cache'
 import { definicoesDoConteudo } from '@/lib/cronograma/adaptativo/meta-def'
 import { lerOverride } from '@/lib/cronograma/adaptativo/catalogo-override-db'
 import { lerCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
@@ -119,7 +119,7 @@ async function materiaisApoio(svc: SupabaseClient, tenantId: string): Promise<Ma
 async function aulasBase(svc: SupabaseClient, tenantId: string): Promise<AulaBase[]> {
   return remember<AulaBase[]>(`revisao-cron:aulas2:${tenantId}`, 45, async () => {
     const [c, ov, apoio, filtros] = await Promise.all([
-      carregarConteudoBanco(svc, tenantId), lerOverride(svc, tenantId).catch(() => null), materiaisApoio(svc, tenantId).catch(() => new Map<string, ApoioAula>()),
+      conteudoBancoCache(svc, tenantId), lerOverride(svc, tenantId).catch(() => null), materiaisApoio(svc, tenantId).catch(() => new Map<string, ApoioAula>()),
       lerFiltros(svc, tenantId).catch(() => ({})),
     ])
     const defs = definicoesDoConteudo(tenantId, { AS: c.AS as unknown as Array<Array<unknown>>, ordem: c.ordem, LP: c.LP })

@@ -72,7 +72,7 @@ describe('REGRAS_PADRAO reproduz as constantes hard-coded da 3.2.0', () => {
   it('params e catálogos usam o registro único de tipos', () => {
     expect([PARAMS_PADRAO.durFl, PARAMS_PADRAO.durQu, PARAMS_PADRAO.durLp, PARAMS_PADRAO.durRf, PARAMS_PADRAO.durRq, PARAMS_PADRAO.jurisprudenciaMin]).toEqual([60, 30, 30, 60, 30, 60])
     expect([PARAMS_PADRAO.offsetRevisao, PARAMS_PADRAO.offsetQuestoes]).toEqual([1, 2])
-    expect(SLUGS_META).toEqual(['pf', 'pp', 'fl', 'qu', 'lp', 'rf', 'rq', 'jp'])
+    expect(SLUGS_META).toEqual(['pf', 'pp', 'fl', 'qu', 'lp', 'rf', 'rq', 'jp', 'gx'])
     expect(rotuloTipo('rf')).toBe('Revisão PDFlash')
     expect(rotuloTipo('xx')).toBeNull()
     expect(ordemTipo('lp')).toBe(3)
@@ -226,5 +226,32 @@ describe('SENSIBILIDADE: as regras realmente mudam o plano', () => {
     const cfg = base({ horas: [5, 5, 5, 5, 5, 0, 0] }) // 25h = faixa equilibrada
     const a = gerar(cfg), b = gerar(cfg, { equilibrio: { questoesDia: 1 }, limitesDia: { questoes: 1 } })
     expect(JSON.stringify(a.plano)).not.toBe(JSON.stringify(b.plano))
+  })
+})
+
+describe('tiposGx (fase 3a)', () => {
+  it('padrão vazio, normalização com clamp/slug e limite de chaves', () => {
+    expect(REGRAS_PADRAO.tiposGx).toEqual({})
+    expect(normalizarRegras({}).tiposGx).toEqual({})
+    const n = normalizarRegras({ tiposGx: { Ruim: {}, 'a': {}, resumo: { maxPorDia: 99, maxPorSemana: 0, dias: [9, 2, 2], faixas: [], aPartirDaSemana: -4, ativo: false } } }).tiposGx
+    expect(Object.keys(n)).toEqual(['resumo'])
+    expect(n.resumo).toEqual({ ativo: false, maxPorDia: 20, maxPorSemana: null, dias: [2], faixas: [], aPartirDaSemana: 0 })
+    const muitos = Object.fromEntries(Array.from({ length: 80 }, (_, k) => ['tipo-' + String(k).padStart(2, '0'), {}]))
+    expect(Object.keys(normalizarRegras({ tiposGx: muitos }).tiposGx).length).toBe(50)
+  })
+  it('hash estável: vazio não entra; com regra muda', () => {
+    expect(hashRegras({ tiposGx: {} })).toBe(HASH_REGRAS_PADRAO)
+    expect(hashRegras({ tiposGx: { resumo: { maxPorDia: 1 } } })).not.toBe(HASH_REGRAS_PADRAO)
+    expect(hashRegras({ tiposGx: { resumo: { maxPorDia: 1 } } })).toBe(hashRegras({ tiposGx: { resumo: { maxPorDia: 1 } } }))
+  })
+  it('delta contra o padrão e validação com mensagem citando o slug', () => {
+    expect(deltaDoPadrao({ tiposGx: {} })).toEqual({})
+    const d = deltaDoPadrao({ tiposGx: { resumo: { maxPorDia: 2 } } })
+    expect(Object.keys(d)).toEqual(['tiposGx'])
+    expect(normalizarRegras(d).tiposGx.resumo.maxPorDia).toBe(2)
+    const v = validarRegras({ tiposGx: { resumo: { maxPorDia: 0, dias: [9] } } })
+    expect(v.ok).toBe(false)
+    expect(v.erros.join(' ')).toContain('"resumo"')
+    expect(validarRegras({ tiposGx: { resumo: { maxPorDia: 2 } } }).ok).toBe(true)
   })
 })

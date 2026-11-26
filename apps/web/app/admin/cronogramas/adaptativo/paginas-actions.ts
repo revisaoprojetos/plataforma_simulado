@@ -5,7 +5,9 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { remember } from '@/lib/cache/relatorio-cache'
-import { carregarConteudoBancoBase } from '@/lib/cronograma/adaptativo/conteudo-banco'
+import { comLimite } from '@/lib/admin/com-limite'
+import { conteudoBancoBaseCache } from '@/lib/cronograma/adaptativo/conteudo-cache'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { CATALOGO_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
 import { minPdf } from '@/lib/cronograma/adaptativo/engine'
 import { paginasEfetivasDocs, type DocParaPaginas } from '@/lib/conteudo/paginas-efetivas'
@@ -35,17 +37,14 @@ export interface PaginaDivergencia {
 
 async function calcularDivergencias(tenantId: string): Promise<{ linhas: LinhaDivergencia[]; semContagem: number; comparadas: number }> {
   const svc = createAdminClient()
-  const c = await carregarConteudoBancoBase(svc, tenantId) // catálogo-base (sem overlay do admin)
+  const c = await conteudoBancoBaseCache(svc, tenantId) // catálogo-base (sem overlay do admin)
   const idx = c.modeloIdx ?? []
   const alvo: Array<{ i: number; docId: string; modelo: number }> = []
   c.AS.forEach((a, i) => { const doc = a[6]; const m = idx[i] ?? -1; if (doc && m >= 0) alvo.push({ i, docId: String(doc), modelo: m }) })
   if (!alvo.length) return { linhas: [], semContagem: 0, comparadas: 0 }
   // pasta/versão dos docs (projeção mínima, .in() em lotes de 80)
-  const docs: DocParaPaginas[] = []
-  for (let k = 0; k < alvo.length; k += 80) {
-    const { data } = await svc.from('simulado_conteudo_documentos').select('id, pasta_id, versao_atual_id').eq('tenant_id', tenantId).in('id', alvo.slice(k, k + 80).map((x) => x.docId))
-    docs.push(...((data || []) as DocParaPaginas[]))
-  }
+  const docs = await fetchAllByIn<DocParaPaginas>(alvo.map((x) => x.docId), (chunk) =>
+    svc.from('simulado_conteudo_documentos').select('id, pasta_id, versao_atual_id').eq('tenant_id', tenantId).in('id', chunk).order('id') as never, { chunk: 80, concorrencia: 4, rotulo: 'diverg-paginas:docs' })
   const pag = await paginasEfetivasDocs(svc, tenantId, docs)
   const pasta = new Map(docs.map((d) => [d.id, d.pasta_id]))
   const linhas: LinhaDivergencia[] = []
@@ -70,7 +69,7 @@ export async function listarDivergenciaPaginas(input: { pagina?: number; porPagi
   const vazio = { linhas: [], total: 0, pagina: 1, porPagina: 25, resumo: { comparadas: 0, divergentes: 0, semContagem: 0, impactoTotalMin: 0 } }
   if (!g) return { ok: false, error: 'Sem permissão.', ...vazio }
   try {
-    const base = await remember(`crono-pag-diverg:${g.tenantId}`, 120, () => calcularDivergencias(g.tenantId))
+    const base = await comLimite(remember(`crono-pag-diverg:${g.tenantId}`, 120, () => calcularDivergencias(g.tenantId)), 40_000, 'A comparação de páginas')
     const minPct = Math.max(0, Number(input.minPct) || 0)
     const q = String(input.q ?? '').trim().toLowerCase()
     const porPagina = Math.min(100, Math.max(5, Math.trunc(Number(input.porPagina)) || 25))

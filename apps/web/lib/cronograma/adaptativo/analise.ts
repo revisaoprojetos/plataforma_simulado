@@ -139,6 +139,13 @@ export function periodoParaDatas(p: string | undefined): { de: string | null; at
   return { de: somaDias(hoje, -(n - 1)), ate: hoje }
 }
 
+/** Teto de espera por RPC (o PostgREST corta em 8 s; as RPCs pesadas têm teto próprio maior). Passou disso → erro visível com "Tentar de novo". */
+const LIMITE_RPC_MS = 25_000
+/** RPCs que varrem plano_meta (~1,6 mi linhas): cache mais longo (a tela é analítica; o dado só muda com marcações/gerações). */
+const TTL_RPC_PESADA = 900
+const PESADAS = new Set([P + 'funil', P + 'parados', P + 'fixacao', P + 'sem_doc', P + 'orfas', P + 'resumo'])
+const msgErro = (e: { message?: string }) => (/abort|timeout|timed out|statement/i.test(e.message ?? '') ? 'a consulta demorou demais' : e.message || 'erro desconhecido')
+
 const hash = (v: unknown) => createHash('sha1').update(JSON.stringify(v)).digest('hex').slice(0, 16)
 
 /** Consulta paginada de uma visão. `semCache` = exportação CSV. TTL curto (5 min); degrada se a migração faltar. */
@@ -153,13 +160,15 @@ export async function consultarVisao(svc: SupabaseClient, tenantId: string, v: V
     p_param: v.param === 'dias' ? String(f.dias) : v.param ?? null,
   }
   const calc = async (): Promise<ListaAn> => {
-    const { data, error } = await svc.rpc(v.rpc, args)
-    if (error) return ausente(error) ? { migrado: false, rows: [], total: 0 } : { migrado: true, erro: error.message, rows: [], total: 0 }
+    const { data, error } = await svc.rpc(v.rpc, args).abortSignal(AbortSignal.timeout(LIMITE_RPC_MS))
+    if (error) { if (ausente(error)) return { migrado: false, rows: [], total: 0 }; throw new Error(msgErro(error)) }
     const rows = (data ?? []) as Array<Record<string, unknown>>
     return { migrado: true, rows, total: Number(rows[0]?.total_linhas ?? 0) }
   }
-  if (o.semCache) return calc()
-  return remember(chaveRelatorio(tenantId, 'adaptativo-an', v.rpc.replace(P, ''), hash(args)), 300, calc)
+  const comErro = (e: unknown): ListaAn => ({ migrado: true, erro: e instanceof Error ? e.message : 'erro desconhecido', rows: [], total: 0 })
+  if (o.semCache) return calc().catch(comErro)
+  // SÓ o sucesso entra no cache (remember não guarda exceção): um timeout não fica "grudado" na tela por minutos.
+  return remember(chaveRelatorio(tenantId, 'adaptativo-an', v.rpc.replace(P, ''), hash(args)), PESADAS.has(v.rpc) ? TTL_RPC_PESADA : 300, calc).catch(comErro)
 }
 
 export async function carregarResumo(svc: SupabaseClient, tenantId: string, f: FiltroAn): Promise<ResumoAn> {
@@ -167,11 +176,11 @@ export async function carregarResumo(svc: SupabaseClient, tenantId: string, f: F
     planejadas: 0, feitas: 0, pct_feitas: null, acerto_pct: null, nao_realizadas: 0, atrasadas: 0, tempo_plan_seg: 0, tempo_real_seg: 0, res: 0, err: 0, parados: 0, marcacoes: 0, desmarcacoes: 0,
     log_desde: null, eventos_desde: null, agg_atualizado: null, agg_linhas: 0 }
   const args = { p_tenant: tenantId, p_de: f.de, p_ate: f.ate, p_grupo: f.grupo, p_disciplina: f.disc, p_tipo: f.tipo, p_motor: f.motor, p_param: String(f.dias) }
-  return remember(chaveRelatorio(tenantId, 'adaptativo-an', 'resumo', hash(args)), 300, async () => {
-    const { data, error } = await svc.rpc(P + 'resumo', args)
-    if (error) return ausente(error) ? vazio : { ...vazio, migrado: true, erro: error.message }
+  return remember(chaveRelatorio(tenantId, 'adaptativo-an', 'resumo', hash(args)), TTL_RPC_PESADA, async () => {
+    const { data, error } = await svc.rpc(P + 'resumo', args).abortSignal(AbortSignal.timeout(LIMITE_RPC_MS))
+    if (error) { if (ausente(error)) return vazio; throw new Error(msgErro(error)) }
     return { ...vazio, ...((data ?? {}) as Partial<ResumoAn>), migrado: true }
-  })
+  }).catch((e: unknown): ResumoAn => ({ ...vazio, migrado: true, erro: e instanceof Error ? e.message : 'erro desconhecido' }))
 }
 
 export interface TotaisAn { gerados: number; recalculados: number; falhas: number; desde: string | null }

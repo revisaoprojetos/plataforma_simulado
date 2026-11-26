@@ -30,13 +30,15 @@ export async function paginarPacotes(tenantId: string, o: { q?: string; status?:
   if (o.status === 'ativo') q = q.eq('ativo', true)
   else if (o.status === 'inativo') q = q.eq('ativo', false)
   else if (o.status === 'gratuito') q = q.eq('acesso_gratuito', true)
-  const [{ data: pacotes, error }, itens, grupos, alcances, { data: todos }] = await Promise.all([
+  const [{ data: pacotes, error }, itens, grupos, alcances, { data: todos }, avulsosRows] = await Promise.all([
     q.order('ordem').order('nome').order('id'),
     fetchAll<{ pacote_id: string }>(() => svc.from('simulado_cronograma_pacote_itens').select('pacote_id').eq('tenant_id', tenantId).order('id') as any),
     fetchAll<{ pacote_id: string }>(() => svc.from('simulado_cronograma_pacote_grupos').select('pacote_id').eq('tenant_id', tenantId).order('id') as any),
     svc.rpc('simulado_cronograma_pacotes_alcance', { p_tenant: tenantId }),
     // KPIs do tenant inteiro (independem do filtro): só colunas leves.
     svc.from('simulado_cronograma_pacotes').select('id, acesso_gratuito').eq('tenant_id', tenantId),
+    // Alunos avulsos por pacote na MESMA onda (antes: uma contagem head por pacote da página, DEPOIS da onda).
+    fetchAll<{ pacote_id: string }>(() => svc.from('simulado_cronograma_pacote_estudantes').select('pacote_id').eq('tenant_id', tenantId).order('id') as any),
   ])
   if (error) return { ok: false, error: error.message }
 
@@ -56,10 +58,8 @@ export async function paginarPacotes(tenantId: string, o: { q?: string; status?:
   const ini = (o.pagina - 1) * o.por
   const linhas = todas.slice(ini, ini + o.por)
 
-  // Alunos avulsos: contagem agregada (head) só dos pacotes desta página.
-  const avulsos = await Promise.all(linhas.map((p) =>
-    svc.from('simulado_cronograma_pacote_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('pacote_id', p.id).then((r) => r.count ?? 0)))
-  linhas.forEach((p, i) => { p.estudantes = avulsos[i] })
+  const nAvulsos = conta(avulsosRows)
+  linhas.forEach((p) => { p.estudantes = nAvulsos.get(p.id) ?? 0 })
 
   let cron = 0, alcance = 0
   for (const v of nItens.values()) cron += v

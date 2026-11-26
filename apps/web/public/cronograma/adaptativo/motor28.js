@@ -32,6 +32,7 @@ exports.TIPOS_META = {
     rf: { slug: 'rf', rotulo: 'Revisão PDFlash', nomeAluno: 'Revisão', familia: 'fl', duracaoPadraoMin: 60, paramDuracao: 'durRf', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 1, ordem: 4 },
     rq: { slug: 'rq', rotulo: 'Revisão Questões', nomeAluno: 'Questões', familia: 'qu', duracaoPadraoMin: 30, paramDuracao: 'durRq', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 2, ordem: 4 },
     jp: { slug: 'jp', rotulo: 'Jurisprudência', nomeAluno: 'Jurisprudência', familia: 'jp', duracaoPadraoMin: 60, paramDuracao: 'jurisprudenciaMin', deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 6, ordem: 4 },
+    gx: { slug: 'gx', rotulo: 'Personalizado', nomeAluno: 'Personalizado', familia: 'gx', duracaoPadraoMin: 30, paramDuracao: null, deslocamentoPadraoSem: null, paramDeslocamento: null, prioridade: 5, ordem: 5 },
 };
 exports.SLUGS_META = Object.keys(exports.TIPOS_META);
 exports.ROTULO_VARIANTE = {
@@ -82,6 +83,7 @@ exports.normalizarRestricoes = normalizarRestricoes;
 exports.normalizarOverrides = normalizarOverrides;
 exports.normalizarFaixas = normalizarFaixas;
 exports.normalizarConstantes = normalizarConstantes;
+exports.normalizarTiposGx = normalizarTiposGx;
 exports.resolverFaixa = resolverFaixa;
 exports.resolverTetoPdf = resolverTetoPdf;
 exports.normalizarRegras = normalizarRegras;
@@ -101,6 +103,7 @@ exports.deltaDoPadrao = deltaDoPadrao;
  * `regras-validacao.ts` (só servidor/testes). Sem Date.now/Math.random.
  */
 const tipos_meta_1 = require("./tipos-meta");
+const gx_tipos_1 = require("./gx-tipos");
 const faixas_carga_1 = require("./faixas-carga");
 exports.VERSAO_SCHEMA_REGRAS = 1;
 exports.TIPOS_RESTRICAO = ['max_por_dia', 'nao_mesmo_dia', 'nao_dias_seguidos', 'so_na_sobra', 'depois_de'];
@@ -135,6 +138,7 @@ exports.REGRAS_PADRAO = {
     restricoes: [],
     adaptacao: { ...exports.ADAPTACAO_PADRAO },
     constantes: exports.CONSTANTES_PADRAO,
+    tiposGx: {},
 };
 // ── normalização (merge com o padrão + clamp) ────────────────────────────────────────────────────────
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -318,6 +322,27 @@ function normalizarConstantes(raw) {
         cargaMinimaMin: int(c.cargaMinimaMin, D.cargaMinimaMin, 0, 6000),
     };
 }
+/** Regras por tipo gx: slug inválido descartado; máx. MAX_TIPOS_GX_REGRAS chaves (ordem alfabética, determinística); campos com clamp. */
+function normalizarTiposGx(raw) {
+    var _a;
+    const src = obj(raw), out = {};
+    const D = gx_tipos_1.REGRA_TIPO_GX_PADRAO;
+    const lim = (v, max) => { const n = int(v, 0, 0, max); return v === null || v === undefined || v === '' || n < 1 ? null : n; };
+    for (const slug of Object.keys(src).sort()) {
+        if (!gx_tipos_1.SLUG_TIPO_GX_RE.test(slug) || Object.keys(out).length >= gx_tipos_1.MAX_TIPOS_GX_REGRAS)
+            continue;
+        const g = obj(src[slug]);
+        out[slug] = {
+            ativo: bool(g.ativo, (_a = D.ativo) !== null && _a !== void 0 ? _a : true),
+            maxPorDia: lim(g.maxPorDia, 20),
+            maxPorSemana: lim(g.maxPorSemana, 100),
+            dias: listaInt(g.dias, [], 0, 6),
+            faixas: listaInt(g.faixas, [], 1, faixas_carga_1.MAX_FAIXAS),
+            aPartirDaSemana: int(g.aPartirDaSemana, D.aPartirDaSemana, 0, 600),
+        };
+    }
+    return out;
+}
 /** Faixa de carga (objeto) para a carga semanal em minutos. */
 const resolverFaixaCarga = (minutosSemana, regras = exports.REGRAS_PADRAO) => (0, faixas_carga_1.faixaPorMinutos)(regras.faixas, minutosSemana);
 exports.resolverFaixaCarga = resolverFaixaCarga;
@@ -435,6 +460,7 @@ function normalizarRegras(raw) {
         },
         restricoes: normalizarRestricoes(r.restricoes),
         constantes: normalizarConstantes(r.constantes),
+        tiposGx: normalizarTiposGx(r.tiposGx),
         adaptacao: (() => { const a = obj(r.adaptacao), A = exports.ADAPTACAO_PADRAO; return { dominoAtivo: bool(a.dominoAtivo, A.dominoAtivo), reforcoAtivo: bool(a.reforcoAtivo, A.reforcoAtivo), semanaEspecialAtiva: bool(a.semanaEspecialAtiva, A.semanaEspecialAtiva), antecipaRetornoAtivo: bool(a.antecipaRetornoAtivo, A.antecipaRetornoAtivo) }; })(),
     };
 }
@@ -461,7 +487,8 @@ function hashRegras(regras) {
     const semRestr = Array.isArray(n.restricoes) && n.restricoes.length === 0, semAdapt = jsonEstavel(n.adaptacao) === jsonEstavel(exports.ADAPTACAO_PADRAO);
     const semConst = jsonEstavel(n.constantes) === jsonEstavel(exports.CONSTANTES_PADRAO);
     const faixasPadrao = jsonEstavel(n.faixas) === jsonEstavel(faixas_carga_1.FAIXAS_PADRAO);
-    const base = Object.fromEntries(Object.entries(n).filter(([k]) => !(k === 'restricoes' && semRestr) && !(k === 'adaptacao' && semAdapt) && !(k === 'constantes' && semConst)));
+    const semGx = !n.tiposGx || Object.keys(n.tiposGx).length === 0;
+    const base = Object.fromEntries(Object.entries(n).filter(([k]) => !(k === 'tiposGx' && semGx) && !(k === 'restricoes' && semRestr) && !(k === 'adaptacao' && semAdapt) && !(k === 'constantes' && semConst)));
     if (faixasPadrao) {
         // faixas no padrão ≡ formato legado (faixas{} + tetosPdf[] + revisao.cicloAteMin) → mesmo hash de antes das faixas dinâmicas
         base.faixas = { faixa1AteMinExclusivo: 900, faixa2AteMinInclusivo: 1470 };
@@ -893,6 +920,27 @@ function rotuloMeta(id) {
     const nome = { pf: 'PDFull', pp: 'PDFull (parte)', fl: 'PDFlash', qu: 'Questões', lp: 'LegProc', jp: 'Jurisprudência', rf: 'PDFlash (revisão)', rq: 'Questões (revisão)' };
     return `${(_a = nome[t]) !== null && _a !== void 0 ? _a : t}${i ? ' ' + i : ''}${r.length ? ' (' + r.join(':') + ')' : ''}`;
 }
+
+  };
+  defs['gx-tipos'] = function (module, exports, require) {
+"use strict";
+// Contrato da FASE 2: metas próprias de tipos personalizados do catálogo ('gx' = família genérica).
+// Só tipos/constantes puras (sem imports): usado pelo motor (motor30), pelo conteúdo-banco, pelo espelho (plano-metas),
+// pela rota do aluno e pelo iframe. Mudar aqui exige combinar com os 3 consumidores.
+//
+// Id da meta: `gx:<slugCatalogo>:<d8>` — slugCatalogo = slug do tipo do catálogo ([a-z0-9_-]{2,40}); d8 = 8 primeiros hex do
+// uuid do DOCUMENTO (em colisão dentro do tenant, sufixo `-2`, `-3`). Estável quando outro documento some; ≤ 54 chars (ID_META ≤ 60).
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SLUG_TIPO_GX_RE = exports.MAX_TIPOS_GX_REGRAS = exports.REGRA_TIPO_GX_PADRAO = exports.ehIdGx = exports.MAX_ITENS_GX = exports.MIN_PADRAO_GX = exports.PREFIXO_GX = exports.SLUG_GX = void 0;
+exports.SLUG_GX = 'gx';
+exports.PREFIXO_GX = 'gx:';
+exports.MIN_PADRAO_GX = 30;
+exports.MAX_ITENS_GX = 500;
+const ehIdGx = (id) => typeof id === 'string' && id.startsWith(exports.PREFIXO_GX);
+exports.ehIdGx = ehIdGx;
+exports.REGRA_TIPO_GX_PADRAO = { ativo: true, maxPorDia: null, maxPorSemana: null, dias: [], faixas: [], aPartirDaSemana: 0 };
+exports.MAX_TIPOS_GX_REGRAS = 50;
+exports.SLUG_TIPO_GX_RE = /^[a-z0-9][a-z0-9_-]{1,39}$/;
 
   };
   defs['motor28'] = function (module, exports, require) {
@@ -2142,6 +2190,7 @@ exports.tetoInfo300 = tetoInfo300;
 exports.tetoPDF300 = tetoPDF300;
 exports.cotaPDFlash300 = cotaPDFlash300;
 exports.metaBloqueada = metaBloqueada;
+exports.normalizarGX = normalizarGX;
 exports.ativarFaixa = ativarFaixa;
 exports.ativarSemana = ativarSemana;
 exports.ehMetaAnterior = ehMetaAnterior;
@@ -2154,6 +2203,7 @@ exports.reservarJuris219 = reservarJuris219;
 exports.gerarPlano = gerarPlano;
 exports.calcularDomino = calcularDomino;
 exports.pendenciasLegproc = pendenciasLegproc;
+exports.pendenciasGx = pendenciasGx;
 // ============================================================
 // Motor do Cronograma Adaptativo — geração DIA A DIA (faixas de horas, rodízio por vagas, semana especial
 // dentro do plano, Jurisprudência semanal obrigatória, dominó). PORTE FIEL do modelo enviado pelo usuário
@@ -2173,6 +2223,7 @@ const faixas_carga_2 = require("./faixas-carga");
 const restricoes_1 = require("./restricoes");
 const rastro_1 = require("./rastro");
 const tipos_meta_1 = require("./tipos-meta");
+const gx_tipos_1 = require("./gx-tipos");
 __exportStar(require("./motor28"), exports);
 var regras_2 = require("./regras");
 Object.defineProperty(exports, "REGRAS_PADRAO", { enumerable: true, get: function () { return regras_2.REGRAS_PADRAO; } });
@@ -2424,14 +2475,32 @@ const feito = (E, id) => { var _a; return E.feitas.has(id) || ((_a = E.prog[id])
 const hojeLocal = () => L.dISO(new Date());
 /** Meta com progresso registrado (tempo ou ponto de parada), concluída ou não. */
 const comDado = (E, id) => { var _a, _b; return feito(E, id) || (((_a = E.prog[id]) === null || _a === void 0 ? void 0 : _a.t) || 0) > 0 || !!((_b = E.prog[id]) === null || _b === void 0 ? void 0 : _b.parou); };
+/** Normaliza `ctx.gx`: só ids `gx:` válidos, sem repetição, duração > 0; ordenado por prioridade, ordem e posição de entrada (estável). */
+function normalizarGX(gx) {
+    if (!Array.isArray(gx) || !gx.length)
+        return [];
+    const vistos = new Set(), out = [];
+    gx.forEach((x, k) => {
+        if (!x || typeof x.id !== 'string' || !(0, gx_tipos_1.ehIdGx)(x.id) || vistos.has(x.id) || typeof x.disc !== 'string' || !x.disc)
+            return;
+        const min = Math.round(Number(x.min));
+        if (!Number.isFinite(min) || min <= 0 || min > 600)
+            return;
+        vistos.add(x.id);
+        out.push({ x: { ...x, min, prioridade: Number.isFinite(Number(x.prioridade)) ? Number(x.prioridade) : 5, ordem: Number.isFinite(Number(x.ordem)) ? Number(x.ordem) : 0 }, k });
+    });
+    return out.sort((a, b) => a.x.prioridade - b.x.prioridade || a.x.ordem - b.x.ordem || a.k - b.k).map((o) => o.x);
+}
 function criarEnv(AS, LP, ctx, P) {
-    var _a;
+    var _a, _b;
     const lista = (LP || []).filter((x) => x && x.id);
+    const GX = normalizarGX((_a = ctx.gx) !== null && _a !== void 0 ? _a : []);
     return {
+        GX, gxMap: new Map(GX.map((x) => [x.id, x])),
         AS, LP: lista, lpMap: new Map(lista.map((x) => [x.id, x])), lpPos: new Map(lista.map((x, k) => [x.id, k])),
         ordem: ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i),
         feitas: new Set(ctx.feitas || []), prog: ctx.prog || {}, notas: (ctx.notas || {}),
-        det: ctx.detalhes || {}, planoAtual: ctx.planoAtual || {}, hoje: ctx.hoje || hojeLocal(), complementar: !!ctx.complementarLegproc, P, bloq: criarBloqueios(ctx.params), ...criarRegrasEnv((0, regras_1.resolverRegras)(ctx)), rastro: (_a = ctx.rastro) !== null && _a !== void 0 ? _a : null,
+        det: ctx.detalhes || {}, planoAtual: ctx.planoAtual || {}, hoje: ctx.hoje || hojeLocal(), complementar: !!ctx.complementarLegproc, P, bloq: criarBloqueios(ctx.params), ...criarRegrasEnv((0, regras_1.resolverRegras)(ctx)), rastro: (_b = ctx.rastro) !== null && _b !== void 0 ? _b : null,
     };
 }
 /** Com overrides por faixa, o motor usa uma cópia viva das regras e alterna as seções conforme a faixa da semana corrente. */
@@ -3014,6 +3083,7 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
                 registrar(i, cfg.start);
     const hist = criarFilaDiagnostico(E, cfg, fixos), histPorSem = {};
     const ignorar = new Set(cfg.lpIgnorar || []);
+    const gx = E.GX.length && metas.gx !== false ? E.GX.filter((x) => ativas.has(x.disc) && !plano[x.id] && !feita(x.id) && !metaBloqueada(E, x.id)) : [];
     const lp = metas.lp ? E.LP.filter((x) => ativas.has(x.disc) && !plano[x.id] && !ignorar.has(x.id) && !metaBloqueada(E, x.id)) : [];
     const metasLP = E.lpMap;
     const rodizio = criarRodizioLP25(cfg.discs, null, P.lpJanelaRodizio);
@@ -3228,8 +3298,58 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
         }
         rodizio.avancar(primeiro.disc);
     };
+    /** Metas 'gx' na sobra do dia, depois do LegProc (prioridade/ordem do item; sem restrição de lei). Sai na hora se não há gx. */
+    const blocoGX = (d) => {
+        if (!gx.length)
+            return;
+        const TG = R.tiposGx, comRegras = !!TG && Object.keys(TG).length > 0;
+        for (let k = 0; k < gx.length; k++) {
+            const x = gx[k];
+            if (livre(d) < x.min)
+                continue;
+            if (comRegras && TG[x.slug] && !elegivelGx(x, d, TG[x.slug]))
+                continue;
+            por(d, x.id, x.min);
+            if (comRegras) {
+                const ch = x.slug + '|' + semDe(cfg.start, d);
+                gxPorSemana.set(ch, (gxPorSemana.get(ch) || 0) + 1);
+                gxUltimaSem = semDe(cfg.start, d);
+            }
+            gx.splice(k, 1);
+            k--;
+        }
+    };
+    // FASE 3a — regras por tipo gx (só elegibilidade). Contagem semanal por slug (inclui metas gx fixas já no plano).
+    const gxPorSemana = new Map();
+    for (const id of Object.keys(plano))
+        if ((0, gx_tipos_1.ehIdGx)(id)) {
+            const ch = id.split(':')[1] + '|' + semDe(cfg.start, plano[id][0]);
+            gxPorSemana.set(ch, (gxPorSemana.get(ch) || 0) + 1);
+        }
+    const gxComRegras = !!R.tiposGx && Object.keys(R.tiposGx).length > 0;
+    const gxMaxAPartir = gxComRegras ? Math.max(0, ...Object.values(R.tiposGx).map((g) => g.aPartirDaSemana || 0)) : 0;
+    let gxUltimaSem = 0;
+    const elegivelGx = (x, d, g) => {
+        const sem = semDe(cfg.start, d);
+        if (g.ativo === false)
+            return false;
+        if (g.aPartirDaSemana > 0 && sem < g.aPartirDaSemana)
+            return false;
+        if (g.dias.length && !g.dias.includes(dDow(d)))
+            return false;
+        if (g.faixas.length) {
+            const i = rotina.fx ? R.faixas.indexOf(rotina.fx) : -1;
+            if (!g.faixas.includes(i >= 0 ? i + 1 : rotina.faixa))
+                return false;
+        }
+        if (g.maxPorDia != null && idsDoDia(d).filter((id) => (0, gx_tipos_1.ehIdGx)(id) && id.split(':')[1] === x.slug).length >= g.maxPorDia)
+            return false;
+        if (g.maxPorSemana != null && (gxPorSemana.get(x.slug + '|' + sem) || 0) >= g.maxPorSemana)
+            return false;
+        return true;
+    };
     let diaAtual = A;
-    const temAcademico = () => (metas.pf && (qi < fila.length || curso)) || devidos.length > 0 || hist.tem() || Object.keys(fixos).some((id) => !feita(id) && !id.startsWith('lp:') && !(0, exports.ehJuris219)(id) && fixos[id][0] > diaAtual);
+    const temAcademico = () => (metas.pf && (qi < fila.length || curso)) || devidos.length > 0 || hist.tem() || Object.keys(fixos).some((id) => !feita(id) && !id.startsWith('lp:') && !(0, gx_tipos_1.ehIdGx)(id) && !(0, exports.ehJuris219)(id) && fixos[id][0] > diaAtual);
     const fechar = () => { fechou = true; leisFinais = new Set(lp.map(chaveLei).filter((lei) => E.complementar || iniciadas.has(lei))); };
     const horizonte = MAX * 7;
     for (let k = 0, d = A; k < horizonte; k++, d = dAdd(d, 1)) {
@@ -3249,7 +3369,10 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
         }
         if (!temAcademico() && !fechou)
             fechar();
-        if (fechou && !lp.some((x) => leisFinais.has(chaveLei(x))))
+        if (fechou && !lp.some((x) => leisFinais.has(chaveLei(x))) && !gx.length)
+            break;
+        // com regras por tipo gx, pendentes por elegibilidade não prolongam o plano: sem colocar nenhuma por 8 semanas (após a maior aPartirDaSemana) para
+        if (fechou && gxComRegras && !lp.some((x) => leisFinais.has(chaveLei(x))) && sem > gxMaxAPartir + 8 && sem - gxUltimaSem >= 8)
             break;
         if (!Object.keys(plano).some((id) => (0, exports.ehJuris219)(id) && semDe(cfg.start, plano[id][0]) === sem)) {
             const reservaJ = reservarJuris219(E, cfg, sem, A, plano);
@@ -3324,7 +3447,9 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
                     ler(d, livre(d), true);
             }
             blocoLP(d);
+            blocoGX(d);
             blocoLP(d, true);
+            blocoGX(d);
             if (carga[d])
                 fim = Math.max(fim, sem);
             continue;
@@ -3354,7 +3479,9 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
                     anterior = ultimoTipoRevisao = proxima.t;
             }
             blocoLP(d);
+            blocoGX(d);
             blocoLP(d, true);
+            blocoGX(d);
             if (carga[d])
                 fim = Math.max(fim, sem);
             continue;
@@ -3449,11 +3576,13 @@ function gerarPlanoBase30(E, cfg, fixos, ancora) {
                 ler(d, livre(d), true);
         }
         blocoLP(d, false);
+        blocoGX(d);
         blocoLP(d, true);
+        blocoGX(d);
         if (carga[d])
             fim = Math.max(fim, sem);
     }
-    const residuo = temAcademico() || (fechou && lp.some((x) => leisFinais.has(chaveLei(x))));
+    const residuo = temAcademico() || (fechou && lp.some((x) => leisFinais.has(chaveLei(x)))) || (gx.length > 0 && (!gxComRegras || gx.some((x) => !R.tiposGx[x.slug])));
     if (residuo)
         throw new ErroInsuficiencia('O plano ultrapassa ' + MAX + ' semanas com a disponibilidade atual. Nenhuma alteração foi aplicada. Aumente as horas ou reduza as matérias; ainda há metas sem data.');
     return { plano, detalhes, fim, legprocRestantes: lp.map((x) => x.id) };
@@ -3570,7 +3699,7 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
             const [, i, k] = id.split(':');
             contadores[i] = Math.max(contadores[i] || 0, +k || 0);
         }
-    const disciplinaMeta = (id) => { var _a, _b; return tipoEstudo(id) === 'lp' ? (_a = E.lpMap.get(id)) === null || _a === void 0 ? void 0 : _a.disc : (_b = AS[indiceAula(id)]) === null || _b === void 0 ? void 0 : _b[0]; };
+    const disciplinaMeta = (id) => { var _a, _b, _c; return tipoEstudo(id) === 'lp' ? (_a = E.lpMap.get(id)) === null || _a === void 0 ? void 0 : _a.disc : tipoEstudo(id) === 'gx' ? (_b = E.gxMap.get(id)) === null || _b === void 0 ? void 0 : _b.disc : (_c = AS[indiceAula(id)]) === null || _c === void 0 ? void 0 : _c[0]; };
     const leiMeta = (id) => { const lp = E.lpMap.get(id); return chaveLei(lp) || ((lp === null || lp === void 0 ? void 0 : lp.disc) + '|meta:' + id); };
     let sequencia = 0;
     for (const [id, [data, h]] of Object.entries(fonte)) {
@@ -3584,7 +3713,8 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
         // Revisão obrigatória: PDFlash de essencial externa (rf) não existe mais — limpa o que sobrou de um plano anterior.
         if (t === 'rf' && !(disc != null && cfg.discs.includes(disc)) && revisaoObrigatoria300(cfg, semDe(cfg.start, data), R))
             continue;
-        if ((!disc || !cfg.discs.includes(disc) || !cfg.metas[meta]) && !esp && !(((0, exports.questoesHistorico)(id) || (0, exports.reforcoHistorico)(id)) && disc && cfg.discs.includes(disc)))
+        const metaLigada = t === 'gx' ? cfg.metas.gx !== false : !!cfg.metas[meta];
+        if ((!disc || !cfg.discs.includes(disc) || !metaLigada) && !esp && !(((0, exports.questoesHistorico)(id) || (0, exports.reforcoHistorico)(id)) && disc && cfg.discs.includes(disc)))
             continue;
         if (minutos <= 0)
             continue;
@@ -3614,7 +3744,7 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
     const limiteDia = memoDia((d) => limitePDF27(E, cfg, d, plano));
     const cont = (id, d) => continuacaoPDF216(E, cfg, id, d, plano, detalhes, pdfPorAula);
     const prioridade = (x, d) => {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e;
         if (ehPdf(x.t) && cont(x.id, d))
             return -3;
         if (((_a = opcoes.movida) === null || _a === void 0 ? void 0 : _a.id) === x.id && opcoes.movida.dia === d)
@@ -3623,6 +3753,8 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
             return R.constantes.prioridadesDomino.rebaixada;
         if (x.t === 'lp')
             return (_b = R.prioridades.porTipo.lp) !== null && _b !== void 0 ? _b : R.prioridades.outros; // LegProc: ÚLTIMA prioridade em todas as faixas
+        if (x.t === 'gx')
+            return (_d = (_c = E.gxMap.get(x.id)) === null || _c === void 0 ? void 0 : _c.prioridade) !== null && _d !== void 0 ? _d : R.prioridades.outros; // tipos personalizados: prioridade do catálogo
         if (rotina.faixa < 3 && !L.ehRev(cfg, semanaRotina, R)) {
             if (R23 && ehPdf(x.t) && !rotina.pdf.has(d))
                 return R.constantes.prioridadesDomino.rebaixada;
@@ -3639,14 +3771,14 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
             if (ehPdf(x.t))
                 return R.prioridades.faixa3.pdf;
         }
-        return (_c = R.prioridades.porTipo[x.t]) !== null && _c !== void 0 ? _c : R.prioridades.outros;
+        return (_e = R.prioridades.porTipo[x.t]) !== null && _e !== void 0 ? _e : R.prioridades.outros;
     };
     const liberar = (x, d) => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
         if (R.restricoes.length) {
             const c = {
                 idsDoDia, dataDe: (k) => { var _a; return (_a = plano[k]) === null || _a === void 0 ? void 0 : _a[0]; }, faixa: rotina.faixa, pai: (k) => { var _a; return ((_a = detalhes[k]) === null || _a === void 0 ? void 0 : _a.pai) || (k.startsWith('pp:') ? 'pf:' + indiceAula(k) : k); },
-                haOutrosPendentes: (fam) => fila.some((y) => y !== x && y.t !== 'lp' && (0, tipos_meta_1.familiaDoTipo)(y.t) !== fam),
+                haOutrosPendentes: (fam) => fila.some((y) => y !== x && y.t !== 'lp' && y.t !== 'gx' && (0, tipos_meta_1.familiaDoTipo)(y.t) !== fam),
             };
             if (!E.rastro) {
                 if ((0, restricoes_1.restricaoBloqueia)(R.restricoes, x.id, d, c))
@@ -3807,7 +3939,7 @@ function calcularDomino219Base(E, fonte0, cfg, desde, opcoes = {}) {
         flashHoje = 0;
         cotaFlash = !retaFinal && revObrig ? cotaPDFlash300(rotina.ativos.filter((data) => data >= d), (data) => capacidade(data) - ocupado(data), fila.filter((x) => x.t === 'fl' && !(0, exports.metaRevisao217)(x.id, detalhes) && semDe(cfg.start, x.data) <= sem).length) : Infinity;
         while (livre > 0) {
-            const disponiveis = fila.filter((x) => liberar(x, d) && (ehPdf(x.t) || x.minutos <= livre)).sort((a, b) => { var _a, _b; return prioridade(a, d) - prioridade(b, d) || (ehPdf(a.t) && ehPdf(b.t) && !a.detalhe.continuacao && !b.detalhe.continuacao && !a.detalhe.reforco && !b.detalhe.reforco ? ((_a = ordem.get(indiceAula(a.id))) !== null && _a !== void 0 ? _a : 1e9) - ((_b = ordem.get(indiceAula(b.id))) !== null && _b !== void 0 ? _b : 1e9) : 0) || (a.t === 'lp' && b.t === 'lp' ? rankRodizio25(a, d) - rankRodizio25(b, d) : 0) || a.data.localeCompare(b.data) || a.seq - b.seq; });
+            const disponiveis = fila.filter((x) => liberar(x, d) && (ehPdf(x.t) || x.minutos <= livre)).sort((a, b) => { var _a, _b, _c, _d, _e, _f; return prioridade(a, d) - prioridade(b, d) || (ehPdf(a.t) && ehPdf(b.t) && !a.detalhe.continuacao && !b.detalhe.continuacao && !a.detalhe.reforco && !b.detalhe.reforco ? ((_a = ordem.get(indiceAula(a.id))) !== null && _a !== void 0 ? _a : 1e9) - ((_b = ordem.get(indiceAula(b.id))) !== null && _b !== void 0 ? _b : 1e9) : 0) || (a.t === 'lp' && b.t === 'lp' ? rankRodizio25(a, d) - rankRodizio25(b, d) : 0) || (a.t === 'gx' && b.t === 'gx' ? ((_d = (_c = E.gxMap.get(a.id)) === null || _c === void 0 ? void 0 : _c.ordem) !== null && _d !== void 0 ? _d : 0) - ((_f = (_e = E.gxMap.get(b.id)) === null || _e === void 0 ? void 0 : _e.ordem) !== null && _f !== void 0 ? _f : 0) : 0) || a.data.localeCompare(b.data) || a.seq - b.seq; });
             const x = disponiveis[0];
             if (!x)
                 break;
@@ -3944,7 +4076,7 @@ function calcularDominoE(E, fonte, cfg, desde, opcoes = {}) {
  * Lança ErroInsuficiencia se o plano não couber em MAX_SEM semanas.
  */
 function gerarPlano(cfg0, AS, LP, fixos, ancora, ctx = {}) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     fixos = fixos || {};
     const R = (0, regras_1.resolverRegras)(ctx), HZ = R.horizonte.maxSemanas;
     const P = L.resolverParams({ ...(ctx.params || {}), maxSemanas: Math.min(HZ, Math.max(20, ((_b = (_a = ctx.params) === null || _a === void 0 ? void 0 : _a.maxSemanas) !== null && _b !== void 0 ? _b : HZ))) });
@@ -3969,9 +4101,10 @@ function gerarPlano(cfg0, AS, LP, fixos, ancora, ctx = {}) {
         if (presos[id] || (metaBloqueada(E, id) && !feito(E, id)) || ehMetaAnterior(E, id, cfg) || ((0, exports.reforcoHistorico)(id) && tipoEstudo(id) === 'pf' && !indicesAnteriores(E, cfg).has(indiceAula(id))))
             continue;
         const t = tipoEstudo(id), i = indiceAula(id);
-        const disc = t === 'lp' ? (_c = E.lpMap.get(id)) === null || _c === void 0 ? void 0 : _c.disc : (_d = AS[i]) === null || _d === void 0 ? void 0 : _d[0];
+        const disc = t === 'lp' ? (_c = E.lpMap.get(id)) === null || _c === void 0 ? void 0 : _c.disc : t === 'gx' ? (_d = E.gxMap.get(id)) === null || _d === void 0 ? void 0 : _d.disc : (_e = AS[i]) === null || _e === void 0 ? void 0 : _e[0];
         const tipo = t === 'pp' ? 'pf' : t === 'rf' ? 'fl' : t === 'rq' ? 'qu' : t;
-        if ((!disc || !cfg.discs.includes(disc) || !cfg.metas[tipo]) && !(((0, exports.questoesHistorico)(id) || (0, exports.reforcoHistorico)(id)) && disc && cfg.discs.includes(disc)))
+        const ligada = t === 'gx' ? cfg.metas.gx !== false : !!cfg.metas[tipo];
+        if ((!disc || !cfg.discs.includes(disc) || !ligada) && !(((0, exports.questoesHistorico)(id) || (0, exports.reforcoHistorico)(id)) && disc && cfg.discs.includes(disc)))
             continue;
         presos[id] = [r.desde < baseData ? baseData : r.desde, r.minutos / 60];
     }
@@ -3985,7 +4118,7 @@ function gerarPlano(cfg0, AS, LP, fixos, ancora, ctx = {}) {
             detalhes[id] = copiar(E.det[id]);
     for (const [id, r] of Object.entries(cfg.remanejadas))
         if (g.plano[id] && !feito(E, id))
-            detalhes[id] = { ...(r.detalhe || {}), pai: ((_e = r.detalhe) === null || _e === void 0 ? void 0 : _e.pai) || id, geracao: r.geracao || null };
+            detalhes[id] = { ...(r.detalhe || {}), pai: ((_f = r.detalhe) === null || _f === void 0 ? void 0 : _f.pai) || id, geracao: r.geracao || null };
     const cfgAtualizada = { reforcosHistorico: cfg.reforcosHistorico, remanejadas: cfg.remanejadas, revisao: cfg.revisao };
     if (Object.keys(cfg.remanejadas).some((id) => g.plano[id] && !feito(E, id))) {
         const r = calcularDominoE(E, g.plano, cfg, baseData, { detalhes, fixarComDado: true });
@@ -4015,6 +4148,13 @@ function pendenciasLegproc(cfg, LP, plano, feitas) {
         return [];
     const f = new Set(feitas), agendadas = new Set(Object.keys(plano).filter((id) => id.startsWith('lp:')));
     return (LP || []).filter((x) => cfg.discs.includes(x.disc) && !agendadas.has(x.id) && !f.has(x.id)).map((x) => x.id);
+}
+/** Metas 'gx' ainda sem data nas disciplinas selecionadas (análogo a pendenciasLegproc). */
+function pendenciasGx(cfg, GX, plano, feitas) {
+    if (cfg.metas.gx === false)
+        return [];
+    const f = new Set(feitas);
+    return normalizarGX(GX).filter((x) => cfg.discs.includes(x.disc) && !plano[x.id] && !f.has(x.id)).map((x) => x.id);
 }
 /** Expostos p/ testes/diagnóstico. */
 exports._interno = { rankingRevisaoBase, criarEnv, gerarPlanoBase30, calcularDominoE, estudadas216, acertoTema };
