@@ -33,6 +33,18 @@ interface AuditParams {
   status?: 'sucesso' | 'erro'
 }
 
+/**
+ * Resolve o ator da sessão atual (1 auth.getUser()). Use ANTES de laços que chamam registrarAudit várias vezes
+ * e repasse o resultado em `atorId`, evitando um getUser extra por evento. Nunca lança.
+ */
+export async function resolverAtorAudit(): Promise<string | null> {
+  try {
+    const sb = await createClient()
+    const { data } = await sb.auth.getUser()
+    return data.user?.id ?? null
+  } catch { return null }
+}
+
 // Colunas de contexto (rota/rota_api/request_id/sessao_id/status) só existem após a migração 20261121100000.
 let semColunasCtxAte = 0
 
@@ -47,13 +59,7 @@ export async function registrarAudit(params: AuditParams): Promise<void> {
 
     let userId = params.atorId ?? null
     if (userId === null) {
-      try {
-        const sb = await createClient()
-        const { data } = await sb.auth.getUser()
-        userId = data.user?.id ?? null
-      } catch {
-        /* sem sessão */
-      }
+      userId = await resolverAtorAudit()
     }
 
     let ip: string | null = null

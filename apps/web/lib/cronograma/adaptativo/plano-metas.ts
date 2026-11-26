@@ -38,6 +38,8 @@ export interface ConteudoDescricao {
   AS: Array<[string, string, string, string | null, string]>                          // disciplina, nº da aula, tema, documento, chave estável
   LP: Array<{ id: string; disc: string; lei: string; texto: string; doc: string | null }>
   WLP: string[][]; WLPdoc: Array<Array<string | null>>
+  /** metas próprias gx (tipos personalizados com geraMeta): id → dados p/ descrever */
+  GX?: Array<{ id: string; nomeTipo: string; disc: string; titulo: string; doc: string | null }>
   /** snapshot por documento: t = título, n = título normalizado, p = pasta (opcional → sem snapshot) */
   DOCS?: Record<string, { t: string; n: string; p: string | null }>
 }
@@ -56,9 +58,11 @@ async function conteudoParaDescricao(svc: SupabaseClient, tenantId: string): Pro
       for (const a of AS) if (uuidOu(a[3])) ids.add(a[3] as string)
       for (const l of LP) if (uuidOu(l.doc)) ids.add(l.doc as string)
       for (const r of WLPdoc) for (const d of r ?? []) if (uuidOu(d)) ids.add(d as string)
+      for (const x of c.GX ?? []) if (uuidOu(x.doc)) ids.add(x.doc as string)
       for (const [id, d] of await carregarInfoDocs(svc, tenantId, [...ids])) DOCS[id] = { t: d.titulo ?? '', n: d.titulo_norm || normalizarTituloDoc(d.titulo), p: d.pasta_id ?? null }
     } catch { /* sem snapshot */ }
-    return { AS, LP, WLP: c.WLP ?? [], WLPdoc, DOCS }
+    const GX = (c.GX ?? []).map((x) => ({ id: x.id, nomeTipo: x.nomeTipo, disc: x.disc, titulo: x.titulo, doc: x.doc ?? null }))
+    return { AS, LP, WLP: c.WLP ?? [], WLPdoc, DOCS, ...(GX.length ? { GX } : {}) }
   })
 }
 
@@ -71,6 +75,10 @@ export function descrever(id: string, c: ConteudoDescricao) {
   const tipo = p[0]
   const base = { tipo, tipo_nome: rotuloMeta(id) ?? rotuloTipo(tipo), parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
   const porAula = (i: number) => { const a = c.AS[i]; return a ? { disciplina: a[0] || null, aula: a[1] || null, titulo: a[2] || null, documento_id: uuidOu(a[3]), aula_key: a[4] } : {} }
+  if (tipo === 'gx') {
+    const it = c.GX?.find((x) => x.id === id)
+    return it ? { ...base, tipo_nome: it.nomeTipo || base.tipo_nome, disciplina: it.disc || null, titulo: it.titulo || null, documento_id: uuidOu(it.doc) } : base
+  }
   if (tipo === 'jp') return { ...base, titulo: 'Jurisprudência' } // 2.19: meta semanal, sem aula/documento
   if (tipo === 'pf' || tipo === 'fl' || tipo === 'qu') return { ...base, ...porAula(+p[1]) }
   if (tipo === 'pp') return { ...base, parte: Number.isFinite(+p[2]) ? +p[2] : null, ...porAula(+p[1]) }
@@ -196,6 +204,39 @@ function hashGrade(s: string): string {
   return h.toString(36) + ':' + s.length
 }
 
+/** stringify estável (chaves ordenadas; undefined→null) — compara jsonb independentemente da ordem das chaves. */
+function estavel(v: unknown): string {
+  if (v === undefined || v === null) return 'null'
+  if (typeof v === 'number') return Number.isFinite(v) ? String(Number(v)) : 'null'
+  if (Array.isArray(v)) return '[' + v.map(estavel).join(',') + ']'
+  if (typeof v === 'object') { const o = v as Record<string, unknown>; return '{' + Object.keys(o).sort().map((k) => JSON.stringify(k) + ':' + estavel(o[k])).join(',') + '}' }
+  return JSON.stringify(v)
+}
+
+/**
+ * Puro: devolve só as linhas NOVAS ou DIFERENTES das existentes (por meta_id). Compara apenas as chaves presentes na linha
+ * existente (colunas de migrações pendentes não vêm do banco → não forçam upsert). `atualizado_em`/`criado_em` são ignorados.
+ */
+export function linhasDiferentes<L extends { meta_id: string }>(linhas: L[], existentes: Map<string, Record<string, unknown>>): L[] {
+  return linhas.filter((l) => {
+    const ex = existentes.get(l.meta_id)
+    if (!ex) return true
+    for (const k of Object.keys(ex)) {
+      if (k === 'atualizado_em' || k === 'criado_em' || k === 'id') continue
+      if (!(k in l)) continue
+      if (estavel((l as Record<string, unknown>)[k]) !== estavel(ex[k])) return true
+    }
+    return false
+  })
+}
+
+/** Hashes do espelho. `linhas` = só o que afeta as linhas espelhadas (grade + detalhes + data de início do cfg); `cfg` = só o que sincronizarCfg grava (cfg/extras/pausa). */
+export function hashesEspelho(row: { cfg: Record<string, unknown> | null; extras: unknown; pausa: unknown; plano: Record<string, unknown> | null }, detalhes: unknown): { linhas: string; cfg: string } {
+  const linhas = hashGrade(JSON.stringify(['k3', String(row.cfg?.start ?? ''), row.plano ?? {}, detalhes]))
+  const cfg = hashGrade(JSON.stringify(['c1', row.cfg ?? {}, row.extras ?? [], row.pausa ?? null]))
+  return { linhas, cfg }
+}
+
 /**
  * Sincroniza as linhas de UM plano com a grade JSON. Pula se a grade não mudou (hash). Best-effort.
  * Retorna quantas linhas ficaram, ou `pulado`/`motivo`.
@@ -208,11 +249,22 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
     const row = p as { id: string; tenant_id: string; estudante_id: string; cfg: Record<string, unknown> | null; plano: Record<string, unknown> | null; extras: unknown; pausa: unknown; grade_espelhada_hash: string | null }
     const grade = row.plano ?? {}
     const detalhes = (sanearDetalhes(await lerDetalhesMetas(svc, row.id)) ?? {}) as Record<string, Record<string, unknown>>
-    const hash = hashGrade(JSON.stringify(['k2', row.cfg ?? {}, row.extras ?? [], row.pausa ?? null, grade, detalhes])) // 'k1' = versão do espelho (aula_key) → re-espelha uma vez; cfg inteiro: mudança de horas/recessos/etc. também ressincroniza
+    const hs = hashesEspelho(row, detalhes)
+    const hash = `${hs.linhas}|${hs.cfg}` // grade_espelhada_hash = "<hash das linhas>|<hash do cfg>" (formato antigo sem '|' → re-espelha 1x)
     if (row.grade_espelhada_hash === hash) return { ok: true, pulado: true }
+    const [hLinhasAnt, hCfgAnt] = (row.grade_espelhada_hash ?? '').split('|')
+    const linhasMudaram = hLinhasAnt !== hs.linhas
+    const cfgMudou = hCfgAnt !== hs.cfg
+
+    // Só cfg/extras/pausa mudaram (grade e detalhes iguais): NÃO recalcula/reenvia as linhas — só sincroniza cfg → colunas + filhas.
+    if (!linhasMudaram) {
+      const ok = await sincronizarCfg(svc, row)
+      if (ok) await svc.from(T_PLANO).update({ grade_espelhada_hash: hash, grade_espelhada_em: new Date().toISOString() }).eq('id', row.id)
+      return { ok: true, pulado: true, motivo: ok ? 'so_cfg' : 'cfg_pendente' }
+    }
 
     const conteudo = await conteudoParaDescricao(svc, row.tenant_id)
-    const cfgOk = await sincronizarCfg(svc, row) // cfg/extras/pausa → colunas + tabelas filhas (best-effort)
+    const cfgOk = cfgMudou ? await sincronizarCfg(svc, row) : true // cfg/extras/pausa → colunas + tabelas filhas (best-effort); inalterado → não refaz o delete+insert das 12 filhas
     const linhas = linhasDaGrade({ tenantId: row.tenant_id, estudanteId: row.estudante_id, planoId: row.id }, grade, String(row.cfg?.start ?? ''), conteudo, detalhes)
 
     // 1º caminho: função TRANSACIONAL (migração 20261106040000) — tudo ou nada, nunca deixa a grade pela metade
@@ -227,21 +279,23 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
     }
 
     // fallback (função ainda não aplicada): apaga o que saiu da grade e grava (upsert) o resto — o `criado_em` das linhas que continuam é preservado
-    const existentes = new Set<string>()
+    const existentesMap = new Map<string, Record<string, unknown>>()
     for (let from = 0; ; from += 1000) {
-      const { data, error: e2 } = await svc.from(T_PM).select('meta_id').eq('plano_id', row.id).order('meta_id', { ascending: true }).range(from, from + 999)
+      const { data, error: e2 } = await svc.from(T_PM).select('*').eq('plano_id', row.id).order('meta_id', { ascending: true }).range(from, from + 999)
       if (e2) return { ok: false, motivo: /does not exist|schema cache/i.test(e2.message) ? 'migracao_pendente' : e2.message }
-      for (const r of (data ?? []) as Array<{ meta_id: string }>) existentes.add(r.meta_id)
+      for (const r of (data ?? []) as Array<Record<string, unknown>>) existentesMap.set(String(r.meta_id), r)
       if (!data || data.length < 1000) break
     }
+    const existentes = new Set(existentesMap.keys())
     const novas = new Set(linhas.map((l) => l.meta_id))
     const sairam = [...existentes].filter((m) => !novas.has(m))
     for (let k = 0; k < sairam.length; k += 150) await svc.from(T_PM).delete().eq('plano_id', row.id).in('meta_id', sairam.slice(k, k + 150))
     const agora = new Date().toISOString()
-    for (let k = 0; k < linhas.length; k += 500) {
+    const aGravar = linhasDiferentes(linhas, existentesMap) // upsert só do que mudou (comparado com o existente)
+    for (let k = 0; k < aGravar.length; k += 500) {
       // colunas opcionais de migrações pendentes (snapshot do doc: 20261125020000; aula_key: 20261129000000; detalhes/semana_origem: 20261110020000):
       // a ausência é memorizada 10 min (recursoAusente) → não se tenta o upsert com a coluna a cada espelhamento.
-      const montar = (sn: boolean, dt: boolean, au: boolean) => linhas.slice(k, k + 500).map(({ doc_titulo, doc_titulo_norm, doc_pasta_id, detalhes, semana_origem, aula_key, ...l }) => ({
+      const montar = (sn: boolean, dt: boolean, au: boolean) => aGravar.slice(k, k + 500).map(({ doc_titulo, doc_titulo_norm, doc_pasta_id, detalhes, semana_origem, aula_key, ...l }) => ({
         ...l, ...(sn ? { doc_titulo, doc_titulo_norm, doc_pasta_id } : {}), ...(dt ? { detalhes, semana_origem } : {}), ...(au ? { aula_key } : {}), atualizado_em: agora,
       }))
       let sn = SNAP_COLS && !recursoAusente('col:pm.doc_titulo'), dt = !recursoAusente('col:pm.detalhes'), au = !recursoAusente('col:pm.aula_key')

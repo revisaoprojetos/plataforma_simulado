@@ -4,6 +4,14 @@ import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
+
+// Dados ESTÁTICOS da prova (config do simulado, anulada, etiqueta funcional, alternativas) em cache curto + single-flight
+// (remember): em simulado ao vivo, milhares de marcações/min repetiam as mesmas 4 leituras. NADA que dependa do estado da
+// sessão (dono, status, tempo) é cacheado — a validação U1 continua por requisição (sessaoExpirada usa os dados estáticos + relógio atual).
+// Chaves via chaveRelatorio(tenant,…): invalidarRelatorios(tenant) (re-correção/imports) limpa tudo; as que levam o id do
+// simulado também caem em invalidarRelatoriosSimulado. Fora isso o TTL curto (60s) limita a defasagem de gabarito/anulação.
+const TTL_ESTATICO_S = 60
 
 // POST /api/sessoes/resposta — auto-save idempotente de uma resposta.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -55,11 +63,14 @@ export async function POST(request: NextRequest) {
   // Autoridade do servidor sobre tempo/janela: recusa a resposta se o limite individual
   // (início + tempo_limite) ou o data_fim do simulado já passou. O timer do cliente é só UX;
   // o auto-encerramento (cron) finaliza a sessão logo em seguida.
-  const { data: sim } = await supabase
-    .from('simulado_simulados')
-    .select('tempo_limite_min, data_fim, regras')
-    .eq('id', sessao.simulado_id)
-    .maybeSingle()
+  const sim = await remember(chaveRelatorio(sessao.tenant_id, 'resp-est', 'sim', sessao.simulado_id), TTL_ESTATICO_S, async () => {
+    const { data } = await supabase
+      .from('simulado_simulados')
+      .select('tempo_limite_min, data_fim, regras')
+      .eq('id', sessao.simulado_id)
+      .maybeSingle()
+    return data ?? null
+  })
   // Regra "continuar após o tempo, sem punição": ignora o limite individual (a janela ainda vale).
   const semPunicaoTempo = ((sim?.regras as any)?.permitir_continuar_apos_tempo === true)
   if (sessaoExpirada(sessao.iniciado_em, sim?.tempo_limite_min, sim?.data_fim, semPunicaoTempo)) {
@@ -79,29 +90,38 @@ export async function POST(request: NextRequest) {
 
   // Questão anulada NÃO aceita resposta (ponto garantido a todos). Ignora silenciosamente —
   // defesa de servidor caso o cliente tente marcar mesmo com a UI bloqueada.
-  const { data: pqAnulada } = await supabase
-    .from('simulado_prova_questoes')
-    .select('anulada')
-    .eq('simulado_id', sessao.simulado_id)
-    .eq('questao_id', questao_id)
-    .maybeSingle()
+  const pqAnulada = await remember(chaveRelatorio(sessao.tenant_id, 'resp-est', 'pq', sessao.simulado_id, questao_id), TTL_ESTATICO_S, async () => {
+    const { data } = await supabase
+      .from('simulado_prova_questoes')
+      .select('anulada')
+      .eq('simulado_id', sessao.simulado_id)
+      .eq('questao_id', questao_id)
+      .maybeSingle()
+    return data ?? null
+  })
   if (pqAnulada?.anulada === true) {
     return NextResponse.json({ saved: false, anulada: true })
   }
   // Etiqueta FUNCIONAL (anular/desconsiderar) também bloqueia a resposta (ponto automático/nulo).
   try {
-    const funcs = await funcaoEtiquetaPorQuestao(supabase, [questao_id])
-    if (funcaoBloqueia(funcs.get(questao_id)?.funcao)) return NextResponse.json({ saved: false, anulada: true })
+    const funcao = await remember(chaveRelatorio(sessao.tenant_id, 'resp-est', 'etq', sessao.simulado_id, questao_id), TTL_ESTATICO_S, async () => {
+      const funcs = await funcaoEtiquetaPorQuestao(supabase, [questao_id])
+      return funcs.get(questao_id)?.funcao ?? null
+    })
+    if (funcaoBloqueia(funcao)) return NextResponse.json({ saved: false, anulada: true })
   } catch { /* etiquetas ausentes */ }
 
   // Valida a alternativa e já resolve a LETRA (por ordem) para armazenar — assim a
   // exibição (caderno, gabarito, mala direta) lê o valor pronto, sem recalcular.
   const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
-  const { data: qAlts } = await supabase
-    .from('simulado_alternativas')
-    .select('id, correta, ordem')
-    .eq('questao_id', questao_id)
-    .order('ordem')
+  const qAlts = await remember(chaveRelatorio(sessao.tenant_id, 'resp-est', 'alt', sessao.simulado_id, questao_id), TTL_ESTATICO_S, async () => {
+    const { data } = await supabase
+      .from('simulado_alternativas')
+      .select('id, correta, ordem')
+      .eq('questao_id', questao_id)
+      .order('ordem')
+    return (data ?? []) as Array<{ id: string; correta: boolean; ordem: number }>
+  })
   const idx = (qAlts ?? []).findIndex((a) => a.id === alternativa_id)
   if (idx < 0) {
     return NextResponse.json({ message: 'Alternativa inválida.' }, { status: 400 })

@@ -13,9 +13,16 @@ import { atualizarPerfilSnapshot } from '@/lib/perfil/snapshot'
 import { invalidarLeituraAluno } from '@/lib/leitura/cache'
 import { registrarTempo } from '@/lib/desempenho/tempo-estudo'
 import { registrarAtividade } from '@/lib/acessos/registro'
+import { MapLru } from '@/lib/util/lru'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
+
+// Caches curtos (60s, por processo) do gate de acesso e do flag de testador: o heartbeat de leitura (45s) repetia as
+// mesmas leituras a cada chamada. Só cacheia resultado POSITIVO do acesso (negado sempre reavalia → liberação aparece na hora).
+const TTL_ACESSO_MS = 60_000
+const acessoCache = new MapLru<string, any>(2000, TTL_ACESSO_MS)
+const testadorCache = new MapLru<string, boolean>(2000, TTL_ACESSO_MS)
 
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
@@ -29,7 +36,12 @@ export async function POST(request: NextRequest) {
   const svc = createAdminClient()
 
   // Documento + gate anti-IDOR (publicado/visível ao aluno); reusa os campos do desafio.
-  const doc = await docAcessivelAluno(svc, sessao.tenantId, documento_id, sessao.estudanteId, 'id, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
+  const kAcesso = `${sessao.tenantId}:${sessao.estudanteId}:${documento_id}`
+  let doc = acessoCache.get(kAcesso)
+  if (!doc) {
+    doc = await docAcessivelAluno(svc, sessao.tenantId, documento_id, sessao.estudanteId, 'id, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
+    if (doc) acessoCache.set(kAcesso, doc)
+  }
   if (!doc) return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
 
   // Estado atual (para acumular tempo e manter o máximo de %/artigo).
@@ -67,7 +79,8 @@ export async function POST(request: NextRequest) {
 
   // MODO TESTE (acesso exclusivo): conclui a leitura normalmente (p/ liberar o quiz), mas NÃO contabiliza
   // (sem XP/streak/medalhas/ranking) — só confere a visualização.
-  const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)
+  let testador = testadorCache.get(kAcesso)
+  if (testador === undefined) { testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id); testadorCache.set(kAcesso, testador) }
 
   // CONTABILIDADE DE TEMPO (Fase 2 do Meu Desempenho): credita o tempo lido na frente. JurisClub quando a
   // conclusão vem do arcade da juris (body.desafio); senão lei seca (LegProc). Testador não conta. Best-effort.

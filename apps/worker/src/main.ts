@@ -128,6 +128,8 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   agendar('/api/cron/jurisclub-publicar', 'cron jurisclub-publicar', (j) => !!j.publicadas, 10 * MIN)
   // Liberação de acesso por data (rota agora pré-checa transição vencida): 5 min mantido.
   agendar('/api/cron/liberacao-transicoes', 'cron liberacao-transicoes', (j) => !!(j.resultados?.some((r: any) => r.ativados || r.expirados)), 5 * MIN)
+  // Outbox de conteúdo: drena em lotes pequenos (25/rodada, dedupe por documento, lock Redis na rota) — backlog antigo some aos poucos sem pico de CPU.
+  agendar('/api/conteudo/outbox/processar', 'outbox conteudo', (j) => !!(j.processados || j.deduplicados), 2 * MIN)
   agendar('/api/cron/guru-silencio', 'cron guru-silencio', (j) => j && j.ok === false, 15 * MIN)
 
   // ── PESADAS (fila serial + jitter) ──

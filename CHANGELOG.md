@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.6 — 2026-11-26
+
+### Menos carga no banco: outbox, cache, auditoria, leitura, cronograma e prova
+- **Outbox de conteúdo:** o worker passa a processar `/api/conteudo/outbox/processar` a cada 2 min, com trava Redis, 25 documentos por rodada e eventos repetidos do mesmo documento baixados juntos (havia 12,5 mil parados desde 19/10).
+- **Cache:** `remember` com single-flight por chave e jitter de ±10% no TTL.
+- **Auditoria:** ator resolvido uma única vez (`resolverAtorAudit`); laço de duplicadas da biblioteca de questões sem `getUser` por item.
+- **Leitura:** heartbeat de 20 s para 45 s; cache de 60 s do acesso e do flag de testador.
+- **Espelho do cronograma:** `cfg` fora do hash das linhas; só regrava o que mudou. Primeira rodada após o deploy re-espelha cada plano uma vez.
+- **Cliente Supabase:** timeout de 25 s e 1 retry só em leituras (deadlock/rede); `sqlQuery` com `statement_timeout` de 30 s.
+- **Prova:** configuração do simulado, anulação, etiquetas e alternativas em cache de 60 s (sessão, dono, status e tempo continuam validados a cada requisição). Troca de gabarito/anulação pode levar até 60 s para valer no auto-save; a re-correção recalcula depois.
+
 ## 4.30.5 — 2026-11-26
 
 ### Menos leituras no banco: atribuições de pasta e relatórios de respostas

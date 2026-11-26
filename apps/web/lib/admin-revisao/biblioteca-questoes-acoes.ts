@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sqlQuery } from '@/lib/data/sql'
-import { registrarAudit } from '@/lib/audit'
+import { registrarAudit, resolverAtorAudit } from '@/lib/audit'
 import { chavesDe, gruposDuplicados, usoDeQuestoes } from './biblioteca-questoes-duplicadas'
 import { limparCacheQuestoes } from './biblioteca-questoes'
 import type { UsoQ } from './biblioteca-questoes-gestao-tipos'
@@ -183,7 +183,8 @@ export async function unificarQuestoes(svc: SupabaseClient, a: Ator, mestreId: s
   feito.arquivadas = (ar.data ?? []).length
 
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_questoes', entidadeId: mestreId, atorId: a.userId, tenantId, antes: { duplicadas_status: dupIds.map((d) => ({ id: d, status: v.todos!.get(d).status })) }, depois: { unificacao_questoes: modo, mestre: mestreId, duplicadas: dupIds, resultado: feito, movidos: mover } }).catch(() => {})
-  for (const d of dupIds) await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_questoes', entidadeId: d, atorId: a.userId, tenantId, antes: { status: v.todos!.get(d).status }, depois: { status: 'arquivada', duplicada_de: mestreId, modo } }).catch(() => {})
+  const atorLoop = a.userId ?? await resolverAtorAudit() // ator resolvido 1x fora do laço (evita auth.getUser() por duplicada)
+  for (const d of dupIds) await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_questoes', entidadeId: d, atorId: atorLoop, tenantId, antes: { status: v.todos!.get(d).status }, depois: { status: 'arquivada', duplicada_de: mestreId, modo } }).catch(() => {})
   limparCacheQuestoes(tenantId)
   return { ok: true, modo, feito }
 }

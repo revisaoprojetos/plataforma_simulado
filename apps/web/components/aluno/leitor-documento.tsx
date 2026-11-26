@@ -675,7 +675,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
 
   useEffect(() => {
     const tick = setInterval(() => { if (document.visibilityState === 'visible') tempoRef.current += 1 }, 1000)
-    const save = setInterval(() => { if (tempoRef.current > 0) flush().catch(() => {}); salvarPonto() }, 20000)
+    const save = setInterval(() => { if (tempoRef.current > 0) flush().catch(() => {}); salvarPonto() }, 45000) // 45s (era 20s); servidor aceita até 120s de tempo_inc por chamada
     // Ao esconder/fechar a aba: envia o tempo pendente via sendBeacon e ZERA (senão o próximo
     // flush contaria o mesmo tempo de novo). Listeners nomeados p/ remover no cleanup (sem leak).
     const onHide = () => {

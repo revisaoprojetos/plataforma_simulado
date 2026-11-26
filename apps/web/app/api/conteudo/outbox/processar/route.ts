@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAutorizado } from '@/lib/seguranca/cron-auth'
+import { comLockCron } from '@/lib/cron/lock'
 import { createAdminClient } from '@/lib/supabase/server'
 
 // Drenador do OUTBOX (A6/Fase 7). O evento já é gravado na mutação (reconciliacao/documentos); aqui ele
@@ -8,11 +9,6 @@ import { createAdminClient } from '@/lib/supabase/server'
 // Ganchos por tipo (notificação/IA) ficam centralizados aqui, fora do caminho da request do usuário.
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
-
-function autorizado(req: NextRequest): boolean {
-  // fail-closed quando não configurado; só header (não vaza em log/referrer como ?secret=). Aceita também CONTEUDO_CRON_SECRET (legado).
-  return cronAutorizado(req, ['CONTEUDO_CRON_SECRET'])
-}
 
 async function tratar(tipo: string, payload: any, tenantId: string | null): Promise<void> {
   // Ganchos futuros: 'anotacao.reconciliar' c/ revisao → fila de revisão/alinhamento por IA;
@@ -35,18 +31,49 @@ async function tratar(tipo: string, payload: any, tenantId: string | null): Prom
   }
 }
 
-export async function POST(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
-  const limite = Math.min(Number(new URL(req.url).searchParams.get('limite')) || 100, 500)
+// Limites por rodada (o consumidor 'documento.atualizado' pode baixar PDF/converter DOCX quando a versão
+// não tem páginas contadas — caro). Rodada curta + orçamento de tempo; o worker chama a cada ~120s e o backlog
+// drena aos poucos. Docs repetidos no backlog são processados 1x e TODOS os eventos pendentes do mesmo doc são baixados juntos.
+const LIMITE_PADRAO = 25
+const LIMITE_MAX = 100
+const ORCAMENTO_MS = 40_000
+
+async function executar(req: NextRequest) {
+  const limite = Math.max(1, Math.min(Number(new URL(req.url).searchParams.get('limite')) || LIMITE_PADRAO, LIMITE_MAX))
   const svc = createAdminClient()
   const { data: eventos, error } = await svc.from('simulado_conteudo_outbox')
     .select('id, tenant_id, tipo, payload').is('processado_em', null).order('criado_em', { ascending: true }).limit(limite)
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
-  let ok = 0
+  const t0 = Date.now()
+  const jaFeitos = new Set<string>() // tenant:doc já tratados nesta rodada
+  let ok = 0, deduplicados = 0
   for (const ev of eventos ?? []) {
-    try { await tratar(ev.tipo, ev.payload, (ev as { tenant_id?: string | null }).tenant_id ?? null); await svc.from('simulado_conteudo_outbox').update({ processado_em: new Date().toISOString() }).eq('id', ev.id); ok++ }
+    if (Date.now() - t0 > ORCAMENTO_MS) break
+    const tenantId = (ev as { tenant_id?: string | null }).tenant_id ?? null
+    const docId = ev.tipo === 'documento.atualizado' ? (ev.payload as any)?.documento_id : null
+    const chave = typeof docId === 'string' ? `${tenantId}:${docId}` : null
+    try {
+      if (chave && jaFeitos.has(chave)) { deduplicados++ } else {
+        await tratar(ev.tipo, ev.payload, tenantId)
+        if (chave) jaFeitos.add(chave)
+      }
+      const agora = new Date().toISOString()
+      await svc.from('simulado_conteudo_outbox').update({ processado_em: agora }).eq('id', ev.id)
+      // Baixa em massa os demais eventos pendentes do MESMO doc (o handler é idempotente/estado-atual): drena o backlog duplicado sem reprocessar.
+      if (chave && tenantId && typeof docId === 'string') {
+        const r = await svc.from('simulado_conteudo_outbox').update({ processado_em: agora })
+          .eq('tenant_id', tenantId).eq('tipo', 'documento.atualizado').eq('payload->>documento_id', docId).is('processado_em', null).select('id')
+        deduplicados += r.data?.length ?? 0
+      }
+      ok++
+    }
     catch (e) { console.error('[outbox] evento', ev.id, (e as Error).message) }
   }
-  return NextResponse.json({ ok: true, processados: ok, total: (eventos ?? []).length })
+  return NextResponse.json({ ok: true, processados: ok, deduplicados, total: (eventos ?? []).length })
 }
+
+// Lock compartilhado (réplicas/worker): rodada anterior ainda rodando → 200 { skipped: true }. Autentica via CRON_SECRET (cronAutorizado).
+export const POST = (req: NextRequest) => process.env.CONTEUDO_CRON_SECRET && cronAutorizado(req, ['CONTEUDO_CRON_SECRET']) && !cronAutorizado(req)
+  ? executar(req) // segredo legado (CONTEUDO_CRON_SECRET): sem lock Redis
+  : comLockCron(req, 'conteudo-outbox', () => executar(req), 3 * 60_000)

@@ -82,6 +82,25 @@ const MEM_MAX = 300
  * instabilidade, computa direto. Só serializa valores JSON.
  */
 export async function remember<T>(chave: string, ttlSeg: number, calcular: () => Promise<T>): Promise<T> {
+  // Single-flight: chamadas concorrentes da mesma chave (no processo) compartilham a MESMA promise em voo
+  // (evita estouro de cache/thundering herd). Removida ao terminar (sucesso ou erro).
+  const emVoo = voando.get(chave) as Promise<T> | undefined
+  if (emVoo) return emVoo
+  const p = rememberInterno(chave, ttlSeg, calcular)
+  voando.set(chave, p)
+  const limpar = () => { if (voando.get(chave) === p) voando.delete(chave) }
+  p.then(limpar, limpar)
+  return p
+}
+
+const voando = new Map<string, Promise<unknown>>()
+
+/** TTL com jitter de ±10% (dessincroniza expirações simultâneas). Mínimo 1s. */
+export function ttlComJitter(ttlSeg: number): number {
+  return Math.max(1, Math.round(ttlSeg * (0.9 + Math.random() * 0.2)))
+}
+
+async function rememberInterno<T>(chave: string, ttlSeg: number, calcular: () => Promise<T>): Promise<T> {
   const r = redis()
   let redisOk = false
   if (r) {
@@ -101,10 +120,10 @@ export async function remember<T>(chave: string, ttlSeg: number, calcular: () =>
   const ms = Date.now() - t0
   if (ms > 3000) console.warn(`[relatorio lento] ${chave} computou em ${ms}ms (cache-miss)`) // observabilidade (Fase 4)
   if (valor !== undefined) {
-    if (redisOk && r) { try { await r.set(chave, JSON.stringify(valor), 'EX', ttlSeg) } catch { /* best-effort */ } }
+    if (redisOk && r) { try { await r.set(chave, JSON.stringify(valor), 'EX', ttlComJitter(ttlSeg)) } catch { /* best-effort */ } }
     else {
       if (mem.size >= MEM_MAX) { const k = mem.keys().next().value; if (k) mem.delete(k) }
-      mem.set(chave, { v: valor, exp: Date.now() + Math.min(ttlSeg, 120) * 1000 }) // memória: no máx. 2 min
+      mem.set(chave, { v: valor, exp: Date.now() + Math.min(ttlComJitter(ttlSeg), 120) * 1000 }) // memória: no máx. 2 min
     }
   }
   return valor

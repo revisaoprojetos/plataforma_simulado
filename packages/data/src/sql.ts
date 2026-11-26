@@ -90,11 +90,20 @@ export function poolStats(): { total: number; idle: number; waiting: number; rep
 export async function sqlQuery<T = any>(text: string, params: any[] = []): Promise<T[] | null> {
   const p = getPool()
   if (!p) return null
+  let client
   try {
-    const r = await p.query(text, params)
+    client = await p.connect()
+    // statement_timeout de 30s por query (SET LOCAL vale só dentro da transação → seguro com pooler transacional).
+    await client.query('BEGIN')
+    await client.query('SET LOCAL statement_timeout = 30000')
+    const r = await client.query(text, params)
+    await client.query('COMMIT')
     return r.rows as T[]
   } catch (e) {
+    try { await client?.query('ROLLBACK') } catch { /* ignora */ }
     console.error('[sql] query falhou (fallback p/ PostgREST):', (e as Error).message)
     return null
+  } finally {
+    client?.release()
   }
 }
