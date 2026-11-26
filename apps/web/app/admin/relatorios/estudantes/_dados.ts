@@ -74,6 +74,17 @@ function compararEstudante(sql: DadosRelatorioEstudante | null, pg: DadosRelator
   console.log(`[shadow estudante] ${estId.slice(0, 8)}: ${probs.length ? 'DIFF ' + probs.join(', ') : 'ok'}`)
 }
 
+/** Acerto da turma agregado por questão via RPC (lotes de 400). null = RPC indisponível → chamador usa o legado. */
+export async function turmaPorQuestaoRpc(svc: SupabaseClient, qids: string[]): Promise<{ questao_id: string; tt: number; ac: number }[] | null> {
+  const out: { questao_id: string; tt: number; ac: number }[] = []
+  for (let i = 0; i < qids.length; i += 400) {
+    const { data, error } = await svc.rpc('fn_turma_resp_por_questao', { p_qids: qids.slice(i, i + 400) })
+    if (error || !Array.isArray(data)) return null
+    out.push(...(data as any[]))
+  }
+  return out
+}
+
 /** Caminho PostgREST original (fallback). */
 async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenantId: string | null): Promise<DadosRelatorioEstudante | null> {
   const { data: alvo } = await svc.from('simulado_estudantes').select('id, nome').eq('id', estId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
@@ -111,20 +122,30 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
   // Turma: respostas de TODOS (sessões reais) às mesmas questões → acerto por disciplina.
   const acDiscTurma = new Map<string, { ac: number; tt: number }>()
   if (qidsAluno.length) {
-    // fetchAllByIn: sem isso o PostgREST trunca em ~1000 e a comparação aluno×turma fica incoerente.
-    const tArr = await fetchAllByIn<any>(qidsAluno, (chunk) =>
-      svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', chunk).order('id'))
-    const tSessIds = [...new Set(tArr.map((r) => r.sessao_id))]
-    const teste = new Set<string>()
-    if (tSessIds.length) {
-      const ts = await fetchAllByIn<any>(tSessIds, (chunk) =>
-        svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', chunk).order('id'))
-      for (const s of ts) if (s.is_teste || s.deletado) teste.add(s.id)
-    }
-    for (const r of tArr) {
-      if (teste.has(r.sessao_id)) continue
-      const disc = discDeQ.get(r.questao_id) ?? 'Sem disciplina'
-      const v = acDiscTurma.get(disc) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; acDiscTurma.set(disc, v)
+    // Agregado no banco (RPC jsonb, lote de 400 questões): antes paginava TODAS as respostas da turma
+    // (milhares de páginas de 1000 linhas por relatório). Sem a RPC (migração pendente) → caminho legado.
+    const agg = await turmaPorQuestaoRpc(svc, qidsAluno)
+    if (agg) {
+      for (const r of agg) {
+        const disc = discDeQ.get(r.questao_id) ?? 'Sem disciplina'
+        const v = acDiscTurma.get(disc) ?? { ac: 0, tt: 0 }; v.tt += r.tt; v.ac += r.ac; acDiscTurma.set(disc, v)
+      }
+    } else {
+      // fetchAllByIn: sem isso o PostgREST trunca em ~1000 e a comparação aluno×turma fica incoerente.
+      const tArr = await fetchAllByIn<any>(qidsAluno, (chunk) =>
+        svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('questao_id', chunk).order('id'))
+      const tSessIds = [...new Set(tArr.map((r) => r.sessao_id))]
+      const teste = new Set<string>()
+      if (tSessIds.length) {
+        const ts = await fetchAllByIn<any>(tSessIds, (chunk) =>
+          svc.from('simulado_sessoes_prova').select('id, is_teste, deletado').in('id', chunk).order('id'))
+        for (const s of ts) if (s.is_teste || s.deletado) teste.add(s.id)
+      }
+      for (const r of tArr) {
+        if (teste.has(r.sessao_id)) continue
+        const disc = discDeQ.get(r.questao_id) ?? 'Sem disciplina'
+        const v = acDiscTurma.get(disc) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; acDiscTurma.set(disc, v)
+      }
     }
   }
 

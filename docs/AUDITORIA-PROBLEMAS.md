@@ -44,6 +44,7 @@ Registro simples de tudo que deu errado (histórico de **02/11/2026 em diante**)
 | 24 | Bloat de 3,2 GB em `simulado_conteudo_versoes` | TOAST com 3,3 GB para ~50 MB de dado vivo; nunca teve autovacuum. | `VACUUM (FULL, ANALYZE) simulado_conteudo_versoes;` via psql, fora do pico. | 26/11/2026 | Você (psql) |
 | 25 | Pendências de CPU | `rebuildCacheTenant` pagina todo o ledger de XP; `matricularEmSimuladosDoBanco` reconcilia todos os membros a cada vínculo; `leitura-publicar` lê todas as aulas com `publicacao`; `curseduca-jobs/sync` e `integracoes-eventos` sem lock Redis. | RPC com DISTINCT; reconciliar só o delta; filtro por data; usar `comLockCron`. | A definir | Implementar |
 | 22 | Badge "N resposta(s)" em questões | A checagem de uso passou a devolver 0 ou 1. | Trocar por RPC de contagem se quiser o número exato. | A definir | Opcional |
+| 26 | Consultas mais pesadas do banco (26/11/2026) | `simulado_pasta_estudantes` (~824 chamadas/min) e `simulado_respostas_objetivas` por questão somavam ~74% do tempo de execução. | v4.30.5: leitura só do próprio aluno + RPC cacheada; relatórios com RPC agregada. Aplicar `20261206000000` no projeto `twdrtlxkjvunkdobudev`. | 26/11/2026 | Você (migração) |
 
 ---
 

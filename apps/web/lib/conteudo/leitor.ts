@@ -5,6 +5,8 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
+import { carregarAtribuicoes, fetchTol } from './atribuicoes'
+export { invalidarAtribuicoesCache } from './atribuicoes'
 import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
 import { docBloqueadoPorLiberacaoAulas } from '@/lib/produtos/liberacao-aulas-aluno'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
@@ -52,15 +54,6 @@ export interface Leitura {
 
 interface NivelRaw { pai_id?: string | null; herda_acesso?: boolean | null; acesso_geral?: AcessoGeral; modo_acesso?: string | null; oculto?: boolean | null }
 
-/** try com colunas novas; se a coluna/tabela não existe, cai no SELECT legado; se tudo falhar, []. */
-async function fetchTol<T>(primario: () => any, legado: () => any): Promise<T[]> {
-  try { return await fetchAll<T>(primario) } catch { try { return await fetchAll<T>(legado) } catch { return [] } }
-}
-async function fetchTolByIn<T>(ids: string[], primario: (c: string[]) => any, legado: (c: string[]) => any): Promise<T[]> {
-  if (!ids.length) return []
-  try { return await fetchAllByIn<T>(ids, primario) } catch { try { return await fetchAllByIn<T>(ids, legado) } catch { return [] } }
-}
-
 /** Mapeia o estado persistido → modo de 1ª classe, PRESERVANDO o comportamento atual (ver bloco acima). */
 function modoEfetivo(raw: NivelRaw, isRoot: boolean, temAtrib: boolean): ModoAcesso {
   const m = raw.modo_acesso
@@ -75,38 +68,6 @@ function modoEfetivo(raw: NivelRaw, isRoot: boolean, temAtrib: boolean): ModoAce
 
 function itemDeNivel(id: string, raw: NivelRaw, atrib: Atribuicao[], ancestrais: ItemAcesso[], isRoot: boolean): ItemAcesso {
   return { id, modo: modoEfetivo(raw, isRoot, atrib.length > 0), oculto: raw.oculto === true, acessoGeral: raw.acesso_geral ?? null, atribuicoes: atrib, ancestrais }
-}
-
-function atribDe(tipo: 'grupo' | 'aluno', refId: string, r: any): Atribuicao {
-  const origem = r?.origem === 'individual' ? 'individual' : r?.origem === 'via_pacote' ? 'via_pacote' : 'avulsa'
-  return {
-    tipo, grupoId: tipo === 'grupo' ? refId : null, estudanteId: tipo === 'aluno' ? refId : null, origem,
-    liberadoDe: r?.liberado_de ?? null, liberadoAte: r?.liberado_ate ?? null,
-    // ausentes (SELECT legado) = null → `permsDa` trata como liberado (igual ao gate antigo: atribuição = acesso cheio).
-    podeLer: r?.pode_ler ?? null, podeBaixar: r?.pode_baixar ?? null, podeGrifar: r?.pode_grifar ?? null,
-  }
-}
-
-/** Atribuições (grupos + estudantes) por nó, já como `Atribuicao[]`. Tolerante a colunas/tabelas ausentes. */
-async function carregarAtribuicoes(svc: any, tenantId: string, tipo: 'pasta' | 'doc', ids: string[]): Promise<Map<string, Atribuicao[]>> {
-  const out = new Map<string, Atribuicao[]>()
-  if (!ids.length) return out
-  const tg = tipo === 'pasta' ? 'simulado_pasta_grupos' : 'simulado_conteudo_documento_grupos'
-  const te = tipo === 'pasta' ? 'simulado_pasta_estudantes' : 'simulado_conteudo_documento_estudantes'
-  const key = tipo === 'pasta' ? 'pasta_id' : 'documento_id'
-  const extra = 'origem, pode_ler, pode_baixar, pode_grifar, liberado_de, liberado_ate'
-  const [grupos, estud] = await Promise.all([
-    fetchTolByIn<any>(ids,
-      (c) => svc.from(tg).select(`${key}, grupo_id, ${extra}`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true }),
-      (c) => svc.from(tg).select(`${key}, grupo_id`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true })),
-    fetchTolByIn<any>(ids,
-      (c) => svc.from(te).select(`${key}, estudante_id, ${extra}`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true }),
-      (c) => svc.from(te).select(`${key}, estudante_id`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true })),
-  ])
-  const push = (id: string, a: Atribuicao) => { (out.get(id) ?? out.set(id, []).get(id)!).push(a) }
-  for (const r of grupos as any[]) push(r[key], atribDe('grupo', r.grupo_id, r))
-  for (const r of estud as any[]) push(r[key], atribDe('aluno', r.estudante_id, r))
-  return out
 }
 
 /**
@@ -124,7 +85,7 @@ async function motorAcesso(svc: any, tenantId: string, estId: string) {
     () => svc.from(T_PASTA).select('id, pai_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }),
   )
   const infoPasta = new Map<string, NivelRaw>((pastas ?? []).map((p: any) => [p.id, { pai_id: p.pai_id ?? null, herda_acesso: p.herda_acesso, acesso_geral: p.acesso_geral ?? null, modo_acesso: p.modo_acesso ?? null, oculto: p.oculto ?? false }]))
-  const atribPasta = await carregarAtribuicoes(svc, tenantId, 'pasta', [...infoPasta.keys()])
+  const atribPasta = await carregarAtribuicoes(svc, tenantId, 'pasta', [...infoPasta.keys()], estId)
 
   function cadeia(paiId: string | null): ItemAcesso[] {
     const chain: ItemAcesso[] = []; const seen = new Set<string>(); let cur = paiId
@@ -167,7 +128,7 @@ async function fetchDocComAcesso(svc: any, tenantId: string, id: string, cols: s
 /** Avalia 1 documento (carrega atribuições do próprio doc). Retorna o `ResultadoAcesso` completo. */
 async function avaliarDocAluno(svc: any, tenantId: string, estId: string, docRaw: any): Promise<ResultadoAcesso> {
   const motor = await motorAcesso(svc, tenantId, estId)
-  const atrib = (await carregarAtribuicoes(svc, tenantId, 'doc', [docRaw.id])).get(docRaw.id) ?? []
+  const atrib = (await carregarAtribuicoes(svc, tenantId, 'doc', [docRaw.id], estId)).get(docRaw.id) ?? []
   return motor.avaliarDoc(docRaw, atrib)
 }
 
@@ -291,7 +252,7 @@ export async function catalogoRaizAluno(svc: any, tenantId: string, estId: strin
   )
   const paiDe = new Map<string, string | null>(pastas.map((p: any) => [p.id, p.pai_id ?? null]))
   const motor = await motorAcesso(svc, tenantId, estId)
-  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', (docs ?? []).map((d: any) => d.id))
+  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', (docs ?? []).map((d: any) => d.id), estId)
   const visiveis = (docs ?? []).filter((d: any) => motor.avaliarDoc(d, atribDocs.get(d.id) ?? []).permitido)
   // docs visíveis por subárvore: cada doc incrementa a pasta que o contém e TODAS as ancestrais.
   const totalSub = new Map<string, number>()
@@ -342,7 +303,7 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   // Motor de acesso ÚNICO (acessoEfetivo) — visibilidade da pasta e de cada doc (modo/oculto/origem/janela).
   const motor = await motorAcesso(svc, tenantId, alunoId)
   const pastaAcessivel = motor.pastaAcessivel
-  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', docs.map((d: any) => d.id))
+  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', docs.map((d: any) => d.id), alunoId)
   const visiveis = docs.filter((d: any) => motor.avaliarDoc(d, atribDocs.get(d.id) ?? []).permitido)
 
   // conta docs visíveis na subárvore de cada pasta (para ocultar pastas vazias + mostrar total)

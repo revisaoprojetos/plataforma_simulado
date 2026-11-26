@@ -58,6 +58,18 @@ function compararDisciplina(sql: DadosRelatorioDisciplina | null, pg: DadosRelat
   console.log(`[shadow disciplina] ${discId.slice(0, 8)}: ${probs.length ? 'DIFF ' + probs.join(', ') : 'ok'}`)
 }
 
+type DiscAgg = { por: { simulado_id: string; assunto_id: string | null; y: number | null; m0: number | null; tt: number; ac: number }[]; est: string[] }
+/** Agregado da disciplina via RPC (lotes de 400). null = RPC indisponível (migração pendente) → legado. */
+async function disciplinaAggRpc(svc: SupabaseClient, qids: string[]): Promise<DiscAgg | null> {
+  const out: DiscAgg = { por: [], est: [] }
+  for (let i = 0; i < qids.length; i += 400) {
+    const { data, error } = await svc.rpc('fn_disciplina_resp_agg', { p_qids: qids.slice(i, i + 400) })
+    if (error || !data || !Array.isArray((data as any).por)) return null
+    out.por.push(...(data as any).por); out.est.push(...((data as any).est ?? []))
+  }
+  return out
+}
+
 /** Caminho PostgREST original (fallback). */
 async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tenantId: string | null): Promise<DadosRelatorioDisciplina | null> {
   const { data: alvo } = await svc.from('simulado_disciplinas').select('id, nome').eq('id', discId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
@@ -75,6 +87,18 @@ async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tena
   const estudantes = new Set<string>()
   let totAc = 0, totTt = 0
 
+  // Agregado no banco (RPC jsonb, lotes de 400 questões): antes paginava TODAS as respostas da disciplina.
+  const viaRpc = qIds.length ? await disciplinaAggRpc(svc, qIds) : null
+  if (viaRpc) {
+    for (const g of viaRpc.por) {
+      const add = (m: Map<string, { ac: number; tt: number }>, k: string) => { const v = m.get(k) ?? { ac: 0, tt: 0 }; v.tt += g.tt; v.ac += g.ac; m.set(k, v) }
+      totTt += g.tt; totAc += g.ac
+      add(acPorSim, g.simulado_id)
+      add(acPorAssunto, g.assunto_id ?? '—')
+      if (g.y != null && g.m0 != null) add(acPorMes, `${g.y}-${String(g.m0).padStart(2, '0')}`)
+    }
+    for (const e of viaRpc.est) estudantes.add(e)
+  } else
   if (qIds.length) {
     // fetchAllByIn nas respostas E nas sessões: sem isso ambos truncam em ~1000 → stats da disciplina incoerentes.
     const respArr = await fetchAllByIn<any>(qIds, (chunk) =>

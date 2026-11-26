@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.30.5 — 2026-11-26
+
+### Menos leituras no banco: atribuições de pasta e relatórios de respostas
+- **Biblioteca do aluno:** `simulado_pasta_estudantes` passa a ler só as linhas do próprio aluno; uma RPC cacheada (60 s por tenant) indica quais pastas têm atribuição de outros alunos. Salvar o acesso de um nó invalida o cache. Novo `lib/conteudo/atribuicoes.ts`.
+- **Relatórios (estudantes/disciplinas):** o fallback paginado de 1000 em 1000 de `respostas_objetivas` foi trocado por RPCs agregadas em lotes de 400 questões.
+- **Migração nova:** `20261206000000_reducao_leituras_pasta_estudantes_respostas.sql` (índice + 3 funções; rodar `NOTIFY pgrst, 'reload schema'` depois). Sem ela o código usa o caminho antigo.
+- **Correção:** `20261120010000_rastreio_aluno_total.sql` não dá mais erro 42803 (agregado no `group by`).
+- Pacote de SQLs para o projeto de produção em `docs/sql-aplicar-twdr/` e diagnóstico em `docs/AUDITORIA-LENTIDAO-2026-11-25.md`.
+
 ## 4.30.4 — 2026-11-25
 
 ### Redução de CPU e memória + limpeza de cache e estado do banco

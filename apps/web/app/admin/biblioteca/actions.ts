@@ -3,6 +3,7 @@ import { sanearBusca } from '@/lib/seguranca/email-seguro'
 import type { Categoria, PastaConteudo, EstudanteAcessoLinha, GrupoAtribuido, NoAcesso, ModoAcessoDTO, OrigemDTO, PermsDTO, DriveNodeDTO, PermissoesAluno, VinculoLeitor, AcessoLinhaSidebar, EventoHistorico } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
+import { invalidarAtribuicoesCache } from '@/lib/conteudo/leitor'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getStorage } from '@/lib/storage'
 import { getCurrentAccess, checkPermission, getAuthUser, isSuperAdmin } from '@/lib/auth/permissions'
@@ -1109,6 +1110,7 @@ export async function salvarAcessoNo(input: {
   const rg = await substituir(tg, 'grupo_id', input.grupos ?? []); if (!rg.ok) return rg
   const re = await substituir(te, 'estudante_id', input.estudantes ?? []); if (!re.ok) return re
 
+  await invalidarAtribuicoesCache(g.tenantId).catch(() => {})
   await registrarAudit({ operacao: 'UPDATE', entidade: tabela, entidadeId: input.id, depois: { modo: input.modo ?? null, oculto: !!input.oculto, herda: input.herda, geral: input.geral?.modo ?? null, grupos: (input.grupos ?? []).length, estudantes: (input.estudantes ?? []).length }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   revalidatePath('/admin/biblioteca')
   return { ok: true }

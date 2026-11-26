@@ -121,8 +121,9 @@ as $$
     'por_tipo', coalesce((select jsonb_agg(x) from (
         select jsonb_build_object('tipo', tipo, 'total', count(*)) as x from at group by tipo order by count(*) desc) q), '[]'::jsonb),
     'por_hora', coalesce((select jsonb_agg(x order by (x->>'hora')::int) from (
-        select jsonb_build_object('hora', extract(hour from iniciado_em at time zone 'America/Sao_Paulo')::int, 'acessos', count(*)) as x
-          from ac group by 1) q), '[]'::jsonb)
+        select jsonb_build_object('hora', h.hora, 'acessos', count(*)) as x
+          from (select extract(hour from iniciado_em at time zone 'America/Sao_Paulo')::int as hora from ac) h
+         group by h.hora) q), '[]'::jsonb)
   );
 $$;
 revoke all on function public.simulado_aluno_metricas_painel(uuid, timestamptz) from public, anon, authenticated;
