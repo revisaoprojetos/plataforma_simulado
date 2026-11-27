@@ -23,6 +23,7 @@ import { registrarGeracao, registrarEventoMeta, registrarSync, type OrigemGeraca
 import { revisoesAntesDoEstudo, aplicarAjustes } from './revisoes-coerentes'
 import type { Grade } from './grade-diff'
 import { planejarProgresso, emParaCliente, type ProgEnviado, type MetaAtual } from './progresso-regras'
+import { gravarJsonStorage } from '@/lib/storage/json'
 import { garantirAS, chavesAtuais } from './remap-as-server'
 import { camposAssinatura, idOrfao, assinaturaDoCfg, type AssinaturaAS } from './remap-as'
 import { aulaKeyDoMetaId } from './progresso-por-chave'
@@ -326,10 +327,8 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row0: P
     // manterMotor: a correção automática do catálogo não promove o plano à regra nova (rev. 23 só vale ao recalcular/gerar de novo)
     const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { legado, manterMotor: true, ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), regras, params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas), prog: progDeMetas(metas), hoje, planoAtual: row.plano as Plano, detalhes: detalhesAtuais, ...(banco.GX?.length ? { gx: banco.GX } : {}) })
     const revs = Object.fromEntries(Object.entries(row.revs || {}).filter(([k]) => semInicio(cfg2.start, +k) <= hoje))
-    try {
-      const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs })], { type: 'application/json' })
-      await svc.storage.from('pdfs').upload(`cronograma/backup-catalogo/${tenantId}/${row.id}.json`, corpo, { upsert: false, contentType: 'application/json' })
-    } catch { /* backup best-effort (já existe = migrado antes) */ }
+    // backup best-effort no storage ativo (já existe = migrado antes → não sobrescreve o ORIGINAL)
+    await gravarJsonStorage('pdfs', `cronograma/backup-catalogo/${tenantId}/${row.id}.json`, { planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs }, false)
     const { error } = await svc.from(T_PLANO)
       .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, revs, atualizado_em: new Date().toISOString() })
       .eq('id', row.id).or(`cfg->>catalogo.is.null,cfg->>catalogo.neq.${catId}`) // concorrência: só uma migração grava

@@ -24,7 +24,7 @@ import { familiaParcial, paginaRetomada, textoParada, type FamiliaParcial } from
 import { urlLeitorRevisao } from './conteudo-meta'
 
 /** Documento da Biblioteca ligado à meta (explícito do admin ou automático), já com título/páginas. */
-export type ConteudoMetaEntrada = { docId: string; origem: 'explicito' | 'auto'; pagina: number | null; titulo: string; paginas: number | null; baixavel?: boolean; /** bloqueado pela matriz (fonte única) */ bloqueado?: boolean; liberaEm?: string | null }
+export type ConteudoMetaEntrada = { docId: string; origem: 'explicito' | 'auto'; pagina: number | null; titulo: string; paginas: number | null; baixavel?: boolean; /** bloqueado pela matriz (fonte única) */ bloqueado?: boolean; liberaEm?: string | null; /** escolhidos na matriz do Gerador */ parteId?: string | null; rotuloAluno?: string | null }
 /** Linha de progresso parcial/não realizada do aluno (já reencaixada por chave). */
 export type ProgressoMetaEntrada = {
   meta_id: string
@@ -92,7 +92,7 @@ export type RevisaoMeta = {
   fam: FamiliaParcial
   minPlan: number
   /** Material da Biblioteca ligado à meta (null = sem conteúdo). `url` abre o leitor do portal com retorno ao cronograma. */
-  doc: { id: string; titulo: string; origem: 'explicito' | 'auto'; paginas: number | null; url: string; baixavel: boolean; bloqueado?: boolean; liberaEm?: string | null } | null
+  doc: { id: string; titulo: string; origem: 'explicito' | 'auto'; paginas: number | null; url: string; baixavel: boolean; bloqueado?: boolean; liberaEm?: string | null; parteId?: string; rotulo?: string } | null
   /** Registro de Parcial / Não realizada do aluno (null = nenhum). */
   parcial: { status: 'parcial' | 'nao_realizada'; pagina: number | null; total: number | null; artigo: string | null; ponto: string | null; minutos: number | null; texto: string; rotulo: string; em: string } | null
 }
@@ -256,7 +256,7 @@ export function montarPayloadRevisaoIframe(args: {
       marcadaEm,
       fam,
       minPlan: minutosPlanejadosDaDuracao(m.duracao),
-      doc: cont ? { id: cont.docId, titulo: cont.titulo, origem: cont.origem, paginas: cont.paginas, baixavel: cont.baixavel === true, bloqueado: cont.bloqueado === true, liberaEm: cont.liberaEm ?? null, url: urlLeitorRevisao(cont.docId, emissao.id, paginaAbrir) } : null,
+      doc: cont ? { id: cont.docId, titulo: cont.titulo, origem: cont.origem, paginas: cont.paginas, baixavel: cont.baixavel === true, bloqueado: cont.bloqueado === true, liberaEm: cont.liberaEm ?? null, ...(cont.parteId ? { parteId: cont.parteId } : {}), ...(cont.rotuloAluno ? { rotulo: cont.rotuloAluno } : {}), url: urlLeitorRevisao(cont.docId, emissao.id, paginaAbrir) } : null,
       parcial,
     }
   }

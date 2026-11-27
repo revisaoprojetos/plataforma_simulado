@@ -42,15 +42,13 @@ import { QuestoesBanco, prefetchQuestoesBanco } from './questoes-banco'
 import { QuestoesUnificar } from './questoes-unificar'
 import { UnificarDisciplinas } from './unificar-disciplinas'
 import { QuestoesClassificacao } from './questoes-classificacao'
-import { QuestoesEtiquetas } from './questoes-etiquetas'
 import type { InicialQuestoesUnificar } from './questoes-unificar'
-import type { ListaEtiquetas } from '@/lib/admin-revisao/questoes-etiquetas-tipos'
 import type { InicialDisciplinas } from '@/lib/admin-revisao/biblioteca-pastas-unificar-tipos'
 import type { InicialClassificacao } from '@/lib/admin-revisao/questoes-classificacao-tipos'
 import type { ResumoClassif } from '@/lib/admin-revisao/biblioteca-questoes-gestao-tipos'
 
 /** Dados lidos no servidor (page.tsx) da sub-área ativa — valem só para a 1ª montagem; depois a API atende as interações. */
-export interface SsrQuestoes { unificar?: InicialQuestoesUnificar | null; etiquetas?: ListaEtiquetas | null; disciplinas?: InicialDisciplinas | null; classificacao?: InicialClassificacao | null }
+export interface SsrQuestoes { unificar?: InicialQuestoesUnificar | null; disciplinas?: InicialDisciplinas | null; classificacao?: InicialClassificacao | null }
 
 const PP = [10, 14, 25, 50, 100]
 const SEM_FILTRO: Pick<EstadoBib, 'q' | 'vis' | 'status' | 'acesso' | 'meta'> = { q: '', vis: 'todos', status: '', acesso: '', meta: {} }
@@ -86,7 +84,7 @@ async function buscarReal(s: EstadoBib, url: string): Promise<RespostaBib> {
  *  rota de API (/api/admin/revisao/biblioteca): aba/pasta/busca/filtro/ordem/página respondem sem navegação completa. */
 export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesInicial, podeEditar, podeCriarSimulado, subQInicial, inicialQ, estadoQInicial, qPerm, unificarInicial = false, contagensInicialQ = null, ssr }: {
   inicial: RespostaBib; estadoInicial: EstadoBib; arvoreInicial: ArvoreBib | null; opcoesInicial: OpcoesFiltroBib; podeEditar: boolean; podeCriarSimulado: boolean
-  /** Aba Questões: sub-aba inicial (banco | unificar | classificacao | etiquetas), 1º quadro do banco (SSR) e permissões. */
+  /** Aba Questões: sub-aba inicial (banco | unificar | classificacao), 1º quadro do banco (SSR) e permissões. */
   subQInicial: SubAbaQ; inicialQ: RespostaQ | null; estadoQInicial: EstadoQ
   qPerm: { ver: boolean; editar: boolean; excluir: boolean; criar: boolean; importarPlataforma: boolean; taxonomia: boolean }
   /** ?modo=unificar-disciplinas: abre direto a visão Unificar disciplinas das abas de conteúdo. */
@@ -121,7 +119,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
   const ancora = useRef<string | null>(null)
   const [subQ, setSubQ] = useState<SubAbaQ>(subQInicial)
   const [totalBancoQ, setTotalBancoQ] = useState<number | null>(inicial.resumo.bancoQuestoes ?? null)
-  // Banco: estado inicial reaplicável (links vindos de Etiquetas/Classificação/Unificar) + seleção que atravessa as sub-abas
+  // Banco: estado inicial reaplicável (links vindos de Classificação/Unificar) + seleção que atravessa as sub-abas
   const [estadoBanco, setEstadoBanco] = useState<EstadoQ>(estadoQInicial)
   const [bancoKey, setBancoKey] = useState(0)
   const [selQ, setSelQ] = useState<Set<string>>(new Set())
@@ -347,7 +345,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />Como funciona esta aba
         </summary>
         <p className="mt-1.5 max-w-[78ch]">
-          {ehQ ? (subQ === 'banco' ? 'O banco real de questões: filtre por visões rápidas, taxonomia e busca, abra uma questão no painel lateral e use as ações em massa.' : subQ === 'unificar' ? 'Junta o que está repetido: questões duplicadas (revisão lado a lado, com prévia do impacto) e termos repetidos da taxonomia (bancas, órgãos, cargos, disciplinas…).' : subQ === 'classificacao' ? 'Acompanha a qualidade da classificação (disciplina, assunto, banca, órgão, ano…), mostra a fila do que falta, sugere e aplica em massa, e organiza o cadastro da taxonomia.' : 'Gerencia as etiquetas das questões: criar, renomear, cor, função, mesclar, excluir com aviso de uso e aplicar/remover em massa a partir da seleção do Banco.')
+          {ehQ ? (subQ === 'banco' ? 'O banco real de questões: filtre por visões rápidas, taxonomia e busca, abra uma questão no painel lateral e use as ações em massa.' : subQ === 'unificar' ? 'Junta o que está repetido: questões duplicadas (revisão lado a lado, com prévia do impacto) e termos repetidos da taxonomia (bancas, órgãos, cargos, disciplinas…).' : 'Acompanha a qualidade da classificação (disciplina, assunto, banca, órgão, ano…), mostra a fila do que falta, sugere e aplica em massa, e organiza o cadastro da taxonomia. As etiquetas ficam em Biblioteca › Classificação › Etiquetas.')
             : <>{tipoAtual.desc}{st.aba === 'pdfull' ? ' Excluir um PDFull envia o documento para a Lixeira; os materiais ligados à aula continuam.' : ''}{ehDoc && ' Desligue “Visível ao aluno” para esconder sem excluir.'}</>}
         </p>
       </details>
@@ -406,10 +404,8 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
             onIrDuplicadas={irUnificarSelecionadas} contagensInicial={bancoKey === 0 && ssrOk.current ? contagensInicialQ : null} />
         ) : subQ === 'unificar' ? (
           <QuestoesUnificar podeEditar={qPerm.editar} inicial={ssrQ?.unificar} />
-        ) : subQ === 'classificacao' ? (
-          <QuestoesClassificacao podeEditar={qPerm.editar} inicial={ssrQ?.classificacao ?? undefined} />
         ) : (
-          <QuestoesEtiquetas podeEditar={qPerm.editar} inicial={ssrQ?.etiquetas} />
+          <QuestoesClassificacao podeEditar={qPerm.editar} inicial={ssrQ?.classificacao ?? undefined} />
         )
       ) : <Nota destaque>Você não tem permissão para ver o banco de questões (questoes:view).</Nota>) : modoUnificar ? (
         <UnificarDisciplinas inicial={ssrQ?.disciplinas} categoria={categoria} podeEditar={podeEditar} podeTaxonomiaVer={qPerm.ver} podeTaxonomiaEditar={qPerm.editar} onMudou={() => void recarregar()} onVoltar={() => setUnificar(false)} />

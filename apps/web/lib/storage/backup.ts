@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getStorage } from '@/lib/storage'
 
 // Backup de segurança antes de QUALQUER deleção (o Supabase Storage não tem lixeira →
 // deleção é irreversível). Copiamos os bytes para um bucket PRIVADO `storage-backups`
@@ -7,11 +8,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const BUCKET_BACKUP = 'storage-backups'
 
-export async function garantirBucketBackup(svc: SupabaseClient): Promise<void> {
+// Provider-aware: usa o storage ATIVO (Supabase ou S3/Hetzner). No S3 o bucket físico é `${S3_BUCKET_PREFIX}storage-backups`.
+// O parâmetro `svc` é mantido só por compatibilidade com os chamadores (o backup não usa mais Supabase Storage direto).
+export async function garantirBucketBackup(_svc?: SupabaseClient): Promise<void> {
   try {
-    await svc.storage.createBucket(BUCKET_BACKUP, { public: false })
+    await getStorage().garantirBucket?.(BUCKET_BACKUP)
   } catch {
-    /* já existe */
+    /* já existe / sem permissão: backupObjeto falha e NADA é deletado */
   }
 }
 
@@ -25,20 +28,17 @@ export function prefixoData(): string {
  * ou null se falhar (nesse caso o chamador NÃO deve deletar o original).
  */
 export async function backupObjeto(
-  svc: SupabaseClient,
+  _svc: SupabaseClient | null | undefined,
   bucket: string,
   path: string,
   prefixo: string,
 ): Promise<string | null> {
   try {
-    const { data, error } = await svc.storage.from(bucket).download(path)
-    if (error || !data) return null
-    const buf = new Uint8Array(await data.arrayBuffer())
+    const st = getStorage()
+    const buf = await st.download(bucket, path)
+    if (!buf) return null
     const destino = `${prefixo}/${bucket}/${path}`
-    const { error: upErr } = await svc.storage
-      .from(BUCKET_BACKUP)
-      .upload(destino, buf, { upsert: true, contentType: (data as any).type || 'application/octet-stream' })
-    if (upErr) return null
+    await st.upload({ bucket: BUCKET_BACKUP, path: destino, data: buf, contentType: 'application/octet-stream', upsert: true, publico: false })
     return destino
   } catch {
     return null

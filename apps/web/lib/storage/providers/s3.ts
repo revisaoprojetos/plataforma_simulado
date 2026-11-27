@@ -111,6 +111,23 @@ export function createS3Provider(): StorageProvider {
       }
     },
 
+    async copy(bucket, de, para) {
+      const { client, mod } = await getClient()
+      const b = bucketFisico(bucket)
+      // CopySource = "bucket/key" com a key codificada por segmento.
+      const src = `${b}/${de.split('/').map(encodeURIComponent).join('/')}`
+      await client.send(new mod.CopyObjectCommand({ Bucket: b, Key: para, CopySource: src }))
+    },
+
+    async garantirBucket(bucket) {
+      const { client, mod } = await getClient()
+      try {
+        await client.send(new mod.CreateBucketCommand({ Bucket: bucketFisico(bucket) }))
+      } catch (e: any) {
+        if (!/AlreadyOwnedByYou|AlreadyExists/i.test(String(e?.name ?? e?.Code ?? ''))) throw e
+      }
+    },
+
     async criarUploadTicket(bucket, path, contentType): Promise<UploadTicket> {
       const { client, mod } = await getClient()
       const presign: any = await import('@aws-sdk/s3-request-presigner').catch(() => {

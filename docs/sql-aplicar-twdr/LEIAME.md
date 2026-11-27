@@ -46,3 +46,12 @@ Rode com o intervalo de 24 h. Compare antes e depois do pacote: erros do tipo `r
 ## (c) Disco: VACUUM FULL do bloat
 
 `VACUUM (FULL, ANALYZE) simulado_conteudo_versoes;` recupera ~3,2 GB de bloat. Tente SOZINHO numa aba nova do SQL Editor (nunca junto de outro comando). Se falhar com 25001 (VACUUM não roda em transação), use psql direto na connection string. Atenção: VACUUM FULL toma ACCESS EXCLUSIVE na tabela durante toda a execução (leituras e escritas travam); rode fora do pico e exige espaço livre temporário igual ao tamanho real da tabela (~tamanho útil, sem o bloat).
+
+## Storage: desvínculo do Supabase (2026-11-27)
+
+| # | Arquivo | O que faz | Pré-requisito | Reverter |
+|---|---|---|---|---|
+| 18 | 18-storage-urls-imagens-hetzner | Reescreve ~260 URLs absolutas do bucket público `imagens` (questões, capas de pasta, banners, tema) para `https://hel1.your-objectstorage.com/revisaopge-imagens/`. Backup em `storage_url_backup_20261127`. | `node apps/web/scripts/storage-publicar-imagens.mjs --aplicar` (bucket imagens do Hetzner é privado hoje) e `curl -sI` da imagem = 200 | 19 |
+| 20 | 20-storage-arquivos-provider-s3 | `simulado_arquivos.provider` 'supabase' → 's3' (15.736 linhas, todas com objeto no Hetzner). Só rótulo. | nenhum | 21 |
+
+Ordem: policy pública das imagens → 18 → 20. URLs do bucket `pdfs` não são reescritas (privado; resolvidas pelo proxy).

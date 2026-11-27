@@ -10,8 +10,9 @@ export const PROXY_PDF_BASE = '/api/arquivo/pdf'
 
 const RE_SUPABASE = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/pdfs\/([^?#]+)/
 // S3 path-style (`endpoint/<prefixo>pdfs/materiais/..`) ou virtual-host (`<prefixo>pdfs.s3.../materiais/..`).
-const RE_S3_PATH = /^https?:\/\/[^?#]*?\/[\w.-]*pdfs\/((?:materiais|relatorios)\/[^?#]+)/i
-const RE_S3_HOST = /^https?:\/\/[\w.-]*pdfs[\w.-]*\/((?:materiais|relatorios)\/[^?#]+)/i
+// Além de materiais/ e relatorios/, reconhece cronograma/ (backups) e os PDFs de job (`{tenant}/{job}.pdf`, uuid/uuid).
+const RE_S3_PATH = /^https?:\/\/[^?#]*?\/[\w.-]*pdfs\/((?:materiais|relatorios|cronograma)\/[^?#]+|[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf)/i
+const RE_S3_HOST = /^https?:\/\/[\w.-]*pdfs[\w.-]*\/((?:materiais|relatorios|cronograma)\/[^?#]+|[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf)/i
 const RE_PROXY = /\/api\/arquivo\/pdf\/(?:t\.\d+\.[\w-]+\/)?([^?#]+)/
 
 function dec(s: string): string {

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lerCfgMetas } from './config-metas'
+import { gravarJsonStorage } from '@/lib/storage/json'
 import { criarCircuitBreaker } from '@/lib/util/circuit-breaker'
 import { diffGrade, mudancaGrande, LIMIAR_AUDITORIA_GRADE, LIMIAR_SNAPSHOT_GRADE, type Grade } from './grade-diff'
 
@@ -93,9 +94,8 @@ export function registrarSync(svc: SupabaseClient, r: {
           let snapshot: string | null = null
           if (mudancaGrande(resumo, LIMIAR_SNAPSHOT_GRADE)) {
             snapshot = `cronograma/backup-grade/${r.tenantId}/${r.planoId}-${Date.now()}.json`
-            const corpo = new Blob([JSON.stringify({ planoId: r.planoId, estudanteId: r.estudanteId, em: new Date().toISOString(), plano: r.antes.plano, cfg: r.antes.cfg })], { type: 'application/json' })
-            const { error: eUp } = await svc.storage.from('pdfs').upload(snapshot, corpo, { upsert: false, contentType: 'application/json' })
-            if (eUp) snapshot = null
+            const okUp = await gravarJsonStorage('pdfs', snapshot, { planoId: r.planoId, estudanteId: r.estudanteId, em: new Date().toISOString(), plano: r.antes.plano, cfg: r.antes.cfg }, false)
+            if (!okUp) snapshot = null
           }
           await svc.from('simulado_audit_logs').insert({
             tenant_id: r.tenantId, ator_tipo: 'estudante', ator_id: r.estudanteId, tabela: 'simulado_cronograma_adaptativo_plano', entidade: 'simulado_cronograma_adaptativo_plano', entidade_id: r.planoId, operacao: 'UPDATE',

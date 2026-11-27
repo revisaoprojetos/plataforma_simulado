@@ -101,7 +101,7 @@ async function lerDisciplinas(svc: Svc, tenantId: string): Promise<{ id: string;
 }
 
 /** Contexto comum (catálogo + pastas + herança) — 1 leitura de cada, reaproveitado por listagem/sugestão/lote. */
-async function contexto(svc: Svc, tenantId: string) {
+export async function contexto(svc: Svc, tenantId: string) {
   const [cls, pastas, disciplinas] = await Promise.all([carregarCatalogoClassificacao(svc, tenantId), lerPastasTodas(svc, tenantId), lerDisciplinas(svc, tenantId)])
   const catalogo: ItemCat[] = cls.map((c) => ({ id: c.id, slug: c.slug, nome: c.nome, cor: c.cor, ativo: c.ativo, formatoLeitura: c.exibicao.formato_leitura }))
   const mapa = mapaHerancaPastas(pastas, catalogo)
@@ -134,7 +134,7 @@ function restricaoPastas(ctx: Contexto, f: FiltrosMatrizEntrada): string[] | nul
   return ids
 }
 
-async function consultarBruto(
+export async function consultarBruto(
   svc: Svc, tenantId: string, ctx: Contexto, f: FiltrosMatrizEntrada,
   pg: { limite: number; offset: number; sort?: SortMatriz; dir?: 'asc' | 'desc' },
 ): Promise<{ linhas: LinhaBruta[]; total: number; semSql: boolean } | { erro: string }> {
@@ -168,7 +168,7 @@ async function consultarBruto(
   return { linhas, total: count ?? linhas.length, semSql: true }
 }
 
-async function contarPartes(svc: Svc, tenantId: string, ids: string[]): Promise<Map<string, number> | null> {
+export async function contarPartes(svc: Svc, tenantId: string, ids: string[]): Promise<Map<string, number> | null> {
   if (ids.length === 0) return new Map()
   const out = new Map<string, number>()
   for (let i = 0; i < ids.length; i += CHUNK) {

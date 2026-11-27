@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { CabecalhoArea } from '@/components/admin/cabecalho-area'
-import { rotaSemCabecalho } from '@/lib/admin/cronogramas-nav'
+import { rotaInternaSemAbas, rotaSemCabecalho } from '@/lib/admin/cronogramas-nav'
 import { ShellCronogramasProvider } from './shell-context'
 
 /**
@@ -12,7 +12,11 @@ import { ShellCronogramasProvider } from './shell-context'
  * com eyebrow + nav. Fachadas AdaptativoTabs/CronogramaTabs ficam nulas. Ver shell-context.tsx.
  */
 export function ShellCronogramas({ children }: { children: React.ReactNode }) {
-  const semCabecalho = rotaSemCabecalho(usePathname())
+  const pathname = usePathname()
+  // Área INTERNA (matriz de aulas do conjunto): sem eyebrow/abas do Cronograma — só o "← Voltar" da própria página.
+  // Provider desligado: o <CabecalhoArea> da página NÃO posiciona a CronogramasNav/BarraSetor aqui.
+  if (rotaInternaSemAbas(pathname)) return <div className="w-full">{children}</div>
+  const semCabecalho = rotaSemCabecalho(pathname)
   return (
     <ShellCronogramasProvider value={true}>
       <div className="w-full">

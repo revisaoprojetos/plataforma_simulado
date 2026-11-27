@@ -16,6 +16,7 @@ const MAPA: Record<string, string[]> = {
   '/admin/biblioteca': [A + 'biblioteca/biblioteca-client.tsx'],
   '/admin/revisao/biblioteca': [A + 'revisao/biblioteca/biblioteca-app.tsx'],
   '/admin/leitura/biblioteca': [A + 'leitura/biblioteca/page.tsx'],
+  '/admin/biblioteca/classificacao': [A + 'biblioteca/classificacao/page.tsx'],
   '/admin/revisao/jurisclub': [A + 'revisao/jurisclub/page.tsx'],
   '/admin/leitura': [A + 'leitura/page.tsx'],
   '/admin/leitura/analise': [A + 'leitura/analise/page.tsx'],

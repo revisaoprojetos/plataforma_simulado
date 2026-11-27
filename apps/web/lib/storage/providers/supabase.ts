@@ -56,6 +56,15 @@ export function createSupabaseProvider(): StorageProvider {
       return new Uint8Array(await data.arrayBuffer())
     },
 
+    async copy(bucket, de, para) {
+      const { error } = await sb().storage.from(bucket).copy(de, para)
+      if (error && !/exist/i.test(error.message)) throw new StorageError(error.message)
+    },
+
+    async garantirBucket(bucket) {
+      try { await sb().storage.createBucket(bucket, { public: false }) } catch { /* já existe */ }
+    },
+
     async criarUploadTicket(bucket, path): Promise<UploadTicket> {
       const { data, error } = await sb().storage.from(bucket).createSignedUploadUrl(path)
       if (error || !data) throw new StorageError(error?.message ?? 'Falha ao preparar o upload.')

@@ -490,7 +490,7 @@ const TIPOS_PADRAO = ['pdfull', 'flash', 'quest', 'legproc']
 type LinhaNova = { key: string; tipo: string; conteudo: string; video: string; pdf: string }
 let seqLinha = 0
 
-function NovaAulaDialog({
+export function NovaAulaDialog({
   aberto,
   aoFechar,
   tipos,
@@ -896,7 +896,7 @@ function PropagarDialog({
 }
 
 // ── Dialog: editar dados do conjunto ──
-function EditarConjuntoDialog({
+export function EditarConjuntoDialog({
   aberto,
   aoFechar,
   conjunto,

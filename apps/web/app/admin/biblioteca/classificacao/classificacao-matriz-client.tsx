@@ -8,8 +8,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { AlertTriangle, ArrowLeft, Loader2, Tags, Wand2 } from 'lucide-react'
-import { CabecalhoArea } from '@/components/admin/cabecalho-area'
+import { AlertTriangle, Info, Loader2, Tags, Wand2 } from 'lucide-react'
 import { AbasLinha } from '@/components/ui/abas-linha'
 import { DataTable, type DataTableColumn, type DataTableSelection } from '@/components/admin/data-table'
 import { Button } from '@/components/ui/button'
@@ -71,6 +70,7 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
   const sp = useSearchParams()
   const filtroAtual = (FILTROS_MATRIZ as readonly string[]).includes(sp.get('f') ?? '') ? (sp.get('f') as FiltroMatriz) : 'todos'
   const comIndice = sp.get('indice') === '1'
+  const comTecnicas = sp.get('tec') === '1'
   const [dlgLote, setDlgLote] = useState<DataTableSelection | null>(null)
   const [dlgSug, setDlgSug] = useState<DataTableSelection | null>(null)
 
@@ -81,18 +81,17 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
   const ir = (mut: (p: URLSearchParams) => void) => { navProgressStart(); router.push(href(mut)) }
 
   const cabecalho = (
-    <CabecalhoArea
-      titulo="Classificação da Biblioteca"
-      descricao="Classificação efetiva de cada documento (definida, herdada da pasta ou pendente), formato de leitura, páginas e conversão."
-      acoes={<Link href="/admin/biblioteca" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted"><ArrowLeft className="h-4 w-4" />Biblioteca</Link>}
-      abas={(
-        <AbasLinha
-          aria-label="Filtro da matriz"
-          ativo={filtroAtual}
-          itens={FILTROS_MATRIZ.map((k) => ({ key: k, label: ROTULO_FILTRO[k], href: href((p) => { k === 'todos' ? p.delete('f') : p.set('f', k) }), prefetch: false }))}
-        />
-      )}
-    />
+    <div className="space-y-3">
+      <div className="flex items-start gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>A classificação de um documento <b className="text-foreground">herda da pasta</b> quando não é definida nele. Crie e ajuste as classificações na aba <b className="text-foreground">Classificações</b> e o que cada uma faz (tempo, metas) dentro de cada classificação, na aba <b className="text-foreground">Regras de uso</b>; aqui você só atribui a pastas e documentos. Clique num documento para abrir o gerenciador dele.</span>
+      </div>
+      <AbasLinha
+        aria-label="Filtro dos documentos"
+        ativo={filtroAtual}
+        itens={FILTROS_MATRIZ.map((k) => ({ key: k, label: ROTULO_FILTRO[k], href: href((p) => { k === 'todos' ? p.delete('f') : p.set('f', k) }), prefetch: false }))}
+      />
+    </div>
   )
 
   if (!dados.ok) {
@@ -104,7 +103,7 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
   }
 
   const colunas: DataTableColumn<LinhaMatrizClassificacao>[] = [
-    { key: 'titulo', header: 'Documento', sortable: true, width: '22rem', render: (l) => <span className="font-medium text-foreground">{l.titulo}</span>, title: (l) => l.titulo },
+    { key: 'titulo', header: 'Documento', sortable: true, width: '22rem', render: (l) => <Link href={`/admin/biblioteca/conteudo/${l.id}/gerenciar`} onClick={(e) => e.stopPropagation()} className="font-medium text-foreground hover:underline" title="Abrir o gerenciador do conteúdo">{l.titulo}</Link>, title: (l) => l.titulo },
     { key: 'pasta', header: 'Pasta', width: '13rem', render: (l) => l.pastaNome ?? <Selo cls="bg-amber-500/15 text-amber-700 dark:text-amber-400">Sem pasta</Selo>, title: (l) => l.pastaNome ?? 'Sem pasta' },
     { key: 'classificacao', header: 'Classificação efetiva', width: '20rem', render: (l) => <CelulaClassificacao l={l} /> },
     {
@@ -112,12 +111,10 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
       render: (l) => !l.formato ? <span className="text-muted-foreground">—</span>
         : <span className={cn(l.formatoOrigem === 'documento' ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{l.formato}{l.formatoOrigem === 'classificacao' && ' (da classificação)'}</span>,
     },
-    {
-      key: 'disciplina', header: 'Disciplina', width: '13rem',
-      render: (l) => !l.disciplina ? <span className="text-muted-foreground">—</span>
-        : <span className={l.disciplinaHerdadaDe ? 'text-muted-foreground' : 'text-foreground'}>{l.disciplina.nome}{l.disciplinaHerdadaDe && <span className="text-[11.5px]"> · herdada</span>}</span>,
-      title: (l) => l.disciplinaHerdadaDe ? `Herdada de ${l.disciplinaHerdadaDe}` : undefined,
-    },
+  ]
+
+  // Colunas técnicas (Partes/Páginas/Conversão/Índice): escondidas por padrão; "Colunas técnicas" (?tec=1) as mostra.
+  const colunasTecnicas: DataTableColumn<LinhaMatrizClassificacao>[] = [
     { key: 'partes', header: 'Partes', width: '5.5rem', align: 'right', render: (l) => <span className="tabular-nums">{l.nPartes ?? '—'}</span> },
     { key: 'paginas', header: 'Páginas', sortable: true, width: '6.5rem', align: 'right', render: (l) => l.paginas != null ? <span className="tabular-nums">{l.paginas}</span> : <Selo cls="bg-amber-500/15 text-amber-700 dark:text-amber-400">sem</Selo> },
     {
@@ -126,10 +123,9 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
         : l.statusConversao === 'ok' ? <Selo cls="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">ok</Selo>
         : <Selo cls="bg-amber-500/15 text-amber-700 dark:text-amber-400">{l.statusConversao === 'revisao_necessaria' ? 'revisar' : l.statusConversao}</Selo>,
     },
-    // Índice (diagnóstico): lido por documento só quando ligado (?indice=1) — evita carga extra no banco por padrão.
     {
       key: 'indice', header: 'Índice', width: '7rem',
-      render: (l) => l.indice ? <Selo cls={INDICE[l.indice].cls}>{INDICE[l.indice].r}</Selo> : <span className="text-muted-foreground" title="Ative “Mostrar índice” para calcular">—</span>,
+      render: (l) => l.indice ? <Selo cls={INDICE[l.indice].cls}>{INDICE[l.indice].r}</Selo> : <span className="text-muted-foreground" title="Ative “Calcular índice” para ver">—</span>,
     },
   ]
 
@@ -146,7 +142,7 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
       <DataTable
         rows={dados.linhas}
         total={dados.total}
-        columns={colunas}
+        columns={comTecnicas ? [...colunas, ...colunasTecnicas] : colunas}
         getRowId={(l) => l.id}
         defaultSort={{ key: 'titulo', dir: 'asc' }}
         perPageOptions={[10, 25, 50, 100]}
@@ -156,20 +152,23 @@ export function ClassificacaoMatrizClient({ dados, podeEditar, pp }: { dados: Ma
         nomeSingular="documento"
         selectable={podeEditar && !dados.migracaoPendente}
         redimensionavel
+        onRowClick={(l) => { navProgressStart(); router.push(`/admin/biblioteca/conteudo/${l.id}/gerenciar`) }}
         filters={(
           <>
             <select aria-label="Filtrar por pasta" className={cn(SELECT_CLS, 'max-w-[16rem]')} value={sp.get('pasta') ?? ''} onChange={(e) => ir((p) => { e.target.value ? p.set('pasta', e.target.value) : p.delete('pasta') })}>
               <option value="">Todas as pastas</option>
               {dados.pastas.map((p) => <option key={p.id} value={p.id}>{p.caminho}</option>)}
             </select>
-            <select aria-label="Filtrar por disciplina" className={cn(SELECT_CLS, 'max-w-[14rem]')} value={sp.get('disc') ?? ''} onChange={(e) => ir((p) => { e.target.value ? p.set('disc', e.target.value) : p.delete('disc') })}>
-              <option value="">Todas as disciplinas</option>
-              {dados.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
-            </select>
             <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border bg-card px-3 text-[13.5px] text-foreground">
-              <input type="checkbox" className="accent-[var(--primary)]" checked={comIndice} onChange={(e) => ir((p) => { e.target.checked ? p.set('indice', '1') : p.delete('indice') })} />
-              Mostrar índice
+              <input type="checkbox" className="accent-[var(--primary)]" checked={comTecnicas} onChange={(e) => ir((p) => { if (e.target.checked) p.set('tec', '1'); else { p.delete('tec'); p.delete('indice') } })} />
+              Colunas técnicas
             </label>
+            {comTecnicas && (
+              <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border bg-card px-3 text-[13.5px] text-foreground">
+                <input type="checkbox" className="accent-[var(--primary)]" checked={comIndice} onChange={(e) => ir((p) => { e.target.checked ? p.set('indice', '1') : p.delete('indice') })} />
+                Calcular índice
+              </label>
+            )}
           </>
         )}
         bulkActions={(sel) => (

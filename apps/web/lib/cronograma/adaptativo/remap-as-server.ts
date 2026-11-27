@@ -6,6 +6,7 @@ import { carregarConteudoBanco, type ConteudoBanco } from './conteudo-banco'
 import { chavesUnicas } from './catalogo-override'
 import { lerDetalhesMetas, gravarDetalhesMetas, espelharEmSegundoPlano } from './plano-metas'
 import { registrarGeracao } from './log-geracao'
+import { gravarJsonStorage } from '@/lib/storage/json'
 import type { PlanoRow } from './dados'
 import { assinaturaDoCfg, assinaturaPorEvidencia, camposAssinatura, hashAS, docIdDaChave, parteAula, type AssinaturaAS } from './remap-as'
 import { remapearEstadoComRelink } from './relink-documento'
@@ -158,10 +159,7 @@ async function garantirASInterno(svc: SupabaseClient, tenantId: string, row: Pla
   const resumo = `${guardada.chaves.length}->${atual.chaves.length} aulas; movidas=${r.stats.aulasMovidas} orfas=${r.stats.aulasOrfas} novas=${r.stats.aulasNovas}; linhas: movidas=${r.stats.metasMovidas} orfas=${r.stats.metasOrfas} restauradas=${r.stats.metasRestauradas}; grade removida=${r.stats.gradeRemovida}${relinkTxt}`
 
   // backup completo ANTES de qualquer escrita (best-effort; rollback manual)
-  try {
-    const corpo = new Blob([JSON.stringify({ planoId: row.id, em: agora, de: guardada, para: atual, cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs, detalhes, metas: linhas })], { type: 'application/json' })
-    await svc.storage.from('pdfs').upload(`cronograma/backup-remap/${tenantId}/${row.id}-${Date.now()}.json`, corpo, { upsert: false, contentType: 'application/json' })
-  } catch { /* best-effort */ }
+  await gravarJsonStorage('pdfs', `cronograma/backup-remap/${tenantId}/${row.id}-${Date.now()}.json`, { planoId: row.id, em: agora, de: guardada, para: atual, cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs, detalhes, metas: linhas }, false)
 
   // 1) reivindica o plano (marca remapEm + novo atualizado_em); quem perder a corrida não repete
   if (!(await travar({ ...cfg, remapEm: agora }))) return { row, consistente: false, remapeou: false }

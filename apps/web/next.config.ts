@@ -37,6 +37,20 @@ const nextConfig: NextConfig = {
         hostname: "tlaxvhcqswiotzibulyo.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      // Produção atual (Supabase twdr…): enquanto houver URLs antigas gravadas no banco.
+      {
+        protocol: "https",
+        hostname: "twdrtlxkjvunkdobudev.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      // Hetzner Object Storage (path-style: https://hel1.your-objectstorage.com/<prefixo><bucket>/<path>).
+      // S3_IMAGE_HOST (env, lida no BUILD) permite outro endpoint/CDN sem editar o código.
+      {
+        protocol: "https",
+        hostname: "hel1.your-objectstorage.com",
+        pathname: "/**",
+      },
+      ...(process.env.S3_IMAGE_HOST ? [{ protocol: "https" as const, hostname: process.env.S3_IMAGE_HOST, pathname: "/**" }] : []),
     ],
   },
   async headers() {

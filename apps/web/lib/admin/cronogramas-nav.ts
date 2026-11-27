@@ -301,3 +301,11 @@ export function rotaSemCabecalho(pathname: string): boolean {
   if (pathname === '/admin/cronogramas/adaptativo' || pathname.startsWith('/admin/cronogramas/adaptativo/')) return false
   return !COM_CABECALHO.includes(pathname)
 }
+
+/**
+ * ÁREA INTERNA (sem a barra de abas do Cronograma): a matriz de aulas de um conjunto (/admin/cronogramas/conteudos/<id>[/…]) só tem
+ * o "← Voltar" (destino exato em `?voltar=`). NÃO vale para a lista /admin/cronogramas/conteudos nem para as demais rotas.
+ */
+export function rotaInternaSemAbas(pathname: string): boolean {
+  return /^\/admin\/cronogramas\/conteudos\/[^/]+(\/.*)?$/.test(pathname)
+}

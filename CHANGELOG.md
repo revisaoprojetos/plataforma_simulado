@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.33.0 — 2026-11-27
+
+### Gestão de classificações, matriz de aulas do Gerador e desacoplamento do storage
+- **Classificações:** lista paginada (10) + página interna por classificação (Visão, Regras de uso, Documentos, Pastas), com Voltar exato; contadores com herança da pasta; removidas as abas globais "Regras de uso" e "Biblioteca Lei Seca"; **Etiquetas** movidas para subaba de Classificação.
+- **Gerenciar do documento:** abas enxutas; aba Partes paginada; **Partes a partir das metas** (LegProc/PDFlash/PDFight) com prévia antes de aplicar.
+- **Matriz de aulas do Gerador** (`/admin/cronogramas/conteudos/[id]`): área interna só com "← Voltar"; linhas = aulas, colunas = seções por classificação; seleção de documento/parte, lote, links de questões, disciplinas e filtros; aba "Avançado / legado". Seleções em `simulado_conteudo_selecao_meta` (area='gerador'); sem seleção o aluno vê o mesmo de antes.
+- **Storage:** provider S3 (Hetzner) com `copy()`/`garantirBucket()`, fallback para Supabase na leitura, `lib/storage/json.ts`, script `storage-publicar-imagens.mjs`.
+- **SQLs (manuais, após o deploy, nesta ordem):** `18-storage-urls-imagens-hetzner.sql` (reverter: 19) e `20-storage-arquivos-provider-s3.sql` (reverter: 21). Nenhuma migração nova de schema.
+- **Pendente:** leitor ainda não posiciona pela parte; tempo da célula usa o documento inteiro.
 ## 4.32.0 — 2026-11-27
 
 ### Biblioteca de partes, classificação genérica por tenant, índice com artigos e diagnóstico de índice

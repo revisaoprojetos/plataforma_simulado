@@ -5,9 +5,10 @@
 // /api/admin/biblioteca/partes (lista com status/medida/uso já calculados no servidor) — o render só exibe.
 // Rotas de API (não server actions). Arquivar = nunca apaga; avisa quando há metas usando a parte.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { AlertTriangle, ArrowDown, ArrowUp, Archive, Loader2, Pencil, Plus, RotateCcw, Search, Wand2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Archive, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ListChecks, Loader2, Pencil, Plus, RotateCcw, Search, Wand2 } from 'lucide-react'
 import { DataTable, type DataTableColumn } from '@/components/admin/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +23,8 @@ type Parte = {
   metasEmUso: number
   resolucao: { ok: boolean; motivo: string; indices: [number, number] | null; recuperadoPorRotulo: { ini: boolean; fim: boolean } } | null
   medida: { artigos: number; palavras: number; caracteres: number } | null
+  /** Vizinhas na ordem das partes ATIVAS (calculadas no servidor; a lista chega paginada). */
+  vizinhoAnteriorId?: string | null; vizinhoProximoId?: string | null; posicao?: number | null
 }
 type Trecho = { uid: string; tipo: string | null; rotulo: string | null; ordem: number; previa: string }
 type Sugestao = {
@@ -50,32 +53,46 @@ function statusDe(p: Parte): { rotulo: string; cls: string } {
   return { rotulo: 'Ok', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
 }
 
-export function PartesAba({ documentoId }: { documentoId: string }) {
+export function PartesAba({ documentoId, titulo }: { documentoId: string; titulo?: string }) {
+  // Lista PAGINADA no servidor (?page/pp/q/sort/dir da URL — mesmo contrato do <DataTable>).
+  const sp = useSearchParams()
+  const page = sp.get('page') ?? '1', pp = sp.get('pp') ?? '10', q = sp.get('q') ?? '', sort = sp.get('sort') ?? '', dir = sp.get('dir') ?? ''
   const [partes, setPartes] = useState<Parte[] | null>(null)
+  const [total, setTotal] = useState(0)
+  const [totalGeral, setTotalGeral] = useState(0)
   const [erro, setErro] = useState<string | null>(null)
   const [ausente, setAusente] = useState(false)
   const [arquivadas, setArquivadas] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [editor, setEditor] = useState<{ parte: Parte | null } | null>(null)
   const [sugerir, setSugerir] = useState(false)
+  const [sobAtualizacao, setSobAtualizacao] = useState(false)
+  const seq = useRef(0)
 
   const carregar = useCallback(async () => {
-    const r = await api<any>(`${API}?documentoId=${documentoId}${arquivadas ? '&arquivadas=1' : ''}`)
-    if (r.ok) { setPartes(r.data.partes ?? []); setErro(null); setAusente(false); return }
+    const id = ++seq.current
+    setSobAtualizacao(true)
+    const qs = new URLSearchParams({ documentoId, page, pp })
+    if (arquivadas) qs.set('arquivadas', '1')
+    if (q) qs.set('q', q)
+    if (sort) qs.set('sort', sort)
+    if (dir) qs.set('dir', dir)
+    const r = await api<any>(`${API}?${qs}`)
+    if (id !== seq.current) return
+    setSobAtualizacao(false)
+    if (r.ok) { setPartes(r.data.partes ?? []); setTotal(r.data.total ?? 0); setTotalGeral(r.data.totalGeral ?? 0); setErro(null); setAusente(false); return }
     if (r.status === 503 || r.data?.codigo === 'tabela_ausente') { setAusente(true); setPartes([]); return }
     setErro(r.data?.error || 'Não foi possível carregar as partes.'); setPartes([])
-  }, [documentoId, arquivadas])
+  }, [documentoId, arquivadas, page, pp, q, sort, dir])
   useEffect(() => { void carregar() }, [carregar])
 
-  const ativas = useMemo(() => (partes ?? []).filter((p) => !p.arquivada), [partes])
-
   async function mover(p: Parte, delta: -1 | 1) {
-    const i = ativas.findIndex((x) => x.id === p.id), j = i + delta
-    if (i < 0 || j < 0 || j >= ativas.length) return
+    const viz = delta === -1 ? p.vizinhoAnteriorId : p.vizinhoProximoId
+    if (!viz || p.posicao == null) return
     setOcupado(true)
-    // ordens densas (índice na lista) — troca a posição das duas vizinhas.
-    const a = await api(API, { method: 'PATCH', body: JSON.stringify({ id: ativas[i].id, ordem: j }) })
-    const b = await api(API, { method: 'PATCH', body: JSON.stringify({ id: ativas[j].id, ordem: i }) })
+    // ordens densas (índice entre as ativas) — troca a posição das duas vizinhas.
+    const a = await api(API, { method: 'PATCH', body: JSON.stringify({ id: p.id, ordem: p.posicao + delta }) })
+    const b = await api(API, { method: 'PATCH', body: JSON.stringify({ id: viz, ordem: p.posicao }) })
     setOcupado(false)
     if (!a.ok || !b.ok) toast.error('Não foi possível reordenar.')
     await carregar()
@@ -108,32 +125,31 @@ export function PartesAba({ documentoId }: { documentoId: string }) {
 
   const colunas: DataTableColumn<Parte>[] = [
     {
-      key: 'ordem', header: 'Ordem', width: '6.5rem',
-      render: (p) => {
-        const i = ativas.findIndex((x) => x.id === p.id)
-        return p.arquivada ? <span className="text-muted-foreground">—</span> : (
-          <span className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon-sm" disabled={ocupado || i <= 0} onClick={() => mover(p, -1)} aria-label="Subir"><ArrowUp /></Button>
-            <Button variant="ghost" size="icon-sm" disabled={ocupado || i < 0 || i >= ativas.length - 1} onClick={() => mover(p, 1)} aria-label="Descer"><ArrowDown /></Button>
-          </span>
-        )
-      },
+      key: 'ordem', header: 'Ordem', width: '7.5rem', sortable: true,
+      render: (p) => p.arquivada ? <span className="text-muted-foreground">—</span> : (
+        <span className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon-sm" disabled={ocupado || !p.vizinhoAnteriorId} onClick={() => mover(p, -1)} aria-label="Subir"><ArrowUp /></Button>
+          <Button variant="ghost" size="icon-sm" disabled={ocupado || !p.vizinhoProximoId} onClick={() => mover(p, 1)} aria-label="Descer"><ArrowDown /></Button>
+        </span>
+      ),
     },
-    { key: 'nome', header: 'Nome', render: (p) => <span className={p.arquivada ? 'text-muted-foreground line-through' : 'font-medium'}>{p.nome}</span>, title: (p) => p.nome },
+    { key: 'nome', header: 'Nome', sortable: true, render: (p) => <span className={p.arquivada ? 'text-muted-foreground line-through' : 'font-medium'}>{p.nome}</span>, title: (p) => p.nome },
     { key: 'faixa', header: 'Faixa', render: (p) => <span className="font-mono text-xs">{faixaTxt(p)}</span>, title: (p) => faixaTxt(p) },
     {
-      key: 'medida', header: 'Artigos / palavras', width: '11rem',
+      key: 'medida', header: 'Artigos / palavras', width: '12rem', sortable: true,
       render: (p) => p.medida ? <span className="tabular-nums">{fmt(p.medida.artigos)} art. · {fmt(p.medida.palavras)} pal.</span> : <span className="text-muted-foreground">—</span>,
     },
     {
-      key: 'uso', header: 'Metas em uso', width: '8rem', align: 'center',
+      key: 'uso', header: 'Metas em uso', width: '9rem', align: 'center', sortable: true,
       render: (p) => <span className={p.metasEmUso > 0 ? 'font-semibold tabular-nums' : 'tabular-nums text-muted-foreground'}>{fmt(p.metasEmUso)}</span>,
     },
     {
-      key: 'status', header: 'Faixa', width: '12rem',
+      key: 'status', header: 'Situação', width: '12rem',
       render: (p) => { const s = statusDe(p); return <span className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold ${s.cls}`}>{p.arquivada ? 'Arquivada' : s.rotulo}</span> },
     },
   ]
+
+  const semNenhuma = partes !== null && totalGeral === 0 && !q
 
   return (
     <div className="space-y-4">
@@ -145,6 +161,10 @@ export function PartesAba({ documentoId }: { documentoId: string }) {
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input type="checkbox" checked={arquivadas} onChange={(e) => setArquivadas(e.target.checked)} /> Mostrar arquivadas
         </label>
+        <a href={`/admin/biblioteca/classificacao${titulo ? `?q=${encodeURIComponent(titulo)}` : ''}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:bg-muted"><ListChecks className="h-4 w-4" /> Classificação deste documento</a>
+        <a href={`/admin/biblioteca/classificacao/partes-das-metas?doc=${documentoId}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:bg-muted"><ListChecks className="h-4 w-4" /> Criar a partir das metas</a>
         <Button variant="outline" onClick={() => setSugerir(true)} disabled={ausente}><Wand2 /> Sugerir divisão</Button>
         <Button onClick={() => setEditor({ parte: null })} disabled={ausente}><Plus /> Nova parte</Button>
       </div>
@@ -162,19 +182,28 @@ export function PartesAba({ documentoId }: { documentoId: string }) {
 
       {partes === null ? (
         <div className="flex items-center gap-2 rounded-2xl border bg-card p-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando partes…</div>
+      ) : semNenhuma && !ausente ? (
+        <div className="rounded-2xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Este documento ainda não tem partes.</p>
+          <p className="mt-1">Use “Sugerir divisão” para propor partes pela estrutura da lei, ou crie uma manualmente.</p>
+        </div>
       ) : !ausente && (
-        <DataTable<Parte>
-          rows={partes} total={partes.length} getRowId={(p) => p.id} columns={colunas}
-          selectable={false} perPageOptions={[1000]} defaultPerPage={1000}
-          nomeSingular="parte" nomePlural="partes"
-          empty={<span className="text-sm text-muted-foreground">Nenhuma parte ainda. Crie uma ou use “Sugerir divisão”.</span>}
-          rowActions={(p) => p.arquivada
-            ? [{ label: 'Restaurar', icon: <RotateCcw />, onClick: () => restaurar(p) }]
-            : [
-              { label: 'Editar', icon: <Pencil />, onClick: () => setEditor({ parte: p }) },
-              { label: 'Arquivar', icon: <Archive />, destructive: true, separatorBefore: true, onClick: () => arquivar(p) },
-            ]}
-        />
+        <div className={sobAtualizacao ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
+          <DataTable<Parte>
+            rows={partes} total={total} getRowId={(p) => p.id} columns={colunas}
+            selectable={false} searchable searchPlaceholder="Buscar parte por nome ou artigo…"
+            defaultSort={{ key: 'ordem', dir: 'asc' }}
+            perPageOptions={[10, 15, 25]} defaultPerPage={10}
+            nomeSingular="parte" nomePlural="partes"
+            empty={<span className="text-sm text-muted-foreground">Nenhuma parte encontrada para esta busca.</span>}
+            rowActions={(p) => p.arquivada
+              ? [{ label: 'Restaurar', icon: <RotateCcw />, onClick: () => restaurar(p) }]
+              : [
+                { label: 'Editar', icon: <Pencil />, onClick: () => setEditor({ parte: p }) },
+                { label: 'Arquivar', icon: <Archive />, destructive: true, separatorBefore: true, onClick: () => arquivar(p) },
+              ]}
+          />
+        </div>
       )}
 
       {editor && (
@@ -302,25 +331,31 @@ function SugerirDialog({ documentoId, onClose, onCriado }: { documentoId: string
   const [n, setN] = useState(10)
   const [gerando, setGerando] = useState(false)
   const [criando, setCriando] = useState(false)
-  const [lista, setLista] = useState<Sugestao[] | null>(null)
+  const [lista, setLista] = useState<Sugestao[] | null>(null) // SÓ a página atual (o servidor pagina)
+  const [meta, setMeta] = useState({ total: 0, totalCriaveis: 0, page: 1, totalPaginas: 1 })
   const [aviso, setAviso] = useState<string | null>(null)
-  const [marcadas, setMarcadas] = useState<Set<number>>(new Set())
+  // Padrão = todas as criáveis marcadas; `excecoes` guarda o que o usuário inverteu (chave = faixa), sem lista gigante no estado.
+  const [excecoes, setExcecoes] = useState<Set<string>>(new Set())
+  const chave = (s: Sugestao) => `${s.iniUid}|${s.fimUid}`
 
-  async function gerar() {
+  async function buscar(page: number) {
     setGerando(true); setAviso(null)
-    const r = await api<any>(`${API}/sugerir`, { method: 'POST', body: JSON.stringify({ documentoId, modo, ...(modo === 'cada_n_artigos' ? { n } : {}) }) })
+    const r = await api<any>(`${API}/sugerir`, { method: 'POST', body: JSON.stringify({ documentoId, modo, page, pp: 10, ...(modo === 'cada_n_artigos' ? { n } : {}) }) })
     setGerando(false)
     if (!r.ok) { setLista([]); setAviso(r.data?.error || 'Não foi possível sugerir.'); return }
-    const s: Sugestao[] = r.data.sugestoes ?? []
-    setLista(s); setAviso(r.data.aviso ?? null)
-    setMarcadas(new Set(s.map((x, i) => (x.conflitaComExistente ? -1 : i)).filter((i) => i >= 0)))
+    setLista(r.data.sugestoes ?? []); setAviso(r.data.aviso ?? null)
+    setMeta({ total: r.data.total ?? 0, totalCriaveis: r.data.totalCriaveis ?? 0, page: r.data.page ?? 1, totalPaginas: r.data.totalPaginas ?? 1 })
   }
+  const gerar = () => { setExcecoes(new Set()); void buscar(1) }
+
+  const marcada = (s: Sugestao) => !s.conflitaComExistente && !excecoes.has(chave(s))
+  const qtdMarcadas = Math.max(0, meta.totalCriaveis - excecoes.size)
 
   async function aceitar() {
-    if (!lista) return
-    const escolhidas = lista.filter((_, i) => marcadas.has(i))
-    if (!escolhidas.length) return
     setCriando(true)
+    const t = await api<any>(`${API}/sugerir`, { method: 'POST', body: JSON.stringify({ documentoId, modo, todas: true, ...(modo === 'cada_n_artigos' ? { n } : {}) }) })
+    if (!t.ok) { setCriando(false); toast.error(t.data?.error || 'Não foi possível preparar as partes.'); return }
+    const escolhidas: Sugestao[] = (t.data.sugestoes ?? []).filter((s: Sugestao) => !excecoes.has(chave(s)))
     let ok = 0; const falhas: string[] = []
     for (const s of escolhidas) { // sequencial: cada criação valida sobreposição contra as anteriores
       const r = await api(API, { method: 'POST', body: JSON.stringify({ documentoId, nome: s.nome, iniUid: s.iniUid, fimUid: s.fimUid, rotuloIni: s.rotuloIni, rotuloFim: s.rotuloFim }) })
@@ -332,7 +367,8 @@ function SugerirDialog({ documentoId, onClose, onCriado }: { documentoId: string
     if (ok) await onCriado()
   }
 
-  const toggle = (i: number) => setMarcadas((p) => { const c = new Set(p); c.has(i) ? c.delete(i) : c.add(i); return c })
+  const toggle = (s: Sugestao) => setExcecoes((p) => { const c = new Set(p); const k = chave(s); c.has(k) ? c.delete(k) : c.add(k); return c })
+  const nav = (page: number) => void buscar(Math.min(Math.max(1, page), meta.totalPaginas))
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !criando) onClose() }}>
@@ -355,25 +391,40 @@ function SugerirDialog({ documentoId, onClose, onCriado }: { documentoId: string
         </div>
         {aviso && <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{aviso}</div>}
         {lista !== null && (
-          <div className="max-h-80 overflow-y-auto rounded-2xl border">
-            {lista.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma sugestão para este critério.</div>
-              : lista.map((s, i) => (
-                <label key={i} className={`flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0 ${s.conflitaComExistente ? 'opacity-60' : 'cursor-pointer hover:bg-muted'}`}>
-                  <input type="checkbox" checked={marcadas.has(i)} disabled={s.conflitaComExistente} onChange={() => toggle(i)} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{s.nome}</span>
-                    <span className="block truncate font-mono text-xs text-muted-foreground">{s.rotuloIni || '(início)'} → {s.rotuloFim || '(fim)'}</span>
-                  </span>
-                  <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{fmt(s.medida.artigos)} art. · {fmt(s.medida.palavras)} pal.</span>
-                  {s.conflitaComExistente && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">sobrepõe parte existente</span>}
-                </label>
-              ))}
+          <div className="space-y-2">
+            <div className="rounded-2xl border">
+              {lista.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma sugestão para este critério. Tente outro modo (ex.: “A cada N artigos”).</div>
+                : lista.map((s) => (
+                  <label key={chave(s)} className={`flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0 ${s.conflitaComExistente ? 'opacity-60' : 'cursor-pointer hover:bg-muted'}`}>
+                    <input type="checkbox" checked={marcada(s)} disabled={s.conflitaComExistente} onChange={() => toggle(s)} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{s.nome}</span>
+                      <span className="block truncate font-mono text-xs text-muted-foreground">{s.rotuloIni || '(início)'} → {s.rotuloFim || '(fim)'}</span>
+                    </span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{fmt(s.medida.artigos)} art. · {fmt(s.medida.palavras)} pal.</span>
+                    {s.conflitaComExistente && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">sobrepõe parte existente</span>}
+                  </label>
+                ))}
+            </div>
+            {meta.total > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <span>{fmt(meta.total)} {meta.total === 1 ? 'sugestão' : 'sugestões'} · página {fmt(meta.page)} de {fmt(meta.totalPaginas)}</span>
+                {meta.totalPaginas > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" disabled={gerando || meta.page <= 1} onClick={() => nav(1)}><ChevronsLeft /> Início</Button>
+                    <Button variant="outline" size="sm" disabled={gerando || meta.page <= 1} onClick={() => nav(meta.page - 1)}><ChevronLeft /> Anterior</Button>
+                    <Button variant="outline" size="sm" disabled={gerando || meta.page >= meta.totalPaginas} onClick={() => nav(meta.page + 1)}>Próxima <ChevronRight /></Button>
+                    <Button variant="outline" size="sm" disabled={gerando || meta.page >= meta.totalPaginas} onClick={() => nav(meta.totalPaginas)}>Final <ChevronsRight /></Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={criando}>Cancelar</Button>
-          <Button onClick={aceitar} disabled={criando || !lista || marcadas.size === 0}>
-            {criando && <Loader2 className="animate-spin" />} Criar {marcadas.size || ''} {marcadas.size === 1 ? 'parte' : 'partes'}
+          <Button onClick={aceitar} disabled={criando || !lista || qtdMarcadas === 0}>
+            {criando && <Loader2 className="animate-spin" />} Criar {qtdMarcadas || ''} {qtdMarcadas === 1 ? 'parte' : 'partes'}
           </Button>
         </DialogFooter>
       </DialogContent>

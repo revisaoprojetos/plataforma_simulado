@@ -28,7 +28,36 @@ export async function GET(req: NextRequest) {
   const c = await ctx('configuracoes:view'); if ('erro' in c) return c.erro
   const sp = req.nextUrl.searchParams
   const r = await listarPartes(c.tenantId, sp.get('documentoId') ?? '', { incluirArquivadas: sp.get('arquivadas') === '1', comStatus: sp.get('status') !== '0' })
-  return r.ok ? json(200, r) : falha(r)
+  if (!r.ok) return falha(r)
+  // Sem `page`: resposta completa (compatível com consumidores antigos). Com `page`: busca + ordenação + paginação NO SERVIDOR.
+  if (!sp.has('page')) return json(200, r)
+
+  const ativas = r.partes.filter((p) => !p.arquivada)
+  const posicao = new Map(ativas.map((p, i) => [p.id, i]))
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const q = norm((sp.get('q') ?? '').trim())
+  let lista = r.partes
+  if (q) lista = lista.filter((p) => norm(`${p.nome} ${p.rotulo_ini ?? ''} ${p.rotulo_fim ?? ''}`).includes(q))
+
+  const sort = sp.get('sort') ?? 'ordem'
+  const dir = sp.get('dir') === 'desc' ? -1 : 1
+  const chave: Record<string, (p: (typeof lista)[number]) => number | string> = {
+    ordem: (p) => (p.arquivada ? 1e9 : 0) + p.ordem,
+    nome: (p) => norm(p.nome),
+    medida: (p) => p.medida?.palavras ?? -1,
+    uso: (p) => p.metasEmUso,
+  }
+  const f = chave[sort] ?? chave.ordem
+  lista = [...lista].sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * dir })
+
+  const pp = [10, 15, 25].includes(Number(sp.get('pp'))) ? Number(sp.get('pp')) : 10
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / pp))
+  const page = Math.min(Math.max(1, Number(sp.get('page')) || 1), totalPaginas)
+  const fatia = lista.slice((page - 1) * pp, page * pp).map((p) => {
+    const i = posicao.get(p.id)
+    return { ...p, vizinhoAnteriorId: i != null && i > 0 ? ativas[i - 1].id : null, vizinhoProximoId: i != null && i < ativas.length - 1 ? ativas[i + 1].id : null, posicao: i ?? null }
+  })
+  return json(200, { ok: true, partes: fatia, total: lista.length, totalGeral: r.partes.length, ativas: ativas.length, page, pp, totalPaginas, versaoId: r.versaoId, totalTrechos: r.totalTrechos })
 }
 
 export async function POST(req: NextRequest) {

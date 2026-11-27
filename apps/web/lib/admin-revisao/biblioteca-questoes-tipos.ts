@@ -57,12 +57,11 @@ export const CAMPOS_CLASSIF: { k: string; rot: string; visao: string }[] = [
   { k: 'etiqueta', rot: 'Etiqueta', visao: 'sem_etiqueta' },
 ]
 
-export type SubAbaQ = 'banco' | 'unificar' | 'classificacao' | 'etiquetas'
+export type SubAbaQ = 'banco' | 'unificar' | 'classificacao'
 export const SUBABAS_Q: { id: SubAbaQ; nome: string }[] = [
   { id: 'banco', nome: 'Banco de questões' },
   { id: 'unificar', nome: 'Unificar' },
   { id: 'classificacao', nome: 'Classificação' },
-  { id: 'etiquetas', nome: 'Etiquetas' },
 ]
 export const ehSubAbaQ = (v: unknown): v is SubAbaQ => SUBABAS_Q.some((x) => x.id === v)
 

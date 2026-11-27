@@ -197,7 +197,7 @@ export function QuestaoPainel({ id, opcoes, podeEditar, onFechar, onMudou, onIrD
               <section aria-label="Etiquetas">
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {(opcoes?.etiquetas ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma etiqueta cadastrada. Crie na sub-aba Etiquetas.</p>}
+                  {(opcoes?.etiquetas ?? []).length === 0 && <p className="text-xs text-muted-foreground">Nenhuma etiqueta cadastrada. Crie em Biblioteca › Classificação › Etiquetas.</p>}
                   {(opcoes?.etiquetas ?? []).map((e) => {
                     const on = ets.has(e.id); const cor = e.cor ?? '#64748b'
                     return (

@@ -95,7 +95,7 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){.gcwrap *{transition:none!important}}
 `
 
-type Aba = 'visao' | 'acesso' | 'alunos' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'areas' | 'partes' | 'hist' | 'cfg' | 'fonte'
+type Aba = 'visao' | 'acesso' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'areas' | 'partes' | 'hist' | 'cfg' | 'fonte'
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 const dt = (s: string | null) => (s ? formatBrt(s) : '—')
 
@@ -108,6 +108,8 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
   const ehModelo = base.ehModelo
   const [aba, setAba] = useState<Aba>(ehModelo ? 'uso' : isMedia ? 'fonte' : 'visao')
   const [copied, setCopied] = useState(false)
+  // Aba única "Acesso" = origens + alunos (sub-aba).
+  const [subAcesso, setSubAcesso] = useState<'origens' | 'alunos'>('origens')
   // Player de mídia (vídeo/áudio) — assistir dentro da plataforma, sem sair da gestão.
   const [player, setPlayer] = useState<{ kind: 'video' | 'audio'; url: string } | null>(null)
   const [abrindoPlayer, setAbrindoPlayer] = useState(false)
@@ -129,14 +131,14 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
     return () => window.removeEventListener('keydown', h, true)
   }, [player])
 
-  const facts: { n: string; label: string; go: Aba }[] = ehModelo ? [
+  const facts: { n: string; label: string; go: Aba | 'alunos' | 'pacotes' }[] = ehModelo ? [
     { n: fmt(base.contagens.vinculos), label: base.contagens.vinculos === 1 ? 'vínculo' : 'vínculos', go: 'uso' },
     { n: base.versaoNum ? `v${base.versaoNum}` : '—', label: 'versão atual', go: 'hist' },
   ] : [
-    { n: fmt(base.contagens.origens), label: base.contagens.origens === 1 ? 'origem de acesso' : 'origens de acesso', go: 'acesso' },
-    { n: fmt(base.contagens.alunos), label: 'alunos com acesso', go: 'alunos' },
-    { n: fmt(base.contagens.vinculos), label: base.contagens.vinculos === 1 ? 'vínculo' : 'vínculos', go: 'uso' },
-    { n: fmt(base.contagens.pacotes), label: 'pacotes', go: 'pacotes' },
+    ...(base.contagens.origens > 0 ? [{ n: fmt(base.contagens.origens), label: base.contagens.origens === 1 ? 'origem de acesso' : 'origens de acesso', go: 'acesso' as Aba }] : []),
+    ...(base.contagens.alunos > 0 ? [{ n: fmt(base.contagens.alunos), label: 'alunos com acesso', go: 'alunos' as Aba }] : []),
+    ...(base.contagens.vinculos > 0 ? [{ n: fmt(base.contagens.vinculos), label: base.contagens.vinculos === 1 ? 'vínculo' : 'vínculos', go: 'uso' as Aba }] : []),
+    ...(base.contagens.pacotes > 0 ? [{ n: fmt(base.contagens.pacotes), label: base.contagens.pacotes === 1 ? 'pacote' : 'pacotes', go: 'pacotes' as Aba }] : []),
     { n: base.versaoNum ? `v${base.versaoNum}` : '—', label: 'versão atual', go: 'hist' },
   ]
 
@@ -148,6 +150,12 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       ? { label: 'Publicado para os alunos', fg: '#13804B', bg: 'color-mix(in oklab,#13804B 14%,var(--card))' }
       : base.liberadoDe ? { label: 'Agendado', fg: '#8A6600', bg: 'color-mix(in oklab,#F1C232 18%,var(--card))' }
         : { label: 'Rascunho · não publicado', fg: 'var(--muted-foreground)', bg: 'var(--muted)' }
+
+  // Atalhos dos números do cabeçalho → aba correspondente (alunos = sub-aba de Acesso; pacotes = aba própria).
+  function irFato(go: Aba | 'alunos' | 'pacotes') {
+    if (go === 'alunos') { setSubAcesso('alunos'); setAba('acesso') }
+    else { if (go === 'acesso') setSubAcesso('origens'); setAba(go as Aba) }
+  }
 
   async function copiarLink() {
     try { await navigator.clipboard.writeText(linkAluno); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { toast.error('Não foi possível copiar.') }
@@ -168,13 +176,13 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
   ] : [
     ...(isMedia ? [{ k: 'fonte' as Aba, label: 'Fonte e link' }] : []),
     { k: 'visao', label: 'Visão geral' },
-    { k: 'acesso', label: 'Quem tem acesso', n: base.contagens.origens },
-    { k: 'alunos', label: 'Alunos', n: base.contagens.alunos },
-    { k: 'uso', label: 'Utilizado em', n: base.contagens.vinculos },
-    { k: 'pacotes', label: 'Pacotes', n: base.contagens.pacotes },
-    { k: 'unit', label: tp.abaTipo.tab },
+    { k: 'acesso', label: 'Acesso', n: base.contagens.alunos },
+    // "Utilizado em" e "Pacotes" só aparecem quando há dado; "unit" (métricas por tipo) era só placeholder em construção.
+    ...(base.contagens.vinculos > 0 ? [{ k: 'uso' as Aba, label: 'Utilizado em', n: base.contagens.vinculos }] : []),
+    ...(base.contagens.pacotes > 0 ? [{ k: 'pacotes' as Aba, label: 'Pacotes', n: base.contagens.pacotes }] : []),
     { k: 'flash', label: 'Flashcards' },
-    { k: 'areas', label: 'Áreas' },
+    // Áreas de visibilidade vêm do plugin do OnlyOffice → só documentos .docx.
+    ...(base.kind === 'docx' ? [{ k: 'areas' as Aba, label: 'Áreas' }] : []),
     ...(base.kind === 'docx' ? [{ k: 'partes' as Aba, label: 'Partes' }] : []),
     { k: 'hist', label: 'Histórico' },
     { k: 'cfg', label: 'Configurações' },
@@ -219,7 +227,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {facts.map((f) => (
-            <button key={f.go} className="fact" onClick={() => setAba(f.go)}>
+            <button key={f.go} className="fact" onClick={() => irFato(f.go)}>
               <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>{f.n}</span>
               <span style={{ fontSize: 12.5, color: 'var(--muted-foreground)', fontWeight: 600 }}>{f.label}</span>
             </button>
@@ -228,17 +236,22 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       </section>
 
       {/* ABAS */}
-      <AbasLinhaControlada valor={aba} onChange={setAba} itens={TABS.map((tb) => ({ valor: tb.k, label: tb.label, badge: tb.n }))} />
+      <AbasLinhaControlada valor={aba} onChange={setAba} itens={TABS.map((tb) => ({ valor: tb.k, label: tb.label, badge: tb.n && tb.n > 0 ? tb.n : undefined }))} />
 
-      {aba === 'visao' && <AbaVisao base={base} dados={dados} tp={tp} />}
-      {aba === 'acesso' && <AbaAcesso base={base} dados={dados} tp={tp} />}
-      {aba === 'alunos' && <AbaAlunos base={base} tp={tp} />}
+      {aba === 'visao' && <AbaVisao base={base} dados={dados} onIrAcesso={() => { setSubAcesso('origens'); setAba('acesso') }} onIrHistorico={() => setAba('hist')} />}
+      {aba === 'acesso' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <AbasLinhaControlada valor={subAcesso} onChange={setSubAcesso}
+            itens={[{ valor: 'origens', label: 'Quem tem acesso', badge: base.contagens.origens > 0 ? base.contagens.origens : undefined }, { valor: 'alunos', label: 'Alunos', badge: base.contagens.alunos > 0 ? base.contagens.alunos : undefined }]} />
+          {subAcesso === 'origens' && <AbaAcesso base={base} dados={dados} tp={tp} />}
+          {subAcesso === 'alunos' && <AbaAlunos base={base} tp={tp} onIrOrigens={() => setSubAcesso('origens')} />}
+        </div>
+      )}
       {aba === 'uso' && <AbaUso dados={dados} />}
-      {aba === 'pacotes' && <EmConstrucao titulo="Pacotes de estudo que incluem este conteúdo" texto="Os pacotes (Extensivos) entram numa fase seguinte. Quando existirem, cada pacote aparece aqui com posição, liberação, alunos e permissões." />}
-      {aba === 'unit' && <EmConstrucao titulo={tp.abaTipo.titulo} texto={`${tp.abaTipo.sub}. As métricas por ${tp.abaTipo.tab.toLowerCase()} dependem do pipeline de eventos de leitura — em construção.`} />}
+      {aba === 'pacotes' && <EmConstrucao titulo="Pacotes de estudo que incluem este conteúdo" texto="Este conteúdo está em pacotes de estudo. O detalhe de posição, liberação e permissões de cada pacote é gerenciado no próprio pacote (Produtos)." />}
       {aba === 'flash' && <AbaFlashcards documentoId={base.id} />}
       {aba === 'areas' && <AbaAreas documentoId={base.id} />}
-      {aba === 'partes' && <PartesAba documentoId={base.id} />}
+      {aba === 'partes' && <PartesAba documentoId={base.id} titulo={base.titulo} />}
       {aba === 'hist' && <AbaHistorico dados={dados} />}
       {aba === 'cfg' && <AbaConfig base={base} tp={tp} />}
       {aba === 'fonte' && <AbaFonte base={base} linkAluno={linkAluno} />}
@@ -289,43 +302,45 @@ function EmConstrucao({ titulo, texto }: { titulo: string; texto: string }) {
 }
 
 // ── VISÃO GERAL (§2.2) ─────────────────────────────────────────────────────────────
-function AbaVisao({ base, dados, tp }: { base: GestaoDados['base']; dados: GestaoDados; tp: ReturnType<typeof gestaoDe> }) {
+function AbaVisao({ base, dados, onIrAcesso, onIrHistorico }: { base: GestaoDados['base']; dados: GestaoDados; onIrAcesso: () => void; onIrHistorico: () => void }) {
   const b = base!
   const entregas = dados.historico?.entregas ?? []
+  const resumo: { l: string; v: string }[] = [
+    { l: 'Origens de acesso', v: fmt(b.contagens.origens) },
+    { l: 'Alunos com acesso', v: fmt(b.contagens.alunos) },
+    { l: 'Vínculos', v: fmt(b.contagens.vinculos) },
+    { l: 'Versão atual', v: b.versaoNum ? `v${b.versaoNum}` : '—' },
+  ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {!b.liberado && (
         <div className="emc" style={{ padding: '30px 24px' }}>
           <strong style={{ fontSize: 16, color: 'var(--foreground)' }}>Ainda não liberado para nenhum aluno</strong>
-          <div style={{ marginTop: 6 }}>Libere este conteúdo em “Quem tem acesso” (entrega avulsa para um grupo ou liberação para um aluno).</div>
+          <div style={{ marginTop: 6 }}>Libere este conteúdo em “Acesso” (entrega avulsa para um grupo ou liberação para um aluno).</div>
+          <button className="gbtn sm" style={{ marginTop: 12 }} onClick={onIrAcesso}>Ir para Acesso</button>
         </div>
       )}
-      {/* KPIs — bloco fiel, valores "em construção" (sem pipeline de métricas) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
-        {tp.kpis.map((label, i) => (
-          <div className="kc" key={label}>
-            <span className="l"><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--muted-foreground)' }} />{label}</span>
-            <span className="v">—</span>
-            <span className="h">{i === 0 ? 'sem métricas ainda' : (tp.hints[i - 1] ?? '')}</span>
+        {resumo.map((r) => (
+          <div className="kc" key={r.l}>
+            <span className="l">{r.l}</span>
+            <span className="v">{r.v}</span>
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-        <div className="kc" style={{ flex: '3 1 360px', gap: 12 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 800 }}>{tp.funilTitulo}</span>
-          <div className="emc">Funil em construção — depende do pipeline de eventos (abertura, leitura, conclusão, download).</div>
-        </div>
-        <div className="kc" style={{ flex: '2 1 300px', gap: 12 }}>
-          <span style={{ fontSize: 14.5, fontWeight: 800 }}>Linha do tempo da publicação</span>
-          {entregas.length === 0 && <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>Sem eventos registrados ainda.</span>}
-          {entregas.slice(0, 8).map((e, i) => (
-            <div className="tl" key={i}>
-              <span className="mono" style={{ color: 'var(--muted-foreground)', paddingTop: 2 }}>{dt(e.em)}</span>
-              <span className="dot" style={{ background: 'var(--primary)' }} />
-              <span style={{ fontSize: 13, lineHeight: 1.45 }}><strong>{e.titulo}</strong></span>
-            </div>
-          ))}
-        </div>
+      <div className="kc" style={{ gap: 12 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 14.5, fontWeight: 800, flex: 1 }}>Linha do tempo da publicação</span>
+          {entregas.length > 8 && <button className="gbtn sm" onClick={onIrHistorico}>Ver tudo no Histórico</button>}
+        </span>
+        {entregas.length === 0 && <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>Nenhum evento registrado ainda. Eventos de liberação, permissões e novas versões aparecem aqui.</span>}
+        {entregas.slice(0, 8).map((e, i) => (
+          <div className="tl" key={i}>
+            <span className="mono" style={{ color: 'var(--muted-foreground)', paddingTop: 2 }}>{dt(e.em)}</span>
+            <span className="dot" style={{ background: 'var(--primary)' }} />
+            <span style={{ fontSize: 13, lineHeight: 1.45 }}><strong>{e.titulo}</strong></span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -399,7 +414,7 @@ function AbaAcesso({ base, dados, tp }: { base: GestaoDados['base']; dados: Gest
 }
 
 // ── ALUNOS (§2.4) ───────────────────────────────────────────────────────────────────
-function AbaAlunos({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typeof gestaoDe> }) {
+function AbaAlunos({ base, tp, onIrOrigens }: { base: GestaoDados['base']; tp: ReturnType<typeof gestaoDe>; onIrOrigens: () => void }) {
   // Carrega SOB DEMANDA (ao abrir a aba) — fora do load da página (era até 300 alunos + detalhes).
   const [carregado, setCarregado] = useState<{ itens: AlunoAcesso[]; total: number } | null>(null)
   useEffect(() => {
@@ -438,7 +453,12 @@ function AbaAlunos({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
     }
   }
   if (carregado === null) return <div className="emc" style={{ padding: 40 }}>Carregando alunos…</div>
-  if (total === 0) return <div className="emc" style={{ padding: 40 }}>Nenhum aluno acessou ainda: o conteúdo não foi liberado.</div>
+  if (total === 0) return (
+    <div className="emc" style={{ padding: 40 }}>
+      Nenhum aluno com acesso ainda: o conteúdo não foi liberado.
+      <div style={{ marginTop: 12 }}><button className="gbtn sm" onClick={onIrOrigens}>Liberar em “Quem tem acesso”</button></div>
+    </div>
+  )
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 18, overflow: 'hidden', background: 'var(--card)' }}>
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, borderBottom: '1px solid var(--border)' }}>
@@ -513,7 +533,7 @@ function AbaUso({ dados }: { dados: GestaoDados }) {
         <button className="gbtn sm" onClick={() => toast('Vincular a… — em construção.')}>Vincular a…</button>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{cats.map((c) => <button key={c} className={f === c ? 'chip on' : 'chip'} onClick={() => setF(c)} aria-pressed={f === c}>{c === 'todos' ? 'Todos' : c}<span className="c">{c === 'todos' ? vincs.length : vincs.filter((v) => v.categoria === c).length}</span></button>)}</div>
-      {lista.length === 0 && <div className="emc">Nenhum vínculo neste filtro.</div>}
+      {lista.length === 0 && <div className="emc">{vincs.length === 0 ? 'Este conteúdo ainda não está vinculado a nenhum cronograma, caderno ou diagnóstico.' : 'Nenhum vínculo neste filtro.'}</div>}
       {lista.map((u) => (
         <div className="lk" key={u.id}>
           <span style={{ width: 40, height: 40, borderRadius: 12, ...seloStyle('docx'), display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{u.selo}</span>
@@ -596,6 +616,11 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Legenda de categorias no leitor</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Barra Núcleo/Prazos/STF/STJ… — específica do LegProc. Deixe desligada em PDFULL/Fight e nos demais.</div></span><Sw on={legenda} onClick={toggleLegenda} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Documento LegProc (leitura em texto)</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>O aluno lê em modo texto, com os entendimentos do STF e do STJ recolhidos (clique para expandir), como na Lei Seca. Desligado = PDF fiel.{b.leituraLegprocAuto ? ' Já ativo automaticamente: este documento está numa pasta LegProc.' : ''}</div></span><Sw on={legproc} onClick={toggleLegproc} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Ocultar a tabela de legenda do início</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No LegProc em texto, a tabela “LEGENDA: amarelo = núcleo…” repete a barra de legendas do leitor. Ligado (padrão) = não aparece para o aluno. Vale só para este documento; também dá para definir por pasta.</div></span><Sw on={ocultaLegTab} onClick={toggleLegTab} /></div>
+        </div>
+        {/* Classificação (matriz única da Biblioteca) */}
+        <div className="kc" style={{ gap: 0, padding: '16px 18px' }}>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 4 }}><strong style={{ fontSize: 15 }}>Classificação</strong><span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>Como este documento é classificado (herança da pasta/disciplina)</span></span>
+          <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Classificação deste documento</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Abre a matriz de classificação já filtrada por este documento.</div></span><a className="gbtn sm" href={`/admin/biblioteca/classificacao?q=${encodeURIComponent(b.titulo)}`}>Abrir matriz</a></div>
         </div>
         {/* Vídeo na leitura (faixa recolhível acima da folha) */}
         <AbaVideo documentoId={b.id} />

@@ -16,6 +16,8 @@ import { mapaCompatTipos } from './tipos-conteudo-server'
 import { classificacaoEfetivaDoc, tipoHerdadoDaPasta, traducaoMeta } from '@/lib/conteudo/classificacao/efetiva'
 import { carregarClassificacaoDosDocs } from '@/lib/conteudo/classificacao/docs-server'
 import { coalescer, lerProgressoReencaixado } from './progresso-emissao'
+import { aplicarSelecoes, type ResolvidoComSelecao } from './selecao-gerador'
+import { lerIndiceSelecoesGerador } from './selecao-gerador-server'
 import {
   indexarBiblioteca, resolverDocumentoMeta, vinculosPorMeta,
   type ConteudoResolvido, type DocBiblioteca, type MetaParaConteudo, type TipoMaterial, type VinculoExplicito,
@@ -99,7 +101,11 @@ export async function metasAtuais(svc: SupabaseClient, tenantId: string, cronogr
 }
 
 /** `baixavel`: o tipo do documento permite o botão "Baixar" (PDF/DOCX — ver lib/conteudo/baixar-pura). */
-export type DocDaMeta = ConteudoResolvido & { titulo: string; paginas: number | null; baixavel: boolean }
+export type DocDaMeta = ConteudoResolvido & {
+  titulo: string; paginas: number | null; baixavel: boolean
+  /** Só quando a matriz do Gerador escolheu PARTE/rótulo para a meta (seleção explícita). Ausente = como antes. */
+  parteId?: string | null; rotuloAluno?: string | null
+}
 
 /**
  * Resolve meta -> documento (explícito > automático) para as metas da grade e devolve título/páginas do doc.
@@ -130,22 +136,25 @@ async function resolverConteudoDasMetasBruto(
 ): Promise<Map<string, DocDaMeta>> {
   const out = new Map<string, DocDaMeta>()
   if (!metas.length) return out
-  const [docs, vinculos, atuais] = await Promise.all([
+  const [docs, vinculos, atuais, idxSelecoes] = await Promise.all([
     docsBibliotecaCache(svc, tenantId).catch(() => [] as DocBiblioteca[]),
     lerVinculos(svc, tenantId, cronogramaId),
     metasAtuais(svc, tenantId, cronogramaId).catch(() => [] as MetaCatalogo[]),
+    lerIndiceSelecoesGerador(svc, tenantId), // matriz de aulas do Gerador (vazio = comportamento de antes)
   ])
   const indice = indexarBiblioteca(docs)
   const porMeta = vinculos.length ? vinculosPorMeta(vinculos, atuais) : new Map<string, VinculoLinha>()
-  const resolvidos = new Map<string, ConteudoResolvido>()
+  const base = new Map<string, ConteudoResolvido>()
   for (const m of metas) {
     const r = resolverDocumentoMeta(m, indice, porMeta.get(m.id))
-    if (r) resolvidos.set(m.id, r)
+    if (r) base.set(m.id, r)
   }
+  // Precedência: seleção da matriz (visível ao aluno) > vínculo explícito do cronograma > automático. Sem seleção: `resolvidos === base`.
+  const resolvidos: Map<string, ResolvidoComSelecao> = aplicarSelecoes(metas, base, idxSelecoes)
   if (!resolvidos.size) return out
 
-  // Metadados dos docs usados (título, versão atual -> páginas), em lotes de 80.
-  const ids = [...new Set([...resolvidos.values()].map((r) => r.docId))]
+  // Metadados dos docs usados (título, versão atual -> páginas), em lotes de 80 (inclui o doc de antes das seleções, p/ fallback).
+  const ids = [...new Set([...resolvidos.values(), ...base.values()].map((r) => r.docId))]
   const info = new Map<string, { titulo: string; versao: string | null; baixavel: boolean }>()
   const docsPag: DocParaPaginas[] = []
   const polDl = await lerPoliticaDownload(svc, tenantId) // chave da PLATAFORMA: desligada → nenhum botão "Baixar" (o servidor também barra)
@@ -159,10 +168,14 @@ async function resolverConteudoDasMetasBruto(
   // páginas EFETIVAS (versão atual − página inicial) pela função única compartilhada; sem contagem → null (o aluno informa o total no Parcial)
   const pagsDoc = await paginasEfetivasDocs(svc, tenantId, docsPag).catch(() => new Map<string, PaginasDoc>())
 
-  for (const [metaId, r] of resolvidos) {
+  for (const [metaId, sel] of resolvidos) {
+    let r: ResolvidoComSelecao = sel
+    // seleção apontando para doc não publicado/apagado: cai no resolvido de antes (o aluno não perde o material)
+    if (!info.has(r.docId) && r.viaSelecao) { const antes = base.get(metaId); if (!antes) continue; r = antes }
     const d = info.get(r.docId)
     if (!d) continue
-    out.set(metaId, { ...r, titulo: d.titulo, paginas: pagsDoc.get(r.docId)?.efetivas ?? null, baixavel: d.baixavel })
+    const { viaSelecao: _via, ...resto } = r
+    out.set(metaId, { ...resto, titulo: d.titulo, paginas: pagsDoc.get(r.docId)?.efetivas ?? null, baixavel: d.baixavel })
   }
   return out
 }

@@ -125,13 +125,9 @@ async function reescreverRefs(svc: SupabaseClient, urlAntes: string, urlDepois: 
   return alteradas
 }
 
-/** Verifica (via LIST, nunca HEAD) que o objeto existe no destino. */
-async function existeNoStorage(svc: SupabaseClient, bucket: string, path: string): Promise<boolean> {
-  const barra = path.lastIndexOf('/')
-  const dir = barra >= 0 ? path.slice(0, barra) : ''
-  const base = barra >= 0 ? path.slice(barra + 1) : path
-  const { data } = await svc.storage.from(bucket).list(dir, { search: base, limit: 100 })
-  return Array.isArray(data) && data.some((f: any) => f.name === base)
+/** Verifica que o objeto existe no destino pelo storage ATIVO (S3: HEAD autenticado; Supabase: .list(), nunca HEAD na URL). */
+async function existeNoStorage(bucket: string, path: string): Promise<boolean> {
+  return getStorage().exists(bucket, path)
 }
 
 export interface ResultadoMigracao { migrados: number; falhas: { path: string; motivo: string }[]; backupId: string | null }
@@ -157,8 +153,12 @@ export async function aplicarMigracao(
   for (const it of itens) {
     try {
       // 1) copy (idempotente: "exists" = ok)
-      const { error: cpErr } = await svc.storage.from(it.bucket).copy(it.de, it.para)
-      if (cpErr && !/exist/i.test(cpErr.message)) { falhas.push({ path: it.de, motivo: `copy: ${cpErr.message}` }); continue }
+      try {
+        await storage.copy(it.bucket, it.de, it.para)
+      } catch (cpErr) {
+        const msg = cpErr instanceof Error ? cpErr.message : 'erro'
+        if (!/exist/i.test(msg)) { falhas.push({ path: it.de, motivo: `copy: ${msg}` }); continue }
+      }
 
       // 2) backup dos bytes do original
       const bkp = await backupObjeto(svc, it.bucket, it.de, prefixo)
@@ -177,7 +177,7 @@ export async function aplicarMigracao(
       await svc.from('simulado_arquivos').update({ path: it.para, nome: it.para.split('/').pop() }).eq('bucket', it.bucket).eq('path', it.de)
 
       // 4) verifica destino via LIST (nunca HEAD)
-      if (!(await existeNoStorage(svc, it.bucket, it.para))) { falhas.push({ path: it.de, motivo: 'destino não confirmado' }); continue }
+      if (!(await existeNoStorage(it.bucket, it.para))) { falhas.push({ path: it.de, motivo: 'destino não confirmado' }); continue }
 
       // 5) só então apaga o original
       await storage.remove(it.bucket, it.de)

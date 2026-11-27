@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import {
-  EYEBROW_CRONOGRAMAS, MODALIDADES, grupoDaRota, gruposVisiveis, hrefDaVista, hrefDoGrupo, hrefNoShell, mostraSubabas, normalizarShell, rotaSemCabecalho,
+  EYEBROW_CRONOGRAMAS, MODALIDADES, grupoDaRota, gruposVisiveis, hrefDaVista, hrefDoGrupo, hrefNoShell, mostraSubabas, normalizarShell, rotaInternaSemAbas, rotaSemCabecalho,
   voltarSeguro, comVoltar, destinoVoltar,
 } from './cronogramas-nav'
 import { resolverRota } from './setores'
@@ -134,6 +134,13 @@ describe('estrutura da navegação', () => {
   it('rotaSemCabecalho: só edição (id, criar, conteudos/[id], pacotes/[id]); nunca o shell nem páginas com cabeçalho', () => {
     for (const p of ['/admin/cronogramas/criar', '/admin/cronogramas/abc', '/admin/cronogramas/conteudos/abc', '/admin/cronogramas/pacotes/abc']) expect(rotaSemCabecalho(p), p).toBe(true)
     for (const p of ['/admin/cronogramas', '/admin/cronogramas/conteudos', '/admin/cronogramas/pacotes', '/admin/cronogramas/fluxo', '/admin/cronogramas/adaptativo/mapa', '/admin/cronogramas/lei-seca', '/admin/revisao/cronograma']) expect(rotaSemCabecalho(p), p).toBe(false)
+  })
+})
+
+describe('área interna da matriz de aulas (sem a barra de abas)', () => {
+  it('só /admin/cronogramas/conteudos/<id>[/…]', () => {
+    for (const p of ['/admin/cronogramas/conteudos/abc', '/admin/cronogramas/conteudos/abc/x']) expect(rotaInternaSemAbas(p), p).toBe(true)
+    for (const p of ['/admin/cronogramas/conteudos', '/admin/cronogramas/abc', '/admin/cronogramas/pacotes/abc', '/admin/cronogramas', '/admin/revisao/cronograma']) expect(rotaInternaSemAbas(p), p).toBe(false)
   })
 })
 

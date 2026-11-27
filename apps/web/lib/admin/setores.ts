@@ -160,8 +160,10 @@ export const SETORES: Setor[] = [
         itens: [
           { label: 'Conteúdos', href: '/admin/biblioteca', icone: BookOpen, perm: 'configuracoes:view' },
           { label: 'Biblioteca Revisão', href: '/admin/revisao/biblioteca', icone: BookOpen, perm: 'configuracoes:view' },
-          { label: 'Biblioteca Lei Seca', href: '/admin/leitura/biblioteca', icone: LayoutTemplate, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
           { label: 'JurisClub', href: '/admin/revisao/jurisclub', icone: Gavel, perm: 'configuracoes:view' },
+          // Atalho removido da barra de abas a pedido (2026-11-27); a rota segue coberta como alias da aba Biblioteca.
+          { label: 'Biblioteca Lei Seca (antigo)', href: '/admin/leitura/biblioteca', icone: LayoutTemplate, perm: 'leitura:view', oculto: !LEITURA_ATIVA, alias: true, alvo: '/admin/biblioteca' },
+          { label: 'Classificação', href: '/admin/biblioteca/classificacao', icone: ListChecks, perm: 'configuracoes:view' },
         ],
       },
       {

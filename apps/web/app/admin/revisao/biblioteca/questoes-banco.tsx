@@ -492,7 +492,7 @@ function EtiquetaDialog({ n, opcoes, onClose, onConfirm }: { n: number; opcoes: 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Etiquetas de {n} {n === 1 ? 'questão' : 'questões'}</DialogTitle>
-          <DialogDescription>Aplica ou remove uma etiqueta das questões selecionadas. As etiquetas são criadas e gerenciadas em Questões › Etiquetas.</DialogDescription>
+          <DialogDescription>Aplica ou remove uma etiqueta das questões selecionadas. As etiquetas são criadas e gerenciadas em Biblioteca › Classificação › Etiquetas.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="flex gap-4 text-sm" role="radiogroup" aria-label="Ação">

@@ -55,6 +55,10 @@ export interface StorageProvider {
   exists(bucket: string, path: string): Promise<boolean>
   /** Baixa os bytes do objeto (null se não existir / erro). */
   download(bucket: string, path: string): Promise<Uint8Array | null>
+  /** Copia um objeto DENTRO do mesmo bucket (de → para). Lança se a origem não existir. Sobrescreve o destino. */
+  copy(bucket: string, de: string, para: string): Promise<void>
+  /** Cria o bucket PRIVADO se não existir (idempotente). Só p/ buckets internos (ex.: backups). */
+  garantirBucket?(bucket: string): Promise<void>
   /** Prepara um upload direto do browser (ver UploadTicket). */
   criarUploadTicket(bucket: string, path: string, contentType?: string): Promise<UploadTicket>
 }

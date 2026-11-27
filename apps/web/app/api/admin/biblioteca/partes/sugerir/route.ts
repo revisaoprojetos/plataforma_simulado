@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!(await checkPermission('configuracoes:view'))) return json(403, { ok: false, error: 'Sem permissão.' })
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return json(400, { ok: false, error: 'Tenant não resolvido.' })
-  const b = (await req.json().catch(() => null)) as { documentoId?: unknown; modo?: unknown; n?: unknown } | null
+  const b = (await req.json().catch(() => null)) as { documentoId?: unknown; modo?: unknown; n?: unknown; page?: unknown; pp?: unknown; todas?: unknown } | null
   const documentoId = typeof b?.documentoId === 'string' ? b.documentoId : ''
   const modo = MODOS.find((m) => m === b?.modo)
   if (!UUID.test(documentoId) || !modo) return json(400, { ok: false, error: 'Informe documentoId e modo (titulo | capitulo | cada_n_artigos).' })
@@ -38,5 +38,15 @@ export async function POST(req: NextRequest) {
     const v = validarPartes([...existentes, { nome: s.nome, ini: s.indices[0], fim: s.indices[1] }])
     return { ...s, conflitaComExistente: v.erros.some((e) => e.codigo === 'sobreposicao' && e.nomes.includes(s.nome)) }
   })
-  return json(200, { ok: true, versaoId: ctx.versaoId, totalTrechos: ctx.trechos.length, sugestoes: saida, ...(atuais.ok ? {} : { aviso: atuais.error }) })
+  const criaveis = saida.filter((s) => !s.conflitaComExistente)
+  const aviso = atuais.ok ? {} : { aviso: atuais.error }
+  // `todas:true` → só as criáveis (sem conflito), p/ o aceite em lote; a prévia da tela vem SEMPRE paginada.
+  if (b?.todas === true) return json(200, { ok: true, versaoId: ctx.versaoId, sugestoes: criaveis, totalCriaveis: criaveis.length, ...aviso })
+  const pp = [10, 15, 25].includes(Number(b?.pp)) ? Number(b?.pp) : 10
+  const totalPaginas = Math.max(1, Math.ceil(saida.length / pp))
+  const page = Math.min(Math.max(1, Number(b?.page) || 1), totalPaginas)
+  return json(200, {
+    ok: true, versaoId: ctx.versaoId, totalTrechos: ctx.trechos.length,
+    sugestoes: saida.slice((page - 1) * pp, page * pp), total: saida.length, totalCriaveis: criaveis.length, page, pp, totalPaginas, ...aviso,
+  })
 }

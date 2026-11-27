@@ -74,7 +74,12 @@ export function prefixoDaCategoria(bucket: string, categoria: string): { like: s
  */
 export function parseStorageUrl(u: string | null | undefined): { bucket: string; path: string } | null {
   if (!u || typeof u !== 'string') return null
-  const m = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+?)(?:\?|$)/.exec(u)
+  let m = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+?)(?:\?|$)/.exec(u)
+  if (!m) {
+    // S3/Hetzner path-style: https://<endpoint>/<S3_BUCKET_PREFIX><bucket>/<path> → bucket LÓGICO (sem o prefixo).
+    const pre = (process.env.S3_BUCKET_PREFIX ?? 'revisaopge-').replace(/[^\w-]/g, '')
+    m = new RegExp('^https?://[^/]+/' + pre + '([\\w.-]+)/(.+?)(?:\\?|$)').exec(u)
+  }
   if (!m) return null
   try {
     return { bucket: m[1], path: decodeURIComponent(m[2]) }

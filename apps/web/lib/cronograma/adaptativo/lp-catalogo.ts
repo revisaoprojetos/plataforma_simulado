@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { lerJsonStorage, gravarJsonStorage } from '@/lib/storage/json'
 import type { ItemLP } from './motor28'
 
 /**
@@ -104,19 +105,12 @@ export async function catalogoLegProc(svc: SupabaseClient, tenantId: string, doc
   if (!docs.length) return []
   const assinatura = hash(`${CHARS_META}|` + docs.map((d) => `${d.id}:${d.versaoId}:${d.disc}`).join('|'))
   return remember<ItemLP[]>(`crono-lp:${tenantId}:${assinatura}`, 86400, async () => {
-    try {
-      const { data } = await svc.storage.from(BUCKET).download(caminho(tenantId))
-      if (data) {
-        const j = JSON.parse(await data.text()) as { assinatura?: string; itens?: ItemLP[] }
-        if (j.assinatura === assinatura && Array.isArray(j.itens)) return j.itens
-      }
-    } catch { /* sem cache no storage → calcula */ }
+    // cache no storage ATIVO (Hetzner/Supabase); ausente/inválido → calcula
+    const j = await lerJsonStorage<{ assinatura?: string; itens?: ItemLP[] }>(BUCKET, caminho(tenantId))
+    if (j && j.assinatura === assinatura && Array.isArray(j.itens)) return j.itens
     const itens: ItemLP[] = []
     for (const d of docs) itens.push(...await segmentarLei(svc, d))
-    try {
-      const corpo = new Blob([JSON.stringify({ assinatura, geradoEm: new Date().toISOString(), itens })], { type: 'application/json' })
-      await svc.storage.from(BUCKET).upload(caminho(tenantId), corpo, { upsert: true, contentType: 'application/json' })
-    } catch { /* cache é opcional */ }
+    await gravarJsonStorage(BUCKET, caminho(tenantId), { assinatura, geradoEm: new Date().toISOString(), itens }, true) // cache é opcional
     return itens
   })
 }

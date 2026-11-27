@@ -72,6 +72,11 @@ export function createGcsProvider(): StorageProvider {
       }
     },
 
+    async copy(bucket, de, para) {
+      const b = await getBucket(bucket)
+      await b.file(de).copy(b.file(para))
+    },
+
     async criarUploadTicket(bucket, path, contentType): Promise<UploadTicket> {
       const b = await getBucket(bucket)
       const [url] = await b.file(path).getSignedUrl({
