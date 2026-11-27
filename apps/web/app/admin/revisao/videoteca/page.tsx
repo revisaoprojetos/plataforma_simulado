@@ -42,7 +42,7 @@ export default async function VideotecaRevisaoPage({ searchParams }: { searchPar
         secao="Pedagógico"
         titulo="Videoteca"
         subtitulo="Todas as videoaulas, ligadas à aula do PDFull. O tempo delas não entra nas horas do cronograma. Ao trocar um vídeo, o progresso e as anotações com minutagem dos alunos continuam."
-        acoes={podeEditar ? <Link href="/admin/conteudos/videos" className={buttonVariants()}><Plus />Incluir videoaula</Link> : undefined}
+        acoes={podeEditar ? <Link href="/admin/biblioteca" className={buttonVariants()}><Plus />Importar videoaulas</Link> : undefined}
       />
       <KpiGrade itens={[
         { valor: resumo.total, rotulo: 'videoaulas' },
@@ -57,7 +57,7 @@ export default async function VideotecaRevisaoPage({ searchParams }: { searchPar
           Videoaulas complementares, ligadas à aula. O tempo delas não entra nas horas do cronograma. Desligue “Visível ao aluno” para esconder sem excluir.
         </p>
         <div className="flex items-center gap-1.5 text-xs">
-          {podeEditar && <Link href="/admin/conteudos/videos" className={buttonVariants({ variant: 'outline', size: 'sm' })}><Plus />Adicionar linha</Link>}
+          {podeEditar && <Link href="/admin/biblioteca" className={buttonVariants({ variant: 'outline', size: 'sm' })}><Plus />Importar pela Biblioteca</Link>}
           {(resumo.temOculto ? ([['todos', 'Todas'], ['escondidos', 'Só escondidas']] as const) : ([['todos', 'Todas']] as const)).map(([v, r]) => (
             <Link key={v} href={`${BASE}?${new URLSearchParams({ ...(q ? { q } : {}), ...(v === 'escondidos' ? { vis: v } : {}) })}`}
               className={cn('rounded-lg border px-2.5 py-1 font-medium', vis === v ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{r}</Link>
@@ -65,13 +65,14 @@ export default async function VideotecaRevisaoPage({ searchParams }: { searchPar
         </div>
       </div>
       <VideosTabela rows={lista.rows} podeEditar={podeEditar} controleVisivel={resumo.temOculto} />
-      <details className="mt-4 rounded-2xl border bg-card p-4 shadow-sm">
-        <summary className="cursor-pointer select-none text-sm font-semibold text-primary">Importar Videoaulas em lote</summary>
-        <p className="mt-2 text-sm text-muted-foreground">
-          O envio de vários vídeos (com acompanhamento do processamento) é feito no gerenciador de vídeo. Para ligar um vídeo a uma aula do PDFull,
-          abra a aula na Biblioteca e use a aba Vídeo (link ou vídeo da plataforma).
-        </p>
-        <Link href="/admin/conteudos/videos" className={`${buttonVariants({ variant: 'outline', size: 'sm' })} mt-2`}>Abrir o gerenciador de vídeo</Link>
+      <details className="mt-4 rounded-2xl border bg-card p-4 shadow-sm" open>
+        <summary className="cursor-pointer select-none text-sm font-semibold text-primary">Como importar videoaulas (uma ou várias)</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>Abra a Biblioteca e entre na pasta da disciplina.</li>
+          <li>Use <b>Novo → Upload de arquivos</b> e selecione <b>vários vídeos de uma vez</b> (.mp4, .webm, .mov, .m4v). O painel mostra o progresso de cada um.</li>
+          <li>Os vídeos importados aparecem aqui na Videoteca. Para ligar a uma aula do PDFull, abra a aula na Biblioteca e use a aba Vídeo.</li>
+        </ol>
+        <Link href="/admin/biblioteca" className={`${buttonVariants({ variant: 'outline', size: 'sm' })} mt-2`}>Abrir a Biblioteca</Link>
       </details>
       <Paginacao total={lista.total} pagina={pagina} porPagina={porPagina} base={BASE} params={pars} />
     </div>

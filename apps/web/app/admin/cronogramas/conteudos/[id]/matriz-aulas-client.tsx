@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 import {
-  POR_PAGINA_MATRIZ, ROTULO_SITUACAO, SITUACOES_MATRIZ,
+  POR_PAGINA_MATRIZ, ROTULO_SITUACAO, ehTipoVideoaula, SITUACOES_MATRIZ,
   type CelulaDocumento, type ColunaMatriz, type LinhaMatriz, type MatrizDados,
 } from '@/lib/cronograma/matriz-gerador-tipos'
 import { EditarConjuntoDialog, NovaAulaDialog } from './conjunto-editor-client'
@@ -47,7 +47,7 @@ function Celula({ coluna, celula, onAbrir }: { coluna: ColunaMatriz; celula: Cel
           <span className="text-[11px] text-muted-foreground">Automático{minutos != null ? ` · ≈ ${minutos} min` : ''}</span>
         </>
       ) : (
-        <span className="text-[12px] text-muted-foreground">{celula.existeSecao ? 'Sem conteúdo · vincular' : 'Sem seção · vincular'}</span>
+        <span className="text-[12px] text-muted-foreground">{ehTipoVideoaula(coluna.tipo) ? 'Sem videoaula · escolher' : celula.existeSecao ? 'Sem conteúdo · vincular' : 'Sem seção · vincular'}</span>
       )}
     </button>
   )
@@ -102,7 +102,7 @@ export function MatrizAulasClient({ dados, tipos, disciplinas, podeEditar }: {
     for (const c of dados.colunas) {
       cols.push({
         key: `col:${c.tipo}`, truncate: false, width: '17rem',
-        header: <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: c.cor ?? 'var(--muted-foreground)' }} />{c.nome}</span>,
+        header: <span className="inline-flex items-center gap-1.5" title={ehTipoVideoaula(c.tipo) ? 'Vale para a aula toda: o vídeo aparece junto do PDFull, de outro PDF de meta ou das questões desta mesma aula (não conta nas horas).' : undefined}><span className="h-2 w-2 rounded-full" style={{ background: c.cor ?? 'var(--muted-foreground)' }} />{c.nome}{ehTipoVideoaula(c.tipo) && <span className="text-[10px] font-normal text-muted-foreground">(junto da aula)</span>}</span>,
         render: (l) => <Celula coluna={c} celula={l.celulas[c.tipo]} onAbrir={() => setAlvo({ linha: l, coluna: c, celula: l.celulas[c.tipo] })} />,
       })
     }

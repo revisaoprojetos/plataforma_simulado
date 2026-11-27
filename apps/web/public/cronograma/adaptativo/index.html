@@ -3200,7 +3200,8 @@ body.revfixo.rv-indisp #aba-hoje,body.revfixo.rv-indisp #aba-semana{display:none
   function linksHtml(id, m) {
     let s = '';
     if (m.resolver) s += `<button type="button" class="link-q link-q-plat" data-acao="rv-resolver" data-id="${esc(id)}">Resolver ${m.qtd} ${m.qtd === 1 ? 'questão' : 'questões'} →</button>`;
-    if (m.video) s += `<a class="link-q" href="${esc(seguro(m.video))}" target="_blank" rel="noopener">Vídeo ↗</a>`;
+    if (m.videoaula && /^\/aluno\/biblioteca\/[\w-]+(\?|$)/.test(String(m.videoaula.url || ''))) s += `<a class="link-q" href="${esc(m.videoaula.url)}" target="_blank" rel="noopener" title="${esc(m.videoaula.titulo || 'Videoaula')}">Videoaula ↗</a>`;
+    else if (m.video) s += `<a class="link-q" href="${esc(seguro(m.video))}" target="_blank" rel="noopener">Vídeo ↗</a>`;
     if (m.pdf) s += `<a class="link-q" href="${esc(seguro(m.pdf))}" target="_blank" rel="noopener">PDF ↗</a>`;
     (m.links || []).forEach(l => { s += `<a class="link-q" href="${esc(seguro(l.url))}" target="_blank" rel="noopener">${esc(l.nome)} ↗</a>`; });
     if (m.simulado) s += `<a class="link-q" href="${esc(seguro(m.simulado.url))}" target="_blank" rel="noopener">${esc(m.simulado.nome)} ↗</a>`;

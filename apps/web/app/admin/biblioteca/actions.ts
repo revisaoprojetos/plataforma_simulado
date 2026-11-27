@@ -1,4 +1,5 @@
 'use server'
+import { listarCatalogoTipos } from '@/lib/cronograma/tipos-conteudo-server'
 import { sanearBusca } from '@/lib/seguranca/email-seguro'
 import type { Categoria, PastaConteudo, EstudanteAcessoLinha, GrupoAtribuido, NoAcesso, ModoAcessoDTO, OrigemDTO, PermsDTO, DriveNodeDTO, PermissoesAluno, VinculoLeitor, AcessoLinhaSidebar, EventoHistorico } from './actions-tipos'
 
@@ -338,7 +339,6 @@ export async function removerPasta(id: string): Promise<{ ok: boolean; error?: s
 /** Pastas classificáveis (disciplina / tipo de material / legenda): Biblioteca normal E JurisClub. */
 const AREAS_CLASSIFICAVEIS = ['conteudo', 'conteudo_jurisclub']
 const CLASS_CRONO = ['essencial', 'complementar', 'especifica'] as const
-const TIPOS_MATERIAL_CRONO = ['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'] as const
 
 /** Marca a pasta como DISCIPLINA do cronograma: garante a simulado_disciplinas (pelo nome da pasta, ou
  *  a já existente de mesmo nome), vincula `simulado_pastas.disciplina_id` e grava a classificação. */
@@ -392,12 +392,24 @@ export async function removerPastaDisciplinaCronograma(pastaId: string): Promise
 
 /** Define o TIPO de material da SUBpasta (pdfull/pdfight/legproc/questoes) — coluna NOVA
  *  `cronograma_tipo_material` (criada por outra frente). `null` limpa. Tolerante se a migração não rodou. */
+/** Classificações (tipos de conteúdo ativos do tenant) para o menu "Classificação" da pasta. */
+export async function listarTiposMaterialPasta(): Promise<{ ok: boolean; error?: string; tipos?: { v: string; rot: string }[] }> {
+  const g = await guard('view'); if (!g.ok) return g
+  const cat = await listarCatalogoTipos(createAdminClient(), g.tenantId)
+  return { ok: true, tipos: cat.filter((t) => t.ativo).sort((a, b) => a.ordem - b.ordem).map((t) => ({ v: t.slug, rot: t.nome })) }
+}
+
 export async function definirTipoMaterialSubpasta(pastaId: string, tipo: string | null): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('update'); if (!g.ok) return g
   if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
-  const valor = tipo && (TIPOS_MATERIAL_CRONO as readonly string[]).includes(tipo) ? tipo : null
-  if (tipo && !valor) return { ok: false, error: 'Tipo de material inválido.' }
   const svc = createAdminClient()
+  // A classificação da pasta vem do CATÁLOGO do tenant (tipos de sistema + personalizados ativos), não de uma lista fixa.
+  let valor: string | null = null
+  if (tipo) {
+    const cat = await listarCatalogoTipos(svc, g.tenantId)
+    valor = cat.some((t) => t.slug === tipo && t.ativo) ? tipo : null
+    if (!valor) return { ok: false, error: 'Classificação inválida ou inativa.' }
+  }
   const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   { const recusa = await recusaPastaEmUso(g.tenantId, [pastaId], 'ter o tipo de material alterado'); if (recusa) return { ok: false, error: recusa } }

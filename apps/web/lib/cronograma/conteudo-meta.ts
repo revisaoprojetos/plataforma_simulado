@@ -48,7 +48,7 @@ export function chaveDisc(nome: string | null | undefined): string {
 /** Papel do material que a meta consome. null = o tipo não tem documento automático (questões, juris, simulado…). */
 export function materialDaMeta(slug: string): 'pdfull' | 'pdflash' | 'legproc' | null {
   const s = normTexto(slug).replace(/ /g, '')
-  if (!s || s.includes('quest') || s.includes('pdfight') || s.includes('simulad') || s.includes('juris')) return null
+  if (!s || s.includes('video') || s.includes('quest') || s.includes('pdfight') || s.includes('simulad') || s.includes('juris')) return null
   if (s.includes('flash') || s.includes('revis')) return 'pdflash'
   if (s.includes('legproc') || s === 'lei' || s.includes('leiseca')) return 'legproc'
   if (s.includes('pdfull') || s === 'pdf' || s.includes('aula') || s.includes('continuacao')) return 'pdfull'

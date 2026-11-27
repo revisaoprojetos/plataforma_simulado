@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { mesclarCatalogo, papelDoSlug, tipoMaterialCompat, validarTipo } from './tipos-conteudo'
 
 describe('mesclarCatalogo', () => {
-  it('sem linhas devolve os 6 de sistema ordenados', () => {
+  it('sem linhas devolve os 7 de sistema ordenados', () => {
     const c = mesclarCatalogo([])
-    expect(c.map((t) => t.slug)).toEqual(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'])
+    expect(c.map((t) => t.slug)).toEqual(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes', 'videoaula'])
   })
   it('override altera rótulo mas nunca papel/slug de sistema', () => {
     const c = mesclarCatalogo([{ slug: 'pdfull', nome: 'Aula', papel: 'questoes', sistema: true, ativo: false, ordem: 99 }])
@@ -46,6 +46,8 @@ describe('compat', () => {
     expect(['aa', 'bb', 'cc', 'dd', 'ee', 'ff'].map((s) => tipoMaterialCompat(s, c))).toEqual(['pdfull', 'legproc', 'jurisclub', 'questoes', 'pdfight', 'pdfight'])
     expect(tipoMaterialCompat('pdflash', c)).toBe('pdflash')
     expect(tipoMaterialCompat('zzz', c)).toBeNull()
+    expect(tipoMaterialCompat('videoaula', c)).toBeNull() // sistema fora do vocabulário antigo
+    expect(papelDoSlug('videoaula', c)).toBe('apoio')
     expect(papelDoSlug('bb', c)).toBe('lei_seca')
   })
 })

@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.34.0 — 2026-11-27
+
+### Videoaula como classificação, menu de classificação da pasta e Videoteca em manutenção
+- **Videoaula (7ª classificação de sistema):** nova coluna "Videoaula" na matriz de aulas do Gerador — escolhe o vídeo da Biblioteca (publicado, tipo vídeo) para a aula, junto do PDFull/PDF de meta/questões. O aluno vê o link "Videoaula ↗" na meta (uma meta por aula). Sem seleção, tudo igual a antes. Tempo de vídeo não entra nas horas.
+- **Biblioteca · menu da pasta:** "Tipo de material" virou **Classificação** e lista o catálogo real do tenant (sistema + personalizados ativos), não mais 6 tipos fixos; a gravação valida contra o catálogo.
+- **Videoteca (Revisão):** área em **manutenção** (nasce bloqueada; libera por allowlist em /admin/sistema). Botões de adicionar apontam para a Biblioteca (upload de vários vídeos), e cada linha ganhou "remover".
+- **Migração (aplicar após o deploy; exige o 17):** `20261209020000_conteudo_tipo_videoaula.sql` (= `docs/sql-aplicar-twdr/22-conteudo-tipo-videoaula.sql`) semeia o tipo `videoaula` por tenant. Sem ela a coluna não aparece na matriz (ou use "criar modelo base" em Classificações).
+- **Pendente:** vídeo já em pasta de disciplina ainda entra no automático do PDFull (comportamento antigo); seletor de vídeo não filtra por disciplina.
 ## 4.33.1 — 2026-11-27
 
 ### Diagnóstico do erro de gravação no storage S3 (Hetzner)

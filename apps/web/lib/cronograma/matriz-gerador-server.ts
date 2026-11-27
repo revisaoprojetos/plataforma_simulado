@@ -22,6 +22,7 @@ import { docsBibliotecaCache } from './meta-extras-server'
 import {
   AREA_GERADOR, chaveAulaGerador, chaveSelecaoGerador, classificacaoSlugDoTipo, prefixoSelecaoConjunto,
 } from './selecao-gerador'
+import { CATEGORIAS_VIDEOAULA, TIPO_ORIGEM_VIDEOAULA, colunaVideoaula, ehTipoVideoaula } from './videoaula-gerador'
 import { T_SELECAO, esquecerSelecoesGerador, selecaoTabelaAusente } from './selecao-gerador-server'
 import {
   MSG_MIGRACAO_SELECAO, situacaoDaLinha, SITUACOES_MATRIZ,
@@ -96,6 +97,9 @@ function montarColunas(
     const c = porSlug.get(cs)
     colunas.push({ tipo: t.slug, nome: t.nome, cor: t.cor, classificacaoId: c?.id ?? null, classificacaoSlug: cs, papel: c?.papel ?? null })
   }
+  // Videoaula: coluna SINTÉTICA (não é seção/meta da aula) — existe quando a classificação de sistema está ativa no tenant.
+  const cv = colunaVideoaula(catalogo)
+  if (cv && !colunas.some((c) => c.tipo === cv.tipo)) colunas.push(cv)
   const tl = tipos.find((t) => t.mostra_links) ?? tipos.find((t) => t.slug === 'quest') ?? null
   return { colunas, tipoLinks: tl ? { tipo: tl.slug, nome: tl.nome } : null }
 }
@@ -130,6 +134,7 @@ export async function carregarMatriz(svc: SupabaseClient, tenantId: string, conj
   const docBib = new Map(docsBib.map((d) => [d.id, d] as const))
   const grupos = agruparAulas(aulas)
   const autoDe = (g: GrupoAula, c: ColunaMatriz): string | null => {
+    if (ehTipoVideoaula(c.tipo)) return null // videoaula não tem sugestão automática: só escolha explícita
     const secao = g.rows.find((r) => r.tipo === c.tipo)
     const r = resolverDocumentoMeta({ id: 'x', tipo: c.tipo, disciplinas: [conjunto.disciplina], aula: g.chave || null, conteudo: secao?.conteudo ?? null }, indice, null)
     return r?.docId ?? null
@@ -240,7 +245,7 @@ export async function carregarMatriz(svc: SupabaseClient, tenantId: string, conj
       // regra de uso EFETIVA (meta > área×classificação > padrão) + minutos calculados aqui
       let regra: CelulaDocumento['regra'] = null
       const docRef = selecao && !selecao.indisponivel && selecao.visivelAluno ? selecao.documentoId : autoId
-      if (docRef) {
+      if (docRef && !ehTipoVideoaula(c.tipo)) { // videoaula não entra nas horas: sem regra de tempo/minutos
         const clsId = (s?.classificacao_id ?? c.classificacaoId) ?? null
         const rr = resolverRegras({ override: selecao?.regrasOverride, usoAreaClassificacao: clsId ? regrasUso.get(clsId)?.regras : undefined })
         const paginas = pags.get(docRef)?.efetivas ?? null
@@ -281,7 +286,26 @@ export interface ParamsSeletor {
   pp: number
 }
 
+/** Seletor da coluna Videoaula: documentos de VÍDEO da Biblioteca (tipo_origem='video'; categoria conteudo/jurisclub), paginado no servidor. */
+async function listarVideosSeletor(svc: SupabaseClient, tenantId: string, p: ParamsSeletor): Promise<DocsSeletorResposta> {
+  const pp = Math.min(Math.max(1, p.pp), 100)
+  const q = (p.q ?? '').replace(/[,()%*\_]/g, ' ').trim().slice(0, 80)
+  let qb = svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id', { count: 'exact' })
+    .eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('tipo_origem', TIPO_ORIGEM_VIDEOAULA).in('categoria', [...CATEGORIAS_VIDEOAULA])
+  if (q) qb = qb.ilike('titulo', `%${q}%`)
+  const page0 = Math.max(1, p.page)
+  const { data, count, error } = await qb.order('titulo', { ascending: true }).order('id', { ascending: true }).range((page0 - 1) * pp, page0 * pp - 1)
+  if (error) throw error
+  const rows = (data ?? []) as { id: string; titulo: string; pasta_id: string | null }[]
+  const pids = [...new Set(rows.map((r) => r.pasta_id).filter(Boolean) as string[])]
+  const pastas = pids.length ? await fetchAllByIn<{ id: string; nome: string }>(pids, (chunk) => svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tenantId).in('id', chunk).order('id') as never).catch(() => []) : []
+  const nomePasta = new Map(pastas.map((x) => [x.id, x.nome] as const))
+  const docs: DocSeletor[] = rows.map((r) => ({ id: r.id, titulo: r.titulo, disciplina: '', classificacaoSlug: 'videoaula', sugerido: false, pasta: r.pasta_id ? nomePasta.get(r.pasta_id) ?? null : null }))
+  return { docs, total: count ?? docs.length, page: page0, pp, sugestao: null }
+}
+
 export async function listarDocsSeletor(svc: SupabaseClient, tenantId: string, conjunto: ConjuntoMin, p: ParamsSeletor): Promise<DocsSeletorResposta> {
+  if (ehTipoVideoaula(p.tipo)) return listarVideosSeletor(svc, tenantId, p)
   const [docs, catalogo] = await Promise.all([
     docsBibliotecaCache(svc, tenantId).catch(() => [] as DocBiblioteca[]),
     carregarCatalogoClassificacao(svc, tenantId).catch(() => [] as ClassificacaoCatalogo[]),
@@ -364,6 +388,13 @@ export async function gravarSelecoes(c: CtxEscrita, itens: EntradaSelecao[]): Pr
   const docs = await fetchAllByIn<{ id: string; titulo: string; pasta_id: string | null }>(docIds, (chunk) =>
     c.svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', c.tenantId).eq('deletado', false).in('id', chunk).order('id') as never)
   const docPorId = new Map(docs.map((d) => [d.id, d] as const))
+  const idsVideoaula = [...new Set(itens.filter((i) => ehTipoVideoaula(i.tipo)).map((i) => i.documentoId))]
+  const videosOk = new Set<string>()
+  if (idsVideoaula.length) {
+    const vs = await fetchAllByIn<{ id: string; tipo_origem: string | null; categoria: string | null }>(idsVideoaula, (chunk) =>
+      c.svc.from('simulado_conteudo_documentos').select('id, tipo_origem, categoria').eq('tenant_id', c.tenantId).eq('deletado', false).in('id', chunk).order('id') as never)
+    for (const v of vs) if (v.tipo_origem === TIPO_ORIGEM_VIDEOAULA && CATEGORIAS_VIDEOAULA.includes(String(v.categoria ?? 'conteudo'))) videosOk.add(v.id)
+  }
   const parteIds = [...new Set(itens.map((i) => i.parteId).filter(Boolean) as string[])]
   const partes = parteIds.length
     ? await fetchAllByIn<{ id: string; documento_id: string; arquivada: boolean }>(parteIds, (chunk) =>
@@ -381,6 +412,10 @@ export async function gravarSelecoes(c: CtxEscrita, itens: EntradaSelecao[]): Pr
     if (!col) return { ok: false, status: 400, error: `Seção "${i.tipo}" não aceita documento da Biblioteca.` }
     if (!chaveAulaGerador(i.aula) || !aulasValidas.has(chaveAulaGerador(i.aula))) return { ok: false, status: 400, error: `Aula "${i.aula}" não existe neste conjunto.` }
     if (!d) return { ok: false, status: 400, error: 'Documento não encontrado neste tenant.' }
+    if (ehTipoVideoaula(i.tipo)) {
+      if (i.parteId) return { ok: false, status: 400, error: 'Videoaula não tem parte: escolha o documento de vídeo inteiro.' }
+      if (!videosOk.has(d.id)) return { ok: false, status: 400, error: 'Escolha um documento de vídeo da Biblioteca (tipo vídeo, categoria Conteúdo ou JurisClub).' }
+    }
     if (i.parteId) {
       const pr = parteOk.get(i.parteId)
       if (!pr || pr.documento_id !== i.documentoId || pr.arquivada) return { ok: false, status: 400, error: 'A parte não pertence ao documento escolhido (ou está arquivada).' }
@@ -473,6 +508,7 @@ export async function vincularPelaSugestao(c: CtxEscrita, aulas: string[], tipos
   const itens: EntradaSelecao[] = []
   for (const x of cels) {
     if (antes.has(chaveSelecaoGerador(c.conjunto.id, x.aula, x.tipo))) continue
+    if (ehTipoVideoaula(x.tipo)) continue // sem sugestão automática para videoaula
     const secao = aulasRows.find((r) => chaveAulaGerador(r.aula) === x.aula && r.tipo === x.tipo)
     const r = resolverDocumentoMeta({ id: 'x', tipo: x.tipo, disciplinas: [c.conjunto.disciplina], aula: x.aula, conteudo: secao?.conteudo ?? null }, indice, null)
     if (r) itens.push({ aula: x.aula, tipo: x.tipo, documentoId: r.docId })

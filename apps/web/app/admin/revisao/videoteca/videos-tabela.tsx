@@ -4,11 +4,14 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ExternalLink, Settings2 } from 'lucide-react'
+import { ExternalLink, Settings2, Trash2 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
+import { removerDocumento } from '@/app/admin/biblioteca/actions'
+import { salvarVideoAction } from '@/app/admin/biblioteca/video-actions'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import type { LinhaVideoteca } from '@/lib/admin-revisao/videoteca'
 import { definirDuracaoVideoAction } from './actions'
 
@@ -39,6 +42,22 @@ export function VideosTabela({ rows, podeEditar, controleVisivel }: { rows: Linh
       const res = await definirDuracaoVideoAction(r.docId!, n)
       if (!res.ok) { toast.error(res.error || 'Não foi possível salvar a duração.'); return }
       toast.success('Duração salva.'); router.refresh()
+    })
+  }
+
+  async function remover(r: LinhaVideoteca) {
+    if (!r.docId) return
+    const ehLink = r.origem === 'link'
+    const ok = await confirmar({
+      titulo: ehLink ? 'Remover o vídeo desta aula?' : 'Mover o vídeo para a lixeira?',
+      mensagem: ehLink ? `O link de vídeo da aula “${r.aula ?? r.titulo}” será removido. A aula continua existindo.` : `“${r.titulo}” vai para a lixeira da Biblioteca (recuperável por 30 dias). Se estiver em uso, a remoção é bloqueada.`,
+      confirmar: ehLink ? 'Remover vídeo' : 'Mover para a lixeira', destrutivo: true,
+    })
+    if (!ok) return
+    iniciar(async () => {
+      const res = ehLink ? await salvarVideoAction(r.docId!, { tipo: 'nenhum' }) : await removerDocumento(r.docId!)
+      if (!res.ok) { toast.error(res.error || 'Não foi possível remover.', { duration: 15000 }); return }
+      toast.success(ehLink ? 'Vídeo removido da aula.' : 'Videoaula movida para a lixeira.'); router.refresh()
     })
   }
 
@@ -84,6 +103,7 @@ export function VideosTabela({ rows, podeEditar, controleVisivel }: { rows: Linh
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
                       {r.link && <a href={r.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: 'ghost', size: 'sm' })}><ExternalLink />Abrir</a>}
                       {r.docId && <Link href={`/admin/biblioteca/conteudo/${r.docId}/gerenciar`} className={buttonVariants({ variant: 'outline', size: 'sm' })}><Settings2 />{r.origem === 'link' ? 'Trocar vídeo' : 'Gerenciar'}{r.versao ? ` · v${r.versao}` : ''}</Link>}
+                      {r.docId && podeEditar && <button type="button" disabled={pendente} onClick={() => void remover(r)} aria-label="Remover videoaula" title={r.origem === 'link' ? 'Remover o vídeo da aula' : 'Mover para a lixeira'} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-destructive hover:text-destructive')}><Trash2 /></button>}
                       {r.origem === 'proprio' && <Link href="/admin/conteudos/videos" className={buttonVariants({ variant: 'outline', size: 'sm' })}><Settings2 />Gerenciar</Link>}
                     </div>
                   </td>

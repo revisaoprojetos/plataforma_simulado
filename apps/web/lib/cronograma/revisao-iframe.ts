@@ -91,6 +91,8 @@ export type RevisaoMeta = {
   /** Família do Parcial (pdf = última página · lp = artigo · outro = ponto + minutos) e minutos planejados. */
   fam: FamiliaParcial
   minPlan: number
+  /** Videoaula (documento de vídeo da Biblioteca) ligada à aula desta meta pela matriz do Gerador (ausente = nenhuma). `url` = leitor do portal com retorno ao cronograma. */
+  videoaula?: { id: string; titulo: string; url: string }
   /** Material da Biblioteca ligado à meta (null = sem conteúdo). `url` abre o leitor do portal com retorno ao cronograma. */
   doc: { id: string; titulo: string; origem: 'explicito' | 'auto'; paginas: number | null; url: string; baixavel: boolean; bloqueado?: boolean; liberaEm?: string | null; parteId?: string; rotulo?: string } | null
   /** Registro de Parcial / Não realizada do aluno (null = nenhum). */
@@ -161,6 +163,8 @@ export function montarPayloadRevisaoIframe(args: {
   conteudos?: Map<string, ConteudoMetaEntrada>
   /** Parcial / Não realizada do aluno nesta emissão. */
   progressoMetas?: ProgressoMetaEntrada[]
+  /** meta (uuid do catálogo) -> videoaula escolhida na matriz do Gerador. Opcional: sem isso `videoaula` fica null (como antes). */
+  videoaulas?: Map<string, { id: string; titulo: string; url: string }>
 }): PayloadRevisaoIframe {
   const { emissao, grade, checks, notas, config, progresso, hoje, semDatas, desatualizada, indisponivel } = args
   const conteudos = args.conteudos ?? new Map<string, ConteudoMetaEntrada>()
@@ -248,6 +252,7 @@ export function montarPayloadRevisaoIframe(args: {
       dur: m.duracao ?? '',
       video: m.video ?? null,
       pdf: m.pdf ?? null,
+      ...(args.videoaulas?.get(m.id) ? { videoaula: args.videoaulas.get(m.id)! } : {}),
       links: (m.links?.urls ?? []).map((u) => ({ nome: u.plataforma.nome, url: u.url })),
       ausente: m.links?.ausente ?? null,
       qtd: m.qtdQuestoes ?? 0,

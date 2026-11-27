@@ -43,6 +43,8 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
   // Biblioteca de Conteúdos (Drive jurídico + Modelos de caderno + editores OnlyOffice). Nasce BLOQUEADA
   // em TODOS os tenants — libere por allowlist. Cobre sub-rotas (/admin/biblioteca/editar/...).
   { key: 'biblioteca', label: 'Biblioteca de Conteúdos', descricao: 'Drive de documentos jurídicos versionados + Modelos de caderno, com edição no OnlyOffice. Bloqueada por padrão; libere só quem for operar.', href: '/admin/biblioteca', padraoBloqueado: true },
+  // Videoteca (Revisão · Pedagógico). Em manutenção: a adição de aulas é feita pela Biblioteca por enquanto. Nasce BLOQUEADA — libere por allowlist.
+  { key: 'videoteca', label: 'Videoteca (Revisão)', descricao: 'Lista das videoaulas da Plataforma Revisão (/admin/revisao/videoteca). Em manutenção: a adição de aulas é feita pela Biblioteca. Bloqueada por padrão.', href: '/admin/revisao/videoteca', padraoBloqueado: true },
 ]
 
 /**

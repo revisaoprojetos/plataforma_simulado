@@ -196,7 +196,7 @@ export async function criarTipoGestao(svc: SupabaseClient, tenantId: string, ato
   return { ok: true, id: novo.id, slug: novo.slug }
 }
 
-/** Cria as linhas do modelo-base que faltam (6 de sistema). Idempotente (ignora as que existem). */
+/** Cria as linhas do modelo-base que faltam (tipos de sistema). Idempotente (ignora as que existem). */
 export async function semearModeloBase(svc: SupabaseClient, tenantId: string, atorId: string | null): Promise<Resultado<{ criadas: number }>> {
   const usados = await slugsDoTenant(svc, tenantId)
   const faltam = TIPOS_SISTEMA.filter((t) => !usados.has(t.slug))

@@ -18,6 +18,7 @@ import { carregarClassificacaoDosDocs } from '@/lib/conteudo/classificacao/docs-
 import { coalescer, lerProgressoReencaixado } from './progresso-emissao'
 import { aplicarSelecoes, type ResolvidoComSelecao } from './selecao-gerador'
 import { lerIndiceSelecoesGerador } from './selecao-gerador-server'
+import { CATEGORIAS_VIDEOAULA, TIPO_ORIGEM_VIDEOAULA, montarVideoaulas, videoaulasPorMeta, type VideoaulaMeta } from './videoaula-gerador'
 import {
   indexarBiblioteca, resolverDocumentoMeta, vinculosPorMeta,
   type ConteudoResolvido, type DocBiblioteca, type MetaParaConteudo, type TipoMaterial, type VinculoExplicito,
@@ -178,6 +179,31 @@ async function resolverConteudoDasMetasBruto(
     out.set(metaId, { ...resto, titulo: d.titulo, paginas: pagsDoc.get(r.docId)?.efetivas ?? null, baixavel: d.baixavel })
   }
   return out
+}
+
+/**
+ * VIDEOAULAS por meta (matriz do Gerador, coluna "Videoaula"): metaId → vídeo da Biblioteca ligado à aula da meta.
+ * Sem seleção de videoaula devolve Map vazio SEM consultar o banco (comportamento idêntico ao de antes). Só vídeos publicados,
+ * não apagados, tipo_origem='video' e categoria conteudo/jurisclub; `bloqueados` (liberação do aluno) escondem o vídeo.
+ * O acesso fino (pasta/documento) continua sendo decidido pelo leitor na abertura. Best-effort: nunca derruba o plano.
+ */
+export async function resolverVideoaulasDasMetas(
+  svc: SupabaseClient, tenantId: string, emissaoId: string, metas: MetaParaConteudo[], bloqueados?: Record<string, string>,
+): Promise<Map<string, VideoaulaMeta>> {
+  try {
+    if (!metas.length) return new Map()
+    const idx = await lerIndiceSelecoesGerador(svc, tenantId)
+    const porMeta = videoaulasPorMeta(metas, idx)
+    if (!porMeta.size) return new Map()
+    const ids = [...new Set([...porMeta.values()].map((s) => s.documentoId))]
+    const rows = await fetchAllByIn<{ id: string; titulo: string; categoria: string | null }>(ids, (chunk) =>
+      svc.from('simulado_conteudo_documentos').select('id, titulo, categoria')
+        .eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('tipo_origem', TIPO_ORIGEM_VIDEOAULA).in('id', chunk).order('id') as never)
+    const validos = new Map(rows.filter((r) => CATEGORIAS_VIDEOAULA.includes(String(r.categoria ?? 'conteudo'))).map((r) => [r.id, r.titulo] as const))
+    return montarVideoaulas(porMeta, validos, emissaoId, bloqueados)
+  } catch {
+    return new Map()
+  }
 }
 
 // ── Progresso parcial / não realizada ──

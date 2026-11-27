@@ -17,7 +17,7 @@ import {
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
 import { DriveAcessoDialog, type DriveNode, type DrivePapel } from '@/components/admin/drive-acesso'
-import { listarPastasConteudo, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from '@/app/admin/biblioteca/actions'
+import { listarTiposMaterialPasta, listarPastasConteudo, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from '@/app/admin/biblioteca/actions'
 import type { PastaConteudo, Categoria } from '@/app/admin/biblioteca/actions-tipos'
 
 // Paleta curta para o menu "Mudar cor" da pasta (mesmas cores do protótipo Drive).
@@ -36,9 +36,18 @@ export const TIPO_MATERIAL_CRONO: { v: string; rot: string }[] = [
   { v: 'legproc', rot: 'LegProc' },
   { v: 'jurisclub', rot: 'JurisClub' },
   { v: 'questoes', rot: 'Questões' },
+  { v: 'videoaula', rot: 'Videoaula' },
 ]
+// Rótulos do catálogo REAL do tenant (carregados 1x ao abrir o submenu): cobrem tipos personalizados além da lista acima.
+let catalogoTipos: { v: string; rot: string }[] | null = null
+let catalogoPromessa: Promise<{ v: string; rot: string }[]> | null = null
+function carregarCatalogoTipos(): Promise<{ v: string; rot: string }[]> {
+  if (catalogoTipos) return Promise.resolve(catalogoTipos)
+  catalogoPromessa ??= listarTiposMaterialPasta().then((r) => { catalogoTipos = r.ok && r.tipos ? r.tipos : TIPO_MATERIAL_CRONO; return catalogoTipos }).catch(() => { catalogoPromessa = null; return TIPO_MATERIAL_CRONO })
+  return catalogoPromessa
+}
 export const rotuloClasse = (v?: string | null) => CLASSIF_CRONO.find((c) => c.v === v)?.rot ?? null
-export const rotuloTipoMaterial = (v?: string | null) => TIPO_MATERIAL_CRONO.find((t) => t.v === v)?.rot ?? null
+export const rotuloTipoMaterial = (v?: string | null) => (catalogoTipos ?? TIPO_MATERIAL_CRONO).find((t) => t.v === v)?.rot ?? TIPO_MATERIAL_CRONO.find((t) => t.v === v)?.rot ?? (v || null)
 
 /** Selo de estado do Cronograma no card da pasta: disciplina (+classificação) OU tipo de material da subpasta. */
 export function SeloCronograma({ p }: { p: PastaConteudo }) {
@@ -76,6 +85,9 @@ export function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAces
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
   async function carregarPastas() { if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
   const pick = (fn: () => void) => () => { setOpen(false); fn() }
+  // Classificações do tenant (catálogo real); enquanto carrega mostra a lista padrão. Só busca quando o menu abre numa subpasta.
+  const [tiposMenu, setTiposMenu] = useState<{ v: string; rot: string }[]>(catalogoTipos ?? TIPO_MATERIAL_CRONO)
+  useEffect(() => { if (open && ancestralEhDisciplina) void carregarCatalogoTipos().then(setTiposMenu) }, [open, ancestralEhDisciplina])
   // Não pode mover a pasta para DENTRO de si mesma nem de um descendente (evita ciclo).
   const bloqueadas = useMemo(() => {
     const set = new Set<string>([p.id])
@@ -125,9 +137,9 @@ export function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAces
               {ancestralEhDisciplina ? (
                 // SUBpasta de uma pasta-disciplina → define o TIPO de material desta subpasta.
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger><CalendarClock className="mr-2 h-4 w-4" /> Tipo de material</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger><CalendarClock className="mr-2 h-4 w-4" /> Classificação</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-52">
-                    {TIPO_MATERIAL_CRONO.map((t) => (
+                    {tiposMenu.map((t) => (
                       <DropdownMenuItem key={t.v} onClick={pick(() => onTipoMaterialCron(t.v))}>
                         <span className="flex-1">{t.rot}</span>
                         {p.cronograma_tipo_material === t.v && <Check className="ml-2 h-4 w-4 text-primary" />}

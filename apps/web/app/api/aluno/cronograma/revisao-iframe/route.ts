@@ -9,7 +9,7 @@ import { montarPayloadRevisaoIframe } from '@/lib/cronograma/revisao-iframe'
 import { formatBrt, hojeBrtISO } from '@/lib/brt'
 import type { MetaParaConteudo } from '@/lib/cronograma/conteudo-meta'
 import { docsBloqueadosDoAluno } from '@/lib/produtos/docs-liberacao-aluno'
-import { lerProgressoMetas, resolverConteudoDasMetas, type DocDaMeta } from '@/lib/cronograma/meta-extras-server'
+import { lerProgressoMetas, resolverConteudoDasMetas, resolverVideoaulasDasMetas, type DocDaMeta } from '@/lib/cronograma/meta-extras-server'
 
 // GET /api/aluno/cronograma/revisao-iframe?emissaoId=<uuid>
 // Carrega o plano FIXO do cronograma Revisão (grade congelada + checks + notas) no formato que o iframe do
@@ -58,6 +58,8 @@ export async function GET(req: NextRequest) {
     // FONTE ÚNICA: materiais que a MATRIZ ainda bloqueia para este aluno (mesma árvore do currículo; cache 60s) → meta rotulada "libera em".
     d.indisponivel ? Promise.resolve({} as Record<string, string>) : cron('bloqueios', docsBloqueadosDoAluno(sessao.tenantId, sessao.estudanteId)),
   ])
+  // Videoaula da matriz do Gerador (coluna "Videoaula"): fora das horas; sem seleção = Map vazio (nenhuma consulta extra).
+  const videoaulas = d.indisponivel ? new Map() : await cron('videoaulas', resolverVideoaulasDasMetas(svc, sessao.tenantId, emissaoId, metasGrade, bloqueados))
   const conteudos = new Map([...conteudos0.entries()].map(([k, v]) => [k, bloqueados[v.docId] !== undefined ? { ...v, bloqueado: true, liberaEm: bloqueados[v.docId] || null } : v]))
   medir('paralelo-total', Date.now() - tPar)
 
@@ -82,6 +84,7 @@ export async function GET(req: NextRequest) {
     indisponivel: d.indisponivel,
     conteudos,
     progressoMetas,
+    videoaulas,
   })
   const corpo = JSON.stringify(payload)
   const etag = `"${createHash('sha1').update(corpo).digest('base64url')}"`

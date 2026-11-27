@@ -1,6 +1,10 @@
 // Contratos (client-safe, sem I/O) da MATRIZ DE AULAS do Gerador — /admin/cronogramas/conteudos/[id].
 // Uma linha por AULA; colunas = seções (tipos de meta ↔ classificações do tenant) + "Links de questões".
 
+/** Classificação/coluna "Videoaula" da matriz (coluna sintética: o vídeo fica ligado à aula inteira e não conta nas horas). */
+export const SLUG_VIDEOAULA = 'videoaula'
+export const ehTipoVideoaula = (tipo: string | null | undefined): boolean => tipo === SLUG_VIDEOAULA
+
 export const POR_PAGINA_MATRIZ = [10, 25, 50] as const
 export const SITUACOES_MATRIZ = ['sem_conteudo', 'automatico', 'selecionado'] as const
 export type SituacaoLinhaMatriz = (typeof SITUACOES_MATRIZ)[number]

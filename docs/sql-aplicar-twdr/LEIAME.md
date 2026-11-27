@@ -55,3 +55,11 @@ Rode com o intervalo de 24 h. Compare antes e depois do pacote: erros do tipo `r
 | 20 | 20-storage-arquivos-provider-s3 | `simulado_arquivos.provider` 'supabase' → 's3' (15.736 linhas, todas com objeto no Hetzner). Só rótulo. | nenhum | 21 |
 
 Ordem: policy pública das imagens → 18 → 20. URLs do bucket `pdfs` não são reescritas (privado; resolvidas pelo proxy).
+
+## Classificação "Videoaula" (2026-11-27)
+
+| # | Arquivo | O que faz | Pré-requisito | Reverter |
+|---|---|---|---|---|
+| 22 | 22-conteudo-tipo-videoaula | Semeia o 7º tipo de sistema `videoaula` (papel `apoio`) em `simulado_conteudo_tipos` para cada tenant (ON CONFLICT DO NOTHING). Habilita a coluna "Videoaula" na matriz de aulas do Gerador. | 17 | `DELETE FROM simulado_conteudo_tipos WHERE slug='videoaula' AND sistema` (só se não houver seleções/regras ligadas) |
+
+Sem o 22, a tela de classificações oferece "criar modelo base" (cria os tipos de sistema que faltam) e a coluna aparece depois disso.

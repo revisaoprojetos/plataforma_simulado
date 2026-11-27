@@ -1,7 +1,7 @@
 // Contrato do CATÁLOGO DE TIPOS DE CONTEÚDO (por tenant). Só tipos/constantes puras (sem I/O, sem imports de servidor):
 // usado pelo servidor (loader/actions), pelo motor (fase 2) e pelas telas admin.
 //
-// Modelo: registro ESTÁTICO de tipos de sistema (os 6 de hoje, não apagáveis, editáveis em rótulo/cor/duração/ordem)
+// Modelo: registro ESTÁTICO de tipos de sistema (os 7 de hoje, não apagáveis, editáveis em rótulo/cor/duração/ordem)
 // + tipos PERSONALIZADOS criados pelo admin (tabela `simulado_conteudo_tipos`). O slug é a chave estável usada pelas
 // pastas (`simulado_pastas.cronograma_tipo_material`), pelas metas e pelas regras.
 
@@ -24,7 +24,7 @@ export const PAPEIS_TIPO: { v: PapelTipo; r: string; desc: string }[] = [
 ]
 
 export interface TipoConteudo {
-  /** Chave estável (minúsculas, a-z0-9_-, 2–40). Tipos de sistema: pdfull, pdfight, pdflash, legproc, jurisclub, questoes. */
+  /** Chave estável (minúsculas, a-z0-9_-, 2–40). Tipos de sistema: pdfull, pdfight, pdflash, legproc, jurisclub, questoes, videoaula. */
   slug: string
   nome: string
   /** Como o aluno vê (cai em `nome` se vazio). */
@@ -54,6 +54,8 @@ export const TIPOS_SISTEMA: readonly TipoConteudo[] = [
   { slug: 'legproc', nome: 'LegProc', nomeAluno: 'LegProc', cor: null, papel: 'lei_seca', duracaoPadraoMin: null, prioridade: 30, ordem: 4, ativo: true, sistema: true, descricao: 'Gera a lei seca por semana.' },
   { slug: 'jurisclub', nome: 'JurisClub', nomeAluno: 'JurisClub', cor: null, papel: 'jurisprudencia', duracaoPadraoMin: null, prioridade: 40, ordem: 5, ativo: true, sistema: true, descricao: 'Gera a meta de jurisprudência.' },
   { slug: 'questoes', nome: 'Questões', nomeAluno: 'Questões', cor: null, papel: 'questoes', duracaoPadraoMin: null, prioridade: 50, ordem: 6, ativo: true, sistema: true, descricao: 'Questões ligadas à aula (não gera meta nova).' },
+  // Videoaula: papel 'apoio' (não gera meta; fica ligada à aula/meta pela matriz do Gerador). NÃO entra nas horas do cronograma.
+  { slug: 'videoaula', nome: 'Videoaula', nomeAluno: 'Videoaula', cor: null, papel: 'apoio', duracaoPadraoMin: null, prioridade: 60, ordem: 7, ativo: true, sistema: true, descricao: 'Videoaula da Biblioteca ligada à aula/meta (não gera meta nova nem entra nas horas).' },
 ]
 
 export const SLUGS_SISTEMA: readonly string[] = TIPOS_SISTEMA.map((t) => t.slug)

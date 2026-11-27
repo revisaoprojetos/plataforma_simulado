@@ -20,13 +20,14 @@ export interface LinhaTipoConteudo {
 
 export type TipoMaterialAntigo = 'pdfull' | 'pdfight' | 'pdflash' | 'legproc' | 'jurisclub' | 'questoes'
 
+const SLUGS_MATERIAL_ANTIGO: ReadonlySet<string> = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'])
 const PAPEIS = new Set<string>(PAPEIS_TIPO.map((p) => p.v))
 const SISTEMA = new Map(TIPOS_SISTEMA.map((t) => [t.slug, t]))
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
 const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
-/** Catálogo efetivo: 6 de sistema (com override) + personalizados, ordenado por ordem e nome. */
+/** Catálogo efetivo: 7 de sistema (com override) + personalizados, ordenado por ordem e nome. */
 export function mesclarCatalogo(linhas: LinhaTipoConteudo[] | null | undefined): TipoConteudo[] {
   const porSlug = new Map<string, LinhaTipoConteudo>()
   for (const l of linhas ?? []) if (l && typeof l.slug === 'string') porSlug.set(l.slug, l)
@@ -117,7 +118,7 @@ const COMPAT: Record<PapelTipo, TipoMaterialAntigo> = {
 /** Slug do vocabulário antigo equivalente ao PAPEL do tipo (sistema devolve o próprio slug). null se o slug é desconhecido. */
 export function tipoMaterialCompat(slug: string | null | undefined, catalogo: TipoConteudo[]): TipoMaterialAntigo | null {
   if (!slug) return null
-  if (SISTEMA.has(slug)) return slug as TipoMaterialAntigo
+  if (SISTEMA.has(slug)) return SLUGS_MATERIAL_ANTIGO.has(slug) ? (slug as TipoMaterialAntigo) : null // 'videoaula' não existe no vocabulário antigo
   const papel = papelDoSlug(slug, catalogo)
   return papel ? COMPAT[papel] : null
 }

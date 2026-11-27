@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { CelulaDocumento, ColunaMatriz, DocSeletor, DocsSeletorResposta, LinhaMatriz, ParteSeletor } from '@/lib/cronograma/matriz-gerador-tipos'
+import { ehTipoVideoaula } from '@/lib/cronograma/matriz-gerador-tipos'
 import { gravarMatrizApi, lerMatrizApi } from './matriz-api'
 
 const MODOS: { v: string; r: string; campo?: { k: string; r: string } }[] = [
@@ -39,6 +40,7 @@ export function SeletorDialog({ conjuntoId, alvo, podeEditar, onClose, onFeito }
 
 function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId: string; alvo: AlvoSeletor; podeEditar: boolean; onClose: () => void; onFeito: () => void }) {
   const { linha, coluna, celula } = alvo
+  const video = ehTipoVideoaula(coluna.tipo) // videoaula: documento de vídeo inteiro, sem parte, sem regra de tempo
   const atual = celula.selecao
   const [q, setQ] = useState('')
   const [qAplicada, setQAplicada] = useState('')
@@ -70,7 +72,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
   useEffect(() => { void carregar() }, [carregar])
 
   useEffect(() => {
-    if (!docId) { setPartes([]); return }
+    if (!docId || video) { setPartes([]); return }
     let vivo = true
     setCarregandoPartes(true)
     lerMatrizApi(conjuntoId, { acao: 'partes', documentoId: docId }).then((r) => {
@@ -79,7 +81,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
       setPartes(r.ok ? ((r.partes as ParteSeletor[]) ?? []) : [])
     })
     return () => { vivo = false }
-  }, [conjuntoId, docId])
+  }, [conjuntoId, docId, video])
 
   function escolher(d: Pick<DocSeletor, 'id' | 'titulo'>) {
     if (d.id !== docId) setParteId(null)
@@ -124,7 +126,9 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
       <DialogHeader>
         <DialogTitle>{coluna.nome} · {linha.titulo || (linha.chave ? `Aula ${linha.chave}` : 'Sem número de aula')}</DialogTitle>
         <DialogDescription>
-          Escolha o documento da Biblioteca{coluna.classificacaoSlug ? ` (classificação ${coluna.classificacaoSlug})` : ''}, a parte e como o aluno vê. Sem escolha, vale o automático.
+          {video
+            ? 'Escolha o documento de vídeo da Biblioteca. Ele aparece para o aluno junto do PDFull, de outro PDF de meta ou das questões desta mesma aula (não conta nas horas do cronograma).'
+            : <>Escolha o documento da Biblioteca{coluna.classificacaoSlug ? ` (classificação ${coluna.classificacaoSlug})` : ''}, a parte e como o aluno vê. Sem escolha, vale o automático.</>}
         </DialogDescription>
       </DialogHeader>
 
@@ -134,19 +138,19 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); setPage(1); setQAplicada(q.trim()) }}>
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por título ou disciplina…" className="h-9 pl-8" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={video ? 'Buscar vídeo por título…' : 'Buscar por título ou disciplina…'} className="h-9 pl-8" />
             </div>
             <Button type="submit" size="sm" variant="outline">Buscar</Button>
           </form>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {!video && <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <label className="inline-flex cursor-pointer items-center gap-1.5"><input type="checkbox" className="accent-[var(--primary)]" checked={qualquerDisc} onChange={(e) => { setPage(1); setQualquerDisc(e.target.checked) }} /> Qualquer disciplina</label>
             <label className="inline-flex cursor-pointer items-center gap-1.5"><input type="checkbox" className="accent-[var(--primary)]" checked={qualquerCls} onChange={(e) => { setPage(1); setQualquerCls(e.target.checked) }} /> Qualquer classificação</label>
-          </div>
+          </div>}
           <div className="min-h-[21rem] divide-y rounded-xl border">
             {carregando && !lista ? (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando…</div>
             ) : !lista?.docs.length ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Nenhum documento neste filtro. Marque “Qualquer disciplina/classificação” para ampliar.</div>
+              <div className="p-6 text-center text-sm text-muted-foreground">{video ? 'Nenhum vídeo publicado encontrado. Envie o vídeo na Biblioteca (tipo vídeo).' : 'Nenhum documento neste filtro. Marque “Qualquer disciplina/classificação” para ampliar.'}</div>
             ) : lista.docs.map((d) => {
               const on = d.id === docId
               return (
@@ -181,7 +185,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
             <div className="font-medium">{docId ? docTitulo : <span className="text-muted-foreground">— nenhum (vale o automático{celula.auto ? `: ${celula.auto.titulo}` : ''})</span>}</div>
           </div>
 
-          <div className="space-y-1.5">
+          {!video && <div className="space-y-1.5">
             <Label className="text-xs">Parte do documento</Label>
             {!docId ? <p className="text-xs text-muted-foreground">Escolha um documento.</p> : carregandoPartes ? (
               <p className="text-xs text-muted-foreground"><Loader2 className="mr-1 inline h-3 w-3 animate-spin" /> Carregando partes…</p>
@@ -198,7 +202,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
                 {!partes.length && <p className="px-1 text-xs text-muted-foreground">Este documento não tem partes cadastradas.</p>}
               </div>
             )}
-          </div>
+          </div>}
 
           <div className="space-y-1.5">
             <Label className="text-xs">Rótulo para o aluno (opcional)</Label>
@@ -206,7 +210,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--primary)]" checked={visivel} onChange={(e) => setVisivel(e.target.checked)} /> Visível ao aluno</label>
 
-          <div className="space-y-1.5 rounded-xl border p-3">
+          {!video && <div className="space-y-1.5 rounded-xl border p-3">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium">Tempo (regra de uso · área Gerador)</span>
               {regraAtual && <span className="text-muted-foreground">{regraAtual.minutos != null ? `≈ ${regraAtual.minutos} min` : 'não calculável'}{regraAtual.paginas ? ` · ${regraAtual.paginas} pág.` : ''}</span>}
@@ -221,7 +225,7 @@ function Corpo({ conjuntoId, alvo, podeEditar, onClose, onFeito }: { conjuntoId:
               {campo && <Input className="h-9 w-28" inputMode="decimal" value={valor} onChange={(e) => { setValor(e.target.value); setOverrideTocado(true) }} placeholder={campo.r} aria-label={campo.r} />}
             </div>
             <p className="text-[11px] text-muted-foreground">Só ajuste quando esta aula fugir da regra da área. O cálculo é feito no servidor.</p>
-          </div>
+          </div>}
         </div>
       </div>
 
