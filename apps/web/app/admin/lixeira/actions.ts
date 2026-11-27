@@ -152,6 +152,10 @@ export async function excluirDefinitivo(tabela: SoftDeleteTabela, id: string) {
     const trava = await bloquearSeTemVinculos(svc, access.tenantId, [{ id, titulo: (d as any)?.titulo }])
     if (trava.bloqueados[0]) return { ok: false, error: trava.bloqueados[0].motivo }
   }
+  if (tabela === 'simulado_conteudo_documentos') {
+    try { const { apagarPartesArquivadas } = await import('@/lib/conteudo/dependencias-documento'); await apagarPartesArquivadas(svc, [id]) }
+    catch (e) { return { ok: false, error: `Exclusão definitiva recusada: ${(e as Error).message}` } }
+  }
   const { error } = await svc.from(tabela).delete().eq('id', id).eq('tenant_id', access.tenantId).eq('deletado', true)
   if (error) return { ok: false, error: `Não foi possível excluir definitivamente (ainda há vínculos): ${error.message}` }
   await registrarAudit({ operacao: 'DELETE', entidade: tabela, entidadeId: id, depois: { definitivo: true } })

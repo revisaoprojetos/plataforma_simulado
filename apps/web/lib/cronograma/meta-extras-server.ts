@@ -13,13 +13,14 @@ import { tipoBaixavel } from '@/lib/conteudo/baixar-pura'
 import { lerPoliticaDownload } from '@/lib/conteudo/politica-download'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { mapaCompatTipos } from './tipos-conteudo-server'
+import { classificacaoEfetivaDoc, tipoHerdadoDaPasta, traducaoMeta } from '@/lib/conteudo/classificacao/efetiva'
+import { carregarClassificacaoDosDocs } from '@/lib/conteudo/classificacao/docs-server'
 import { coalescer, lerProgressoReencaixado } from './progresso-emissao'
 import {
   indexarBiblioteca, resolverDocumentoMeta, vinculosPorMeta,
   type ConteudoResolvido, type DocBiblioteca, type MetaParaConteudo, type TipoMaterial, type VinculoExplicito,
 } from './conteudo-meta'
 
-const TIPOS_MATERIAL = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'])
 const T_VINC = 'simulado_cronograma_meta_conteudo'
 const T_PROG = 'simulado_cronograma_meta_progresso'
 
@@ -53,24 +54,11 @@ async function carregarDocsBiblioteca(svc: SupabaseClient, tenantId: string): Pr
     while (pilha.length) { const c = pilha.pop()!; if (!discDaPasta.has(c)) { discDaPasta.set(c, p.disciplina_id); (filhos.get(c) ?? []).forEach((f) => pilha.push(f)) } }
   }
   if (!discDaPasta.size) return []
-  const compatTipos = await mapaCompatTipos(svc, tenantId) // tipos personalizados → vocabulário antigo pelo PAPEL
+  const [compatTipos, classDocs] = await Promise.all([mapaCompatTipos(svc, tenantId), carregarClassificacaoDosDocs(svc, tenantId)]) // tipos personalizados → vocabulário antigo pelo PAPEL
+  // herança ÚNICA (efetiva.ts): pasta tipada mais próxima; a classificação PRÓPRIA do doc (se houver) vence a pasta
+  const traduzir = traducaoMeta({ compat: compatTipos })
   const cache = new Map<string, string | null>()
-  const tipoHerdado = (id: string): TipoMaterial | null => {
-    const caminho: string[] = []
-    let cur: string | null = id, achado: string | null = null
-    const visto = new Set<string>()
-    while (cur && !visto.has(cur)) {
-      visto.add(cur)
-      if (cache.has(cur)) { achado = cache.get(cur)!; break }
-      caminho.push(cur)
-      const t = tipo.get(cur)
-      const tc = t ? (TIPOS_MATERIAL.has(t) ? t : (compatTipos.get(t) ?? null)) : null
-      if (tc) { achado = tc; break }
-      cur = pai.get(cur) ?? null
-    }
-    for (const c of caminho) cache.set(c, achado)
-    return achado as TipoMaterial | null
-  }
+  const tipoHerdado = (id: string): TipoMaterial | null => tipoHerdadoDaPasta(id, { pai, slug: tipo }, traduzir, cache) as TipoMaterial | null
   const docs = await fetchAllByIn<{ id: string; titulo: string; pasta_id: string }>([...discDaPasta.keys()], (chunk) =>
     svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id')
       .eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).in('pasta_id', chunk).order('id') as never,
@@ -78,7 +66,7 @@ async function carregarDocsBiblioteca(svc: SupabaseClient, tenantId: string): Pr
   const out: DocBiblioteca[] = []
   for (const d of docs) {
     const nome = discNome.get(discDaPasta.get(d.pasta_id) ?? '')
-    if (nome) out.push({ id: d.id, titulo: d.titulo, disc: nome, tipo: tipoHerdado(d.pasta_id) })
+    if (nome) out.push({ id: d.id, titulo: d.titulo, disc: nome, tipo: classificacaoEfetivaDoc({ docClassId: classDocs.porDoc.get(d.id), slugPorId: classDocs.slugPorId, traduzir, pastaSlugHerdado: tipoHerdado(d.pasta_id) }).tipo as TipoMaterial | null })
   }
   return out
 }

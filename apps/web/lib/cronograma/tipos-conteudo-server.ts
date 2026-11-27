@@ -3,6 +3,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { esquecer, remember } from '@/lib/cache/relatorio-cache'
 import { sqlQuery } from '@/lib/data/sql'
+import { colunaClassificacaoIdExiste } from '@/lib/conteudo/classificacao/coluna-doc-server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { mesclarCatalogo, slugsGeraMeta, tipoMaterialCompat, type LinhaTipoConteudo } from './tipos-conteudo'
 import type { TipoConteudo, UsoTipoConteudo } from './tipos-conteudo-tipos'
@@ -86,7 +87,10 @@ export async function usoDosTipos(svc: SupabaseClient, tenantId: string): Promis
 }
 
 async function calcularUsoDosTipos(svc: SupabaseClient, tenantId: string): Promise<UsoTipoConteudo[]> {
-  const rows = await sqlQuery<{ slug: string; pastas: number; documentos: number; planos: number }>(
+  type LinhaUso = { slug: string; pastas: number; documentos: number; planos: number }
+  const comColuna = await colunaClassificacaoIdExiste()
+  // Com a coluna classificacao_id: o doc com classificação PRÓPRIA conta no slug dela (não no da pasta). Com NULL em todo lugar = idêntico ao antigo.
+  const rows = await sqlQuery<LinhaUso>(
     `WITH RECURSIVE cl AS (
        SELECT id AS raiz, id AS cur, cronograma_tipo_material AS tipo FROM simulado_pastas
         WHERE tenant_id = $1 AND folder_area = 'conteudo' AND deletado = false AND cronograma_tipo_material IS NOT NULL
@@ -94,10 +98,26 @@ async function calcularUsoDosTipos(svc: SupabaseClient, tenantId: string): Promi
        SELECT cl.raiz, p.id, cl.tipo FROM cl JOIN simulado_pastas p ON p.pai_id = cl.cur AND p.tenant_id = $1 AND p.deletado = false)
      SELECT cl.tipo AS slug, count(DISTINCT cl.raiz)::int AS pastas, count(DISTINCT d.id)::int AS documentos, count(DISTINCT pl.id)::int AS planos
        FROM cl
-       LEFT JOIN simulado_conteudo_documentos d ON d.pasta_id = cl.cur AND d.tenant_id = $1 AND d.deletado = false
+       LEFT JOIN simulado_conteudo_documentos d ON d.pasta_id = cl.cur AND d.tenant_id = $1 AND d.deletado = false${comColuna ? ' AND d.classificacao_id IS NULL' : ''}
        LEFT JOIN ${T_PM} pm ON pm.documento_id = d.id AND pm.tenant_id = $1
        LEFT JOIN ${T_PLANO} pl ON pl.id = pm.plano_id AND pl.arquivada = false
       GROUP BY cl.tipo`, [tenantId])
+  if (rows && comColuna) {
+    // docs com classificação própria: contam no slug da classificação (somados; disjuntos dos da pasta). Falha = mantém só o da pasta.
+    const proprios = await sqlQuery<LinhaUso>(
+      `SELECT ct.slug, 0::int AS pastas, count(DISTINCT d.id)::int AS documentos, count(DISTINCT pl.id)::int AS planos
+         FROM simulado_conteudo_documentos d
+         JOIN simulado_conteudo_tipos ct ON ct.id = d.classificacao_id AND ct.tenant_id = $1
+         LEFT JOIN ${T_PM} pm ON pm.documento_id = d.id AND pm.tenant_id = $1
+         LEFT JOIN ${T_PLANO} pl ON pl.id = pm.plano_id AND pl.arquivada = false
+        WHERE d.tenant_id = $1 AND d.deletado = false AND d.classificacao_id IS NOT NULL
+        GROUP BY ct.slug`, [tenantId])
+    for (const r of proprios ?? []) {
+      const ex = rows.find((x) => x.slug === r.slug)
+      if (ex) { ex.documentos = Number(ex.documentos) + Number(r.documentos); ex.planos = Number(ex.planos) + Number(r.planos) }
+      else rows.push(r)
+    }
+  }
   if (rows) return rows.map((r) => ({ slug: r.slug, pastas: Number(r.pastas), documentos: Number(r.documentos), planosAtivos: Number(r.planos) }))
 
   // Fallback PostgREST (em memória; .in() em chunks via fetchAllByIn).

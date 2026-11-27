@@ -655,6 +655,7 @@ export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria
           <>
           {/* Modelos de caderno não têm aluno (só admin): sem "Gerenciar acessos". */}
           {!ehModelo && <button onClick={abrirGerenciarAcessos} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Users2 className="h-4 w-4" />Gerenciar acessos</button>}
+          {!ehModelo && <a href="/admin/biblioteca/classificacao" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Classificação</a>}
           <DriveNovoButton
             rotuloBranco={ehModelo ? 'Modelo em branco' : 'Documento em branco'}
             onNovaPasta={async (nome, cor) => {

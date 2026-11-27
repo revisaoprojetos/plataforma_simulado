@@ -1,6 +1,7 @@
 import 'server-only'
 import { sqlQuery } from '@/lib/data/sql'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { colunaClassificacaoIdExiste } from '@/lib/conteudo/classificacao/coluna-doc-server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { montarCobertura } from '@/lib/revisao/cronograma'
 import { regrasDaRequisicao } from '@/app/admin/revisao/cronograma/adaptativo/comum'
@@ -95,13 +96,8 @@ async function carregarAdaptativo(t: string): Promise<ResumoCronograma> {
     montarCobertura(svc, t, regras.valores),
     sqlQuery<{ n: number }>(`SELECT count(*)::int n FROM simulado_cronograma_adaptativo_plano WHERE tenant_id = $1 AND arquivada = false`, [t]),
     sqlQuery<{ tipo: string; n: number; d: number }>(`SELECT tipo, count(*)::int n, count(DISTINCT disciplina)::int d FROM simulado_cronograma_adaptativo_meta_def WHERE tenant_id = $1 AND ativa = true GROUP BY 1`, [t]),
-    // Documentos publicados por tipo de material (tipo herdado da pasta ancestral mais próxima).
-    sqlQuery<{ tipo: string; n: number }>(
-      `WITH RECURSIVE p AS (
-         SELECT id, cronograma_tipo_material tipo FROM simulado_pastas WHERE tenant_id = $1 AND folder_area = 'conteudo' AND cronograma_tipo_material IS NOT NULL
-         UNION ALL
-         SELECT c.id, p.tipo FROM simulado_pastas c JOIN p ON c.pai_id = p.id WHERE c.tenant_id = $1 AND c.folder_area = 'conteudo' AND c.cronograma_tipo_material IS NULL)
-       SELECT p.tipo, count(d.id)::int n FROM p JOIN simulado_conteudo_documentos d ON d.pasta_id = p.id AND d.tenant_id = $1 AND d.status = 'publicado' AND d.deletado = false GROUP BY 1`, [t]),
+    // Documentos publicados por tipo de material (tipo herdado da pasta ancestral mais próxima; a classificação PRÓPRIA do doc, se a coluna existir, vence).
+    docsPorTipo(t),
   ])
   // SQL direto indisponível/falhou: planos e LegProc via PostgREST; documentos da Biblioteca ficam "—" (null).
   const planosN = planos ? n(planos[0]?.n) : await contarPg(svc, 'simulado_cronograma_adaptativo_plano', t, (q) => q.eq('arquivada', false))
@@ -131,3 +127,29 @@ async function contarPg(svc: ReturnType<typeof createAdminClient>, tabela: strin
 }
 
 export const lerAdaptativo = (tenantId: string) => lerSeguro<ResumoCronograma>(`revisao-cron:ada-resumo:${tenantId}`, () => carregarAdaptativo(tenantId))
+
+const CTE_TIPO_PASTA = `WITH RECURSIVE p AS (
+         SELECT id, cronograma_tipo_material tipo FROM simulado_pastas WHERE tenant_id = $1 AND folder_area = 'conteudo' AND cronograma_tipo_material IS NOT NULL
+         UNION ALL
+         SELECT c.id, p.tipo FROM simulado_pastas c JOIN p ON c.pai_id = p.id WHERE c.tenant_id = $1 AND c.folder_area = 'conteudo' AND c.cronograma_tipo_material IS NULL)`
+
+/** SQL ANTIGO (coluna classificacao_id ausente): tipo herdado só da pasta. */
+const SQL_DOCS_POR_TIPO_PASTA = `${CTE_TIPO_PASTA}
+       SELECT p.tipo, count(d.id)::int n FROM p JOIN simulado_conteudo_documentos d ON d.pasta_id = p.id AND d.tenant_id = $1 AND d.status = 'publicado' AND d.deletado = false GROUP BY 1`
+
+/** Com a coluna: COALESCE(slug da classificação do doc, tipo herdado da pasta). Com classificacao_id NULL em todo lugar = idêntico ao antigo. */
+const SQL_DOCS_POR_TIPO_DOC = `${CTE_TIPO_PASTA}
+       SELECT COALESCE(ct.slug, p.tipo) AS tipo, count(d.id)::int n
+         FROM simulado_conteudo_documentos d
+         LEFT JOIN p ON p.id = d.pasta_id
+         LEFT JOIN simulado_conteudo_tipos ct ON ct.id = d.classificacao_id AND ct.tenant_id = $1
+        WHERE d.tenant_id = $1 AND d.status = 'publicado' AND d.deletado = false AND COALESCE(ct.slug, p.tipo) IS NOT NULL
+        GROUP BY 1`
+
+async function docsPorTipo(t: string): Promise<Array<{ tipo: string; n: number }> | null> {
+  if (await colunaClassificacaoIdExiste()) {
+    const r = await sqlQuery<{ tipo: string; n: number }>(SQL_DOCS_POR_TIPO_DOC, [t])
+    if (r) return r
+  }
+  return sqlQuery<{ tipo: string; n: number }>(SQL_DOCS_POR_TIPO_PASTA, [t])
+}

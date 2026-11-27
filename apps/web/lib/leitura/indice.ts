@@ -7,6 +7,10 @@
  * Persistência sem migração: guardado em `simulado_documentos.quiz_config.indice_tipos` (jsonb já
  * existente). Vazio/ausente = padrão (capítulos + artigos, o comportamento anterior).
  */
+/**
+ * TABELA ÚNICA de tipos/níveis de dispositivo. Consumida por lib/conteudo/dispositivos.ts (classificação),
+ * leitor-documento.tsx, preview admin e TOC. Não duplicar níveis em outro lugar.
+ */
 export const TIPOS_INDICE: { tipo: string; label: string; nivel: number }[] = [
   { tipo: 'livro', label: 'Livros', nivel: 0 },
   { tipo: 'parte', label: 'Partes', nivel: 0 },

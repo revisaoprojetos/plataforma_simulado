@@ -26,7 +26,7 @@ import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-p
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { normalizarMetadados, type Metadados } from '@/lib/conteudo/metadados'
 import { sanitizarHtmlLeitura } from '@/lib/seguranca/sanitizar-html'
-import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas, dependenciasDocumentos } from '@/lib/conteudo/dependencias-documento'
+import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas, dependenciasDocumentos, arquivarPartesDosDocumentos } from '@/lib/conteudo/dependencias-documento'
 import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
@@ -738,7 +738,7 @@ export async function removerDocumento(documentoId: string): Promise<{ ok: boole
   // TRAVA CENTRAL: documento com vínculos (grifos, metas, progresso, produtos…) ou EM USO por plano ativo NÃO vai à lixeira.
   const { data: doc } = await svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false).maybeSingle()
   if (!doc) return { ok: false, error: 'Documento não encontrado ou já na lixeira.' }
-  const trava = await bloquearSeTemVinculos(svc, g.tenantId, [{ id: documentoId, titulo: (doc as any).titulo }])
+  const trava = await bloquearSeTemVinculos(svc, g.tenantId, [{ id: documentoId, titulo: (doc as any).titulo }], { softDelete: true })
   if (trava.bloqueados[0]) return { ok: false, error: trava.bloqueados[0].motivo, bloqueado: true }
   // Soft-delete → Lixeira. Esta tabela NÃO tem o trigger de carimbo (só as 8 núcleo),
   // então setamos deletado_em/deletado_por explicitamente (senão o purge 30d nunca varre).
@@ -747,6 +747,7 @@ export async function removerDocumento(documentoId: string): Promise<{ ok: boole
     .update({ deletado: true, deletado_em: new Date().toISOString(), deletado_por: g.atorId })
     .eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false)
   if (error) return { ok: false, error: error.message }
+  await arquivarPartesDosDocumentos(svc, g.tenantId, [documentoId], g.atorId)
   await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { deletado: true } })
   await registrarPastasEsvaziadas(svc, { tenantId: g.tenantId, atorId: g.atorId, acao: 'lixeira', saindo: [{ id: documentoId, pasta_id: (doc as any).pasta_id }] })
   revalidatePath('/admin/biblioteca')

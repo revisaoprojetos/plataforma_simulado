@@ -13,6 +13,8 @@ import { lerOverride } from './catalogo-override-db'
 import { lerDiscSemTipo } from './config-metas'
 import { mapaCompatTipos, mapaGeraMeta } from '@/lib/cronograma/tipos-conteudo-server'
 import { montarGX, type DocGX } from './gx-montar'
+import { classificacaoEfetivaDoc, tipoHerdadoDaPasta, traducaoBanco } from '@/lib/conteudo/classificacao/efetiva'
+import { carregarClassificacaoDosDocs } from '@/lib/conteudo/classificacao/docs-server'
 import type { ItemGX } from './gx-tipos'
 import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, disciplinaRetirada, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
@@ -63,7 +65,6 @@ export interface ConteudoBanco extends Conteudo {
 }
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
-const TIPOS_MATERIAL = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'])
 
 /** `.in()` em lotes (evita hang do proxy com listas grandes); projeção já vem do build. */
 async function selectInChunks<T>(
@@ -144,25 +145,11 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
 
   // tipo de material herdado: subpasta-tipada mais próxima subindo a árvore (com memoização + anti-ciclo)
   // tipos PERSONALIZADOS do catálogo: tratados pelo PAPEL (slug equivalente do vocabulário antigo)
-  const [compatTipos, geraMeta] = await Promise.all([mapaCompatTipos(svc, tenantId), mapaGeraMeta(svc, tenantId)])
+  const [compatTipos, geraMeta, classDocs] = await Promise.all([mapaCompatTipos(svc, tenantId), mapaGeraMeta(svc, tenantId), carregarClassificacaoDosDocs(svc, tenantId)])
+  // herança ÚNICA (lib/conteudo/classificacao/efetiva.ts): pasta tipada mais próxima; a classificação PRÓPRIA do doc (se houver) vence a pasta
+  const traduzir = traducaoBanco({ geraMeta, compat: compatTipos })
   const tipoCache = new Map<string, string | null>()
-  const tipoHerdado = (pastaId: string): string | null => {
-    const caminho: string[] = []
-    let cur: string | null = pastaId
-    let achado: string | null = null
-    const seen = new Set<string>()
-    while (cur && !seen.has(cur)) {
-      seen.add(cur)
-      if (tipoCache.has(cur)) { achado = tipoCache.get(cur)!; break }
-      caminho.push(cur)
-      const t = tipoPorPasta.get(cur)
-      const tc = t ? (TIPOS_MATERIAL.has(t) ? t : geraMeta.has(t) ? `gx:${t}` : (compatTipos.get(t) ?? null)) : null
-      if (tc) { achado = tc; break }
-      cur = paiPorPasta.get(cur) ?? null
-    }
-    for (const c of caminho) tipoCache.set(c, achado)
-    return achado
-  }
+  const tipoHerdado = (pastaId: string): string | null => tipoHerdadoDaPasta(pastaId, { pai: paiPorPasta, slug: tipoPorPasta }, traduzir, tipoCache)
 
   // 3) documentos publicados dessas pastas (projeção mínima; .in() em lotes)
   const pastaIds = [...discDaPasta.keys()]
@@ -182,7 +169,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   for (const d of docs) {
     const discId = discDaPasta.get(d.pasta_id); if (!discId) continue
     const disc = discById.get(discId); if (!disc) continue
-    const tipo = tipoHerdado(d.pasta_id)
+    const tipo = classificacaoEfetivaDoc({ docClassId: classDocs.porDoc.get(d.id), slugPorId: classDocs.slugPorId, traduzir, pastaSlugHerdado: tipoHerdado(d.pasta_id), fallbackLegado: 'pdfull' }).tipo // sem tipo = pdfull (compat)
     if (tipo?.startsWith('gx:')) { gxDocs.push({ id: d.id, titulo: d.titulo, disc: nomeDisciplina(disc.nome), slug: tipo.slice(3) }); continue } // tipo personalizado que gera meta própria
     if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo, disc: disc.nome, versaoId: d.versao_atual_id }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)

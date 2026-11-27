@@ -5,6 +5,7 @@
 export type TipoDependencia =
   | 'grifos' | 'metas' | 'progresso' | 'produto' | 'questoes'
   | 'atualizacoes' | 'caderno' | 'vinculos' | 'jurisclub' | 'favoritos' | 'respostas' | 'lei'
+  | 'partes' | 'selecoes'
 
 export type PorTipo = Partial<Record<TipoDependencia, number>>
 /** `emUso`: o documento compõe metas de plano de aluno NÃO arquivado (ou meta ativa do catálogo) → além de não
@@ -44,8 +45,22 @@ const ROTULOS: Record<TipoDependencia, [string, string]> = {
   favoritos: ['favorito de aluno', 'favoritos de alunos'],
   respostas: ['resposta de quiz de aluno', 'respostas de quiz de alunos'],
   lei: ['dispositivo/histórico de lei', 'dispositivos/históricos de lei'],
+  partes: ['parte de documento ativa', 'partes de documento ativas'],
+  selecoes: ['seleção de meta (parte/documento)', 'seleções de meta (parte/documento)'],
 }
 export const ORDEM_TIPOS = Object.keys(ROTULOS) as TipoDependencia[]
+
+/**
+ * Partes/seleções → contagens que BLOQUEIAM. Seleções (>0) sempre bloqueiam. Partes: só as ATIVAS bloqueiam
+ * (arquivadas são apagadas pelo purge antes do DELETE do documento). No SOFT-DELETE (`softDelete: true`) as partes
+ * ativas são arquivadas automaticamente (plano §10.4), então não bloqueiam; só as seleções.
+ */
+export function contagemPartesQueBloqueia(
+  d: { partesAtivas: number; selecoes: number } | undefined, opts?: { softDelete?: boolean },
+): { partes: number; selecoes: number } {
+  if (!d) return { partes: 0, selecoes: 0 }
+  return { partes: opts?.softDelete ? 0 : Math.max(0, d.partesAtivas || 0), selecoes: Math.max(0, d.selecoes || 0) }
+}
 
 export function dependenciasVazias(): Dependencias { return { total: 0, porTipo: {} } }
 

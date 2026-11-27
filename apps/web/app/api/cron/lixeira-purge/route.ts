@@ -41,6 +41,7 @@ type ResultadoTabela = {
   storageRemovidos?: number
   /** Retidos na Lixeira por terem vínculos (questões/bancos em uso). */
   retidos?: number
+  partesApagadas?: number
   pulada?: boolean
   erro?: string
 }
@@ -113,6 +114,12 @@ export async function POST(req: NextRequest) {
             res.retidos = (res.retidos ?? 0) + r.bloqueados.length
           }
           ids = ok
+          // Partes ARQUIVADAS não bloqueiam (as ativas/seleções já foram retidas acima): apaga-as ANTES do DELETE do
+          // documento (FK RESTRICT). Só em modo aplicar; erro real = retém tudo (nada apagado).
+          if (aplicar && ids.length) {
+            const { apagarPartesArquivadas } = await import('@/lib/conteudo/dependencias-documento')
+            res.partesApagadas = await apagarPartesArquivadas(svc, ids)
+          }
         } catch (e) {
           res.retidos = ids.length
           res.erro = `trava de vínculos (documentos) falhou, nada apagado: ${(e as Error).message}`

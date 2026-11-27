@@ -75,7 +75,7 @@ export async function softDelete(
   if (tabela === 'simulado_conteudo_documentos' && access.tenantId) {
     try {
       const { bloquearSeTemVinculos } = await import('@/lib/conteudo/dependencias-documento')
-      const r = await bloquearSeTemVinculos(svc, access.tenantId, arr.map((id) => ({ id })))
+      const r = await bloquearSeTemVinculos(svc, access.tenantId, arr.map((id) => ({ id })), { softDelete: true })
       if (r.bloqueados.length) {
         bloqueadas = r.bloqueados.map((b) => ({ id: b.id, motivo: b.motivo }))
         mensagem = r.bloqueados[0].motivo + (r.bloqueados.length > 1 ? ` (+${r.bloqueados.length - 1} outros)` : '')
@@ -103,6 +103,11 @@ export async function softDelete(
     const { data, error } = await q.select('id')
     if (error && !primeiroErro) primeiroErro = error as Error
     count += data?.length ?? 0
+  }
+  // Documento na lixeira: arquiva as partes ativas (plano §10.4, com auditoria; best-effort).
+  if (tabela === 'simulado_conteudo_documentos' && access.tenantId && count > 0) {
+    const { arquivarPartesDosDocumentos } = await import('@/lib/conteudo/dependencias-documento')
+    await arquivarPartesDosDocumentos(svc, access.tenantId, arr, access.userId ?? null)
   }
   return { error: primeiroErro, count, bloqueadas, mensagem }
 }

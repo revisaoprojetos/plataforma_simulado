@@ -2756,11 +2756,15 @@ function atualizaContTopicos(tp){
   const el=$('#sideCount');if(!el)return;
   el.textContent=f.length?(d+' de '+f.length+' tópicos lidos'):(pd+' de '+secs.length+' lidas');el.title=pd+' de '+secs.length+' páginas lidas';
 }
+/* PROVISÓRIO: a fonte única da classificação de dispositivos é lib/conteudo/dispositivos.ts (classificarDispositivo); este tocHeads (regex de artigo) será unificado na fase seguinte. */
 /* TÍTULOS do documento em texto (JurisClub/LegProc): h1–h4 reais do corpo (não os de tabelas/caixas), com id estável. Em documentos antigos do leitor segue h3. */
 function tocHeads(sec){if(!sec)return[];const bib=sec.querySelector('.bib-flow');
-  const nodes=bib?$$('h1,h2,h3,h4',bib).filter(h=>!h.closest('table,.caixa-colapsavel')):$$('.flow h3',sec);
-  const out=[];nodes.forEach((h,i)=>{const c=h.cloneNode(true);c.querySelectorAll('button,.bmk,svg,a:empty').forEach(x=>x.remove());const t=(c.textContent||'').replace(/\s+/g,' ').trim();if(t.length<2||/^[\d\s.\-–—_]+$/.test(t))return;if(!h.id)h.id='th-'+i;out.push({id:h.id,t,lv:bib?+h.tagName[1]:3,el:h})});
-  if(bib&&out.length){const base=Math.min(...out.map(o=>o.lv));out.forEach(o=>o.lv=o.lv-base+1)} /* nível relativo: o título mais alto = 1 */
+  // LegProc/lei: o ARTIGO é um parágrafo (p/li/div com data-uid) "Art. 5º …", não um título → entra no índice
+  // junto com os títulos/capítulos (antes só h1–h4 apareciam e a barra lateral ficava "furada").
+  const RE_ART=/^Art(?:igo)?s?\.?\s*\d+/i;
+  const nodes=bib?$$('h1,h2,h3,h4,p,li,div',bib).filter(h=>{if(h.closest('table,.caixa-colapsavel'))return false;if(/^H[1-4]$/.test(h.tagName))return true;if(h.querySelector('h1,h2,h3,h4,p,li,div'))return false;return RE_ART.test((h.textContent||'').replace(/\s+/g,' ').trim())}):$$('.flow h3',sec);
+  const out=[];nodes.forEach((h,i)=>{const isArt=bib&&!/^H[1-4]$/.test(h.tagName);const c=h.cloneNode(true);c.querySelectorAll('button,.bmk,svg,a:empty').forEach(x=>x.remove());let t=(c.textContent||'').replace(/\s+/g,' ').trim();if(isArt)t=t.length>70?t.slice(0,70).trim()+'…':t;if(t.length<2||/^[\d\s.\-–—_]+$/.test(t))return;if(!h.id)h.id='th-'+i;out.push({id:h.id,t,lv:bib?(isArt?5:+h.tagName[1]):3,el:h,art:isArt})});
+  if(bib&&out.length){const hs=out.filter(o=>!o.art);const base=hs.length?Math.min(...hs.map(o=>o.lv)):5,maxH=hs.length?Math.max(...hs.map(o=>o.lv))-base+1:0;out.forEach(o=>{o.lv=o.art?maxH+1:o.lv-base+1})} /* nível relativo: título mais alto = 1; artigos logo abaixo do título mais fundo */
   return out}
 function renderToc(){
   // MODO PDF/BIBLIOTECA: abas "Índices" (títulos, caixas aninhadas estilo juris) e "Páginas" (lista de

@@ -1,9 +1,10 @@
 import 'server-only'
 import type { createAdminClient } from '@/lib/supabase/server'
 import { sqlQuery } from '@/lib/data/sql'
+import { dependenciasPartesPorDocumento } from './dependencias-partes'
 import {
   dependenciasVazias, somarDependencia, particionarPorVinculos, mensagemLoteParcial, MSG_NAO_VERIFICADO,
-  mensagemEmUso, mensagemPastaEmUso, pastasEsvaziadas,
+  mensagemEmUso, mensagemPastaEmUso, pastasEsvaziadas, contagemPartesQueBloqueia,
   type Dependencias, type DocRef, type Bloqueado, type TipoDependencia, type AcaoBloqueada,
 } from './dependencias-documento-pura'
 
@@ -206,7 +207,7 @@ export async function registrarPastasEsvaziadas(
  * `bloquearSeTemVinculos`, que já falha fechado).
  */
 export async function dependenciasDocumentos(
-  svc: Svc, tenantId: string, ids: string[], opts?: { origem?: Origem },
+  svc: Svc, tenantId: string, ids: string[], opts?: { origem?: Origem; softDelete?: boolean },
 ): Promise<Map<string, Dependencias>> {
   const unicos = [...new Set(ids.filter((x) => typeof x === 'string' && UUID.test(x)))]
   const res = new Map<string, Dependencias>(unicos.map((id) => [id, dependenciasVazias()]))
@@ -219,6 +220,13 @@ export async function dependenciasDocumentos(
     if (opts?.origem !== 'leitura') {
       const uso = await documentosEmUso(svc, tenantId, lote)
       for (const [id, n] of uso) { const d = res.get(id); if (d) { d.emUso = true; d.planosAtivos = n } }
+      // Partes/seleções (FK RESTRICT). Falha fechada: erro ≠ tabela ausente propaga (a tabela ausente já vira 0 lá dentro).
+      const pa = await dependenciasPartesPorDocumento(svc, tenantId, lote)
+      for (const [id, n] of pa) {
+        const d = res.get(id); if (!d) continue
+        const c = contagemPartesQueBloqueia(n, { softDelete: opts?.softDelete })
+        somarDependencia(d, 'partes', c.partes); somarDependencia(d, 'selecoes', c.selecoes)
+      }
     }
   }
   return res
@@ -231,7 +239,7 @@ export type ResultadoBloqueio = { livres: DocRef[]; bloqueados: Bloqueado[]; men
  * Os chamadores só podem excluir/soft-deletar `livres`.
  */
 export async function bloquearSeTemVinculos(
-  svc: Svc, tenantId: string, docs: DocRef[], opts?: { origem?: Origem },
+  svc: Svc, tenantId: string, docs: DocRef[], opts?: { origem?: Origem; softDelete?: boolean },
 ): Promise<ResultadoBloqueio> {
   let deps = new Map<string, Dependencias>()
   try { deps = await dependenciasDocumentos(svc, tenantId, docs.map((d) => d.id), opts) }
@@ -242,8 +250,48 @@ export async function bloquearSeTemVinculos(
 
 /** Atalho p/ ação de UM documento: devolve a mensagem de recusa ou null se está livre. */
 export async function recusaDocumentoUnico(
-  svc: Svc, tenantId: string, doc: DocRef, opts?: { origem?: Origem },
+  svc: Svc, tenantId: string, doc: DocRef, opts?: { origem?: Origem; softDelete?: boolean },
 ): Promise<string | null> {
   const r = await bloquearSeTemVinculos(svc, tenantId, [doc], opts)
   return r.bloqueados[0]?.motivo ?? null
+}
+
+/** SOFT-DELETE: arquiva as partes ATIVAS dos documentos (plano §10.4) + auditoria. Best-effort: nunca derruba a exclusão. */
+export async function arquivarPartesDosDocumentos(svc: Svc, tenantId: string, ids: string[], atorId: string | null): Promise<number> {
+  const unicos = [...new Set(ids.filter((x) => UUID.test(x)))]
+  let total = 0
+  try {
+    for (let i = 0; i < unicos.length; i += CHUNK) {
+      const lote = unicos.slice(i, i + CHUNK)
+      const { data, error } = await (svc as any).from('simulado_conteudo_partes').update({ arquivada: true })
+        .eq('tenant_id', tenantId).eq('arquivada', false).in('documento_id', lote).select('id, documento_id')
+      if (error) { if (!tabelaAusente(`${error.code ?? ''} ${error.message}`)) console.error('[dependencias-documento] arquivar partes', error.message); continue }
+      const rows = (data ?? []) as { id: string; documento_id: string }[]
+      total += rows.length
+      const porDoc = new Map<string, string[]>()
+      for (const r of rows) (porDoc.get(r.documento_id) ?? porDoc.set(r.documento_id, []).get(r.documento_id)!).push(r.id)
+      if (porDoc.size) {
+        const { registrarAudit } = await import('@/lib/audit')
+        for (const [docId, pids] of porDoc) {
+          await registrarAudit({
+            operacao: 'UPDATE', entidade: 'simulado_conteudo_partes', entidadeId: docId, tenantId, atorId,
+            antes: { arquivada: false, partes: pids.length }, depois: { arquivada: true, motivo: 'documento_enviado_a_lixeira', ids: pids.slice(0, 200) },
+          }).catch(() => {})
+        }
+      }
+    }
+  } catch (e) { console.error('[dependencias-documento] arquivar partes', (e as Error)?.message) }
+  return total
+}
+
+/** PURGE: apaga as partes ARQUIVADAS dos documentos antes do DELETE deles (FK RESTRICT). Lança em erro real (o chamador retém). */
+export async function apagarPartesArquivadas(svc: Svc, ids: string[]): Promise<number> {
+  const unicos = [...new Set(ids.filter((x) => UUID.test(x)))]
+  let total = 0
+  for (let i = 0; i < unicos.length; i += CHUNK) {
+    const { data, error } = await (svc as any).from('simulado_conteudo_partes').delete().eq('arquivada', true).in('documento_id', unicos.slice(i, i + CHUNK)).select('id')
+    if (error) { if (tabelaAusente(`${error.code ?? ''} ${error.message}`)) return total; throw new Error(`partes arquivadas: ${error.message}`) }
+    total += (data ?? []).length
+  }
+  return total
 }

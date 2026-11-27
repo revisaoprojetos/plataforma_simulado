@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.32.0 — 2026-11-27
+
+### Biblioteca de partes, classificação genérica por tenant, índice com artigos e diagnóstico de índice
+- **Partes por documento:** nova aba **Partes** no gerenciar do documento (partes/seleções reutilizáveis).
+- **Classificação genérica por tenant:** matriz em `/admin/biblioteca/classificacao` com modelo-base de 6 tipos.
+- **Herança única de classificação** (`classificacao/efetiva.ts`), usada pelo Cronograma Adaptativo, conteúdo por meta e resumo.
+- **Diagnóstico de índice por documento** (rota `/api/admin/biblioteca/diagnostico-indice`).
+- **Índice com artigos:** leitor-jus `tocHeads` + classificador único `dispositivos.ts`.
+- **Lixeira/purge:** trava para partes e seleções vinculadas.
+- **Migrações (JÁ aplicadas em produção; aplicar ANTES do deploy em outros ambientes):** `20261209000000_conteudo_partes_classificacao.sql`, `20261209010000_conteudo_tipos_modelo_base.sql`.
+- **Aviso:** as telas novas funcionam sem mudar o que o aluno vê; Fase 8 (seletor nas metas) pendente.
+
 ## 4.31.0 — 2026-11-26
 
 ### Edição de marcação pelo admin, comentário recolhível e tipos de conteúdo do Cronograma Adaptativo

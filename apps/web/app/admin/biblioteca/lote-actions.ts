@@ -11,7 +11,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
 import { definirVersaoAtual } from '@/lib/conteudo/documentos'
-import { bloquearSeTemVinculos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas } from '@/lib/conteudo/dependencias-documento'
+import { bloquearSeTemVinculos, arquivarPartesDosDocumentos, recusarSeEmUso, recusaPastaEmUso, registrarPastasEsvaziadas } from '@/lib/conteudo/dependencias-documento'
 import { recusarPublicarTeste } from '@/lib/conteudo/guarda-publicar-teste'
 
 // AÇÕES EM LOTE da Biblioteca (admin). Estende as ações unitárias existentes (mover, status, acesso,
@@ -284,7 +284,7 @@ export async function executarLote(alvo: AlvoLote, acoesIn: AcaoLote[]): Promise
       const acaoTrava = a.tipo === 'lixeira' ? 'excluir' : a.tipo === 'mover' ? 'mover' : a.tipo === 'categoria' ? 'categoria' : a.tipo === 'status' && a.status !== 'publicado' ? 'despublicar' : null
       if (acaoTrava) {
         const refs = ctx.docs.map((d) => ({ id: d.id, titulo: d.titulo }))
-        const t = a.tipo === 'lixeira' ? await bloquearSeTemVinculos(svc, g.tenantId, refs) : await recusarSeEmUso(svc, g.tenantId, refs, acaoTrava)
+        const t = a.tipo === 'lixeira' ? await bloquearSeTemVinculos(svc, g.tenantId, refs, { softDelete: true }) : await recusarSeEmUso(svc, g.tenantId, refs, acaoTrava)
         for (const b of t.bloqueados) bloq.set(b.id, b.motivo)
         // Mudança de pasta/coleção arrasta pastas: recusa se a pasta (ou subpasta) do escopo tiver documento em uso.
         if (a.tipo === 'categoria' && ctx.res.escopo.size) {
@@ -306,6 +306,7 @@ export async function executarLote(alvo: AlvoLote, acoesIn: AcaoLote[]): Promise
       } catch (err: any) {
         e = new Map(ctxA.docs.map((d) => [d.id, err?.message || 'Falha inesperada.'] as [string, string]))
       }
+      if (a.tipo === 'lixeira') { const okIds = ctxA.docs.filter((d) => !e.has(d.id)).map((d) => d.id); if (okIds.length) await arquivarPartesDosDocumentos(svc, g.tenantId, okIds, g.atorId) }
       bloq.forEach((msg, id) => e.set(id, msg))
       // Auditoria "pasta esvaziada" (último documento saiu por mover/lixeira/categoria).
       if (acaoTrava === 'excluir' || acaoTrava === 'mover' || acaoTrava === 'categoria') {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   dependenciasVazias, somarDependencia, temVinculos, resumoDependencias, mensagemBloqueio, mensagemEmUso, mensagemPastaEmUso,
-  particionarPorVinculos, mensagemLoteParcial, pastasEsvaziadas, MSG_NAO_VERIFICADO, ALTERNATIVAS_EM_USO,
+  particionarPorVinculos, mensagemLoteParcial, pastasEsvaziadas, contagemPartesQueBloqueia, MSG_NAO_VERIFICADO, ALTERNATIVAS_EM_USO,
   type Dependencias,
 } from './dependencias-documento-pura'
 
@@ -85,5 +85,23 @@ describe('pasta esvaziada (auditoria)', () => {
   })
   it('pasta ausente do mapa conta como vazia', () => {
     expect(pastasEsvaziadas([{ id: 'x', pasta_id: 'p9' }], new Map()).get('p9')).toEqual(['x'])
+  })
+})
+
+describe('partes e seleções (Fase 9)', () => {
+  it('seleções sempre bloqueiam; partes só ativas; soft-delete ignora partes ativas', () => {
+    expect(contagemPartesQueBloqueia(undefined)).toEqual({ partes: 0, selecoes: 0 })
+    expect(contagemPartesQueBloqueia({ partesAtivas: 0, selecoes: 0 })).toEqual({ partes: 0, selecoes: 0 }) // só arquivadas
+    expect(contagemPartesQueBloqueia({ partesAtivas: 2, selecoes: 0 })).toEqual({ partes: 2, selecoes: 0 })
+    expect(contagemPartesQueBloqueia({ partesAtivas: 2, selecoes: 1 }, { softDelete: true })).toEqual({ partes: 0, selecoes: 1 })
+  })
+  it('rótulos e bloqueio', () => {
+    const d = dependenciasVazias()
+    somarDependencia(d, 'partes', 1); somarDependencia(d, 'selecoes', 3)
+    expect(temVinculos(d)).toBe(true)
+    expect(resumoDependencias(d)).toBe('1 parte de documento ativa, 3 seleções de meta (parte/documento)')
+  })
+  it('comportamento antigo intacto sem partes', () => {
+    expect(resumoDependencias(dep({ grifos: 2 }))).toBe('2 grifos/anotações de alunos')
   })
 })

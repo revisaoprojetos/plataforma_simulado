@@ -13,6 +13,7 @@ import { salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCateg
 import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
 import { AbaFlashcards } from './flashcards-tab'
 import { AbaAreas } from './areas-tab'
+import { PartesAba } from '@/app/admin/biblioteca/partes-aba'
 import { AbaVideo } from './video-tab'
 import { AtualizacoesDocumento } from '@/components/biblioteca/gestao/atualizacoes-documento'
 
@@ -94,7 +95,7 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){.gcwrap *{transition:none!important}}
 `
 
-type Aba = 'visao' | 'acesso' | 'alunos' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'areas' | 'hist' | 'cfg' | 'fonte'
+type Aba = 'visao' | 'acesso' | 'alunos' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'areas' | 'partes' | 'hist' | 'cfg' | 'fonte'
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 const dt = (s: string | null) => (s ? formatBrt(s) : '—')
 
@@ -174,6 +175,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
     { k: 'unit', label: tp.abaTipo.tab },
     { k: 'flash', label: 'Flashcards' },
     { k: 'areas', label: 'Áreas' },
+    ...(base.kind === 'docx' ? [{ k: 'partes' as Aba, label: 'Partes' }] : []),
     { k: 'hist', label: 'Histórico' },
     { k: 'cfg', label: 'Configurações' },
   ]
@@ -236,6 +238,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       {aba === 'unit' && <EmConstrucao titulo={tp.abaTipo.titulo} texto={`${tp.abaTipo.sub}. As métricas por ${tp.abaTipo.tab.toLowerCase()} dependem do pipeline de eventos de leitura — em construção.`} />}
       {aba === 'flash' && <AbaFlashcards documentoId={base.id} />}
       {aba === 'areas' && <AbaAreas documentoId={base.id} />}
+      {aba === 'partes' && <PartesAba documentoId={base.id} />}
       {aba === 'hist' && <AbaHistorico dados={dados} />}
       {aba === 'cfg' && <AbaConfig base={base} tp={tp} />}
       {aba === 'fonte' && <AbaFonte base={base} linkAluno={linkAluno} />}

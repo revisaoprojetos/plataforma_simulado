@@ -23,7 +23,7 @@ import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 import { prepararCaixasTabela, prepararCaixasCobrado, prepararTabelasColapsaveis } from '@/lib/leitura/caixas'
 import { prepararSelosLeitura } from '@/lib/leitura/selos'
 import { prepararArtigosCobrados } from '@/lib/leitura/artigos-cobrados'
-import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
+import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import { TemasDoDia } from '@/components/leitura/temas-do-dia'
 import { extrairTopicos, ancorarTopicos, type TopicoBase } from '@/lib/leitura/topicos'
@@ -354,8 +354,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     // Ignora dispositivos citados em tabelas de comparação (não são artigos/incisos da aula).
     const disp = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]')).filter((el) => !el.closest('table'))
     if (disp.length) {
-      // Hierarquia do índice: CAPÍTULO/TÍTULO/SEÇÃO (0) → Art. (1) → § (2) → inciso (3) → alínea (4).
-      const NIVEL_TIPO: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
+      // Hierarquia do índice: tabela ÚNICA em lib/leitura/indice.ts (NIVEL_TIPO).
       setSecoes(disp.map((el) => {
         const id = el.getAttribute('data-disp') || ''
         const tipo = el.getAttribute('data-disp-tipo') || 'artigo'

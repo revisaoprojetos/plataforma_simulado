@@ -5,13 +5,15 @@
 
 export interface TrechoExtraido {
   ordem: number
-  tipo: 'titulo' | 'capitulo' | 'artigo' | 'paragrafo' | 'inciso' | 'alinea' | 'texto'
+  tipo: 'livro' | 'parte' | 'titulo' | 'capitulo' | 'secao' | 'subsecao' | 'artigo' | 'paragrafo' | 'inciso' | 'alinea' | 'item' | 'texto'
   rotulo: string | null // "Art. 5º", "§ 1º", "II", "a)"
   texto: string
   hashTexto: string
 }
 
-const BLOCOS = /<(h[1-6]|p|li|blockquote|pre|td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi
+import { classificarDispositivo } from './dispositivos'
+
+const BLOCOS =/<(h[1-6]|p|li|blockquote|pre|td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi
 // Containers que apenas embrulham blocos — removidos (unwrap) para não engolir os filhos.
 const CONTAINERS = /<\/?(div|section|article|main|header|footer|span|font|a)\b[^>]*>/gi
 const ENTIDADES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—', hellip: '…', sect: '§', aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', atilde: 'ã', otilde: 'õ', ccedil: 'ç', agrave: 'à', acirc: 'â', ecirc: 'ê', ocirc: 'ô' }
@@ -38,22 +40,18 @@ export function hashTexto(texto: string): string {
   return (h >>> 0).toString(16)
 }
 
-const RE_ARTIGO = /^Art(?:igo)?\.?\s*\d+/i
-const RE_PARAGRAFO = /^(§+\s*\d*|Par[áa]grafo\s+[úu]nico)/i
-const RE_INCISO = /^[IVXLCDM]+\s*[-–.)]/
-const RE_ALINEA = /^[a-z]\s*\)/
-
-/** Infere tipo + rótulo pelo começo do texto e pela tag do bloco. */
+/**
+ * Infere tipo + rótulo do bloco via a função ÚNICA `classificarDispositivo` (dispositivos.ts).
+ * Só muda `tipo`/`rotulo` — NUNCA a sequência/filtro de blocos (o uid dos trechos depende dela).
+ * Legado preservado: heading sem rótulo reconhecível → h1 'titulo', h2 'capitulo', h3–h6 'titulo';
+ * bloco que não é dispositivo (inclui citação e td/th) → 'paragrafo'.
+ */
 function classificar(tag: string, texto: string): { tipo: TrechoExtraido['tipo']; rotulo: string | null } {
   const t = tag.toLowerCase()
-  if (/^h1$/.test(t)) return { tipo: 'titulo', rotulo: null }
-  if (/^h2$/.test(t)) return { tipo: 'capitulo', rotulo: null }
-  if (RE_ARTIGO.test(texto)) return { tipo: 'artigo', rotulo: (texto.match(RE_ARTIGO) || [])[0]?.trim() ?? null }
-  if (RE_PARAGRAFO.test(texto)) return { tipo: 'paragrafo', rotulo: (texto.match(RE_PARAGRAFO) || [])[0]?.trim() ?? null }
-  if (RE_INCISO.test(texto)) return { tipo: 'inciso', rotulo: (texto.match(RE_INCISO) || [])[0]?.replace(/[-–.)]\s*$/, '').trim() ?? null }
-  if (RE_ALINEA.test(texto)) return { tipo: 'alinea', rotulo: (texto.match(RE_ALINEA) || [])[0]?.trim() ?? null }
-  if (/^h[3-6]$/.test(t)) return { tipo: 'titulo', rotulo: null }
-  return { tipo: 'paragrafo', rotulo: null }
+  const c = classificarDispositivo(t, texto)
+  if (c.via === 'tag') return { tipo: t === 'h2' ? 'capitulo' : 'titulo', rotulo: null }
+  if (c.tipo === 'texto') return { tipo: 'paragrafo', rotulo: null }
+  return { tipo: c.tipo, rotulo: c.rotulo }
 }
 
 /**

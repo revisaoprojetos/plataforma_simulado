@@ -1,6 +1,7 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
 import { selosParaSpans, slugDeTag } from './selos'
+import { IndexadorDispositivos, dentroDeTabelaOuCaixa } from '../conteudo/dispositivos'
 import { normalizarTermoTag, mapaTagsBiblioteca, type TagBiblioteca } from './biblioteca-tags'
 
 // Sanitizador de HTML para a AREA DE LEITURA (server-only).
@@ -244,48 +245,28 @@ function ancorarArtigos(root: any): number {
 
 export interface Dispositivo { id_estavel: string; tipo: string; rotulo: string; caminho: string; ordem: number; texto: string }
 
-// Slug curto de um texto (para id de titulo/capitulo/secao sem numero claro).
-function slugCurto(s: string): string {
-  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'sec'
-}
-
 const BLOCOS_DISP = 'p,div,li,section,blockquote,h1,h2,h3,h4,h5,h6'
-const RE_ESTRUT = /^(t[íi]tulo|cap[íi]tulo|se[çc][ãa]o|livro|parte)\b/i
 
 /**
- * Marca artigos/§/incisos/alíneas e títulos com id ESTÁVEL (derivado do rótulo, não
- * da posição) em `data-disp` + `data-disp-tipo`. Retorna a lista de dispositivos.
+ * Marca dispositivos (Livro/Parte/Título/Capítulo/Seção, Art., §, inciso, alínea, item) com id ESTÁVEL
+ * (derivado do rótulo normalizado, não da posição) em `data-disp` + `data-disp-tipo`. A classificação vem
+ * da função ÚNICA `classificarDispositivo` (lib/conteudo/dispositivos.ts); citações (tabela/caixa/aspas/
+ * "nos termos do art. X") não entram. Retorna a lista de dispositivos.
  */
 function indexarDispositivos(root: any): Dispositivo[] {
   const disp: Dispositivo[] = []
-  const usados = new Map<string, number>()
-  const unico = (base: string) => { const n = (usados.get(base) ?? 0) + 1; usados.set(base, n); return n === 1 ? base : `${base}~${n}` }
-  const ctx = { artigo: '', paragrafo: '', inciso: '' }
+  const idx = new IndexadorDispositivos()
   let ordem = 0
   for (const el of root.querySelectorAll(BLOCOS_DISP)) {
-    const tag = (el.tagName || '').toUpperCase()
+    const tag = (el.tagName || '').toLowerCase()
     const txt = (el.text || '').replace(/\s+/g, ' ').trim()
     if (!txt || el.getAttribute('data-disp')) continue
-    if (dentroDeTabela(el)) continue // dispositivos citados em tabelas de comparação não entram no índice
-    let tipo = '', id = '', rotulo = ''
-    let m: RegExpMatchArray | null
-    if (TITULOS.has(tag) || RE_ESTRUT.test(txt)) {
-      tipo = 'secao'; rotulo = txt.slice(0, 60); id = unico('sec-' + slugCurto(txt)); ctx.artigo = ctx.paragrafo = ctx.inciso = ''
-    } else if ((m = txt.match(/^art(?:igo)?\.?\s*(\d+)/i))) {
-      tipo = 'artigo'; id = unico('art-' + m[1]); rotulo = 'Art. ' + m[1]; ctx.artigo = id; ctx.paragrafo = ''; ctx.inciso = ''
-    } else if (/^par[áa]grafo\s+[úu]nico/i.test(txt)) {
-      tipo = 'paragrafo'; id = unico((ctx.artigo || 'art') + '.par-unico'); rotulo = 'Parágrafo único'; ctx.paragrafo = id; ctx.inciso = ''
-    } else if ((m = txt.match(/^§\s*(\d+)/))) {
-      tipo = 'paragrafo'; id = unico((ctx.artigo || 'art') + '.par-' + m[1]); rotulo = '§ ' + m[1]; ctx.paragrafo = id; ctx.inciso = ''
-    } else if ((m = txt.match(/^([IVXLCDM]{1,6})\s*[-–]/))) {
-      tipo = 'inciso'; const parent = ctx.paragrafo || ctx.artigo || 'art'; id = unico(parent + '.inc-' + m[1].toLowerCase()); rotulo = m[1]; ctx.inciso = id
-    } else if ((m = txt.match(/^([a-z])\s*\)/i))) {
-      tipo = 'alinea'; const parent = ctx.inciso || ctx.paragrafo || ctx.artigo || 'art'; id = unico(parent + '.al-' + m[1].toLowerCase()); rotulo = m[1].toLowerCase() + ')'
-    } else continue
+    const d = idx.proximo(tag, txt, { dentroDeTabelaOuCaixa: dentroDeTabelaOuCaixa(el) })
+    if (!d) continue
     ordem += 1
-    el.setAttribute('data-disp', id)
-    el.setAttribute('data-disp-tipo', tipo)
-    disp.push({ id_estavel: id, tipo, rotulo, caminho: id, ordem, texto: txt.slice(0, 4000) })
+    el.setAttribute('data-disp', d.id)
+    el.setAttribute('data-disp-tipo', d.tipo)
+    disp.push({ id_estavel: d.id, tipo: d.tipo, rotulo: d.rotulo, caminho: d.id, ordem, texto: txt.slice(0, 4000) })
   }
   return disp
 }

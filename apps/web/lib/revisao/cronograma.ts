@@ -1,6 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { classificacaoEfetivaDoc, tipoHerdadoDaPasta, traducaoCrua } from '@/lib/conteudo/classificacao/efetiva'
+import { carregarClassificacaoDosDocs } from '@/lib/conteudo/classificacao/docs-server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { MAX_SEM, REV_OPCOES_NOVAS, REV_PADRAO } from '@/lib/cronograma/adaptativo/motor30'
 import { paginasEfetivasDocs, type PaginasDoc } from '@/lib/conteudo/paginas-efetivas'
@@ -93,20 +95,29 @@ async function materiaisApoio(svc: SupabaseClient, tenantId: string): Promise<Ma
   for (const p of pastas) if (p.pai_id) (filhos.get(p.pai_id) ?? filhos.set(p.pai_id, []).get(p.pai_id)!).push(p.id)
   const discDa = new Map<string, string>()
   for (const p of pastas) if (p.disciplina_id) { const pil = [p.id]; while (pil.length) { const c = pil.pop()!; if (!discDa.has(c)) { discDa.set(c, p.disciplina_id); (filhos.get(c) ?? []).forEach((f) => pil.push(f)) } } }
-  const herdado = (id: string): string | null => { const seen = new Set<string>(); let c: string | null = id; while (c && !seen.has(c)) { seen.add(c); const t = tipo.get(c); if (t) return t; c = pai.get(c) ?? null } return null }
+  // herança ÚNICA (efetiva.ts, tradução crua): pasta tipada mais próxima; a classificação PRÓPRIA do doc (se houver) vence a pasta
+  const cacheH = new Map<string, string | null>()
+  const herdado = (id: string): string | null => tipoHerdadoDaPasta(id, { pai, slug: tipo }, traducaoCrua, cacheH)
+  const classDocs = await carregarClassificacaoDosDocs(svc, tenantId)
+  const efetivo = (docId: string, pastaId: string): string | null => classificacaoEfetivaDoc({ docClassId: classDocs.porDoc.get(docId), slugPorId: classDocs.slugPorId, traduzir: traducaoCrua, pastaSlugHerdado: herdado(pastaId) }).tipo
   const alvo = new Set(['pdflash', 'pdfight', 'questoes'])
   const pastaIds = [...discDa.keys()].filter((id) => alvo.has(herdado(id) ?? ''))
-  if (!pastaIds.length) return out
-  const [docs, discs] = await Promise.all([
-    fetchAllByIn<{ id: string; titulo: string; pasta_id: string; versao_atual_id: string | null }>(pastaIds, (l) => svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id, versao_atual_id').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).in('pasta_id', l).order('id'), { chunk: 80, rotulo: 'revisao-cron:docs' }),
+  // docs com classificação PRÓPRIA de apoio em pasta que não é de apoio (vazio hoje: classificacao_id é NULL em todo lugar)
+  const extraIds = [...classDocs.porDoc.keys()]
+  if (!pastaIds.length && !extraIds.length) return out
+  const [docs0, extras, discs] = await Promise.all([
+    pastaIds.length ? fetchAllByIn<{ id: string; titulo: string; pasta_id: string; versao_atual_id: string | null }>(pastaIds, (l) => svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id, versao_atual_id').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).in('pasta_id', l).order('id'), { chunk: 80, rotulo: 'revisao-cron:docs' }) : Promise.resolve([]),
+    extraIds.length ? fetchAllByIn<{ id: string; titulo: string; pasta_id: string; versao_atual_id: string | null }>(extraIds, (l) => svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id, versao_atual_id').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).in('id', l).order('id'), { chunk: 80, rotulo: 'revisao-cron:docs-classe' }) : Promise.resolve([]),
     fetchAll<{ id: string; nome: string }>(() => svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId).order('id'), 1000, 'revisao-cron:disciplinas'),
   ])
+  const vistos = new Set(docs0.map((d) => d.id))
+  const docs = [...docs0, ...extras.filter((d) => !vistos.has(d.id) && d.pasta_id && discDa.has(d.pasta_id))].filter((d) => alvo.has(efetivo(d.id, d.pasta_id) ?? ''))
   const dn = new Map(discs.map((d) => [d.id, d.nome]))
   // páginas EFETIVAS (versão atual − página inicial): função única compartilhada com o Adaptativo e a Meta
   const pg = await paginasEfetivasDocs(svc, tenantId, docs.map((d) => ({ id: d.id, pasta_id: d.pasta_id, versao_atual_id: d.versao_atual_id }))).catch(() => new Map<string, PaginasDoc>())
   for (const d of docs) {
     const n = numeroAula(d.titulo); const disc = dn.get(discDa.get(d.pasta_id) ?? ''); if (!n || !disc) continue
-    const k = `${chaveDisciplina(disc)}|${n}`, t = herdado(d.pasta_id)
+    const k = `${chaveDisciplina(disc)}|${n}`, t = efetivo(d.id, d.pasta_id)
     const e = out.get(k) ?? { flashPag: 0, flashTem: false, fightPag: 0, fightTem: false, qDoc: false }
     const p = pg.get(d.id)?.efetivas ?? 0
     if (t === 'pdflash') { e.flashTem = true; e.flashPag = e.flashPag || p } else if (t === 'pdfight') { e.fightTem = true; e.fightPag = e.fightPag || p } else e.qDoc = true
