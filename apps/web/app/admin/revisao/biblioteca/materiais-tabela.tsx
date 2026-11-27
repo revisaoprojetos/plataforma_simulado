@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
 import { avisarRecusaDocumento } from '@/components/biblioteca/recusa-documento'
+import { prepararMovimento } from '@/components/biblioteca/mover-confirmado'
 import { CheckSelecao } from '@/components/biblioteca/selecao-lote'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
 import { MenuDoc } from '@/components/biblioteca/menus-drive'
@@ -18,7 +19,7 @@ import type { ColunasLista } from '@/components/biblioteca/metadados-toolbar'
 import { CAMPOS_META, listaMulti, textoMeta, type Metadados } from '@/lib/conteudo/metadados'
 import type { KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
-import { duplicarDocumento, removerDocumento, renomearDocumento, moverDocumento, urlDownloadDocumento, abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
+import { duplicarDocumento, removerDocumento, renomearDocumento, urlDownloadDocumento, abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
 import type { LinhaMaterial, TipoBib, VersaoDoc } from '@/lib/admin-revisao/biblioteca-tipos'
 import { listarVersoesDocAction } from './actions'
 
@@ -184,7 +185,7 @@ export function MateriaisTabela(p: TabelaProps) {
                               onAbrir={() => p.onDetalhe(r.id)} onAcesso={() => p.onAcessoDoc(r)} onCapaPagina={() => p.onCapa(r.id)} onEditarOffice={() => office(r)}
                               onBaixar={async () => { const x = await urlDownloadDocumento(r.id); if (!x.ok || !x.url) return toast.error(x.error || 'Falha ao gerar o link.'); window.open(x.url, '_blank') }}
                               onRenomear={() => renomear(r)}
-                              onMover={async (pasta) => { const x = await moverDocumento(r.id, pasta); if (!x.ok) return toast.error(x.error || 'Falha.'); toast.success('Documento movido.'); p.onMudou() }}
+                              onMover={async (pasta) => { const prep = await prepararMovimento([r.id], pasta, { [r.id]: (r as any).titulo ?? '' }); if (!prep) return; const x = await prep.fn(r.id); if (!x.ok) return toast.error(x.error || 'Falha.'); toast.success('Documento movido.'); p.onMudou() }}
                               onArquivar={() => excluir(r)}
                               onDuplicar={async () => { const t = toast.loading('Criando cópia…'); const x = await duplicarDocumento(r.id); toast.dismiss(t); if (!x.ok) return toast.error(x.error || 'Falha ao copiar.'); toast.success('Cópia criada.'); p.onMudou() }} />
                           )}

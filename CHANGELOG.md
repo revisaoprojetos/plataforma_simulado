@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.35.0 — 2026-11-27
+
+### Transferir metas entre documentos + confirmação reforçada ao mover documento em uso
+- **Transferir metas (Biblioteca):** novo pop-up avançado, no padrão do "Substituir", para passar as metas de um documento para outro — com ou sem arquivar a origem. Mostra origem e destino lado a lado, checklist do que transferir (metas dos planos, vínculos do cronograma Revisão, catálogo de metas), prévia antes → depois e motivo opcional. Metas concluídas e progresso são mantidos; grifos/anotações, progresso de leitura, itens de produto e metas LegProc/Juris/tipos próprios aparecem desabilitados com o motivo. Disponível no menu do card/lista, na barra de seleção, na Biblioteca de revisão e no Estúdio (uma origem por vez).
+- **Arquivar documento que é meta:** o fluxo agora oferece "Transferir metas e arquivar", "Só transferir" ou "Arquivar mesmo assim" (as 4 confirmações de antes).
+- **Mover documento em uso por planos ativos:** deixou de só mostrar a trava — agora tem a mesma confirmação reforçada do arquivar (lista do que está em uso → impacto → digitar MOVER → motivo livre), com auditoria. Vale no menu, no lote e nas telas do Estúdio.
+- **Migração (aplicar antes do deploy):** `supabase/migrations/20261210000000_transferir_metas_documento.sql` (função `transferir_metas_documento`). Sem ela a prévia funciona, mas a transferência avisa para rodar a migração.
+- **Limitações:** planos que já têm o destino, planos legados sem lista de documentos e planos com origem órfã não são alterados; mover pasta inteira e mover em lote pelo diálogo de ações em massa ainda recusam documento em uso; sem botão de desfazer.
+
 ## 4.34.0 — 2026-11-27
 
 ### Videoaula como classificação, menu de classificação da pasta e Videoteca em manutenção

@@ -32,7 +32,10 @@ import { CAMPOS_META } from '@/lib/conteudo/metadados'
 import type { AlvoCP } from '@/app/admin/biblioteca/capa-actions-tipos'
 import { definirVisibilidadeConteudo, salvarLeituraLegproc } from '@/app/admin/biblioteca/gestao-actions'
 import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
-import { abrirEdicaoDocx, criarConteudoQuestoes, criarDocumentoBranco, criarPasta, definirCorPasta, moverDocumento, publicarDocumento, removerDocumento, urlDownloadDocumento } from '@/app/admin/biblioteca/actions'
+import { transferirMetasAvulso } from '@/components/biblioteca/transferir-metas'
+import { ArrowRightLeft } from 'lucide-react'
+import { prepararMovimento } from '@/components/biblioteca/mover-confirmado'
+import { abrirEdicaoDocx, criarConteudoQuestoes, criarDocumentoBranco, criarPasta, definirCorPasta, publicarDocumento, removerDocumento, urlDownloadDocumento } from '@/app/admin/biblioteca/actions'
 import { TIPOS_BIB, ehTipoBib, type ArvoreBib, type EstadoBib, type LinhaMaterial, type OpcoesFiltroBib, type RespostaBib, type TipoBib } from '@/lib/admin-revisao/biblioteca-tipos'
 import { ESTADO_Q_PADRAO, SUBABAS_Q, type EstadoQ, type RespostaQ, type SubAbaQ } from '@/lib/admin-revisao/biblioteca-questoes-tipos'
 import { MateriaisTabela } from './materiais-tabela'
@@ -388,6 +391,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Alterar status', ['status'])}><CircleDot />Status</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar acesso', ['acesso'])}><Users2 />Acesso</Button>
           <Button size="sm" variant="outline" disabled={!!emLote || !ehDoc || ehQ} onClick={() => setSubstituirLote(true)}><Replace />Substituir arquivos</Button>
+          <Button size="sm" variant="outline" disabled={!!emLote || !ehDoc || ehQ} title="Leva as metas dos alunos deste documento para outro (um por vez)" onClick={() => void transferirMetasAvulso(ids, Object.fromEntries([...docsVistos.current].map(([id, v]) => [id, v.titulo])))}><ArrowRightLeft />Transferir metas</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => setRegAtualizacao(alvoSel())}><History />Registrar atualização</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => abrirLote('Configurar em lote', ['categoria', 'status', 'acesso', 'visibilidade', 'legenda'], { config: true })}><Settings2 />Configurar em lote…</Button>
           <Button size="sm" variant="outline" disabled={!!emLote} onClick={() => void arquivarLote()}>Arquivar</Button>
@@ -484,7 +488,7 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
       )}
       {moverLote && (
         <MoverConteudoDialog titulo={`Mover ${ids.length} ${ids.length === 1 ? 'material' : 'materiais'}`} subtitulo="Escolha a pasta de destino — entre nas pastas ou clique para selecionar" pastas={pastasMover} atualId={null}
-          onConfirm={async (destino) => { setMoverLote(false); await lote('Movendo', ids, (id) => moverDocumento(id, destino), 'Movidos') }} onClose={() => setMoverLote(false)} />
+          onConfirm={async (destino) => { setMoverLote(false); const titulos = Object.fromEntries([...docsVistos.current].map(([id, v]) => [id, v.titulo])); const prep = await prepararMovimento(ids, destino, titulos); if (!prep) return; await lote('Movendo', ids, prep.fn, 'Movidos') }} onClose={() => setMoverLote(false)} />
       )}
       {metaLote && <MetadadosLoteDialog n={ids.length} onClose={() => setMetaLote(false)} onSalvo={() => { setMetaLote(false); setSel(new Set()); void recarregar() }} ids={ids} />}
     </div>

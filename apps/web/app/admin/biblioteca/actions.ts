@@ -473,19 +473,32 @@ export async function listarPastasConteudo(categoria: Categoria = 'conteudo'): P
   return (rows ?? []).filter((p) => !p.deletado).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null }))
 }
 
-export async function moverDocumento(documentoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string; bloqueado?: boolean }> {
+/**
+ * Move o documento de pasta. Em uso por plano de aluno ativo é RECUSADO (`bloqueado`), a menos que o admin tenha passado pela
+ * confirmação reforçada (`confirmado` + motivo livre): aí move mesmo assim (o banco recusa o UPDATE direto → RPC de exceção
+ * controlada, que registra quem/quando/motivo). O documento mantém id, metas e grifos; só a pasta muda.
+ */
+export async function moverDocumento(documentoId: string, pastaId: string | null, opts?: { confirmado?: boolean; motivo?: string }): Promise<{ ok: boolean; error?: string; bloqueado?: boolean }> {
   const g = await guard('update')
   if (!g.ok) return g
   const svc = createAdminClient()
   const { data: atual } = await svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle()
   if (!atual) return { ok: false, error: 'Documento não encontrado.' }
   // TRAVA: documento em uso por plano de aluno ativo não muda de pasta (mover para a mesma pasta é no-op).
-  if ((atual as any).pasta_id !== pastaId) {
+  if ((atual as any).pasta_id !== pastaId && !opts?.confirmado) {
     const uso = await recusarSeEmUso(svc, g.tenantId, [{ id: documentoId, titulo: (atual as any).titulo }], 'mover')
     if (uso.bloqueados[0]) return { ok: false, error: uso.bloqueados[0].motivo, bloqueado: true }
   }
   const { error } = await svc.from('simulado_conteudo_documentos').update({ pasta_id: pastaId }).eq('tenant_id', g.tenantId).eq('id', documentoId)
-  if (error) return { ok: false, error: error.message }
+  if (error) {
+    if (!opts?.confirmado || !g.atorId) return { ok: false, error: error.message }
+    const motivoBruto = (opts.motivo ?? '').trim()
+    if (!motivoBruto) return { ok: false, error: 'Informe o motivo da mudança de pasta.' }
+    const motivo = motivoBruto.length >= 10 ? motivoBruto : `Mudança de pasta confirmada: ${motivoBruto}`
+    const { error: e2 } = await (svc as any).rpc('executar_override_documentos', { p_motivo: motivo, p_ator: g.atorId, p_tenant: g.tenantId, p_docs: [documentoId], p_acao: 'mover', p_valor: pastaId ?? '' })
+    if (e2) return { ok: false, error: /does not exist|schema cache/i.test(e2.message) ? 'Rode a migração 20261118110000 (bloqueio de documentos).' : e2.message }
+  }
+  if (opts?.confirmado) await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, antes: { pasta_id: (atual as any).pasta_id }, depois: { pasta_id: pastaId, mudanca_confirmada_em_uso: true, motivo: opts.motivo ?? '' }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   if ((atual as any).pasta_id !== pastaId) await registrarPastasEsvaziadas(svc, { tenantId: g.tenantId, atorId: g.atorId, acao: 'mover', saindo: [{ id: documentoId, pasta_id: (atual as any).pasta_id }], destinoId: pastaId })
   revalidatePath('/admin/biblioteca')
   return { ok: true }

@@ -18,6 +18,7 @@ import {
   Replace, Link2, Download, SquarePen, Eye, EyeOff,
 } from 'lucide-react'
 import { avisarRecusaDocumento, avisarRecusasLote } from '@/components/biblioteca/recusa-documento'
+import { prepararMovimento } from '@/components/biblioteca/mover-confirmado'
 import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { formatBrt } from '@/lib/brt'
@@ -32,12 +33,14 @@ import {
 } from '@/components/admin/estudio/lista-ui'
 import { AdicionarConteudo } from '@/components/admin/estudio/adicionar-conteudo'
 import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
+import { transferirMetasAvulso } from '@/components/biblioteca/transferir-metas'
+import { ArrowRightLeft } from 'lucide-react'
 import { AulasVinculadasModal } from '@/components/admin/estudio/aulas-vinculadas-modal'
 import { MoverModal } from '@/components/admin/estudio/mover-modal'
 import { VisualizarDocumento, editarDocumento, baixarDocumento } from '@/components/admin/estudio/abrir-documento'
 import {
   criarPasta, renomearPasta, moverPasta, removerPasta,
-  moverDocumento, removerDocumento,
+  removerDocumento,
 } from '@/app/admin/biblioteca/actions'
 
 export type LinhaBiblioteca = {
@@ -108,7 +111,9 @@ export function BibliotecaEstudio({
   }
   const baixar = (l: LinhaBiblioteca) => baixarDocumento(l.id)
   async function moverPara(l: LinhaBiblioteca, destino: string | null) {
-    const r = l.kind === 'pasta' ? await moverPasta(l.id, destino) : await moverDocumento(l.id, destino)
+    let r: { ok: boolean; error?: string }
+    if (l.kind === 'pasta') r = await moverPasta(l.id, destino)
+    else { const prep = await prepararMovimento([l.id], destino, { [l.id]: (l as any).titulo ?? (l as any).nome ?? '' }); if (!prep) return; r = await prep.fn(l.id) }
     if (!r.ok) { if ((r as any).bloqueado && l.kind !== 'pasta') avisarRecusaDocumento(r.error || 'Mudança recusada.', l.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: l }), onOcultado: refresh, forcar: { acao: 'mover', valor: destino } }); else toast.error(r.error || 'Falha ao mover.', { duration: 15000 }); return }
     toast.success('Movido.'); refresh()
   }
@@ -171,6 +176,7 @@ export function BibliotecaEstudio({
     { label: 'Editar documento', icon: <SquarePen className="h-4 w-4" />, onClick: () => editar(l) },
     { label: 'Aulas vinculadas', icon: <Link2 className="h-4 w-4" />, onClick: () => setModal({ tipo: 'aulas', row: l }) },
     { label: 'Substituir documento', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: l }) },
+    { label: 'Transferir metas…', icon: <ArrowRightLeft className="h-4 w-4" />, onClick: () => { void transferirMetasAvulso([l.id], { [l.id]: l.nome }) } },
     { label: 'Ocultar do aluno', icon: <EyeOff className="h-4 w-4" />, onClick: () => { void definirVisibilidadeConteudo(l.id, false).then((r) => r.ok ? (toast.success('Documento oculto para os alunos. Nada foi apagado.'), refresh()) : toast.error(r.error || 'Falha ao ocultar.')) } },
     { label: 'Baixar', icon: <Download className="h-4 w-4" />, onClick: () => baixar(l) },
     { label: 'Mover', icon: <FolderInput className="h-4 w-4" />, onClick: () => setModal({ tipo: 'mover', row: l }) },

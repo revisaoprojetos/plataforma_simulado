@@ -27,11 +27,14 @@ import {
   BTN_ICON_TOP, BTN_ACAO, BTN_PRIMARIO, GRAD_PRIMARY, type OpcaoPill,
 } from '@/components/admin/estudio/lista-ui'
 import { SubstituirModal } from '@/components/admin/estudio/substituir-modal'
+import { transferirMetasAvulso } from '@/components/biblioteca/transferir-metas'
+import { ArrowRightLeft } from 'lucide-react'
 import { AulasVinculadasModal } from '@/components/admin/estudio/aulas-vinculadas-modal'
 import { TagsModal } from '@/components/admin/estudio/tags-modal'
 import { MoverModal } from '@/components/admin/estudio/mover-modal'
 import { VisualizarDocumento, editarDocumento, baixarDocumento } from '@/components/admin/estudio/abrir-documento'
-import { moverDocumento, removerDocumento } from '@/app/admin/biblioteca/actions'
+import { removerDocumento } from '@/app/admin/biblioteca/actions'
+import { prepararMovimento } from '@/components/biblioteca/mover-confirmado'
 import { avisarRecusaDocumento, avisarRecusasLote } from '@/components/biblioteca/recusa-documento'
 import { definirVisibilidadeConteudo } from '@/app/admin/biblioteca/gestao-actions'
 import { etiquetasDoDocumento } from '@/app/admin/conteudos/materiais/biblioteca/actions'
@@ -97,7 +100,9 @@ export function DocumentosEstudio({
     else toast.message('Este material não está ligado a um produto.')
   }
   async function moverPara(r: DocRow, destino: string | null) {
-    const res = await moverDocumento(r.id, destino)
+    const prep = await prepararMovimento([r.id], destino, { [r.id]: r.titulo })
+    if (!prep) return
+    const res = await prep.fn(r.id) as { ok: boolean; error?: string; bloqueado?: boolean }
     if (!res.ok) { if (res.bloqueado) avisarRecusaDocumento(res.error || 'Mudança recusada.', r.id, { onSubstituir: () => setModal({ tipo: 'substituir', row: r }), onOcultado: refresh, forcar: { acao: 'mover', valor: destino } }); else toast.error(res.error || 'Falha ao mover.'); return }
     toast.success('Movido.'); refresh()
   }
@@ -163,6 +168,7 @@ export function DocumentosEstudio({
     { label: 'Editar documento', icon: <SquarePen className="h-4 w-4" />, onClick: () => editar(r) },
     { label: 'Aulas vinculadas', icon: <Link2 className="h-4 w-4" />, onClick: () => setModal({ tipo: 'aulas', row: r }) },
     { label: 'Substituir documento', icon: <Replace className="h-4 w-4" />, onClick: () => setModal({ tipo: 'substituir', row: r }) },
+    { label: 'Transferir metas…', icon: <ArrowRightLeft className="h-4 w-4" />, onClick: () => { void transferirMetasAvulso([r.id], { [r.id]: r.titulo }) } },
     { label: 'Ocultar do aluno', icon: <EyeOff className="h-4 w-4" />, onClick: () => ocultar(r) },
     { label: 'Baixar', icon: <Download className="h-4 w-4" />, onClick: () => baixar(r) },
     { label: 'Mover', icon: <FolderInput className="h-4 w-4" />, onClick: () => setModal({ tipo: 'mover', row: r }) },

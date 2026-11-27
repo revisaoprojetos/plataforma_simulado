@@ -3,6 +3,7 @@
 import { toast } from 'sonner'
 import { arquivarConteudo, vinculosParaArquivar } from '@/app/admin/biblioteca/gestao-actions'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
+import { abrirTransferirMetas } from './transferir-metas'
 
 type Res = { ok: boolean; error?: string }
 
@@ -22,6 +23,14 @@ export async function prepararArquivamento(ids: string[], titulos?: Record<strin
   if (itens.length === 0) {
     const ok = await confirmar({ titulo: `Arquivar ${n} ${n === 1 ? 'material' : 'materiais'}`, mensagem: 'O status vira “Arquivado” e os alunos deixam de ver. Os documentos continuam na Biblioteca.', confirmar: 'Arquivar' })
     return ok ? { fn: (id) => arquivarConteudo(id), comVinculos: 0 } : null
+  }
+
+  // METAS: com UM documento em uso por metas, oferece TRANSFERIR as metas para outro documento (pop-up) antes de arquivar.
+  // Saídas: transferiu+arquivou → pronto; só transferiu → nada a arquivar; "Arquivar mesmo assim" → segue os 4 passos abaixo.
+  if (lista.length === 1 && (itens[0].planosAtivos > 0 || itens[0].emUso)) {
+    const s = await abrirTransferirMetas({ id: lista[0], titulo: titulos?.[lista[0]] ?? itens[0].titulo }, { arquivar: true, permitirArquivarAssim: true })
+    if (!s) return null
+    if (s.tipo === 'concluido') return s.arquivou ? { fn: async () => ({ ok: true }), comVinculos: 0 } : null
   }
 
   const planos = itens.reduce((s, i) => s + i.planosAtivos, 0)

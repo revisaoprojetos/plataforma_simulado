@@ -4,6 +4,7 @@
 // persiste entre card/tabela) e a barra de ações em lote (fixa no rodapé, com contador).
 
 import { useCallback, useRef, useState } from 'react'
+import { ArrowRightLeft } from 'lucide-react'
 import { Check, Minus, X, MoreHorizontal, FolderInput, Eye, EyeOff, Trash2, Users2, Layers, Settings2, History, Type, CircleDot, Download, Replace, Tags, SquarePen, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -67,7 +68,7 @@ export function useSelecaoIds() {
   return { sel, alternar, todos, limpar, manter }
 }
 
-export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'baixar' | 'lixeira' | 'substituir' | 'metadados' | 'publicar' | 'legproc' | 'arquivar'
+export type AcaoBarra = 'mover' | 'status' | 'categoria' | 'acesso' | 'visibilidade_mostrar' | 'visibilidade_ocultar' | 'legenda' | 'configurar' | 'atualizacao' | 'baixar' | 'lixeira' | 'substituir' | 'metadados' | 'publicar' | 'legproc' | 'arquivar' | 'transferir_metas'
 
 /** Barra de ação em lote: fixa no rodapé, sem ocupar largura útil da página. */
 export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModelo, onTodos, onLimpar, onSair, onAcao }: {
@@ -94,6 +95,7 @@ export function BarraLote({ nDocs, nPastas, totalVisivel, todosMarcados, ehModel
         <button type="button" onClick={() => onAcao('mover')} disabled={off} className={btn}><FolderInput className="h-3.5 w-3.5" />Mover</button>
         <button type="button" onClick={() => onAcao('metadados')} disabled={semDoc} className={btn}><Tags className="h-3.5 w-3.5" />Editar metadados</button>
         <button type="button" onClick={() => onAcao('substituir')} disabled={semDoc} className={btn}><Replace className="h-3.5 w-3.5" />Substituir arquivos</button>
+        <button type="button" onClick={() => onAcao('transferir_metas')} disabled={semDoc} className={btn} title="Leva as metas dos alunos deste documento para outro (um por vez)"><ArrowRightLeft className="h-3.5 w-3.5" />Transferir metas</button>
         <button type="button" onClick={() => onAcao('publicar')} disabled={semDoc} className={btn}><SquarePen className="h-3.5 w-3.5" />Publicar</button>
         {!ehModelo && <button type="button" onClick={() => onAcao('legproc')} disabled={semDoc} className={btn}><Layers className="h-3.5 w-3.5" />Leitura LegProc</button>}
         <button type="button" onClick={() => onAcao('status')} disabled={off} className={btn}><CircleDot className="h-3.5 w-3.5" />Status</button>

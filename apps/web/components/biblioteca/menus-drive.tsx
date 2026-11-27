@@ -7,6 +7,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { ArrowRightLeft } from 'lucide-react'
+import { transferirMetasAvulso } from '@/components/biblioteca/transferir-metas'
 import { toast } from 'sonner'
 import {
   Folder, ChevronRight, MoreVertical, Loader2, X, Archive, Download, Pencil, Info, Trash2, FolderInput, Link2, Files,
@@ -245,6 +247,7 @@ export function MenuDoc({ d, categoria, onAbrir, onAcesso, onCapaPagina, onEdita
           {!ehQuestoes && <DropdownMenuItem onClick={onBaixar}><Download className="mr-2 h-4 w-4" /> Baixar</DropdownMenuItem>}
           <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
           <DropdownMenuItem onClick={() => { carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
+          {!ehQuestoes && <DropdownMenuItem onClick={() => void transferirMetasAvulso([d.id], { [d.id]: d.titulo })}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transferir metas…</DropdownMenuItem>}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onArquivar} className="text-destructive focus:text-destructive"><Archive className="mr-2 h-4 w-4" /> Arquivar</DropdownMenuItem>
         </DropdownMenuContent>

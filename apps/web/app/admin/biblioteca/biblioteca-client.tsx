@@ -20,6 +20,8 @@ import { SubstituirLoteDialog } from '@/components/biblioteca/substituir-lote-di
 import { MetadadosLoteDialog } from '@/components/biblioteca/metadados-lote-dialog'
 import { arquivarConteudo, salvarLeituraLegproc } from './gestao-actions'
 import { prepararArquivamento } from '@/components/biblioteca/arquivar-confirmado'
+import { transferirMetasAvulso } from '@/components/biblioteca/transferir-metas'
+import { prepararMovimento } from '@/components/biblioteca/mover-confirmado'
 import type { AlvoLote, AcaoLote, ResultadoLote } from './lote-actions-tipos'
 import type { AlvoCP } from './capa-actions-tipos'
 import {
@@ -46,7 +48,7 @@ import { createClient } from '@/lib/supabase/client'
 import { SeloCronograma, MenuPasta, MenuDoc, MoverConteudoDialog, Overlay, DriveAcessoWrapper } from '@/components/biblioteca/menus-drive'
 import { formatBrt } from '@/lib/brt'
 import type { PastaConteudo, Categoria, NoAcesso } from './actions-tipos'
-import { listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento, importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx, renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento, definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta, carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from './actions'
+import { listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx, renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento, definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta, carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from './actions'
 
 declare global { interface Window { DocsAPI?: any } }
 
@@ -273,6 +275,7 @@ export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria
     if (a === 'publicar') { void loteSimples('Publicando', 'Publicados', (id) => publicarDocumento(id)); return }
     if (a === 'legproc') { void loteSimples('Marcando como LegProc', 'Marcados como LegProc', (id) => salvarLeituraLegproc(id, true)); return }
     if (a === 'arquivar') { void arquivarSelecionados(); return }
+    if (a === 'transferir_metas') { void transferirMetasAvulso([...selDocs.sel], Object.fromEntries(docs.map((d) => [d.id, d.titulo]))).then((ok) => { if (ok) carregar(pastaAtual) }); return }
     const abrir = (titulo: string, secoes: SecaoLote[], extra?: { config?: boolean; inicial?: InicialLote }) => setLoteDlg({ titulo, alvo, secoes, ...extra })
     if (a === 'baixar') abrir('Baixar documentos', ['baixar'])
     else if (a === 'mover') abrir('Mover para a pasta', ['mover'])
@@ -576,7 +579,9 @@ export function BibliotecaClient({ initial }: { initial?: { categoria: Categoria
     toast.success('Renomeado.'); carregar(pastaAtual)
   }
   async function moverDoc(d: Doc, pastaId: string | null) {
-    const r = await moverDocumento(d.id, pastaId); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
+    const prep = await prepararMovimento([d.id], pastaId, { [d.id]: d.titulo })
+    if (!prep) return
+    const r = await prep.fn(d.id); if (!r.ok) return toast.error(r.error || 'Falha.', { duration: 20000 })
     toast.success('Documento movido.'); carregar(pastaAtual)
   }
   async function arquivarDoc(d: Doc) {
