@@ -85,13 +85,13 @@ export function TransferirMetasDialog({ origem, arquivarInicial = false, permiti
             <CartaoDoc rotulo="Origem" lado={previa?.origem} titulo={origem.titulo} carregando={carregando && !previa} />
             <div className="hidden items-center text-muted-foreground md:flex"><ArrowRight className="h-5 w-5" aria-hidden /></div>
             <div className="min-w-0">
-              {destino && previa?.destino ? (
-                <CartaoDoc rotulo="Destino" lado={previa.destino} titulo={destino.titulo ?? previa.destino.titulo} carregando={false}
+              {destino ? (
+                <CartaoDoc rotulo="Destino" lado={previa?.destino} titulo={destino.titulo ?? previa?.destino?.titulo ?? 'Documento escolhido'} carregando={carregando && !previa?.destino}
                   acao={<button type="button" onClick={() => setPicker(true)} disabled={rodando} className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"><Repeat className="mr-1 inline h-3 w-3" />Trocar</button>}
-                  destinoInfo={previa.destinoContagens} />
+                  destinoInfo={previa?.destinoContagens} />
               ) : (
                 <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed bg-muted/20 p-4 text-center">
-                  {destino && carregando ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : (
+                  {(
                     <>
                       <div className="text-sm font-medium">Documento de destino</div>
                       <div className="text-xs text-muted-foreground">Escolha o documento que passa a ser aberto pelas metas.</div>

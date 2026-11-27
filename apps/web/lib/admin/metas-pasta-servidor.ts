@@ -223,7 +223,15 @@ export async function montarMatrizDisciplinas(tenantId: string): Promise<MatrizD
       svc.from('simulado_disciplinas').select('id, nome, classificacao').eq('tenant_id', tenantId).order('id') as never),
     docsDiretosPorPasta(svc, tenantId),
   ])
-  const planos = await planosPorPasta(svc, tenantId, pastas)
+  // A contagem de planos é só informativa na Matriz: se não vier em ~4 s (ou falhar por statement timeout), a tela abre
+  // com 0 e a conta segue em segundo plano preenchendo o cache (próxima abertura já vem completa). As ações que PRECISAM
+  // do número exato (confirmação de impacto) continuam usando planosPorPasta direto.
+  const calculo = planosPorPasta(svc, tenantId, pastas)
+  calculo.catch(() => {})
+  const planos = await Promise.race([
+    calculo.catch(() => new Map<string, number>()),
+    new Promise<Map<string, number>>((res) => setTimeout(() => res(new Map()), 4000)),
+  ])
   const linhas = agregarMatriz({
     cfg: cfg.lista, disciplinas: discs, slugs, docsDiretos, planos,
     pastas: pastas.map((p) => ({ id: p.id, nome: p.nome, paiId: p.pai_id, disciplinaId: p.disciplina_id, tipoMaterial: p.cronograma_tipo_material })),

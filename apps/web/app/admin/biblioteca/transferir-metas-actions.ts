@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { sqlQuery } from '@/lib/data/sql'
+import { sqlLeitura } from 'data'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { dependenciasDocumentos, resumoDependencias } from '@/lib/conteudo/dependencias-documento'
 import { invalidarCachesPaginas } from '@/lib/conteudo/paginas-sync'
@@ -45,13 +46,19 @@ async function carregarDoc(svc: Svc, tenantId: string, id: string): Promise<DocR
 /** Contagens agregadas (SQL direto, só leitura). `null` = SQL indisponível → falha fechada no chamador. */
 async function contar(tenantId: string, origem: string, destino: string | null): Promise<{ c: ContagensTransferencia; destino: { planos: number; defs: number; metaConteudo: number } } | null> {
   const o = `d:${origem.toLowerCase()}`, d = destino ? `d:${destino.toLowerCase()}` : 'd:-'
-  const planos = await sqlQuery<{ transf: number; conflito: number; orfas: number; dest: number }>(
+  // Leituras críticas via sqlLeitura (transação READ ONLY): se falhar, devolve o MOTIVO REAL (timeout, permissão, coluna…) em vez de "SQL indisponível".
+  const critica = async <T,>(text: string, params: any[]): Promise<T[]> => {
+    const r = await sqlLeitura<T>(text, params)
+    if (!r.rows) throw new Error(`Não foi possível verificar os planos agora: ${r.erro ?? 'erro desconhecido'}. Nada foi alterado.`)
+    return r.rows
+  }
+  const planos = await critica<{ transf: number; conflito: number; orfas: number; dest: number }>(
     `SELECT count(*) FILTER (WHERE tem_o AND NOT tem_d)::int AS transf, count(*) FILTER (WHERE tem_o AND tem_d)::int AS conflito,
             count(*) FILTER (WHERE orfa_o)::int AS orfas, count(*) FILTER (WHERE tem_d)::int AS dest
        FROM (SELECT (cfg->'chavesAS' @> jsonb_build_array($2::text)) AS tem_o, (cfg->'chavesAS' @> jsonb_build_array($3::text)) AS tem_d,
                     coalesce((cfg->'orfas') ? $2::text, false) AS orfa_o
                FROM ${T_PLANO} WHERE tenant_id = $1 AND arquivada = false AND exemplo = false AND jsonb_typeof(cfg->'chavesAS') = 'array') x`, [tenantId, o, d])
-  const metas = await sqlQuery<{ transf: number; concl: number; derivadas: number; legados: number }>(
+  const metas = await critica<{ transf: number; concl: number; derivadas: number; legados: number }>(
     `SELECT count(*) FILTER (WHERE pm.tipo IN ${TIPOS_AULA} AND (p.cfg->'chavesAS' @> jsonb_build_array($2::text)) AND NOT (p.cfg->'chavesAS' @> jsonb_build_array($3::text)))::int AS transf,
             count(*) FILTER (WHERE pm.tipo IN ${TIPOS_AULA} AND (p.cfg->'chavesAS' @> jsonb_build_array($2::text)) AND NOT (p.cfg->'chavesAS' @> jsonb_build_array($3::text)) AND m.estado = 'done')::int AS concl,
             count(*) FILTER (WHERE pm.tipo NOT IN ${TIPOS_AULA})::int AS derivadas,

@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.35.1 — 2026-11-27
+
+### Transferir metas: seleção do destino e diagnóstico da prévia
+- **Pop-up "Transferir metas":** o destino escolhido agora fica visível mesmo quando a prévia falha (antes voltava para "Escolher destino", parecendo que a seleção não pegou).
+- **Prévia:** as leituras de planos passam a usar transação somente-leitura e mostram o **motivo real** do erro (tempo esgotado, permissão, conexão) em vez do genérico "SQL direto indisponível" — serve para achar por que a prévia falha em produção.
+
 ## 4.35.0 — 2026-11-27
 
 ### Transferir metas entre documentos + confirmação reforçada ao mover documento em uso
