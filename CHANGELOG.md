@@ -12,6 +12,10 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.33.1 — 2026-11-27
+
+### Diagnóstico do erro de gravação no storage S3 (Hetzner)
+- **Storage S3:** quando o PUT falha, o erro agora traz status HTTP, bucket, endpoint, região, prefixo da chave de acesso e tamanho do segredo (nunca o valor) em vez do genérico `UnknownError`. Serve para achar por que o OnlyOffice não consegue salvar em produção (log `[conteudo/callback] storage: S3 PUT falhou: …`).
 ## 4.33.0 — 2026-11-27
 
 ### Gestão de classificações, matriz de aulas do Gerador e desacoplamento do storage

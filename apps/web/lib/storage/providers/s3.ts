@@ -49,14 +49,21 @@ export function createS3Provider(): StorageProvider {
       const { client, mod } = await getClient()
       const body = p.data instanceof ArrayBuffer ? new Uint8Array(p.data) : p.data
       const cacheControl = p.cacheControl ?? (p.upsert ? 'max-age=3600' : 'max-age=31536000')
-      await client.send(new mod.PutObjectCommand({
-        Bucket: bucketFisico(p.bucket),
-        Key: p.path,
-        Body: body as Uint8Array,
-        ContentType: p.contentType,
-        CacheControl: cacheControl,
-        ACL: p.publico ? 'public-read' : undefined,
-      }))
+      try {
+        await client.send(new mod.PutObjectCommand({
+          Bucket: bucketFisico(p.bucket),
+          Key: p.path,
+          Body: body as Uint8Array,
+          ContentType: p.contentType,
+          CacheControl: cacheControl,
+          ACL: p.publico ? 'public-read' : undefined,
+        }))
+      } catch (e: any) {
+        // O SDK devolve só "UnknownError" quando o Hetzner responde sem corpo S3 padrão: expõe status/bucket/endpoint
+        // (NUNCA credenciais) para o diagnóstico aparecer no log/UI.
+        const meta = e?.$metadata ?? {}
+        throw new StorageError(`S3 PUT falhou: ${e?.name ?? 'Erro'} http=${meta.httpStatusCode ?? '?'} msg=${String(e?.message ?? '').slice(0, 160)} bucket=${bucketFisico(p.bucket)} endpoint=${process.env.S3_ENDPOINT ?? '(vazio)'} regiao=${process.env.S3_REGION ?? '(vazia)'} chaveId=${(process.env.S3_ACCESS_KEY_ID ?? '').slice(0, 4)}… segredo=${(process.env.S3_SECRET_ACCESS_KEY ?? '').length}chars req=${meta.requestId ?? '-'}`)
+      }
       const tamanho = (body as Uint8Array).byteLength
       // url pública guarda o bucket LÓGICO (o getPublicUrl mapeia p/ físico) — mantém a URL estável.
       const url = p.publico ? this.getPublicUrl(p.bucket, p.path) : null
