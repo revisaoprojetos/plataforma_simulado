@@ -3,7 +3,7 @@ import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { membrosDoGrupo } from '@/lib/admin-revisao/biblioteca-questoes-duplicadas'
 import { desfazer, executar, historico, ignorar, listarGrupos, previa, restaurarIgnoradas } from '@/lib/admin-revisao/questoes-unificar'
-import { LIMIAR_PADRAO, type FiltrosU, type UsoFiltro, type VistaU } from '@/lib/admin-revisao/questoes-unificar-tipos'
+import { LIMIAR_PADRAO, type FiltrosU, type VistaU } from '@/lib/admin-revisao/questoes-unificar-tipos'
 
 export const dynamic = 'force-dynamic'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -23,11 +23,13 @@ export async function GET(req: NextRequest) {
   try {
     if (s === 'grupos') {
       const vista = (['pendentes', 'ignoradas', 'resolvidas'].includes(sp.get('vista') ?? '') ? sp.get('vista') : 'pendentes') as VistaU
-      const lim = Number(sp.get('limiar')); const uso = (['simulado', 'respostas', 'livre'].includes(sp.get('uso') ?? '') ? sp.get('uso') : '') as UsoFiltro
+      const lim = Number(sp.get('limiar'))
+      const lista = (k: string, ok: (x: string) => boolean) => [...new Set((sp.get(k) ?? '').split(',').map((x) => x.trim()).filter(ok))].slice(0, 200)
       const f: FiltrosU = {
-        vista, nivel: sp.get('nivel') ?? '', uso, disciplina: UUID.test(sp.get('disciplina') ?? '') ? sp.get('disciplina')! : '', banca: UUID.test(sp.get('banca') ?? '') ? sp.get('banca')! : '',
-        ano: /^\d{4}$/.test(sp.get('ano') ?? '') ? sp.get('ano')! : '', status: ['publicada', 'rascunho', 'arquivada'].includes(sp.get('status') ?? '') ? sp.get('status')! : '',
-        gabarito: sp.get('gabarito') === 'divergente' ? 'divergente' : sp.get('gabarito') === 'ok' ? 'ok' : '', limiar: Number.isFinite(lim) && lim > 0 ? lim : LIMIAR_PADRAO,
+        vista, nivel: lista('nivel', (x) => ['identica', 'codigo', 'enunciado', 'semelhante'].includes(x)), uso: lista('uso', (x) => ['simulado', 'respostas', 'livre'].includes(x)),
+        disciplina: lista('disciplina', (x) => UUID.test(x)), banca: lista('banca', (x) => UUID.test(x)), ano: lista('ano', (x) => /^\d{4}$/.test(x)),
+        status: lista('status', (x) => ['publicada', 'rascunho', 'arquivada'].includes(x)), gabarito: lista('gabarito', (x) => x === 'divergente' || x === 'ok'),
+        limiar: Number.isFinite(lim) && lim > 0 ? lim : LIMIAR_PADRAO,
         q: (sp.get('q') ?? '').slice(0, 120), page: num(sp.get('page'), 1), pp: num(sp.get('pp'), 14),
       }
       return NextResponse.json(await listarGrupos(svc, tenantId, f, sp.get('fresh') === '1'))

@@ -8,6 +8,7 @@ import { idsDuplicadas, limparCacheDuplicadas } from './biblioteca-questoes-dupl
 import { VIS_SQL } from './biblioteca-questoes-vis'
 import { limparCacheGestao } from './biblioteca-questoes-gestao'
 import { AGRUPAMENTOS_Q, RAIZ_Q, compactarArvore, type AgrupamentoQ, type EstadoQ, type LinhaQuestaoBib, type OpcoesQ, type RespostaQ } from './biblioteca-questoes-tipos'
+import { condicoesFiltros, sanearLista, type DimAdmin } from '@/lib/filtros/questoes-sql'
 import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 // BANCO DE QUESTÕES na Biblioteca (aba "Questões"): árvore por taxonomia da questão + lista paginada.
@@ -187,12 +188,15 @@ async function arvorePlana(svc: SupabaseClient, tenantId: string, ag: Exclude<Ag
 // ─────────────────────────── opções dos filtros ───────────────────────────
 export async function opcoesQuestoes(svc: SupabaseClient, tenantId: string): Promise<OpcoesQ> {
   const hit = fresco(cOpcoes, tenantId); if (hit) return hit
-  const [b, o, a, e, d] = await Promise.all([
+  const [b, o, a, e, d, as_, det, car] = await Promise.all([
     sqlQuery<{ id: string; nome: string }>('select id, nome from simulado_bancas where tenant_id = $1 order by nome', [tenantId]),
     sqlQuery<{ id: string; nome: string }>('select id, nome from simulado_orgaos where tenant_id = $1 order by nome', [tenantId]),
     sqlQuery<{ ano: number }>('select distinct ano from simulado_questoes where tenant_id = $1 and deletado = false and ano is not null order by ano desc', [tenantId]),
     sqlQuery<{ id: string; nome: string; cor: string | null }>('select id, nome, cor from simulado_etiquetas where tenant_id = $1 and deletado = false order by nome', [tenantId]),
     sqlQuery<{ id: string; nome: string }>('select id, nome from simulado_disciplinas where tenant_id = $1 order by nome', [tenantId]),
+    sqlQuery<{ id: string; nome: string; pai_id: string | null; disciplina_id: string | null }>('select id, nome, pai_id, disciplina_id from simulado_assuntos where tenant_id = $1 order by nome', [tenantId]),
+    sqlQuery<{ assunto_id: string; nome: string }>("select distinct assunto_id, btrim(assunto_detalhe) as nome from simulado_questoes where tenant_id = $1 and deletado = false and assunto_id is not null and nullif(btrim(assunto_detalhe), '') is not null order by 2 limit 5000", [tenantId]),
+    sqlQuery<{ cargo: string }>("select distinct btrim(cargo) as cargo from simulado_questoes where tenant_id = $1 and deletado = false and nullif(btrim(cargo), '') is not null order by 1 limit 2000", [tenantId]),
   ])
   const pg = async (t: string, cols: string) => (await fetchAll<any>(() => svc.from(t).select(cols).eq('tenant_id', tenantId).order('id', { ascending: true }))).sort((x, y) => ptbr(x.nome ?? '', y.nome ?? ''))
   const v: OpcoesQ = {
@@ -201,6 +205,7 @@ export async function opcoesQuestoes(svc: SupabaseClient, tenantId: string): Pro
     anos: a ? a.map((x) => x.ano) : [...new Set((await fetchAll<any>(() => svc.from('simulado_questoes').select('id, ano').eq('tenant_id', tenantId).eq('deletado', false).not('ano', 'is', null).order('id', { ascending: true }))).map((r) => r.ano as number))].sort((x, y) => y - x),
     etiquetas: e ?? (await pg('simulado_etiquetas', 'id, nome, cor, deletado')).filter((x: any) => !x.deletado),
     disciplinas: d ?? await pg('simulado_disciplinas', 'id, nome'),
+    assuntos: as_ ?? undefined, detalhes: det ?? undefined, cargos: car ? car.map((x) => x.cargo) : undefined,
   }
   cOpcoes.set(tenantId, { at: Date.now(), v })
   return v
@@ -216,6 +221,11 @@ export async function assuntosDaDisciplina(svc: SupabaseClient, tenantId: string
 
 // ─────────────────────────── lista paginada ───────────────────────────
 type Where = { sql: string; params: any[] }
+
+/** Seleção multi-valor do card de filtros (EstadoQ → dimensões). */
+export function selDeEstado(e: EstadoQ): Record<DimAdmin, string> {
+  return { disciplina: e.disc, assunto: e.ass, detalhe: e.det, banca: e.banca, orgao: e.orgao, cargo: e.cargo, ano: e.ano, dificuldade: e.dif, status: e.status, tipo: e.tipo, etiqueta: e.etq }
+}
 
 /** Monta o WHERE parametrizado (tenant SEMPRE no $1). dupIds = ids das duplicadas suspeitas (só para a visão 'duplicada'). */
 export function montarWhere(tenantId: string, e: EstadoQ, dupIds: string[] = []): Where {
@@ -253,12 +263,8 @@ export function montarWhere(tenantId: string, e: EstadoQ, dupIds: string[] = [])
       else if (e.agrupar === 'etiqueta') w.push(UUID.test(val) ? `exists (select 1 from simulado_questao_etiquetas ne where ne.questao_id = q.id and ne.etiqueta_id = ${add(val)}::uuid)` : 'false')
     }
   }
-  if (e.status) w.push(`q.status = ${add(e.status)}`)
-  if (e.dif) w.push(`q.nivel_dificuldade = ${add(e.dif)}`)
-  if (e.tipo) w.push(`q.tipo = ${add(e.tipo)}`)
-  if (e.banca && UUID.test(e.banca)) w.push(`q.banca_id = ${add(e.banca)}::uuid`)
-  if (e.orgao && UUID.test(e.orgao)) w.push(`q.orgao_id = ${add(e.orgao)}::uuid`)
-  if (e.ano) w.push(`q.ano = ${add(Number(e.ano))}`)
+  // filtros do card (MULTI-seleção, mesma lógica das facetas — lib/filtros/questoes-sql)
+  w.push(...condicoesFiltros(selDeEstado(e), add))
   const busca = e.q.replace(/[\\%_]/g, (c) => `\\${c}`).trim()
   if (busca) {
     const cod = /^Q-?([0-9a-f]{8})$/i.exec(e.q.trim())
@@ -370,8 +376,12 @@ async function listarQuestoesRest(svc: SupabaseClient, tenantId: string, e: Esta
     if (e.vis && visCol[e.vis]) q = q.is(visCol[e.vis], null)
     else if (e.vis === 'rascunho' || e.vis === 'arquivada') q = q.eq('status', e.vis)
     else if (e.vis === 'anulada') q = q.eq('anulada', true)
-    if (e.status) q = q.eq('status', e.status); if (e.dif) q = q.eq('nivel_dificuldade', e.dif); if (e.tipo) q = q.eq('tipo', e.tipo)
-    if (e.banca && UUID.test(e.banca)) q = q.eq('banca_id', e.banca); if (e.orgao && UUID.test(e.orgao)) q = q.eq('orgao_id', e.orgao); if (e.ano) q = q.eq('ano', Number(e.ano))
+    // fallback sem SQL direto: filtros do card em multi-seleção via .in() (listas pequenas, ≤ 60 itens; sem etiqueta/assunto-árvore)
+    const multi = (col: string, l: string[]) => { if (l.length) q = q.in(col, l) }
+    multi('status', sanearLista('status', e.status)); multi('nivel_dificuldade', sanearLista('dificuldade', e.dif)); multi('tipo', sanearLista('tipo', e.tipo))
+    multi('banca_id', sanearLista('banca', e.banca)); multi('orgao_id', sanearLista('orgao', e.orgao)); multi('ano', sanearLista('ano', e.ano))
+    multi('disciplina_id', sanearLista('disciplina', e.disc)); multi('assunto_id', sanearLista('assunto', e.ass)); multi('cargo', sanearLista('cargo', e.cargo))
+    multi('assunto_detalhe', sanearLista('detalhe', e.det))
     const busca = sanearBusca(e.q)
     if (busca) q = q.or(`enunciado.ilike.%${busca}%,assunto_detalhe.ilike.%${busca}%`)
     const col: Record<string, string> = { atualizado: 'updated_at', enunciado: 'enunciado', ano: 'ano', tipo: 'tipo', status: 'status', versao: 'versao', cargo: 'cargo', dif: 'nivel_dificuldade' }

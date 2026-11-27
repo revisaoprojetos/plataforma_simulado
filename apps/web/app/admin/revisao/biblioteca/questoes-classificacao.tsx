@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 import { ESTADO_Q_PADRAO, VISOES_Q, type EstadoQ } from '@/lib/admin-revisao/biblioteca-questoes-tipos'
 import { TIPOS_TAX_G, type ItemTaxG, type RespostaTaxG, type ResumoClassif, type TipoTaxG } from '@/lib/admin-revisao/biblioteca-questoes-gestao-tipos'
 import { PaginacaoBib } from './paginacao-bib'
+import { FiltrosMultiCard } from './filtros-multi-card'
+import { FAIXAS_TAX, OPCOES_CLASSE_TAX, OPCOES_USO_TAX, SEM_DISCIPLINA } from '@/lib/admin-revisao/taxonomia-filtros'
 import { QuestoesBanco } from './questoes-banco'
 import { Carregando, ErroTentar, ItemTrilho, PainelCard, Trilho, Vazio, campoBusca, selectBarra, thCls } from './gestao-ui'
 import { aoMutar, cacheG, lerG, postG, prefetchG, semearG } from './questoes-api'
@@ -163,14 +165,17 @@ function TaxonomiaGestor({ tipo, podeEditar, onAbrirBanco, onUnificarTermos, onM
   const meta = TIPOS_TAX_G.find((t) => t.id === tipo)!
   const [busca, setBusca] = useState(''); const [q, setQ] = useState('')
   const [sort, setSort] = useState(tipo === 'ano' ? 'nome' : 'questoes'); const [dir, setDir] = useState<'asc' | 'desc'>(tipo === 'ano' ? 'asc' : 'desc')
-  const [disc, setDisc] = useState(''); const [semUso, setSemUso] = useState(false)
+  const [disc, setDisc] = useState<string[]>([]); const [uso, setUso] = useState<string[]>([]); const [faixa, setFaixa] = useState<string[]>([]); const [classe, setClasse] = useState<string[]>([])
   const [page, setPage] = useState(1); const [pp, setPp] = useState(14)
   const [dados, setDados] = useState<RespostaTaxG | null>(() => cacheG<RespostaTaxG>(PARAMS_TAX_PADRAO(tipo)) ?? null)
   const [erro, setErro] = useState<string | null>(null); const [carregando, setCarregando] = useState(() => !cacheG(PARAMS_TAX_PADRAO(tipo)))
   const [dlg, setDlg] = useState<null | { k: 'novo' } | { k: 'renomear'; i: ItemTaxG } | { k: 'mover'; i: ItemTaxG }>(null)
   const [agindo, setAgindo] = useState<string | null>(null)
   const seq = useRef(0)
-  const params = useMemo(() => ({ s: 'taxonomia', tipo, q, sort, dir, disciplina: disc, semuso: semUso, page, pp }), [tipo, q, sort, dir, disc, semUso, page, pp])
+  const params = useMemo(() => ({ s: 'taxonomia', tipo, q, sort, dir, disciplina: disc.join(','), uso: uso.join(','), faixa: faixa.join(','), classe: classe.join(','), page, pp }), [tipo, q, sort, dir, disc, uso, faixa, classe, page, pp])
+  const nFiltros = disc.length + uso.length + faixa.length + classe.length
+  const setDim = (id: string, v: string[]) => { ({ disciplina: setDisc, uso: setUso, faixa: setFaixa, classe: setClasse } as Record<string, (x: string[]) => void>)[id]?.(v); setPage(1) }
+  const limparDims = () => { setDisc([]); setUso([]); setFaixa([]); setClasse([]); setPage(1) }
   const carregar = useCallback(async (fresh = false) => {
     const mine = ++seq.current; setErro(null)
     const hit = fresh ? undefined : cacheG<RespostaTaxG>(params)
@@ -210,6 +215,16 @@ function TaxonomiaGestor({ tipo, podeEditar, onAbrirBanco, onUnificarTermos, onM
 
   return (
     <>
+      <div className="space-y-3">
+      <FiltrosMultiCard rotulo={`Filtros de ${meta.nome.toLowerCase()}`}
+        dims={[
+          ...(tipo === 'assunto' ? [{ id: 'disciplina', rotulo: 'Disciplina', busca: 'Buscar disciplina…', valor: disc, contagens: dados?.facetas?.disciplina, opcoes: [...(dados?.disciplinas ?? []).map((d) => ({ v: d.id, label: d.nome })), { v: SEM_DISCIPLINA, label: 'Sem disciplina' }] }] : []),
+          { id: 'uso', rotulo: 'Uso', valor: uso, contagens: dados?.facetas?.uso, opcoes: OPCOES_USO_TAX },
+          { id: 'faixa', rotulo: 'Questões', valor: faixa, contagens: dados?.facetas?.faixa, opcoes: FAIXAS_TAX.map((f) => ({ v: f.v, label: f.label })) },
+          ...(tipo === 'disciplina' ? [{ id: 'classe', rotulo: 'Classificação', valor: classe, contagens: dados?.facetas?.classe, opcoes: OPCOES_CLASSE_TAX }] : []),
+        ]}
+        onChange={setDim} onLimpar={limparDims} nota={`O número ao lado de cada opção é a quantidade de ${meta.nome.toLowerCase()} que você teria ao marcá-la.`} />
+      <div className="min-w-0">
       <PainelCard titulo={meta.nome}
         acao={<>{carregando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Carregando" />}
           {onUnificarTermos && <Button size="sm" variant="outline" onClick={() => onUnificarTermos(tipo, '')} disabled={tipo === 'ano'} title="Detectar e mesclar nomes repetidos ou parecidos"><Merge />Unificar repetidos</Button>}
@@ -217,9 +232,7 @@ function TaxonomiaGestor({ tipo, podeEditar, onAbrirBanco, onUnificarTermos, onM
         barra={<>
           <div className="relative min-w-48 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={`Buscar ${meta.singular}`} aria-label={`Buscar ${meta.singular}`} className={campoBusca} autoComplete="off" /></div>
-          {tipo === 'assunto' && <select className={cn(selectBarra, 'max-w-56')} value={disc} onChange={(e) => { setDisc(e.target.value); setPage(1) }} aria-label="Filtrar por disciplina"><option value="">Disciplina: todas</option>{(dados?.disciplinas ?? []).map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}</select>}
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={semUso} onChange={(e) => { setSemUso(e.target.checked); setPage(1) }} className="h-3.5 w-3.5 accent-[var(--primary)]" />Só sem questões</label>
-          {(q || disc || semUso) && <button type="button" onClick={() => { setBusca(''); setQ(''); setDisc(''); setSemUso(false); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
+          {(q || nFiltros > 0) && <button type="button" onClick={() => { setBusca(''); setQ(''); limparDims() }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
         </>}>
         {!entidade && <p className="mx-2 mb-1 mt-2 rounded-lg border bg-muted/30 p-2 text-xs text-muted-foreground">{tipo === 'ano' ? 'O ano é um número em cada questão: para corrigir, use a fila ou a classificação em massa.' : `${meta.nome} são textos livres nas questões, sem cadastro próprio. Renomear troca o valor em todas as questões que o usam (se o novo nome já existir, os dois são unificados).`}</p>}
         {erro && !dados ? <ErroTentar msg={erro} onTentar={() => void carregar(true)} /> : !dados ? <Carregando /> : (
@@ -232,7 +245,7 @@ function TaxonomiaGestor({ tipo, podeEditar, onAbrirBanco, onUnificarTermos, onM
                 <Th k="questoes" className="text-right">Questões</Th><th className={cn(thCls, 'text-right')}>Ações</th>
               </tr></thead>
               <tbody>
-                {dados.itens.length === 0 && <tr><td colSpan={6}><Vazio>{q || disc || semUso ? 'Nada encontrado com esta busca/filtro.' : 'Nada cadastrado ainda.'}</Vazio></td></tr>}
+                {dados.itens.length === 0 && <tr><td colSpan={6}><Vazio>{q || nFiltros > 0 ? 'Nada encontrado com esta busca/filtro.' : 'Nada cadastrado ainda.'}</Vazio></td></tr>}
                 {dados.itens.map((i) => (
                   <tr key={i.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="max-w-[28rem] px-3 py-2.5"><span className="block truncate font-medium" title={i.nome}>{i.nome}</span></td>
@@ -257,6 +270,8 @@ function TaxonomiaGestor({ tipo, podeEditar, onAbrirBanco, onUnificarTermos, onM
         )}
       </PainelCard>
       <PaginacaoBib total={total} page={page} pp={pp} opcoesPP={PP} selecionados={0} carregando={carregando} rotuloVazio="Nenhum item" onPage={setPage} onPP={(n) => { setPp(n); setPage(1) }} />
+      </div>
+      </div>
 
       {dlg && <DialogoTax tipo={tipo} dlg={dlg} disciplinas={dados?.disciplinas ?? []} onClose={() => setDlg(null)} onFeito={() => { setDlg(null); onMudou() }} />}
     </>

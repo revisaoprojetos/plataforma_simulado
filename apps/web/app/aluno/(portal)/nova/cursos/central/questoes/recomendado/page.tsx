@@ -200,7 +200,7 @@ export default async function RecomendadoPage() {
                   {questao.ano != null && <Tag kind="gold">{questao.ano}</Tag>}
                   {questao.prova && <Muted size={12.5}>{questao.prova}</Muted>}
                 </Row>
-                <H2 style={{ fontSize: 18 }}>{questao.enunciado}</H2>
+                <H2 style={{ fontSize: 18, whiteSpace: 'pre-wrap' }}>{questao.enunciado}</H2>
                 <Col gap={10}>
                   {questao.alternativas.map((a) => (
                     <Row key={a.letra} gap={14} style={{ flexWrap: 'nowrap', alignItems: 'flex-start', padding: '14px 16px', borderRadius: 14, border: '1px solid var(--line)' }}>

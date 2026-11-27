@@ -133,7 +133,7 @@ export function ProvaRevisao({ theme, data, mo: moInit = 'cad' }: SimScreenProps
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--flag)' }}><Ic d={P.flag} size={13} />Para revisar</span>
                     )}
                   </div>
-                  <p style={{ margin: 0, fontSize: qFs, lineHeight: 1.7, color: 'var(--ink)' }}>{enunciado}</p>
+                  <p style={{ margin: 0, fontSize: qFs, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{enunciado}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {alts.map((alt) => {
                       const on = curAns === alt.letra

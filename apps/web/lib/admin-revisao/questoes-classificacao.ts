@@ -5,6 +5,7 @@ import { sqlQuery } from '@/lib/data/sql'
 import { createAdminClient } from '@/lib/supabase/server'
 import { esquecer, remember } from '@/lib/cache/relatorio-cache'
 import { plano } from './texto-plano'
+import { filtrarTax, unirLegadoTax, type FiltrosTax } from './taxonomia-filtros'
 import { resumoClassificacao, listarTaxonomiaG, sugestoesQuestoes } from './biblioteca-questoes-gestao'
 import type { ItemTaxG, RespostaTaxG, SugestaoQ, TipoTaxG } from './biblioteca-questoes-gestao-tipos'
 import { PARAMS_TAX_PADRAO, type DistribuicaoQ, type InicialClassificacao } from './questoes-classificacao-tipos'
@@ -99,10 +100,11 @@ async function listas(tenantId: string, fresh = false): Promise<Lista | null> {
 }
 
 /** Lista paginada/filtrada/ordenada da taxonomia a partir da agregação única em cache. null = sem SQL direto (o chamador usa o fallback). */
-export async function taxonomiaRapida(tenantId: string, tipo: TipoTaxG, o: { q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; disciplina?: string; semUso?: boolean; fresh?: boolean }): Promise<RespostaTaxG | null> {
+export async function taxonomiaRapida(tenantId: string, tipo: TipoTaxG, o: { q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; disciplina?: string; semUso?: boolean; multi?: FiltrosTax; fresh?: boolean }): Promise<RespostaTaxG | null> {
   const L = await listas(tenantId, o.fresh); if (!L) return null
   const termo = plano(o.q ?? '')
-  let l = L.itens[tipo].filter((i) => (!termo || plano(i.nome).includes(termo) || plano(i.paiNome ?? '').includes(termo)) && (!o.disciplina || i.paiId === o.disciplina) && (!o.semUso || i.questoes === 0))
+  const r0 = filtrarTax(L.itens[tipo], unirLegadoTax(o.multi, o.disciplina, o.semUso), (i) => !termo || plano(i.nome).includes(termo) || plano(i.paiNome ?? '').includes(termo))
+  let l = r0.lista
   const dir = o.dir === 'desc' ? -1 : 1
   const sort = o.sort ?? (tipo === 'ano' ? 'nome' : 'questoes')
   l = [...l].sort((a, b) => {
@@ -110,7 +112,7 @@ export async function taxonomiaRapida(tenantId: string, tipo: TipoTaxG, o: { q?:
     return (c || ptbr(a.nome, b.nome) || (a.id < b.id ? -1 : 1)) * dir
   })
   const pp = Math.min(100, Math.max(5, o.pp ?? 14)), page = Math.max(1, o.page ?? 1)
-  const out: RespostaTaxG = { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp }
+  const out: RespostaTaxG = { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, facetas: r0.facetas }
   if (tipo === 'assunto') out.disciplinas = L.disciplinas
   return out
 }

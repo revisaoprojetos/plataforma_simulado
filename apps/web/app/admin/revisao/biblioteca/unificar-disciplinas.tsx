@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { ROTULO_CONF_TERMO, type ConfTermo } from '@/lib/admin-revisao/questoes-termos-tipos'
 import { rotuloTipoMaterial } from '@/components/biblioteca/menus-drive'
 import type { CategoriaPU, GrupoPasta, HistoricoPU, InicialDisciplinas, PreviaPU, RespostaGruposPU, RespostaPastasPU, VariantePasta } from '@/lib/admin-revisao/biblioteca-pastas-unificar-tipos'
+import { FiltrosMultiCard } from './filtros-multi-card'
 import { AbasSublinhado, Carregando, ErroTentar, PainelCard, Vazio, campoBusca, selectBarra } from './gestao-ui'
 import { COR_CONF, Candidatos as CandidatosTaxonomia, Num, prefetchGruposTermos } from './unificar-termos'
 
@@ -57,7 +58,7 @@ const fmt = (n: number) => n.toLocaleString('pt-BR')
 type Vista = 'candidatos' | 'taxonomia' | 'manual' | 'historico'
 
 export function UnificarDisciplinas({ categoria, podeEditar, podeTaxonomiaVer = false, podeTaxonomiaEditar = false, onMudou, onVoltar, inicial }: {
-  /** dados do SSR (carregarInicialUnificarDisciplinas): renderiza na hora, sem chamada no load */ inicial?: InicialDisciplinas | null; categoria: CategoriaPU; podeEditar: boolean; /** questoes:view / questoes:update — a vista de taxonomia usa a rota do Unificar de termos */ podeTaxonomiaVer?: boolean; podeTaxonomiaEditar?: boolean; onMudou: () => void; onVoltar: () => void
+  /** dados do SSR (carregarInicialUnificarDisciplinas): renderiza na hora, sem chamada no load */ inicial?: InicialDisciplinas | null; categoria: CategoriaPU; podeEditar: boolean; /** questoes:view / questoes:update — a vista de taxonomia usa a rota do Unificar de termos */ podeTaxonomiaVer?: boolean; podeTaxonomiaEditar?: boolean; onMudou: () => void; /** ausente = embutida no Unificar de Questões (sem botão de voltar) */ onVoltar?: () => void
 }) {
   const [vista, setVista] = useState<Vista>('candidatos')
   const [limiar, setLimiar] = useState(0.85)
@@ -88,7 +89,7 @@ export function UnificarDisciplinas({ categoria, podeEditar, podeTaxonomiaVer = 
           <h2 className="text-base font-semibold">Unificar disciplinas · {rotulo}</h2>
           <p className="text-xs text-muted-foreground">Junta pastas-disciplina repetidas ou parecidas: leva documentos e subpastas para a pasta mantida e funde subpastas do mesmo tipo (PDFull com PDFull…). Nada é apagado — as variantes vão para a Lixeira e dá para desfazer.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={onVoltar}><ArrowLeft />Voltar aos materiais</Button>
+        {onVoltar && <Button variant="outline" size="sm" onClick={onVoltar}><ArrowLeft />Voltar aos materiais</Button>}
       </div>
       <AbasSublinhado<Vista> rotulo="Visão da unificação" valor={vista} onChange={(v) => { virgem.current = false; setVista(v) }}
         abas={[{ id: 'candidatos', nome: 'Pastas repetidas', n: resumo?.resumo.grupos }, ...(podeTaxonomiaVer ? [{ id: 'taxonomia' as Vista, nome: 'Disciplinas da taxonomia', n: nTax }] : []), { id: 'manual', nome: 'Escolher manualmente' }, { id: 'historico', nome: 'Histórico' }]}
@@ -99,7 +100,7 @@ export function UnificarDisciplinas({ categoria, podeEditar, podeTaxonomiaVer = 
         </p>
       )}
       <div className="mt-2">
-        {vista === 'historico' ? <Historico podeEditar={podeEditar} onMudou={depoisDeMudar} />
+        {vista === 'historico' ? <Historico podeEditar={podeEditar} onMudou={depoisDeMudar} podeTaxonomiaVer={podeTaxonomiaVer} podeTaxonomiaEditar={podeTaxonomiaEditar} />
           : vista === 'taxonomia' ? (
             <>
               <p className="mb-2 px-1 text-xs text-muted-foreground">A disciplina da taxonomia é compartilhada com questões, cronograma, flashcards e cursos. Cada pasta da Biblioteca aponta para uma delas: quando duas disciplinas são a mesma, unificar aqui <b>reaponta as pastas, as metas do cronograma e as questões</b> para a mantida (a prévia lista as pastas afetadas). É a mesma detecção do Unificar › Termos da aba Questões.</p>
@@ -116,7 +117,7 @@ export function UnificarDisciplinas({ categoria, podeEditar, podeTaxonomiaVer = 
 // ════════════════════════════════════════ CANDIDATOS ════════════════════════════════════════
 function Candidatos({ categoria, podeEditar, limiar, onLimiar, onMudou, versao, inicial, onDados }: { inicial: RespostaGruposPU | null; onDados: (d: RespostaGruposPU) => void; categoria: CategoriaPU; podeEditar: boolean; limiar: number; onLimiar: (n: number) => void; onMudou: () => void; versao: number }) {
   const [busca, setBusca] = useState(''); const [q, setQ] = useState('')
-  const [conf, setConf] = useState(''); const [sort, setSort] = useState('docs'); const [verIgn, setVerIgn] = useState(false)
+  const [conf, setConf] = useState<string[]>([]); const [sort, setSort] = useState('docs'); const [verIgn, setVerIgn] = useState(false)
   const [page, setPage] = useState(1); const pp = 20
   const [dados, setDados] = useState<RespostaGruposPU | null>(inicial); const [erro, setErro] = useState<string | null>(null); const [carregando, setCarregando] = useState(!inicial)
   const semente = useRef(inicial ? qs({ s: 'grupos', categoria, sort: 'docs', dir: 'desc', page: 1, pp: 20, limiar: inicial.limiar }) : null)
@@ -126,7 +127,7 @@ function Candidatos({ categoria, podeEditar, limiar, onLimiar, onMudou, versao, 
   useEffect(() => { setIgnLocal(lerLocal()) }, [])
   useEffect(() => { const t = setTimeout(() => { if (busca.trim() !== q) { setQ(busca.trim()); setPage(1) } }, 300); return () => clearTimeout(t) }, [busca, q])
 
-  const params = useMemo<P>(() => ({ s: 'grupos', categoria, q, confianca: conf, sort, dir: sort === 'nome' ? 'asc' : 'desc', page, pp, limiar, ignorados: verIgn, ign: ignLocal.join(',') }), [categoria, q, conf, sort, page, limiar, verIgn, ignLocal])
+  const params = useMemo<P>(() => ({ s: 'grupos', categoria, q, confianca: conf.join(','), sort, dir: sort === 'nome' ? 'asc' : 'desc', page, pp, limiar, ignorados: verIgn, ign: ignLocal.join(',') }), [categoria, q, conf, sort, page, limiar, verIgn, ignLocal])
   // semeia o cache do cliente com o SSR (voltar a esta lista < 60 s não chama a API)
   useEffect(() => { if (inicial && semente.current) CACHE.set(semente.current, { t: Date.now(), v: inicial }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const carregar = useCallback(async (fresh = false) => {
@@ -142,7 +143,7 @@ function Candidatos({ categoria, podeEditar, limiar, onLimiar, onMudou, versao, 
   useEffect(() => { if (dados && (!sel || !dados.grupos.some((g) => g.id === sel))) setSel(dados.grupos[0]?.id ?? null) }, [dados, sel])
   const grupo = dados?.grupos.find((g) => g.id === sel) ?? null
   const totalPag = dados ? Math.max(1, Math.ceil(dados.total / pp)) : 1
-  const filtrando = !!(q || conf || verIgn)
+  const filtrando = !!(q || conf.length || verIgn)
 
   async function ignorar(g: GrupoPasta, desfazer: boolean) {
     const r = await enviar({ acao: 'ignorar', grupoId: g.id, nomes: g.variantes.map((v) => v.nome), desfazer }, false)
@@ -157,22 +158,22 @@ function Candidatos({ categoria, podeEditar, limiar, onLimiar, onMudou, versao, 
   }
 
   return (
+    <div className="space-y-4">
+    <FiltrosMultiCard rotulo="Filtros dos candidatos" titulo="Filtros dos candidatos" onChange={(_, v) => { setConf(v); setPage(1) }} onLimpar={() => { setConf([]); setPage(1) }}
+      dims={[{ id: 'confianca', rotulo: 'Confiança da sugestão', opcoes: (['alta', 'media', 'baixa'] as ConfTermo[]).map((c) => ({ v: c, label: ROTULO_CONF_TERMO[c] })), valor: conf, contagens: dados ? { ...dados.porConfianca } : undefined }]}
+      nota="Alta = nomes iguais após normalizar; média/baixa = parecidos (erro de digitação). O sistema sugere manter a pasta com mais documentos." />
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
       <PainelCard titulo="Candidatos · pastas-disciplina" rotulo="Grupos candidatos a unificação"
         acao={<>{carregando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Carregando" />}<button type="button" onClick={() => { CACHE.clear(); void carregar(true); onMudou() }} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline" title="Recalcular candidatos"><RefreshCw className="h-3.5 w-3.5" />Recalcular</button></>}
         barra={<>
           <div className="relative min-w-40 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar disciplina…" aria-label="Buscar nos candidatos" className={campoBusca} autoComplete="off" /></div>
-          <select className={selectBarra} value={conf} onChange={(e) => { setConf(e.target.value); setPage(1) }} aria-label="Confiança">
-            <option value="">Confiança: todas</option>
-            {(['alta', 'media', 'baixa'] as ConfTermo[]).map((c) => <option key={c} value={c}>{ROTULO_CONF_TERMO[c]}{dados ? ` (${dados.porConfianca[c]})` : ''}</option>)}
-          </select>
           <select className={selectBarra} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1) }} aria-label="Ordenar">
             <option value="docs">Mais documentos</option><option value="score">Maior similaridade</option><option value="variantes">Mais variantes</option><option value="nome">Nome (A–Z)</option>
           </select>
           <select className={selectBarra} value={limiar} onChange={(e) => { onLimiar(Number(e.target.value)); setPage(1) }} aria-label="Limiar de similaridade para erros de digitação" title="Rigor da detecção de erros de digitação">
             {[0.98, 0.92, 0.85, 0.78, 0.7, 0.62].map((n) => <option key={n} value={n}>Similaridade ≥ {Math.round(n * 100)}%</option>)}
           </select>
-          {(q || conf) && <button type="button" onClick={() => { setBusca(''); setQ(''); setConf(''); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
+          {(q || conf.length > 0) && <button type="button" onClick={() => { setBusca(''); setQ(''); setConf([]); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={verIgn} onChange={(e) => { setVerIgn(e.target.checked); setPage(1) }} className="accent-[var(--primary)]" />Ver ignorados{dados && dados.ignorados > 0 ? ` (${dados.ignorados})` : ''}</label>
         </>}>
         {erro && !dados ? <ErroTentar msg={erro} onTentar={() => void carregar(true)} /> : !dados ? <Carregando /> : (
@@ -208,6 +209,7 @@ function Candidatos({ categoria, podeEditar, limiar, onLimiar, onMudou, versao, 
         )}
       </PainelCard>
       <RevisaoGrupo key={grupo?.id ?? 'vazio'} categoria={categoria} grupo={grupo} ignorado={verIgn} podeEditar={podeEditar} carregando={!dados} onIgnorar={(g, d) => void ignorar(g, d)} onMesclado={() => { onMudou(); void carregar(true) }} />
+    </div>
     </div>
   )
 }
@@ -446,10 +448,29 @@ function RevisaoGrupo({ categoria, grupo, ignorado, manual, podeEditar, carregan
 }
 
 // ════════════════════════════════════════ HISTÓRICO ════════════════════════════════════════
-function Historico({ podeEditar, onMudou }: { podeEditar: boolean; onMudou: () => void }) {
+function Historico({ podeEditar, onMudou, podeTaxonomiaVer, podeTaxonomiaEditar }: { podeEditar: boolean; onMudou: () => void; podeTaxonomiaVer: boolean; podeTaxonomiaEditar: boolean }) {
   const [dados, setDados] = useState<{ itens: HistoricoPU[]; semTabela: boolean } | null>(null); const [erro, setErro] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Unificações das DISCIPLINAS DA TAXONOMIA (log legado + novo), vindas do histórico do Unificar › Termos; desfazer pela mesma rota.
+  type LogTax = { id: string; canonicaNome: string; nomeFinal: string | null; variantes: { nome: string; questoes: number }[]; questoes: number; criadoEm: string; desfeita: boolean; podeDesfazer: boolean }
+  const [tax, setTax] = useState<LogTax[] | null>(null)
+  const carregarTax = useCallback(async () => {
+    if (!podeTaxonomiaVer) return
+    try { const r = await fetch('/api/admin/revisao/biblioteca/questoes-termos?s=historico&fresh=1', { cache: 'no-store' }); const j = await r.json(); setTax(j?.ok ? (j.itens as any[]).filter((x) => x.tipoTermo === 'disciplina') : []) } catch { setTax([]) }
+  }, [podeTaxonomiaVer])
+  async function desfazerTax(l: LogTax) {
+    const ok = await confirmar({ titulo: 'Desfazer esta unificação de disciplinas?', mensagem: `Recria as disciplinas unificadas (${l.variantes.map((v) => v.nome).join(', ') || '—'}) e devolve ~${fmt(l.questoes)} questão(ões) para elas.`, confirmar: 'Desfazer' })
+    if (!ok) return
+    setBusy(l.id)
+    try {
+      const r = await fetch('/api/admin/revisao/biblioteca/questoes-termos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ acao: 'desfazer', tipo: 'disciplina', id: l.id }) })
+      const j = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))
+      if (!j.ok) { toast.error(j.error || 'Não foi possível desfazer.'); return }
+      CACHE.clear(); toast.success(`Desfeito — ${fmt(j.questoes ?? 0)} questão(ões) restaurada(s).`); onMudou(); void carregarTax()
+    } catch { toast.error('Falha de rede.') } finally { setBusy(null) }
+  }
   const carregar = useCallback(async (fresh = false) => { setErro(null); const j = await ler<{ itens: HistoricoPU[]; semTabela: boolean }>({ s: 'historico' }, fresh); if (j.ok) setDados(j); else setErro(j.error ?? 'Falha ao carregar.') }, [])
+  useEffect(() => { void carregarTax() }, [carregarTax])
   useEffect(() => { void carregar(true) }, [carregar])
   async function desfazer(l: HistoricoPU) {
     const ok = await confirmar({ titulo: 'Desfazer esta unificação?', mensagem: `Os ${fmt(l.documentos)} documento(s) voltam às pastas de origem e as pastas arquivadas são restauradas.${l.taxonomia ? ' A disciplina da taxonomia unificada junto também é restaurada.' : ''} Documentos movidos depois não são sobrescritos.`, confirmar: 'Desfazer' })
@@ -465,8 +486,8 @@ function Historico({ podeEditar, onMudou }: { podeEditar: boolean; onMudou: () =
       {erro && !dados ? <ErroTentar msg={erro} onTentar={() => void carregar(true)} /> : !dados ? <Carregando /> : (
         <div className="min-h-0 flex-1 overflow-auto p-2">
           {dados.semTabela && <p className="mb-2 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">O histórico depende da migration <code>20261113060000_questoes_termos_mesclagens.sql</code> (ainda não aplicada neste banco).</p>}
-          {dados.itens.length === 0 ? <Vazio>Nenhuma unificação de disciplinas para desfazer.</Vazio> : (
-            <ul className="space-y-1.5">{dados.itens.map((l) => (
+          {dados.itens.length === 0 ? <Vazio>Nenhuma unificação de pastas para desfazer.</Vazio> : (
+            <ul className="space-y-1.5" aria-label="Unificações de pastas">{dados.itens.map((l) => (
               <li key={l.id} className={cn('flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm', l.desfeita && 'opacity-50')}>
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] text-muted-foreground">{new Date(l.criadoEm).toLocaleString('pt-BR')}{l.taxonomia ? ' · com taxonomia' : ''}</p>
@@ -476,6 +497,23 @@ function Historico({ podeEditar, onMudou }: { podeEditar: boolean; onMudou: () =
                 {podeEditar && !l.desfeita && l.podeDesfazer && <Button size="sm" variant="outline" disabled={busy === l.id} onClick={() => void desfazer(l)}>{busy === l.id ? <Loader2 className="animate-spin" /> : <Undo2 />}Desfazer</Button>}
                 {l.desfeita && <span className="text-xs text-muted-foreground">desfeita</span>}
               </li>))}</ul>
+          )}
+          {podeTaxonomiaVer && (
+            <div className="mt-4">
+              <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Disciplinas da taxonomia unificadas</h3>
+              {tax === null ? <Carregando linhas={2} /> : tax.length === 0 ? <Vazio>Nenhuma unificação de disciplinas da taxonomia para desfazer.</Vazio> : (
+                <ul className="mt-1.5 space-y-1.5" aria-label="Unificações de disciplinas da taxonomia">{tax.map((l) => (
+                  <li key={l.id} className={cn('flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm', l.desfeita && 'opacity-50')}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] text-muted-foreground">{new Date(l.criadoEm).toLocaleString('pt-BR')}</p>
+                      <p className="mt-0.5 break-words font-medium">{l.nomeFinal || l.canonicaNome}</p>
+                      <p className="break-words text-xs text-muted-foreground">{l.variantes.map((v) => v.nome).join(' · ')} — {fmt(l.questoes)} questões</p>
+                    </div>
+                    {podeTaxonomiaEditar && !l.desfeita && l.podeDesfazer && <Button size="sm" variant="outline" disabled={busy === l.id} onClick={() => void desfazerTax(l)}>{busy === l.id ? <Loader2 className="animate-spin" /> : <Undo2 />}Desfazer</Button>}
+                    {l.desfeita && <span className="text-xs text-muted-foreground">desfeita</span>}
+                  </li>))}</ul>
+              )}
+            </div>
           )}
         </div>
       )}

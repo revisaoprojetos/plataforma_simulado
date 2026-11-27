@@ -3,6 +3,11 @@
 // + etiquetas (simulado_questao_etiquetas). O assunto específico (assunto_detalhe) é texto livre: coluna/busca, não nó da árvore.
 
 import type { ArvoreBib } from './biblioteca-tipos'
+import { sanearLista, type DimAdmin } from '@/lib/filtros/questoes-sql'
+import { juntarLista } from '@/lib/aluno/filtros-multi'
+
+/** "a|b" da URL → lista higienizada (uuid/ano/whitelist) de volta em "a|b". Itens inválidos somem. */
+const listaSegura = (dim: DimAdmin, v: string | null): string => juntarLista(sanearLista(dim, v)) ?? ''
 
 export type AgrupamentoQ = 'disciplina' | 'banca' | 'orgao' | 'ano' | 'cargo' | 'dificuldade' | 'status' | 'tipo' | 'etiqueta'
 
@@ -75,9 +80,15 @@ export interface EstadoQ {
   status: string
   dif: string
   tipo: string
+  /** Filtros do card (MULTI-seleção: valores separados por "|"; '' = sem filtro). */
   banca: string
   orgao: string
   ano: string
+  disc: string
+  ass: string
+  det: string
+  cargo: string
+  etq: string
   sort: string
   dir: 'asc' | 'desc'
   page: number
@@ -85,7 +96,7 @@ export interface EstadoQ {
 }
 
 export const ESTADO_Q_PADRAO: EstadoQ = {
-  vis: '', agrupar: 'disciplina', no: null, q: '', status: '', dif: '', tipo: '', banca: '', orgao: '', ano: '', sort: 'atualizado', dir: 'desc', page: 1, pp: 14,
+  vis: '', agrupar: 'disciplina', no: null, q: '', status: '', dif: '', tipo: '', banca: '', orgao: '', ano: '', disc: '', ass: '', det: '', cargo: '', etq: '', sort: 'atualizado', dir: 'desc', page: 1, pp: 14,
 }
 
 export interface LinhaQuestaoBib {
@@ -115,6 +126,10 @@ export interface OpcoesQ {
   anos: number[]
   etiquetas: { id: string; nome: string; cor: string | null }[]
   disciplinas: { id: string; nome: string }[]
+  /** card de filtros: assuntos (árvore por pai_id), tópicos específicos (assunto_detalhe) e cargos — opcionais (fallback REST não os traz) */
+  assuntos?: { id: string; nome: string; pai_id: string | null; disciplina_id: string | null }[]
+  detalhes?: { assunto_id: string; nome: string }[]
+  cargos?: string[]
 }
 
 /** Árvore COMPACTA (só o necessário, em tuplas): [id, nome, paiId, proprios, total, cor?, disciplinaId?, classificacao?] — ~40% menor que o objeto completo. */
@@ -162,12 +177,17 @@ export function estadoQDeParams(sp: URLSearchParams): EstadoQ {
     agrupar: ehAgrupamentoQ(ag) ? ag : 'disciplina',
     no: sp.get('no') || null,
     q: (sp.get('q') ?? '').trim().slice(0, 80),
-    status: ['publicada', 'rascunho', 'arquivada'].includes(sp.get('status') ?? '') ? sp.get('status')! : '',
-    dif: ['facil', 'medio', 'dificil'].includes(sp.get('dif') ?? '') ? sp.get('dif')! : '',
-    tipo: ['objetiva', 'discursiva'].includes(sp.get('tipo') ?? '') ? sp.get('tipo')! : '',
-    banca: sp.get('banca') ?? '',
-    orgao: sp.get('orgao') ?? '',
-    ano: /^\d{4}$/.test(sp.get('ano') ?? '') ? sp.get('ano')! : '',
+    status: listaSegura('status', sp.get('status')),
+    dif: listaSegura('dificuldade', sp.get('dif')),
+    tipo: listaSegura('tipo', sp.get('tipo')),
+    banca: listaSegura('banca', sp.get('banca')),
+    orgao: listaSegura('orgao', sp.get('orgao')),
+    ano: listaSegura('ano', sp.get('ano')),
+    disc: listaSegura('disciplina', sp.get('disc')),
+    ass: listaSegura('assunto', sp.get('ass')),
+    det: listaSegura('detalhe', sp.get('det')),
+    cargo: listaSegura('cargo', sp.get('cargo')),
+    etq: listaSegura('etiqueta', sp.get('etq')),
     sort: (ORDENS_Q as readonly string[]).includes(sort) ? sort : 'atualizado',
     dir: sp.get('dir') === 'asc' ? 'asc' : sp.get('dir') === 'desc' ? 'desc' : (sort === 'atualizado' || !sp.get('sort') ? 'desc' : 'asc'),
     page: Math.max(1, Number(sp.get('page')) || 1),
@@ -187,6 +207,11 @@ export function paramsDeEstadoQ(s: EstadoQ): URLSearchParams {
   if (s.banca) p.set('banca', s.banca)
   if (s.orgao) p.set('orgao', s.orgao)
   if (s.ano) p.set('ano', s.ano)
+  if (s.disc) p.set('disc', s.disc)
+  if (s.ass) p.set('ass', s.ass)
+  if (s.det) p.set('det', s.det)
+  if (s.cargo) p.set('cargo', s.cargo)
+  if (s.etq) p.set('etq', s.etq)
   if (s.sort !== 'atualizado' || s.dir !== 'desc') { p.set('sort', s.sort); p.set('dir', s.dir) }
   if (s.page > 1) p.set('page', String(s.page))
   if (s.pp !== 14) p.set('pp', String(s.pp))

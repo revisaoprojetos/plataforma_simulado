@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.36.0 — 2026-11-27
+
+### Filtros unificados (multi-seleção + contagem ao vivo) no Banco do aluno e no admin
+- **Banco de Questões do aluno:** cada filtro (disciplina, banca, **órgão**, **cargo**, ano, dificuldade) aceita várias opções, com busca e **rolagem horizontal** para textos longos; **assunto em árvore** (sub-assuntos + "tópicos específicos"). A cada seleção, o **número de questões** ao lado de cada opção (à esquerda do nome, com divisória) e o total do botão **"Filtrar N questões"** são recalculados no servidor. Acordeão (um filtro aberto por vez), botão fixo no rodapé, card mais largo e que acompanha a rolagem da página; chips por valor.
+- **Texto das questões:** enunciado, alternativas e comentário respeitam **quebras de linha/parágrafos**, justificados e sem negrito total (mesmo renderizador do admin); tesoura, letra e texto alinhados. Quebras de linha também nas provas/resultados (Revisão/MEQ/VND, embed) e nos detalhes do banco do admin.
+- **Admin (mesmo componente, barra HORIZONTAL):** Biblioteca › Questões, **/admin/questoes**, questões do **Estúdio** (banco aberto/editar banco) e telas de **Unificar** (duplicadas, termos, etiquetas, classificação, disciplinas). Painéis de opções abrem soltos no corpo da página (não são cortados nem saem da tela; viram para cima/para o lado quando falta espaço). Núcleo compartilhado em `components/filtros` + `lib/filtros` (facetas por SQL agregado, escopo por tenant).
+- **Unificação:** nova **Central de duplicados** (avisos por seção), **Termos** abre com todos os tipos + faixa de avisos por tipo e **sugestão do termo a manter**; Disciplinas (pastas) no padrão novo; histórico/desfazer de disciplinas da taxonomia. /admin/questoes passa a usar os mesmos componentes da Biblioteca nas abas Unificação/Classificação/Etiquetas.
+- **Cronograma › Disciplinas e metas › Matriz:** a contagem de planos ativos (≈1,6 mi de metas) não derruba mais a tela por *statement timeout* — a matriz abre sem esperar (4 s) e a conta termina em segundo plano preenchendo o cache.
+- **Exportação de questões** respeita os filtros multi-valor.
+
 ## 4.35.1 — 2026-11-27
 
 ### Transferir metas: seleção do destino e diagnóstico da prévia

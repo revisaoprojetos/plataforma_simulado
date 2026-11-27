@@ -28,7 +28,9 @@ export interface ItemTaxG {
   /** disciplina: nº de assuntos · assunto: disciplina pai */
   extra?: number; paiId?: string | null; paiNome?: string | null; cor?: string | null; classificacao?: string | null
 }
-export interface RespostaTaxG { itens: ItemTaxG[]; total: number; page: number; pp: number; disciplinas?: { id: string; nome: string }[]; degradado?: boolean }
+export interface RespostaTaxG { itens: ItemTaxG[]; total: number; page: number; pp: number; disciplinas?: { id: string; nome: string }[]; degradado?: boolean
+  /** nº de itens por opção de filtro (cada dimensão com os OUTROS filtros aplicados) */
+  facetas?: Record<'disciplina' | 'uso' | 'faixa' | 'classe', Record<string, number>> }
 
 export interface SugestaoQ {
   disciplinaId?: string | null; disciplina?: string | null; assuntoId?: string | null; assunto?: string | null

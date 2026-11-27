@@ -170,5 +170,5 @@ export async function transferirMetas(origemId: string, destinoId: string, opts:
 
   revalidatePath('/admin/biblioteca'); revalidatePath('/admin/revisao/biblioteca')
   if (opts.arquivarOrigem && !arquivou) return { ok: false, error: `Metas transferidas, mas a origem NÃO foi arquivada: ${avisoArquivar ?? 'erro'}`, planos, metas, metaConteudo, arquivou: false }
-  return { ok: true, planos, metas, metaConteudo, arquivou, mensagem: mensagemTransferida({ planos, metas, metaConteudo, arquivou }) }
+  return { ok: true, planos, metas, metaConteudo, arquivou, mensagem: mensagemTransferida({ planos, metas, metaConteudo, arquivou, planosJaTinhamDestino: previa.contagens.planosConflito }) }
 }

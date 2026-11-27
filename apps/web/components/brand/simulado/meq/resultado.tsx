@@ -394,7 +394,7 @@ function CardCorrecao({ item, rq, N, jx, setJx, onPrev, onNext, onNextErr, hasEr
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: statusPill.bg, color: statusPill.color, fontSize: 12, fontWeight: 800 }}>{statusPill.icon}{statusPill.label}</span>
         </div>
 
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)' }}>{item.enunciado}</p>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{item.enunciado}</p>
 
         {/* Blocos Certo / Errado */}
         <div className={`${P}-ceblk`} style={{ display: 'flex', gap: 10 }}>

@@ -113,7 +113,7 @@ export function FeedbackItem({ fb }: { fb: Feedback }) {
             {/* Questão */}
             <div className="mt-3">
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Questão</p>
-              <p className="max-h-32 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-sm text-foreground/90">{fb.enunciado}</p>
+              <p className="max-h-32 overflow-y-auto rounded-lg border bg-muted/40 p-3 whitespace-pre-wrap text-sm text-foreground/90">{fb.enunciado}</p>
             </div>
 
             {/* Resposta ao estudante */}

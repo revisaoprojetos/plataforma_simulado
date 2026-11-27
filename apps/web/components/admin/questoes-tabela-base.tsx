@@ -85,7 +85,7 @@ const statusCfg: Record<string, { label: string; cls: string }> = {
  */
 export function QuestoesTabelaBase({
   questoes, titulo, subtitulo, acao, cor = '#6d28d9', icone, editHrefBase = '/admin/questoes',
-  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar, semCabecalho = false, servidor,
+  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar, semCabecalho = false, servidor, filtrosSlot,
 }: {
   questoes: QuestaoLinha[]
   titulo: string
@@ -100,6 +100,11 @@ export function QuestoesTabelaBase({
   /** Oculta o cabeçalho da seção (título/contagem) — ex.: quando a página já tem o título. */
   semCabecalho?: boolean
   servidor?: ModoServidor
+  /**
+   * OPCIONAL (modo local): substitui os 3 selects locais (matéria/status/dificuldade) por filtros do pai — ex.: o card de multi-seleção
+   * com contagem ao vivo do Estúdio, em que o pai já entrega `questoes` filtradas pelo servidor. Sem a prop, nada muda.
+   */
+  filtrosSlot?: React.ReactNode
 }) {
   const srv = servidor
   const [buscaLocal, setBuscaLocal] = useState('')
@@ -237,6 +242,8 @@ export function QuestoesTabelaBase({
 
       {srv ? (
         srv.filtros ? <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 pt-0">{srv.filtros}</div> : <div className="border-b" />
+      ) : filtrosSlot ? (
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 pt-0">{filtrosSlot}</div>
       ) : (
       <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 pt-0">
         <Select value={disc} onValueChange={(v) => setDisc(v ?? '')} items={{ all: 'Todas matérias', ...Object.fromEntries(disciplinas.map((d) => [d, d])) }}>

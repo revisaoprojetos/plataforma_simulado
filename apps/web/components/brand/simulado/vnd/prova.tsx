@@ -172,7 +172,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
                       </span>
                     )}
                   </div>
-                  <p style={{ margin: 0, fontSize: qFs, lineHeight: 1.7, color: 'var(--ink)' }}>{q.enunciado}</p>
+                  <p style={{ margin: 0, fontSize: qFs, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{q.enunciado}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {(q.alternativas ?? []).map((alt) => {
                       const sel = answers[qi] === alt.letra

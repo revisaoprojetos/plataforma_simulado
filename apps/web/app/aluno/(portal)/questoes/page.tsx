@@ -13,6 +13,8 @@ import { questoesForaDeJogoTenant } from '@/lib/simulado/questoes-anuladas'
 import { resolverComentarioGabarito } from '@/lib/simulado/comentario-gabarito'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { sqlQuery } from '@/lib/data/sql'
+import { lerLista, expandirAssuntos } from '@/lib/aluno/filtros-multi'
 import { PlatformBanco } from '@/components/brand/interna/banco'
 
 const POR_PAGINA = 10
@@ -32,19 +34,25 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
   const tid = sessao.tenantId
   const estId = sessao.estudanteId
 
-  // Taxonomia dos filtros + anos distintos + resumo de prática.
-  const [{ data: disciplinasAll }, { data: bancas }, { data: assuntos }, { data: metaRows }, praticaTotal, praticaAcertos] = await Promise.all([
+  // Taxonomia dos filtros + facetas distintas (disciplina/ano/órgão/cargo/assunto/tópico) + resumo de prática.
+  const [{ data: disciplinasAll }, { data: bancas }, { data: assuntos }, { data: orgaosAll }, facetas, praticaTotal, praticaAcertos] = await Promise.all([
     svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tid).order('nome'),
     svc.from('simulado_bancas').select('id, nome').eq('tenant_id', tid).order('nome'),
-    svc.from('simulado_assuntos').select('id, nome, disciplina_id').eq('tenant_id', tid).order('nome'),
-    svc.from('simulado_questoes').select('ano, disciplina_id').eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva').limit(3000),
+    svc.from('simulado_assuntos').select('id, nome, disciplina_id, pai_id').eq('tenant_id', tid).order('nome'),
+    svc.from('simulado_orgaos').select('id, nome').eq('tenant_id', tid).order('nome'),
+    carregarFacetas(svc, tid),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).then((r) => r.count ?? 0, () => 0),
     svc.from('simulado_respostas_avulsas').select('*', { count: 'exact', head: true }).eq('estudante_id', estId).eq('correta', true).then((r) => r.count ?? 0, () => 0),
   ])
-  const anos = [...new Set((metaRows ?? []).map((r: any) => r.ano).filter(Boolean))].sort((a, b) => b - a)
-  // Só mostra no filtro as disciplinas que realmente têm questões (esconde as nunca usadas).
-  const discUsadas = new Set((metaRows ?? []).map((r: any) => r.disciplina_id).filter(Boolean))
+  const anos = [...new Set(facetas.map((r) => r.ano).filter((x): x is number => !!x))].sort((a, b) => b - a)
+  // Só mostra no filtro o que realmente tem questões (esconde o nunca usado).
+  const discUsadas = new Set(facetas.map((r) => r.disciplina_id).filter(Boolean))
   const disciplinas = (disciplinasAll ?? []).filter((d: any) => discUsadas.has(d.id))
+  const orgaoUsados = new Set(facetas.map((r) => r.orgao_id).filter(Boolean))
+  const orgaos = (orgaosAll ?? []).filter((o: any) => orgaoUsados.has(o.id))
+  const cargos = [...new Set(facetas.map((r) => r.cargo).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const detalhes = [...new Map(facetas.filter((r) => r.assunto_id && r.assunto_detalhe).map((r) => [`${r.assunto_id}|${r.assunto_detalhe}`, { assunto_id: r.assunto_id as string, nome: r.assunto_detalhe as string }])).values()]
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const pct = praticaTotal > 0 ? Math.round((praticaAcertos / praticaTotal) * 100) : 0
 
   // Questões ANULADAS (etiqueta funcional anular/desconsiderar OU boolean) não podem ser praticadas:
@@ -57,11 +65,16 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     // .eq('anulada', false) + not-in(foraDeJogo): remove as anuladas (por boolean e por etiqueta).
     qb = qb.eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva')
     if (foraIds.length) qb = qb.not('id', 'in', `(${foraIds.join(',')})`)
-    if (params.disciplina) qb = qb.eq('disciplina_id', params.disciplina)
-    if (params.assunto) qb = qb.eq('assunto_id', params.assunto)
-    if (params.banca) qb = qb.eq('banca_id', params.banca)
-    if (params.ano) qb = qb.eq('ano', Number(params.ano))
-    if (params.dificuldade) qb = qb.eq('nivel_dificuldade', params.dificuldade)
+    // Multi-seleção: cada filtro é uma lista "a|b|c" → .in(); assunto abrange os sub-assuntos (pai_id).
+    const L = (v?: string) => lerLista(v)
+    if (L(params.disciplina).length) qb = qb.in('disciplina_id', L(params.disciplina))
+    if (L(params.assunto).length) qb = qb.in('assunto_id', expandirAssuntos(L(params.assunto), (assuntos ?? []) as any))
+    if (L(params.detalhe).length) qb = qb.in('assunto_detalhe', L(params.detalhe))
+    if (L(params.banca).length) qb = qb.in('banca_id', L(params.banca))
+    if (L(params.orgao).length) qb = qb.in('orgao_id', L(params.orgao))
+    if (L(params.cargo).length) qb = qb.in('cargo', L(params.cargo))
+    if (L(params.ano).length) qb = qb.in('ano', L(params.ano).map(Number).filter((n) => Number.isFinite(n)))
+    if (L(params.dificuldade).length) qb = qb.in('nivel_dificuldade', L(params.dificuldade))
     if (params.comentadas) qb = qb.not('comentario_professor', 'is', null)
     if (params.busca) qb = qb.ilike('enunciado', `%${params.busca}%`)
     return qb
@@ -234,7 +247,7 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
       <BancoNavProvider>
         <PlatformBanco brand={_it.brand} theme={_it.theme}
           stats={{ resolvidas: praticaTotal, acertos: praticaAcertos, aproveitamento: pct, total: count ?? 0 }}
-          filtros={{ disciplinas: (disciplinas ?? []) as any, assuntos: (assuntos ?? []) as any, bancas: (bancas ?? []) as any, anos, params }}
+          filtros={{ disciplinas: (disciplinas ?? []) as any, assuntos: (assuntos ?? []) as any, bancas: (bancas ?? []) as any, orgaos: orgaos as any, cargos, detalhes, anos, params }}
           questoes={lista} paginacao={paginacaoEl}
           desempenhoFiltro={desempenhoFiltro} porDia={porDia} />
       </BancoNavProvider>
@@ -271,4 +284,19 @@ function Kpi({ icon, tom, rotulo, valor }: { icon: React.ReactNode; tom: string;
       <div className="min-w-0"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">{rotulo}</p><p className="text-lg font-bold leading-tight tabular-nums">{valor}</p></div>
     </div>
   )
+}
+
+type Faceta = { disciplina_id: string | null; ano: number | null; orgao_id: string | null; cargo: string | null; assunto_id: string | null; assunto_detalhe: string | null }
+
+/** Combinações DISTINTAS de taxonomia das questões publicadas (alimenta as opções dos filtros). 1 SELECT DISTINCT; fallback PostgREST paginado. */
+async function carregarFacetas(svc: ReturnType<typeof createAdminClient>, tid: string): Promise<Faceta[]> {
+  const rows = await sqlQuery<Faceta>(
+    `select distinct disciplina_id::text, ano, orgao_id::text, nullif(btrim(cargo), '') as cargo, assunto_id::text, nullif(btrim(assunto_detalhe), '') as assunto_detalhe
+       from simulado_questoes where tenant_id = $1 and status = 'publicada' and deletado = false and anulada = false and tipo <> 'discursiva'`, [tid])
+  if (rows) return rows
+  try {
+    const r = await fetchAll<Faceta>(() => svc.from('simulado_questoes').select('disciplina_id, ano, orgao_id, cargo, assunto_id, assunto_detalhe')
+      .eq('tenant_id', tid).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva').order('id', { ascending: true }) as never)
+    return r.map((x) => ({ ...x, cargo: x.cargo?.trim() || null, assunto_detalhe: x.assunto_detalhe?.trim() || null }))
+  } catch { return [] }
 }

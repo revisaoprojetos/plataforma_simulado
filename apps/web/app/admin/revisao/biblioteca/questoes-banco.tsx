@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Archive, BookOpen, CheckCircle2, Check, Columns3, Folder, GraduationCap, Inbox, Keyboard, Loader2, Merge, Tag, Tags, Trash2, Wand2, X, FolderInput } from 'lucide-react'
+import { Archive, BookOpen, CheckCircle2, Check, Columns3, Folder, SlidersHorizontal, GraduationCap, Inbox, Keyboard, Loader2, Merge, Tag, Tags, Trash2, Wand2, X, FolderInput } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -19,6 +19,8 @@ import {
 } from '@/lib/admin-revisao/biblioteca-questoes-tipos'
 import type { ResumoClassif, SugestaoQ } from '@/lib/admin-revisao/biblioteca-questoes-gestao-tipos'
 import type { UsoQuestao } from '@/app/admin/questoes/actions-tipos'
+import { PainelFiltrosQuestoesAdmin, CAMPOS_CARD, VAZIO_CARD, chipsDoEstado, type CampoCard } from '@/components/filtros/painel-filtros-questoes-admin'
+import { juntarLista, lerLista } from '@/lib/aluno/filtros-multi'
 import { PastasPainel, RAIZ } from './pastas-painel'
 import { PaginacaoBib } from './paginacao-bib'
 import { ClassificarDialog, type PatchUI } from './classificar-dialog'
@@ -207,8 +209,11 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
   const prefetch = useCallback((s: EstadoQ) => { if (!lerCache(s)) void buscarQ(s).catch(() => {}) }, [])
   const recarregar = useCallback(() => { limparCacheBanco(); void carregarContagens(true); onMudou?.(); return carregar(st, { fresh: true }) }, [carregar, st, carregarContagens, onMudou])
 
-  const temFiltro = !!(st.q || st.status || st.dif || st.tipo || st.banca || st.orgao || st.ano || (st.vis && !fila))
-  const limparFiltros = () => { setBusca(''); setSt((s) => ({ ...s, q: '', status: '', dif: '', tipo: '', banca: '', orgao: '', ano: '', vis: fila ? s.vis : '', page: 1 })) }
+  const temFiltro = !!(st.q || temCard(st) || (st.vis && !fila))
+  const [cardAberto, setCardAberto] = useState(() => chipsDoEstado(st, null).length > 0)
+  const chipsCard = useMemo(() => chipsDoEstado(st, opcoes), [st, opcoes])
+  const removerChip = (campo: CampoCard, valor: string) => setSt((s) => ({ ...s, [campo]: juntarLista(lerLista(s[campo]).filter((x) => x !== valor)) ?? '', page: 1 }))
+  const limparFiltros = () => { setBusca(''); setSt((s) => ({ ...s, q: '', ...VAZIO_CARD, vis: fila ? s.vis : '', page: 1 })) }
   const noAtual: NoPasta | null = st.no && st.no !== RAIZ ? arvore?.nos.find((n) => n.id === st.no) ?? null : null
   const rotuloNo = st.no === RAIZ ? ag.sem : noAtual ? noAtual.nome : null
   // ao pairar no seletor, pré-carrega (1ª página + árvore) de cada agrupamento: trocar de agrupamento passa a ser instantâneo
@@ -342,24 +347,15 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
   const filtros = (
     <>
       {chips}
-      <select className={selectCls} aria-label="Filtrar por status" value={st.status} onChange={(e) => setSt((s) => ({ ...s, status: e.target.value, page: 1 }))}>
-        <option value="">Status: todos</option><option value="publicada">Publicada</option><option value="rascunho">Rascunho</option><option value="arquivada">Arquivada</option>
-      </select>
-      <select className={selectCls} aria-label="Filtrar por dificuldade" value={st.dif} onChange={(e) => setSt((s) => ({ ...s, dif: e.target.value, page: 1 }))}>
-        <option value="">Dificuldade: todas</option><option value="facil">Fácil</option><option value="medio">Médio</option><option value="dificil">Difícil</option>
-      </select>
-      <select className={selectCls} aria-label="Filtrar por tipo" value={st.tipo} onChange={(e) => setSt((s) => ({ ...s, tipo: e.target.value, page: 1 }))}>
-        <option value="">Tipo: todos</option><option value="objetiva">Objetiva</option><option value="discursiva">Discursiva</option>
-      </select>
-      <select className={cn(selectCls, 'max-w-44')} aria-label="Filtrar por banca" value={st.banca} onChange={(e) => setSt((s) => ({ ...s, banca: e.target.value, page: 1 }))}>
-        <option value="">Banca: todas</option>{(opcoes?.bancas ?? []).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
-      </select>
-      <select className={cn(selectCls, 'max-w-44')} aria-label="Filtrar por órgão" value={st.orgao} onChange={(e) => setSt((s) => ({ ...s, orgao: e.target.value, page: 1 }))}>
-        <option value="">Órgão: todos</option>{(opcoes?.orgaos ?? []).map((b) => <option key={b.id} value={b.id}>{b.nome}</option>)}
-      </select>
-      <select className={selectCls} aria-label="Filtrar por ano" value={st.ano} onChange={(e) => setSt((s) => ({ ...s, ano: e.target.value, page: 1 }))}>
-        <option value="">Ano: todos</option>{(opcoes?.anos ?? []).map((a) => <option key={a} value={String(a)}>{a}</option>)}
-      </select>
+      <Button type="button" variant="outline" size="sm" onClick={() => setCardAberto((v) => !v)} aria-expanded={cardAberto} className="h-9">
+        <SlidersHorizontal />Filtros{chipsCard.length > 0 && <span className="rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">{chipsCard.length}</span>}
+      </Button>
+      {chipsCard.map((c) => (
+        <button key={c.campo + c.valor} type="button" onClick={() => removerChip(c.campo, c.valor)} title="Remover este filtro"
+          className="inline-flex h-7 max-w-64 items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 text-xs font-medium text-primary hover:bg-primary/15">
+          <span className="truncate">{c.label}</span><X className="h-3 w-3 shrink-0" />
+        </button>
+      ))}
       {temFiltro && <button type="button" onClick={limparFiltros} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar busca e filtros</button>}
       {rotuloNo && !fila && <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{ag.nome.split(' ')[0]}: {rotuloNo}</span>}
     </>
@@ -412,6 +408,7 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
       <div className="min-w-0">
         {erro && <div className="mb-3 rounded-xl border p-4 text-center text-sm"><p className="mb-2 text-destructive">Não foi possível carregar ({erro}).</p><Button variant="outline" onClick={() => void carregar(st, { fresh: true })}>Tentar de novo</Button></div>}
         {dados?.degradado && <Nota>Consulta SQL indisponível: lista no modo reduzido (ordenação, busca e algumas visões limitadas). Verifique DATABASE_URL.</Nota>}
+        {cardAberto && <div className="mb-3"><PainelFiltrosQuestoesAdmin st={st} opcoes={opcoes} onAplicar={(r) => { setSel(new Set()); setSt((s) => ({ ...s, ...r, page: 1 })) }} /></div>}
         <QuestoesTabelaBase
           questoes={linhas} titulo="Banco de questões" semCabecalho
           carregarDetalhe={async (id) => { try { const r = await fetch(`${URL_API}?detalhe=${id}`, { cache: 'no-store' }); return await r.json() } catch { return { ok: false } } }}
@@ -435,7 +432,7 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
                   </div>
                 )}
               </div>
-              {!fila && <ExportQuestoesButton filtros={{ q: st.q, status: st.status, disciplina: discNo, dificuldade: st.dif, tipo: st.tipo }} />}
+              {!fila && <ExportQuestoesButton filtros={{ q: st.q, status: st.status, disciplina: st.disc || discNo, dificuldade: st.dif, tipo: st.tipo }} />}
               {podeEditar && <Button type="button" variant="outline" size="sm" disabled={!sel.size} onClick={() => setClassificar(true)} title={sel.size ? 'Classificar as questões selecionadas' : 'Selecione questões para classificar'}><FolderInput />Classificar{sel.size ? ` (${sel.size})` : ''}</Button>}
               {podeCriar && !fila && <NovaQuestaoDialog podeImportarPlataforma={podeImportarPlataforma} />}
             </div>
@@ -466,6 +463,7 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
         <p className="mt-1 hidden items-center gap-1.5 text-[11px] text-muted-foreground xl:flex"><Keyboard className="h-3.5 w-3.5" aria-hidden />Atalhos: <kbd className="rounded border px-1">/</kbd> buscar · <kbd className="rounded border px-1">N</kbd>/<kbd className="rounded border px-1">P</kbd> próxima/anterior · <kbd className="rounded border px-1">X</kbd> selecionar a página · <kbd className="rounded border px-1">Esc</kbd> limpar seleção</p>
       </div>
 
+
       <QuestaoPainel id={destinoIds} opcoes={opcoes} podeEditar={podeEditar} onFechar={() => setPainelId(null)} onMudou={() => { void recarregar() }}
         onIrDuplicadas={(g) => { setPainelId(null); onIrDuplicadas?.(g) }} />
 
@@ -481,7 +479,8 @@ export function QuestoesBanco({ inicial: inicialBruto, estadoInicial, podeEditar
   )
 }
 
-function temFiltroSemVis(s: EstadoQ) { return !!(s.q || s.status || s.dif || s.tipo || s.banca || s.orgao || s.ano) }
+function temCard(s: EstadoQ) { return CAMPOS_CARD.some((c) => !!s[c]) }
+function temFiltroSemVis(s: EstadoQ) { return !!(s.q || temCard(s)) }
 
 function EtiquetaDialog({ n, opcoes, onClose, onConfirm }: { n: number; opcoes: OpcoesQ | null; onClose: () => void; onConfirm: (etiquetaId: string, modo: 'aplicar' | 'remover') => void }) {
   const [et, setEt] = useState('')

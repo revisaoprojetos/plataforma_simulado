@@ -469,7 +469,7 @@ function CorrecaoCard({ item, jx, onToggleJx }: { item: SimCorrecaoItem; jx: boo
         <span style={{ flex: 1 }} />
         {pill}
       </div>
-      <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)' }}>{item.enunciado}</p>
+      <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{item.enunciado}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(item.alternativas ?? []).map((a) => {
           const isG = !!a.correta

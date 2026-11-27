@@ -9,10 +9,12 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import {
   ROTULO_CONF_TERMO, TIPOS_TERMO,
-  type ConfTermo, type ExemploQuestao, type GrupoTermo, type InicialTermos, type MesclagemLog, type PreviaMescla, type RespostaGruposTermos, type RespostaNorm, type RespostaResumosTermos, type TipoTermo,
+  type ConfTermo, type ExemploQuestao, type GrupoTermo, type InicialTermos, type MesclagemLog, type PreviaMescla, type RespostaGruposTermos, type RespostaNorm, type ResumoTipoTermo, type TipoTermo,
 } from '@/lib/admin-revisao/questoes-termos-tipos'
 import { AbasSublinhado, Carregando, ErroTentar, PainelCard, Vazio, campoBusca, selectBarra } from './gestao-ui'
 import { limparCacheG } from './questoes-api'
+import { TermosFiltrosCard } from './termos-filtros-card'
+import type { FiltrosTermo } from '@/lib/admin-revisao/termos-filtros'
 
 // UNIFICAR › TERMOS DA TAXONOMIA. Detecta no servidor (cache 5 min) variantes de Disciplina · Assunto · Banca · Órgão · Cargo · Assunto específico,
 // revisão lado a lado (canônico + nome final), PRÉVIA do impacto + confirmação, mesclagem transacional em ROTA DE API, "São termos diferentes",
@@ -54,92 +56,82 @@ const LS = 'bib-termos-ignorados:v1'
 const lerLocal = (tipo: TipoTermo): string[] => { try { return (JSON.parse(localStorage.getItem(LS) || '{}')[tipo] ?? []) as string[] } catch { return [] } }
 const gravarLocal = (tipo: TipoTermo, ids: string[]) => { try { const o = JSON.parse(localStorage.getItem(LS) || '{}'); o[tipo] = ids.slice(-300); localStorage.setItem(LS, JSON.stringify(o)) } catch { /* ignore */ } }
 
-/** Pré-carrega (cache do cliente 60 s) a 1ª página de um tipo com os parâmetros PADRÃO do painel — trocar de aba fica instantâneo. */
-export const prefetchGruposTermos = (tipo: TipoTermo, limiar = 0.85) => { if (tipo !== 'ano') prefetch({ s: 'grupos', tipo, page: 1, pp: 20, limiar, sort: 'questoes', dir: 'desc' }) }
-const CHAVE_RESUMOS = qs({ s: 'resumos', limiar: 0.85 })
-const CHAVE_BANCA = qs({ s: 'grupos', tipo: 'banca', page: 1, pp: 20, limiar: 0.85, sort: 'questoes', dir: 'desc' })
+/** Pré-carrega (cache do cliente 60 s) a 1ª página de um tipo com os parâmetros PADRÃO do painel — trocar de tipo fica instantâneo. */
+export const prefetchGruposTermos = (tipo: TipoTermo, limiar = 0.85) => { if (tipo !== 'ano') prefetch({ s: 'grupos', tipos: tipo, page: 1, pp: 20, limiar, sort: 'questoes', dir: 'desc' }) }
+/** Tipos mesclaveis: vazio no filtro = TODOS (padrão da tela; a lista abre com todos os tipos mesclados). */
+const TODOS_TIPOS: TipoTermo[] = TIPOS_TERMO.filter((t) => t.mesclavel).map((t) => t.id)
+const CHAVE_TODOS = qs({ s: 'grupos', tipos: TODOS_TIPOS.join(','), page: 1, pp: 20, limiar: 0.85, sort: 'questoes', dir: 'desc' })
+const PLURAL: Record<TipoTermo, string> = { disciplina: 'Disciplinas', assunto: 'Assuntos', banca: 'Bancas', orgao: 'Órgãos', cargo: 'Cargos', assunto_detalhe: 'Assuntos específicos', ano: 'Anos' }
 
 export const COR_CONF: Record<ConfTermo, string> = { alta: 'bg-primary/10 text-primary', media: 'bg-primary/10 text-primary', baixa: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
 const fmt = (n: number) => n.toLocaleString('pt-BR')
-type Vista = 'candidatos' | 'normalizar' | 'historico'
+type Vista = 'candidatos' | 'normalizar' | 'anos' | 'historico'
 const ROT_ORIGEM: Record<string, string> = { mesclagem: 'Mesclagem', normalizacao: 'Normalização', disciplina: 'Unificação' }
+const TIPOS_NORMALIZAR = TIPOS_TERMO.filter((t) => t.mesclavel && !t.entidade)
 
-export function UnificarTermos({ podeEditar, inicial }: { podeEditar: boolean; /** dados do SSR (resumos + grupos do tipo padrão): renderiza na hora, sem chamada no load */ inicial?: InicialTermos | null }) {
-  const [tipo, setTipo] = useState<TipoTermo>(inicial?.grupos.tipo ?? 'banca')
+export function UnificarTermos({ podeEditar, inicial }: { podeEditar: boolean; /** dados do SSR (grupos do tipo padrão): renderiza na hora, sem chamada no load */ inicial?: InicialTermos | null }) {
+  // O TIPO DE TERMO é um filtro (multi) do card, não mais uma aba por tipo: a lista de candidatos combina os tipos escolhidos.
+  const [tipos, setTipos] = useState<TipoTermo[]>([]) // [] = todos os tipos mesclados
+  const [tipoNorm, setTipoNorm] = useState<TipoTermo>(TIPOS_NORMALIZAR[0].id)
   const trocou = useRef(false)
   const [vista, setVista] = useState<Vista>('candidatos')
   const [limiar, setLimiar] = useState(0.85)
-  const [resumos, setResumos] = useState<RespostaResumosTermos | null>(inicial?.resumos ?? null)
   const [versao, setVersao] = useState(0)
-  const [ignLocal, setIgnLocal] = useState<Record<string, string[]>>({})
-  useEffect(() => { const o: Record<string, string[]> = {}; for (const t of TIPOS_TERMO) o[t.id] = lerLocal(t.id); setIgnLocal(o) }, [versao])
-
-  const ignt = useMemo(() => Object.entries(ignLocal).flatMap(([t, ks]) => ks.map((k) => `${t}:${k}`)).join(','), [ignLocal])
-  // semeia o cache do cliente com o SSR (o prefetch por hover nas abas deixa a troca de tipo < 300 ms)
-  useEffect(() => {
-    if (!inicial) return
-    CACHE.set(CHAVE_RESUMOS, { t: Date.now(), v: inicial.resumos })
-    if (inicial.grupos.tipo === 'banca') CACHE.set(CHAVE_BANCA, { t: Date.now(), v: inicial.grupos })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (inicial && limiar === 0.85 && ignt === '' && versao === 0) return // contagens vieram do SSR
-    let vivo = true
-    void ler<RespostaResumosTermos>({ s: 'resumos', limiar, ignt }).then((j) => { if (vivo && j.ok) setResumos(j) })
-    return () => { vivo = false }
-  }, [limiar, ignt, versao])
-
+  // semeia o cache do cliente com o SSR (1ª chamada = zero requisições)
+  const inicialTodos = !!inicial && (inicial.grupos.tipos?.length ?? 0) === TODOS_TIPOS.length
+  useEffect(() => { if (inicial && inicialTodos) CACHE.set(CHAVE_TODOS, { t: Date.now(), v: inicial.grupos }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const depoisDeMudar = useCallback(() => setVersao((v) => v + 1), [])
-  const abas = TIPOS_TERMO.map((t) => ({ id: t.id, nome: t.nome, n: resumos?.resumos.find((r) => r.tipo === t.id)?.grupos }))
-  const resumoTipo = resumos?.resumos.find((r) => r.tipo === tipo)
-  const meta = TIPOS_TERMO.find((t) => t.id === tipo)!
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <AbasSublinhado<TipoTermo> rotulo="Tipo de termo" valor={tipo} onChange={(t) => { trocou.current = true; setTipo(t); setVista('candidatos') }} abas={abas}
-            onHover={(t) => prefetchGruposTermos(t, limiar)} />
-        </div>
-        <div className="flex items-center gap-1.5 pb-1">
-          {meta.mesclavel && !meta.entidade && (
-            <Button size="sm" variant={vista === 'normalizar' ? 'default' : 'outline'} onClick={() => setVista(vista === 'normalizar' ? 'candidatos' : 'normalizar')}><Wand2 />Normalizar texto</Button>
-          )}
-          <Button size="sm" variant={vista === 'historico' ? 'default' : 'outline'} onClick={() => setVista(vista === 'historico' ? 'candidatos' : 'historico')} onPointerEnter={() => prefetch({ s: 'historico' })}><History />Histórico</Button>
-        </div>
-      </div>
-
-      {resumoTipo && vista === 'candidatos' && (
-        <p className="mt-2 px-1 text-xs text-muted-foreground">
-          <b className="text-foreground">{fmt(resumoTipo.termos)}</b> {meta.nome.toLowerCase()}(s) em uso · <b className="text-foreground">{fmt(resumoTipo.questoes)}</b> questões ·{' '}
-          {tipo === 'ano' ? 'ano é número: não há variantes de texto para mesclar.' : <><b className="text-foreground">{fmt(resumoTipo.grupos)}</b> grupo(s) candidato(s), {fmt(resumoTipo.variantesEmGrupos)} termos e {fmt(resumoTipo.questoesEmGrupos)} questões envolvidas.</>}
-        </p>
-      )}
-
+      <AbasSublinhado<Vista> rotulo="Visão de termos" valor={vista} onChange={setVista}
+        abas={[{ id: 'candidatos', nome: 'Candidatos a unificar' }, { id: 'normalizar', nome: 'Normalizar texto' }, { id: 'anos', nome: 'Anos' }, { id: 'historico', nome: 'Histórico' }]}
+        onHover={(v) => { if (v === 'historico') prefetch({ s: 'historico' }) }} />
       <div className="mt-2">
-        {tipo === 'ano' ? <PainelAnos />
+        {vista === 'anos' ? <PainelAnos />
           : vista === 'historico' ? <Historico podeEditar={podeEditar} onMudou={depoisDeMudar} />
-          : vista === 'normalizar' ? <Normalizar tipo={tipo} podeEditar={podeEditar} onMudou={depoisDeMudar} />
-          : <Candidatos key={tipo} inicial={!trocou.current && inicial?.grupos.tipo === tipo ? inicial.grupos : null} tipo={tipo} podeEditar={podeEditar} limiar={limiar} onLimiar={setLimiar} onMudou={depoisDeMudar} versao={versao} />}
+          : vista === 'normalizar' ? (
+            <div>
+              <div className="mb-2 flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                <label htmlFor="tipo-norm" className="font-semibold">Texto livre de</label>
+                <select id="tipo-norm" className={selectBarra} value={tipoNorm} onChange={(e) => setTipoNorm(e.target.value as TipoTermo)}>
+                  {TIPOS_NORMALIZAR.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </select>
+                <span>Banca, órgão, disciplina e assunto são cadastros: use “Candidatos a unificar”.</span>
+              </div>
+              <Normalizar key={tipoNorm} tipo={tipoNorm} podeEditar={podeEditar} onMudou={depoisDeMudar} />
+            </div>
+          )
+          : <Candidatos tipos={tipos} onTipos={(t) => { trocou.current = true; setTipos(t) }} inicial={!trocou.current && inicialTodos && tipos.length === 0 ? inicial!.grupos : null} onHistorico={() => setVista('historico')} podeEditar={podeEditar} limiar={limiar} onLimiar={setLimiar} onMudou={depoisDeMudar} versao={versao} />}
       </div>
     </div>
   )
 }
 
 // ════════════════════════════════════════ CANDIDATOS ════════════════════════════════════════
-export function Candidatos({ tipo, podeEditar, limiar, onLimiar, onMudou, versao, inicial }: { inicial?: RespostaGruposTermos | null; tipo: TipoTermo; podeEditar: boolean; limiar: number; onLimiar: (n: number) => void; onMudou: () => void; versao: number }) {
+export function Candidatos({ tipo, tipos: tiposProp, onTipos, onHistorico, podeEditar, limiar, onLimiar, onMudou, versao, inicial }: {
+  inicial?: RespostaGruposTermos | null; /** tipo FIXO (Unificar disciplinas) */ tipo?: TipoTermo; /** tipos escolhidos no filtro (Unificar termos); [] = todos */ tipos?: TipoTermo[]; onTipos?: (t: TipoTermo[]) => void
+  /** abre o Histórico (atalho "Desfazer" após mesclar) */ onHistorico?: () => void
+  podeEditar: boolean; limiar: number; onLimiar: (n: number) => void; onMudou: () => void; versao: number
+}) {
+  const tipos = useMemo<TipoTermo[]>(() => { const t = tiposProp ?? (tipo ? [tipo] : []); return t.length ? t : TODOS_TIPOS }, [tiposProp, tipo])
+  const chaveTipos = tipos.join(',')
+  const selecionados = tiposProp ?? [] // o que o usuário marcou no filtro (vazio = todos)
+  const [filtros, setFiltros] = useState<FiltrosTermo>({})
   const [busca, setBusca] = useState(''); const [q, setQ] = useState('')
-  const [conf, setConf] = useState(''); const [sort, setSort] = useState('questoes'); const [verIgn, setVerIgn] = useState(false)
+  const [sort, setSort] = useState('questoes'); const [verIgn, setVerIgn] = useState(false)
   const [page, setPage] = useState(1); const [pp] = useState(20)
   const [dados, setDados] = useState<RespostaGruposTermos | null>(inicial ?? null); const [erro, setErro] = useState<string | null>(null); const [carregando, setCarregando] = useState(!inicial)
-  const semente = useRef(inicial ? qs({ s: 'grupos', tipo, page: 1, pp: 20, limiar: inicial.limiar, sort: 'questoes', dir: 'desc' }) : null)
+  const semente = useRef(inicial ? qs({ s: 'grupos', tipos: chaveTipos, page: 1, pp: 20, limiar: inicial.limiar, sort: 'questoes', dir: 'desc' }) : null)
   const [sel, setSel] = useState<string | null>(null)
   const [ignLocal, setIgnLocal] = useState<string[]>([])
   const seq = useRef(0)
-  const meta = TIPOS_TERMO.find((t) => t.id === tipo)!
-  useEffect(() => { setIgnLocal(lerLocal(tipo)) }, [tipo])
+  const multiTipo = tipos.length > 1
+  const nomeTipos = tipos.length === TODOS_TIPOS.length ? 'todos os tipos' : tipos.map((t) => TIPOS_TERMO.find((x) => x.id === t)?.nome ?? t).join(' + ')
+  useEffect(() => { setIgnLocal(TIPOS_TERMO.flatMap((t) => lerLocal(t.id))) }, [versao])
   useEffect(() => { const t = setTimeout(() => { if (busca.trim() !== q) { setQ(busca.trim()); setPage(1) } }, 300); return () => clearTimeout(t) }, [busca, q])
 
-  const params = useMemo<P>(() => ({ s: 'grupos', tipo, q, confianca: conf, sort, dir: sort === 'nome' ? 'asc' : 'desc', page, pp, limiar, ignorados: verIgn, ign: ignLocal.join(',') }), [tipo, q, conf, sort, page, pp, limiar, verIgn, ignLocal])
+  const params = useMemo<P>(() => ({ s: 'grupos', tipos: chaveTipos, q, confs: (filtros.confianca ?? []).join(','), disc: (filtros.disciplina ?? []).join(','), faixa: (filtros.faixa ?? []).join(','), nv: (filtros.variantes ?? []).join(','), sort, dir: sort === 'nome' ? 'asc' : 'desc', page, pp, limiar, ignorados: verIgn, ign: ignLocal.join(',') }), [chaveTipos, q, filtros, sort, page, pp, limiar, verIgn, ignLocal])
   const carregar = useCallback(async (fresh = false) => {
     if (semente.current) { if (!fresh && qs(params) === semente.current && versao === 0) return; semente.current = null } // 1º render = dados do SSR, zero chamadas
     const mine = ++seq.current; setErro(null); setCarregando(true)
@@ -156,14 +148,15 @@ export function Candidatos({ tipo, podeEditar, limiar, onLimiar, onMudou, versao
   useEffect(() => { if (dados && (!sel || !dados.grupos.some((g) => g.id === sel))) setSel(dados.grupos[0]?.id ?? null) }, [dados, sel])
   const grupo = dados?.grupos.find((g) => g.id === sel) ?? null
   const totalPag = dados ? Math.max(1, Math.ceil(dados.total / pp)) : 1
-  const filtrando = !!(q || conf || verIgn)
+  const filtrando = !!(q || verIgn || Object.values(filtros).some((v) => v?.length))
+  const mudarFiltros = (f: FiltrosTermo) => { setFiltros(f); setPage(1) }
 
   async function ignorar(g: GrupoTermo, desfazer: boolean) {
-    const r = await enviar({ acao: 'ignorar', tipo, grupoId: g.id, nomes: g.variantes.map((v) => v.nome), desfazer }, false)
+    const r = await enviar({ acao: 'ignorar', tipo: g.tipo, grupoId: g.id, nomes: g.variantes.map((v) => v.nome), desfazer }, false)
     if (r.ok) { CACHE.clear(); toast.success(desfazer ? 'O grupo voltará a ser sugerido.' : 'Marcado como “São termos diferentes”.'); onMudou(); void carregar(true); return }
     if (r.semTabela) { // fallback no navegador
-      const atual = lerLocal(tipo); const novo = desfazer ? atual.filter((k) => k !== g.id) : [...new Set([...atual, g.id])]
-      gravarLocal(tipo, novo); setIgnLocal(novo); onMudou()
+      const atual = lerLocal(g.tipo); const novo = desfazer ? atual.filter((k) => k !== g.id) : [...new Set([...atual, g.id])]
+      gravarLocal(g.tipo, novo); onMudou()
       toast.success(desfazer ? 'O grupo voltará a ser sugerido (neste navegador).' : 'Marcado como “São termos diferentes” (guardado só neste navegador — aplique a migration 20261113060000 para valer para todos).')
       return
     }
@@ -171,28 +164,30 @@ export function Candidatos({ tipo, podeEditar, limiar, onLimiar, onMudou, versao
   }
 
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
-      <PainelCard titulo={`Candidatos · ${meta.nome}`} rotulo="Grupos candidatos a unificação"
+    <div className="space-y-4">
+      {onTipos && dados?.porTipo && <AvisosDuplicados porTipo={dados.porTipo} selecionados={selecionados} onTipos={(t) => { onTipos(t); setPage(1) }} />}
+      <TermosFiltrosCard tipos={selecionados} onTipos={(t) => { onTipos?.(t); setPage(1) }} filtros={filtros} onFiltros={mudarFiltros} facetas={dados?.facetas} disciplinas={dados?.opcoesDisciplina ?? []} mostrarTipo={!!onTipos} />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)]">
+      <PainelCard titulo={`Candidatos · ${nomeTipos}`} rotulo="Grupos candidatos a unificação"
         acao={<>{carregando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Carregando" />}<button type="button" onClick={() => { CACHE.clear(); void carregar(true); onMudou() }} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline" title="Recalcular candidatos"><RefreshCw className="h-3.5 w-3.5" />Recalcular</button></>}
         barra={<>
-          <div className="relative min-w-40 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={`Buscar ${meta.singular}…`} aria-label="Buscar nos candidatos" className={campoBusca} autoComplete="off" /></div>
-          <select className={selectBarra} value={conf} onChange={(e) => { setConf(e.target.value); setPage(1) }} aria-label="Confiança">
-            <option value="">Confiança: todas</option>
-            {(['alta', 'media', 'baixa'] as ConfTermo[]).map((c) => <option key={c} value={c}>{ROTULO_CONF_TERMO[c]}{dados ? ` (${dados.porConfianca[c]})` : ''}</option>)}
-          </select>
+          <div className="relative min-w-40 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar termo…" aria-label="Buscar nos candidatos" className={campoBusca} autoComplete="off" /></div>
           <select className={selectBarra} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1) }} aria-label="Ordenar">
             <option value="questoes">Mais questões</option><option value="score">Maior similaridade</option><option value="variantes">Mais variantes</option><option value="nome">Nome (A–Z)</option>
           </select>
           <select className={selectBarra} value={limiar} onChange={(e) => { onLimiar(Number(e.target.value)); setPage(1) }} aria-label="Limiar de similaridade para erros de digitação" title="Rigor da detecção de erros de digitação">
             {[0.98, 0.92, 0.85, 0.78, 0.7, 0.62].map((n) => <option key={n} value={n}>Similaridade ≥ {Math.round(n * 100)}%</option>)}
           </select>
-          {(q || conf) && <button type="button" onClick={() => { setBusca(''); setQ(''); setConf(''); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
+          {(q || filtrando) && <button type="button" onClick={() => { setBusca(''); setQ(''); setFiltros({}); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={verIgn} onChange={(e) => { setVerIgn(e.target.checked); setPage(1) }} className="accent-[var(--primary)]" />Ver ignorados{dados && dados.ignorados > 0 ? ` (${dados.ignorados})` : ''}</label>
         </>}>
         {erro && !dados ? <ErroTentar msg={erro} onTentar={() => void carregar(true)} /> : !dados ? <Carregando /> : (
           <>
+            <p className="mx-2 mb-1 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground" aria-live="polite">
+              <b className="text-foreground">{fmt(dados.resumo.termos)}</b> termos em uso · <b className="text-foreground">{fmt(dados.resumo.questoes)}</b> questões · <b className="text-foreground">{fmt(dados.resumo.grupos)}</b> grupos
+            </p>
             <div className="min-h-0 flex-1 overflow-auto p-1.5" role="listbox" aria-label="Grupos de termos candidatos">
-              {dados.grupos.length === 0 ? <Vazio>{filtrando ? 'Nenhum grupo com esta busca/filtro.' : `Nenhum termo repetido ou parecido em ${meta.nome.toLowerCase()} — a taxonomia está limpa nesse critério. Afrouxe a similaridade para procurar erros de digitação.`}</Vazio> : (
+              {dados.grupos.length === 0 ? <Vazio>{filtrando ? 'Nenhum grupo com esta busca/filtro.' : `Nenhum termo repetido ou parecido em ${nomeTipos.toLowerCase()} — a taxonomia está limpa nesse critério. Afrouxe a similaridade para procurar erros de digitação.`}</Vazio> : (
                 <ul className="space-y-1.5">
                   {dados.grupos.map((g) => (
                     <li key={g.id}>
@@ -200,10 +195,12 @@ export function Candidatos({ tipo, podeEditar, limiar, onLimiar, onMudou, versao
                         className={cn('w-full rounded-xl border p-2.5 text-left transition-colors', g.id === sel ? 'border-primary/50 bg-primary/5' : 'hover:bg-muted')}>
                         <span className="flex items-center gap-2 text-[11px]">
                           <span className={cn('rounded-full px-2 py-0.5 font-semibold', COR_CONF[g.confianca])}>{ROTULO_CONF_TERMO[g.confianca]} · {g.score}%</span>
+                          {multiTipo && <span className="rounded-full border px-2 py-0.5 font-medium text-muted-foreground">{TIPOS_TERMO.find((t) => t.id === g.tipo)?.nome}</span>}
                           <span className="ml-auto tabular-nums text-muted-foreground">{fmt(g.questoes)} questões</span>
                         </span>
                         <span className="mt-1 block truncate text-sm font-medium" title={g.variantes.find((v) => v.id === g.canonicaId)?.nome}>{g.variantes.find((v) => v.id === g.canonicaId)?.nome}</span>
-                        <span className="block truncate text-xs text-muted-foreground">+ {g.variantes.length - 1}: {g.variantes.filter((v) => v.id !== g.canonicaId).map((v) => v.nome).join(' · ')}</span>
+                        <span className="block truncate text-xs text-muted-foreground" title={g.motivo}>Sugestão: manter este · {g.motivo}</span>
+                        <span className="block truncate text-xs text-muted-foreground">+ {g.variantes.length - 1}: {g.variantes.filter((v) => v.id !== g.canonicaId).map((v) => `${v.nome} (${fmt(v.questoes)})`).join(' · ')}</span>
                         {g.variantes[0].paiNome && <span className="block truncate text-[11px] text-muted-foreground">em {g.variantes[0].paiNome}</span>}
                       </button>
                     </li>
@@ -223,14 +220,51 @@ export function Candidatos({ tipo, podeEditar, limiar, onLimiar, onMudou, versao
         )}
       </PainelCard>
 
-      <RevisaoGrupo key={grupo?.id ?? 'vazio'} tipo={tipo} grupo={grupo} ignorado={verIgn} podeEditar={podeEditar} carregando={!dados} onIgnorar={(g, d) => void ignorar(g, d)} onMesclado={() => { onMudou(); void carregar(true) }} />
+      <RevisaoGrupo key={grupo?.id ?? 'vazio'} tipo={grupo?.tipo ?? tipos[0]} grupo={grupo} ignorado={verIgn} podeEditar={podeEditar} onHistorico={onHistorico} carregando={!dados} onIgnorar={(g, d) => void ignorar(g, d)} onMesclado={() => { onMudou(); void carregar(true) }} />
+      </div>
     </div>
   )
 }
 
+// ════════════════════════════════════════ AVISOS DE DUPLICADOS (faixa no topo) ════════════════════════════════════════
+// Contagens por tipo vêm PRONTAS do servidor (`porTipo`); clicar aplica o filtro de tipo (clicar de novo volta para todos).
+function AvisosDuplicados({ porTipo, selecionados, onTipos }: { porTipo: ResumoTipoTermo[]; selecionados: TipoTermo[]; onTipos: (t: TipoTermo[]) => void }) {
+  const lista = TODOS_TIPOS.map((t) => porTipo.find((p) => p.tipo === t)).filter((p): p is ResumoTipoTermo => !!p)
+  const grupos = lista.reduce((s, p) => s + p.grupos, 0)
+  const termos = lista.reduce((s, p) => s + p.variantesEmGrupos, 0)
+  const questoes = lista.reduce((s, p) => s + p.questoesEmGrupos, 0)
+  return (
+    <section aria-label="Avisos de termos duplicados" className={cn('rounded-2xl border p-3 shadow-sm', grupos > 0 ? 'border-amber-500/40 bg-amber-500/5' : 'bg-card')}>
+      <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+        <AlertTriangle className={cn('h-4 w-4 shrink-0', grupos > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')} aria-hidden />
+        {grupos > 0
+          ? <span className="font-semibold text-foreground">{fmt(grupos)} grupo(s) de termos duplicados ou parecidos · {fmt(termos)} termos · {fmt(questoes)} questões afetadas</span>
+          : <span className="font-semibold text-foreground">Nenhum termo duplicado nos critérios atuais</span>}
+        <span className="text-muted-foreground">Clique em um tipo para filtrar a lista.</span>
+      </p>
+      <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {lista.map((p) => {
+          const ativo = selecionados.length === 1 && selecionados[0] === p.tipo
+          const alerta = p.grupos > 0
+          return (
+            <li key={p.tipo}>
+              <button type="button" aria-pressed={ativo} onClick={() => onTipos(ativo ? [] : [p.tipo])}
+                className={cn('w-full rounded-xl border p-2 text-left transition-colors hover:bg-muted', alerta ? 'border-amber-500/40 bg-amber-500/10' : 'bg-card', ativo && 'ring-2 ring-primary')}>
+                <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{PLURAL[p.tipo]}</span>
+                <span className={cn('block text-sm font-semibold tabular-nums', alerta ? 'text-amber-700 dark:text-amber-400' : 'text-foreground')}>{alerta ? `${fmt(p.grupos)} grupo(s) duplicado(s)` : 'Sem duplicados'}</span>
+                <span className="block truncate text-[11px] tabular-nums text-muted-foreground">{alerta ? `${fmt(p.variantesEmGrupos)} termos · ${fmt(p.questoesEmGrupos)} questões` : `${fmt(p.termos)} termos em uso`}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 // ════════════════════════════════════════ REVISÃO DO GRUPO ════════════════════════════════════════
-function RevisaoGrupo({ tipo, grupo, ignorado, podeEditar, carregando, onIgnorar, onMesclado }: {
-  tipo: TipoTermo; grupo: GrupoTermo | null; ignorado: boolean; podeEditar: boolean; carregando: boolean; onIgnorar: (g: GrupoTermo, desfazer: boolean) => void; onMesclado: () => void
+function RevisaoGrupo({ tipo, grupo, ignorado, podeEditar, carregando, onIgnorar, onMesclado, onHistorico }: {
+  tipo: TipoTermo; grupo: GrupoTermo | null; ignorado: boolean; podeEditar: boolean; carregando: boolean; onIgnorar: (g: GrupoTermo, desfazer: boolean) => void; onMesclado: () => void; onHistorico?: () => void
 }) {
   const meta = TIPOS_TERMO.find((t) => t.id === tipo)!
   const [canon, setCanon] = useState(grupo?.canonicaId ?? '')
@@ -267,8 +301,14 @@ function RevisaoGrupo({ tipo, grupo, ignorado, podeEditar, carregando, onIgnorar
     setGravando(false)
     if (!j.ok) { toast.error(j.error || 'Não foi possível mesclar.'); return }
     setPrevia(null)
-    toast.success(`Mesclado em “${j.mantida ?? nome}”: ${fmt(j.questoes ?? 0)} questão(ões) atualizada(s)${j.removidas ? `, ${j.removidas} cadastro(s) removido(s)` : ''}${j.assuntosUnidos ? `, ${j.assuntosUnidos} assunto(s) repetido(s) unido(s)` : ''}.${j.mantidas?.length ? ` Mantido(s) por ainda estarem em uso: ${j.mantidas.join(', ')}.` : ''}${j.podeDesfazer ? ' Dá para desfazer em Histórico.' : ''}`)
+    toast.success(`Mesclado em “${j.mantida ?? nome}”: ${fmt(j.questoes ?? 0)} questão(ões) atualizada(s)${j.removidas ? `, ${j.removidas} cadastro(s) removido(s)` : ''}${j.assuntosUnidos ? `, ${j.assuntosUnidos} assunto(s) repetido(s) unido(s)` : ''}.${j.mantidas?.length ? ` Mantido(s) por ainda estarem em uso: ${j.mantidas.join(', ')}.` : ''}${j.podeDesfazer ? ' Dá para desfazer em Histórico.' : ''}`,
+      j.podeDesfazer && onHistorico ? { action: { label: 'Desfazer', onClick: onHistorico }, duration: 12_000 } : undefined)
     onMesclado()
+  }
+  const ehSugestao = !!grupo && canon === grupo.canonicaId && fora.size === 0 && nome === grupo.nomeSugerido
+  function usarSugestao() {
+    if (!grupo) return
+    nomeEditado.current = false; setCanon(grupo.canonicaId); setFora(new Set()); setNome(grupo.nomeSugerido)
   }
 
   return (
@@ -278,6 +318,16 @@ function RevisaoGrupo({ tipo, grupo, ignorado, podeEditar, carregando, onIgnorar
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={cn('rounded-full px-2 py-0.5 font-semibold', COR_CONF[grupo.confianca])}>{ROTULO_CONF_TERMO[grupo.confianca]} · similaridade {grupo.score}%</span>
             <span className="text-muted-foreground">{grupo.motivo}</span>
+          </div>
+
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm" aria-label="Sugestão de unificação">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Sugestão</p>
+            <p className="mt-0.5">Manter <b className="break-words">“{grupo.variantes.find((v) => v.id === grupo.canonicaId)?.nome}”</b> ({fmt(grupo.variantes.find((v) => v.id === grupo.canonicaId)?.questoes ?? 0)} questões) e unir {grupo.variantes.length - 1} variante(s):</p>
+            <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+              {grupo.variantes.filter((v) => v.id !== grupo.canonicaId).map((v) => <li key={v.id} className="break-words">• {v.nome} <span className="tabular-nums">({fmt(v.questoes)} questões)</span></li>)}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">Por quê: {grupo.motivo} · confiança {ROTULO_CONF_TERMO[grupo.confianca].toLowerCase()} · similaridade {grupo.score}%.</p>
+            {!ehSugestao && podeEditar && <button type="button" onClick={usarSugestao} className="mt-1 text-xs font-semibold text-primary hover:underline">Voltar à sugestão</button>}
           </div>
 
           <div className="overflow-x-auto rounded-xl border">
@@ -325,7 +375,7 @@ function RevisaoGrupo({ tipo, grupo, ignorado, podeEditar, carregando, onIgnorar
 
           {podeEditar ? (
             <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-              <Button onClick={() => void abrirPrevia()} disabled={calc || !dupIds.length || !nome.trim() || ignorado}>{calc ? <Loader2 className="animate-spin" /> : <Merge />}Ver impacto e mesclar {dupIds.length + 1}</Button>
+              <Button onClick={() => void abrirPrevia()} disabled={calc || !dupIds.length || !nome.trim() || ignorado}>{calc ? <Loader2 className="animate-spin" /> : <Merge />}{ehSugestao ? `Unificar com a sugestão (${dupIds.length + 1})` : `Ver impacto e mesclar ${dupIds.length + 1}`}</Button>
               {ignorado ? <Button variant="outline" onClick={() => onIgnorar(grupo, true)}><Undo2 />Voltar a sugerir</Button>
                 : <Button variant="outline" onClick={() => onIgnorar(grupo, false)} title="Não sugerir mais este grupo"><EyeOff />São termos diferentes</Button>}
               {!dupIds.length && <span className="text-xs text-muted-foreground">Inclua ao menos uma variante para mesclar.</span>}

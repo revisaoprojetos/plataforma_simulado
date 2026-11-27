@@ -89,9 +89,12 @@ export function nadaATransferir(c: ContagensTransferencia, itens: ItensTransfere
   return !planos && !mc && !itens.catalogo
 }
 
-export function mensagemTransferida(r: { planos: number; metas: number; metaConteudo: number; arquivou: boolean }): string {
+export function mensagemTransferida(r: { planos: number; metas: number; metaConteudo: number; arquivou: boolean; planosJaTinhamDestino?: number }): string {
+  const ja = r.planosJaTinhamDestino ?? 0
+  const nota = ja > 0 ? ` ${ja.toLocaleString('pt-BR')} ${ja === 1 ? 'plano já tinha' : 'planos já tinham'} o destino: neles nada foi movido e a aula do destino continua; a da origem sai quando o plano for reorganizado.` : ''
+  if (r.planos === 0 && r.metas === 0 && r.metaConteudo === 0) return `Nenhuma meta precisou ser transferida.${r.arquivou ? ' Origem arquivada.' : ''}${nota}`
   const p = r.planos === 1 ? '1 plano' : `${r.planos.toLocaleString('pt-BR')} planos`
   const partes = [`${p} (${r.metas.toLocaleString('pt-BR')} ${r.metas === 1 ? 'meta' : 'metas'})`]
   if (r.metaConteudo > 0) partes.push(`${r.metaConteudo.toLocaleString('pt-BR')} ${r.metaConteudo === 1 ? 'vínculo' : 'vínculos'} do cronograma Revisão`)
-  return `Metas transferidas: ${partes.join(' e ')}${r.arquivou ? '. Origem arquivada.' : '.'} Os alunos veem o novo material ao abrir o cronograma.`
+  return `Metas transferidas: ${partes.join(' e ')}${r.arquivou ? '. Origem arquivada.' : '.'} Os alunos veem o novo material ao abrir o cronograma.${nota}`
 }

@@ -1,8 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { SemAcessoArea } from '@/app/admin/conteudos/_components/sem-acesso-area'
 import { lerClassificacaoPadraoLote } from './actions'
+import {
+  contarQuestoesDoBanco, facetasBancoEstudio, listarQuestoesBanco, opcoesBancoEstudio, type LinhaBancoEstudio,
+} from '@/lib/conteudo/questoes-estudio'
+import { FILTROS_VAZIOS, contarAplicados, filtrosDeParams, ordemBanco } from '@/lib/conteudo/questoes-estudio-filtros'
 import { listarBancosFiltrados, contarQuestoesPorBanco } from './bancos-lista'
 import {
   BancosAcervo, type BancoRow, type QuestaoPreviewLinha, type QuestaoDetalhe,
@@ -11,9 +15,8 @@ import {
 export const dynamic = 'force-dynamic'
 const SEM = '00000000-0000-0000-0000-000000000000'
 const PP = [5, 10, 25, 50]
-const MAX_VINCULOS = 5000
 const LETRAS = 'ABCDEFGHIJ'
-const DIF_RANK: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
+const selBancoIdDe = (sp: Record<string, string>) => (sp.sel ?? '').trim() || null
 
 // BANCO DE QUESTÕES › índice (Estúdio). Dois níveis no MESMO padrão de navegador do Produtos:
 //  - sem ?sel: lista de bancos (pastas folder_area='banco') paginada/filtrada no banco (.range + count);
@@ -30,12 +33,9 @@ export default async function QuestoesAcervoPage({ searchParams }: { searchParam
   const q = (sp.q ?? '').trim()
   const dir = sp.dir === 'asc' ? 'asc' : 'desc'
 
-  const fDisc = (sp.disc ?? '').trim() || null
-  const fBanca = (sp.banca ?? '').trim() || null
-  const fAnoRaw = Number(sp.ano)
-  const fAno = Number.isInteger(fAnoRaw) && fAnoRaw > 1900 ? fAnoRaw : null
-  const fDif = ['facil', 'medio', 'dificil'].includes(sp.dif) ? sp.dif : null
-  const fSit = ['publicada', 'rascunho', 'arquivada'].includes(sp.sit) ? sp.sit : null
+  // Nível 1 (lista de bancos): filtros por NOME da classificação padrão do banco. Nível 2 usa os filtros multi-seleção do card (ids).
+  const fDisc = selBancoIdDe(sp) ? null : (sp.disc ?? '').trim() || null
+  const fBanca = selBancoIdDe(sp) ? null : (sp.banca ?? '').trim() || null
 
   const classLote = await lerClassificacaoPadraoLote()
   const selBancoId = (sp.sel ?? '').trim() || null
@@ -44,46 +44,25 @@ export default async function QuestoesAcervoPage({ searchParams }: { searchParam
   if (selBancoId) {
     const { data: b } = await svc.from('simulado_pastas').select('id, nome, tipo').eq('tenant_id', tid).eq('folder_area', 'banco').eq('id', selBancoId).maybeSingle()
     if (b) {
-      const vinc = await fetchAll<{ questao_id: string }>(() =>
-        svc.from('simulado_questao_pasta').select('questao_id').eq('tenant_id', tid).eq('pasta_id', selBancoId).order('questao_id', { ascending: true }))
-      const ids = vinc.map((v) => v.questao_id).slice(0, MAX_VINCULOS)
-      const todas = ids.length
-        ? await fetchAllByIn<any>(ids, (chunk) =>
-            svc.from('simulado_questoes')
-              .select('id, enunciado, tipo, ano, nivel_dificuldade, status, comentario_professor, created_at, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)')
-              .in('id', chunk).eq('tenant_id', tid).eq('deletado', false).order('id', { ascending: true }))
-        : []
-      // Numeração estável = ordem de criação.
-      todas.sort((a: any, b2: any) => String(a.created_at ?? '').localeCompare(String(b2.created_at ?? '')) || String(a.id).localeCompare(String(b2.id)))
-      const numeroPor = new Map<string, number>(todas.map((x: any, i: number) => [x.id, i + 1]))
-
-      const opcoes = (get: (x: any) => string | null) => [...new Set(todas.map(get).filter(Boolean) as string[])].sort((a, c) => a.localeCompare(c, 'pt-BR'))
-      const disciplinasFiltro = opcoes((x) => x.disciplinas?.nome ?? null)
-      const bancasFiltro = opcoes((x) => x.bancas?.nome ?? null)
-      const anosFiltro = [...new Set(todas.map((x: any) => x.ano).filter((a: any) => typeof a === 'number') as number[])].sort((a, c) => c - a)
-
-      const ql = q.toLowerCase()
-      let lista = todas.filter((x: any) =>
-        (!ql || String(x.enunciado ?? '').toLowerCase().includes(ql))
-        && (!fDisc || x.disciplinas?.nome === fDisc)
-        && (!fBanca || x.bancas?.nome === fBanca)
-        && (fAno == null || x.ano === fAno)
-        && (!fDif || x.nivel_dificuldade === fDif)
-        && (!fSit || x.status === fSit))
-      const sort = sp.sort ?? 'numero'
+      // Filtros do card (multi-seleção), busca, ordem e página: TUDO no banco (SQL), com facetas (contagem por opção) do núcleo compartilhado.
+      const fe = filtrosDeParams((k) => sp[k])
+      const sort = ordemBanco(sp.sort)
       const sdir = sp.sort ? dir : 'asc'
-      const mult = sdir === 'asc' ? 1 : -1
-      lista = [...lista].sort((a: any, c: any) => {
-        if (sort === 'ano') return ((a.ano ?? 0) - (c.ano ?? 0)) * mult
-        if (sort === 'dificuldade') return ((DIF_RANK[a.nivel_dificuldade ?? ''] ?? 99) - (DIF_RANK[c.nivel_dificuldade ?? ''] ?? 99)) * mult
-        return ((numeroPor.get(a.id) ?? 0) - (numeroPor.get(c.id) ?? 0)) * mult
-      })
-      const total = lista.length
-      const fatia = lista.slice((page - 1) * pp, page * pp)
+      const [lista, base] = await Promise.all([
+        listarQuestoesBanco(svc, tid, selBancoId, fe, { sort, dir: sdir, page, pp }),
+        facetasBancoEstudio(tid, selBancoId, FILTROS_VAZIOS),
+      ])
+      const opcoesEstudio = base ? await opcoesBancoEstudio(tid, base.contagens) : null
+      // Total do banco (sem filtros).
+      const totalBanco = base?.total ?? (lista.degradado ? lista.total : (await contarQuestoesDoBanco(tid, selBancoId)) ?? lista.total)
+      const fatia = lista.rows
+      const total = lista.total
 
       // Alternativas só da fatia + da questão selecionada.
       const qsel = (sp.qsel ?? '').trim() || null
-      const idsAlt = [...new Set([...fatia.map((x: any) => x.id), ...(qsel ? [qsel] : [])])]
+      let xs: LinhaBancoEstudio | null = fatia.find((x) => x.id === qsel) ?? null
+      if (qsel && !xs) xs = (await listarQuestoesBanco(svc, tid, selBancoId, FILTROS_VAZIOS, { somenteId: qsel, page: 1, pp: 1 })).rows[0] ?? null
+      const idsAlt = [...new Set([...fatia.map((x) => x.id), ...(xs ? [xs.id] : [])])]
       const alts = idsAlt.length
         ? await fetchAllByIn<any>(idsAlt, (chunk) =>
             svc.from('simulado_alternativas').select('id, questao_id, ordem, texto, correta').in('questao_id', chunk).order('id', { ascending: true }))
@@ -95,40 +74,39 @@ export default async function QuestoesAcervoPage({ searchParams }: { searchParam
         const i = (altsPor.get(qid) ?? []).findIndex((a) => a.correta)
         return i >= 0 ? (LETRAS[i] ?? null) : null
       }
-      const provaDe = (x: any) => [x.bancas?.nome, x.ano].filter(Boolean).join(' · ') || null
+      const provaDe = (x: LinhaBancoEstudio) => [x.banca, x.ano].filter(Boolean).join(' · ') || null
 
-      const questoes: QuestaoPreviewLinha[] = fatia.map((x: any) => ({
-        id: x.id, numero: numeroPor.get(x.id) ?? 0, enunciado: x.enunciado ?? '',
+      const questoes: QuestaoPreviewLinha[] = fatia.map((x) => ({
+        id: x.id, numero: x.numero, enunciado: x.enunciado,
         tipo: x.tipo === 'discursiva' ? 'discursiva' : 'objetiva',
         altCount: altsPor.get(x.id)?.length ?? 0, gabarito: gabaritoDe(x.id), prova: provaDe(x),
-        ano: typeof x.ano === 'number' ? x.ano : null,
-        dificuldade: x.nivel_dificuldade ?? null, status: x.status ?? null,
-        temExplicacao: !!(x.comentario_professor && String(x.comentario_professor).trim()),
+        ano: x.ano, dificuldade: x.nivel_dificuldade, status: x.status,
+        temExplicacao: !!(x.comentario_professor && x.comentario_professor.trim()),
       }))
 
       let detalhe: QuestaoDetalhe | null = null
-      const xs: any = qsel ? todas.find((x: any) => x.id === qsel) : null
       if (xs) {
         detalhe = {
-          id: xs.id, numero: numeroPor.get(xs.id) ?? 0, enunciado: xs.enunciado ?? '', tipo: xs.tipo === 'discursiva' ? 'discursiva' : 'objetiva',
+          id: xs.id, numero: xs.numero, enunciado: xs.enunciado, tipo: xs.tipo === 'discursiva' ? 'discursiva' : 'objetiva',
           gabarito: gabaritoDe(xs.id),
           alternativas: (altsPor.get(xs.id) ?? []).map((a, i) => ({ letra: LETRAS[i] ?? '?', texto: a.texto ?? '', correta: !!a.correta })),
           explicacao: xs.comentario_professor ?? null,
-          classificacao: { disciplina: xs.disciplinas?.nome ?? null, assunto: xs.assuntos?.nome ?? null, prova: provaDe(xs) },
+          classificacao: { disciplina: xs.disciplina, assunto: xs.assunto, prova: provaDe(xs) },
         }
       }
 
       const cls = classLote[selBancoId]
       const banco: BancoRow = {
         id: (b as any).id, nome: (b as any).nome, tipo: (b as any).tipo === 'discursiva' ? 'discursiva' : 'objetiva',
-        questoes: vinc.length, atualizadoEm: null, disciplina: cls?.disciplina?.nome ?? null, banca: cls?.banca?.nome ?? null,
+        questoes: totalBanco, atualizadoEm: null, disciplina: cls?.disciplina?.nome ?? null, banca: cls?.banca?.nome ?? null,
       }
       return (
         <BancosAcervo
           modo="banco" banco={banco} questoes={questoes} totalQuestoes={total} detalhe={detalhe}
           rows={[]} total={0}
-          filtros={{ disc: fDisc, banca: fBanca, ano: fAno, dif: fDif, sit: fSit }}
-          disciplinasFiltro={disciplinasFiltro} bancasFiltro={bancasFiltro} anosFiltro={anosFiltro}
+          filtros={{ disc: null, banca: null }}
+          disciplinasFiltro={[]} bancasFiltro={[]}
+          filtrosEstudio={fe} opcoesEstudio={opcoesEstudio} facInicial={contarAplicados(fe) === 0 && !fe.q ? base : null}
         />
       )
     }
@@ -150,8 +128,9 @@ export default async function QuestoesAcervoPage({ searchParams }: { searchParam
     <BancosAcervo
       modo="bancos" banco={null} questoes={[]} totalQuestoes={0} detalhe={null}
       rows={rows} total={total}
-      filtros={{ disc: fDisc, banca: fBanca, ano: null, dif: null, sit: null }}
-      disciplinasFiltro={nomes('disciplina')} bancasFiltro={nomes('banca')} anosFiltro={[]}
+      filtros={{ disc: fDisc, banca: fBanca }}
+      disciplinasFiltro={nomes('disciplina')} bancasFiltro={nomes('banca')}
+      filtrosEstudio={FILTROS_VAZIOS} opcoesEstudio={null} facInicial={null}
     />
   )
 }

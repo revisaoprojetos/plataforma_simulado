@@ -97,7 +97,7 @@ export function ProvaRunner({ voltarHref }: { voltarHref: string }) {
                 </button>
               </div>
 
-              <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: 'var(--ink)' }}>{q.enunciado}</p>
+              <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{q.enunciado}</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {q.alts.map((txt, k) => {

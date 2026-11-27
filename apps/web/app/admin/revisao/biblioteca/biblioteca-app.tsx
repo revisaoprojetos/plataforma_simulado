@@ -407,7 +407,8 @@ export function BibliotecaApp({ inicial, estadoInicial, arvoreInicial, opcoesIni
             podeImportarPlataforma={qPerm.importarPlataforma} onTotalBanco={setTotalBancoQ} sel={selQ} setSel={setSelQ} onUnificarSelecionadas={irUnificarSelecionadas}
             onIrDuplicadas={irUnificarSelecionadas} contagensInicial={bancoKey === 0 && ssrOk.current ? contagensInicialQ : null} />
         ) : subQ === 'unificar' ? (
-          <QuestoesUnificar podeEditar={qPerm.editar} inicial={ssrQ?.unificar} />
+          <QuestoesUnificar podeEditar={qPerm.editar} inicial={ssrQ?.unificar}
+            disciplinas={{ podeEditarMateriais: podeEditar, podeTaxonomiaVer: qPerm.ver, podeTaxonomiaEditar: qPerm.editar, inicial: ssrQ?.disciplinas, onMudou: () => void recarregar() }} />
         ) : (
           <QuestoesClassificacao podeEditar={qPerm.editar} inicial={ssrQ?.classificacao ?? undefined} />
         )

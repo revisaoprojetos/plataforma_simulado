@@ -20,6 +20,8 @@ export interface IndicadoresEtiquetas {
 
 export interface ListaEtiquetas {
   itens: EtiquetaQ[]; total: number; page: number; pp: number
+  /** nº de etiquetas por opção de filtro (cada dimensão com os OUTROS filtros aplicados) */
+  facetas?: Record<'situacao' | 'funcao' | 'faixa', Record<string, number>>
   indicadores: IndicadoresEtiquetas
   degradado?: boolean
 }

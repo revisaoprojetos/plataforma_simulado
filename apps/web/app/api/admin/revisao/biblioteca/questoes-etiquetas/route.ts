@@ -1,3 +1,4 @@
+import { FAIXAS_ET, OPCOES_FUNCAO_ET, OPCOES_SITUACAO_ET, lerListaEt } from '@/lib/admin-revisao/etiquetas-filtros'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     if (s === 'lista') {
       const filtro = (FILTROS.includes(sp.get('filtro') ?? '') ? sp.get('filtro') : '') as FiltroEtiquetas
       const sort = ORDENS.includes(sp.get('sort') ?? '') ? (sp.get('sort') as OrdemEtiquetas) : undefined
-      return NextResponse.json({ ok: true, ...(await listarEtiquetasQ(svc, tenantId, { q: sp.get('q') ?? '', filtro, sort, dir: sp.get('dir') === 'asc' ? 'asc' : sp.get('dir') === 'desc' ? 'desc' : undefined, page: num(sp.get('page'), 1), pp: num(sp.get('pp'), 14), fresh })) })
+      return NextResponse.json({ ok: true, ...(await listarEtiquetasQ(svc, tenantId, { q: sp.get('q') ?? '', filtro, multi: { situacao: lerListaEt(sp.get('situacao'), OPCOES_SITUACAO_ET.map((o) => o.v)), funcao: lerListaEt(sp.get('funcao'), OPCOES_FUNCAO_ET.map((o) => o.v)), faixa: lerListaEt(sp.get('faixa'), FAIXAS_ET.map((o) => o.v)) }, sort, dir: sp.get('dir') === 'asc' ? 'asc' : sp.get('dir') === 'desc' ? 'desc' : undefined, page: num(sp.get('page'), 1), pp: num(sp.get('pp'), 14), fresh })) })
     }
     const id = sp.get('id') ?? ''
     if (s === 'detalhe') {

@@ -122,7 +122,7 @@ export async function listarGruposPU(svc: SupabaseClient, tenantId: string, o: O
   const porConfianca: Record<ConfTermo, number> = { alta: 0, media: 0, baixa: 0 }
   for (const g of base.grupos) if (!ign.has(g.id)) porConfianca[g.confianca]++
   const termo = plano(o.q ?? '')
-  let l = base.grupos.filter((g) => (o.verIgnorados ? ign.has(g.id) : !ign.has(g.id)) && (!o.confianca || g.confianca === o.confianca) &&
+  let l = base.grupos.filter((g) => (o.verIgnorados ? ign.has(g.id) : !ign.has(g.id)) && (!o.confianca || o.confianca.split(',').includes(g.confianca)) &&
     (!termo || g.variantes.some((v) => plano(v.nome).includes(termo) || plano(v.disciplinaNome ?? '').includes(termo))))
   const dir = o.dir === 'asc' ? 1 : -1
   const sort = o.sort ?? 'docs'

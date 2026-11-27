@@ -15,6 +15,8 @@ import type {
 } from '@/lib/admin-revisao/questoes-etiquetas-tipos'
 import { CORES, FUNCOES, FuncaoSelect, PaletaCor } from '@/app/admin/etiquetas/etiquetas-client'
 import { PaginacaoBib } from './paginacao-bib'
+import { FiltrosMultiCard } from './filtros-multi-card'
+import { FAIXAS_ET, OPCOES_FUNCAO_ET, OPCOES_SITUACAO_ET, filtroLegadoEt, type DimEt, type FiltrosEt } from '@/lib/admin-revisao/etiquetas-filtros'
 
 // SUB-ABA ETIQUETAS (Biblioteca > Questões). Gerenciador das etiquetas do banco: lista com cor/nome/nº de questões reais (SQL agregado no servidor),
 // busca, filtros e ordenação no servidor, indicadores, criar/renomear/cor/função, excluir com prévia, mesclar (várias), detalhe em painel lateral
@@ -54,10 +56,6 @@ async function postar<T = any>(acao: string, corpo: Record<string, unknown>): Pr
 }
 
 const PP = [10, 14, 25, 50, 100]
-const FILTROS: { id: FiltroEtiquetas; nome: string }[] = [
-  { id: '', nome: 'Todas as etiquetas' }, { id: 'mais_usadas', nome: 'Mais usadas (top 10)' }, { id: 'sem_uso', nome: 'Sem uso' },
-  { id: 'duplicadas', nome: 'Nome repetido' }, { id: 'funcao', nome: 'Com função no simulado' },
-]
 const funcInfo = (f?: FuncaoEtiquetaQ | null) => FUNCOES.find((x) => x.id === f) ?? null
 const COR_PADRAO = 'var(--muted-foreground)'
 const fundo = (cor: string) => `color-mix(in srgb, ${cor} 14%, transparent)`
@@ -81,7 +79,7 @@ function Vazio({ children }: { children: React.ReactNode }) { return <p classNam
 /** `inicial` = 1ª página (nome A-Z, 14/página) lida no servidor (carregarInicialEtiquetas): renderiza na hora, sem chamada no load. */
 export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean; inicial?: ListaEtiquetas | null }) {
   const router = useRouter()
-  const [filtro, setFiltro] = useState<FiltroEtiquetas>('')
+  const [multi, setMulti] = useState<FiltrosEt>({})
   const [busca, setBusca] = useState('')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<OrdemEtiquetas>('nome')
@@ -98,7 +96,7 @@ export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean
   const [detalhe, setDetalhe] = useState<EtiquetaQ | null>(null)
   const seq = useRef(0)
 
-  const params = useMemo(() => ({ s: 'lista', q, filtro, sort, dir, page, pp }), [q, filtro, sort, dir, page, pp])
+  const params = useMemo(() => ({ s: 'lista', q, situacao: (multi.situacao ?? []).join(','), funcao: (multi.funcao ?? []).join(','), faixa: (multi.faixa ?? []).join(','), sort, dir, page, pp }), [q, multi, sort, dir, page, pp])
   // Semeia o cache do cliente com o SSR (uma vez): voltar à visão padrão, ou o efeito abaixo, responde sem rede.
   const semeado = useRef(false)
   if (!semeado.current) { semeado.current = true; if (inicial && !CACHE.has(qs(params))) CACHE.set(qs(params), { t: Date.now(), v: { ok: true, ...inicial } }) }
@@ -128,10 +126,21 @@ export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean
   const alternar = (e: EtiquetaQ) => setMarcadas((m) => { const x = new Map(m); if (x.has(e.id)) x.delete(e.id); else x.set(e.id, e); return x })
   const todasMarcadas = itens.length > 0 && itens.every((e) => marcadas.has(e.id))
   const aposMutar = () => { setMarcadas(new Map()); void carregar(true) }
-  const filtrar = (f: FiltroEtiquetas) => { setFiltro(f); setPage(1) }
+  const filtrar = (f: FiltroEtiquetas) => { setMulti(filtroLegadoEt(f)); setPage(1) }
+  const nFiltros = Object.values(multi).reduce((t, l) => t + (l?.length ?? 0), 0)
+  const ativoKpi = (f: FiltroEtiquetas): boolean => { const m = filtroLegadoEt(f); const ks = Object.keys(m) as DimEt[]; if (!ks.length) return nFiltros === 0; return nFiltros === (m[ks[0]]?.length ?? 0) && ks.length === 1 && (m[ks[0]] ?? []).every((v) => multi[ks[0]]?.includes(v)) }
+  const filtro: FiltroEtiquetas = nFiltros === 0 ? '' : ativoKpi('sem_uso') ? 'sem_uso' : ativoKpi('duplicadas') ? 'duplicadas' : ativoKpi('funcao') ? 'funcao' : ativoKpi('mais_usadas') ? 'mais_usadas' : ('multi' as FiltroEtiquetas)
+  const dimsCard = [
+    { id: 'situacao', rotulo: 'Situação', opcoes: OPCOES_SITUACAO_ET, valor: multi.situacao ?? [], contagens: dados?.facetas?.situacao },
+    { id: 'funcao', rotulo: 'Função no simulado', opcoes: OPCOES_FUNCAO_ET, valor: multi.funcao ?? [], contagens: dados?.facetas?.funcao },
+    { id: 'faixa', rotulo: 'Questões com a etiqueta', opcoes: FAIXAS_ET.map((f) => ({ v: f.v, label: f.label })), valor: multi.faixa ?? [], contagens: dados?.facetas?.faixa },
+  ]
 
   return (
-    <section className="flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border bg-card p-2 shadow-sm xl:h-[calc(100vh-9.5rem)]" aria-label="Etiquetas das questões">
+    <div className="space-y-4">
+    <FiltrosMultiCard rotulo="Filtros das etiquetas" dims={dimsCard} onChange={(id, v) => { setMulti((m) => ({ ...m, [id]: v })); setPage(1) }} onLimpar={() => { setMulti({}); setPage(1) }}
+      nota="O número ao lado de cada opção é a quantidade de etiquetas que você teria ao marcá-la." />
+    <section className="flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border bg-card p-2 shadow-sm xl:h-[calc(100vh-16rem)]" aria-label="Etiquetas das questões">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Etiquetas das questões</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -163,13 +172,12 @@ export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar etiqueta" aria-label="Buscar etiqueta" className={cn(campo, 'pl-8')} autoComplete="off" />
         </div>
-        <select className={selectBarra} value={filtro} onChange={(e) => filtrar(e.target.value as FiltroEtiquetas)} aria-label="Filtrar etiquetas">{FILTROS.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}</select>
         <select className={selectBarra} value={`${sort}:${dir}`} onChange={(e) => { const [s, d] = e.target.value.split(':'); setSort(s as OrdemEtiquetas); setDir(d as 'asc' | 'desc'); setPage(1) }} aria-label="Ordenar etiquetas">
           <option value="nome:asc">Nome (A-Z)</option><option value="nome:desc">Nome (Z-A)</option>
           <option value="questoes:desc">Mais questões</option><option value="questoes:asc">Menos questões</option>
           <option value="simulados:desc">Mais em simulados</option><option value="ultimo:desc">Usada recentemente</option><option value="criada:desc">Criada recentemente</option>
         </select>
-        {(q || filtro) && <button type="button" onClick={() => { setBusca(''); setQ(''); setFiltro(''); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
+        {(q || nFiltros > 0) && <button type="button" onClick={() => { setBusca(''); setQ(''); setMulti({}); setPage(1) }} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" />Limpar</button>}
         {podeEditar && marcadas.size > 0 && (
           <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-2 py-1 text-xs">
             <b>{marcadas.size}</b> marcada(s)
@@ -191,7 +199,7 @@ export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean
                 <Th k="ultimo">Última atualização</Th><Th k="criada">Criada em</Th><th className={cn(thCls, 'text-right')}>Ações</th>
               </tr></thead>
               <tbody>
-                {itens.length === 0 && <tr><td colSpan={8}><Vazio>{q || filtro ? 'Nenhuma etiqueta com esta busca/filtro.' : 'Nenhuma etiqueta cadastrada. Use “Nova etiqueta”.'}</Vazio></td></tr>}
+                {itens.length === 0 && <tr><td colSpan={8}><Vazio>{q || nFiltros > 0 ? 'Nenhuma etiqueta com esta busca/filtro.' : 'Nenhuma etiqueta cadastrada. Use “Nova etiqueta”.'}</Vazio></td></tr>}
                 {itens.map((e) => {
                   const f = funcInfo(e.funcao)
                   return (
@@ -238,6 +246,7 @@ export function QuestoesEtiquetas({ podeEditar, inicial }: { podeEditar: boolean
       {detalhe && <DetalheDrawer et={detalhe} podeEditar={podeEditar} onClose={() => setDetalhe(null)} onVer={() => verNoBanco(detalhe)} onMudou={() => void carregar(true)}
         onMesclar={() => { setMescla({ origens: [detalhe], entre: false }); setDetalhe(null) }} onEditar={() => { setEditor({ et: detalhe }); setDetalhe(null) }} />}
     </section>
+    </div>
   )
 }
 

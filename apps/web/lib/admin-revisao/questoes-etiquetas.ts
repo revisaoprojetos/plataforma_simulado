@@ -6,6 +6,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { plano } from './texto-plano'
+import { facetasEt, filtroLegadoEt, passaEt, type FiltrosEt } from './etiquetas-filtros'
 import type {
   DetalheEtiqueta, EtiquetaQ, FiltroEtiquetas, FuncaoEtiquetaQ, IndicadoresEtiquetas, ListaEtiquetas, OrdemEtiquetas, PreviaExcluir, PreviaMesclar, QuestaoMini,
 } from './questoes-etiquetas-tipos'
@@ -86,7 +87,7 @@ export async function carregarInicialEtiquetas(tenantId: string): Promise<ListaE
   try { return await listarEtiquetasQ(createAdminClient(), tenantId, { q: '', filtro: '', sort: 'nome', dir: 'asc', page: 1, pp: 14 }) } catch { return null }
 }
 
-export async function listarEtiquetasQ(svc: SupabaseClient, tenantId: string, o: { q?: string; filtro?: FiltroEtiquetas; sort?: OrdemEtiquetas; dir?: 'asc' | 'desc'; page?: number; pp?: number; fresh?: boolean }): Promise<ListaEtiquetas> {
+export async function listarEtiquetasQ(svc: SupabaseClient, tenantId: string, o: { q?: string; filtro?: FiltroEtiquetas; multi?: FiltrosEt; sort?: OrdemEtiquetas; dir?: 'asc' | 'desc'; page?: number; pp?: number; fresh?: boolean }): Promise<ListaEtiquetas> {
   const { itens: todas, ind, degradado } = await listaEmCache(svc, tenantId, o.fresh)
   // duplicadas por nome normalizado
   const grupos = new Map<string, EtiquetaQ[]>()
@@ -96,17 +97,18 @@ export async function listarEtiquetasQ(svc: SupabaseClient, tenantId: string, o:
   const base = todas.map((e) => ({ ...e, grupoDup: dupDe.get(e.id) ?? null }))
 
   const termo = plano(o.q ?? '')
-  let l = base.filter((e) => !termo || plano(e.nome).includes(termo))
-  if (o.filtro === 'sem_uso') l = l.filter((e) => e.questoes === 0)
-  else if (o.filtro === 'duplicadas') l = l.filter((e) => e.grupoDup)
-  else if (o.filtro === 'funcao') l = l.filter((e) => e.funcao)
-  else if (o.filtro === 'mais_usadas') { const top = [...base].filter((e) => e.questoes > 0).sort((a, b) => b.questoes - a.questoes).slice(0, 10).map((e) => e.id); const s = new Set(top); l = l.filter((e) => s.has(e.id)) }
-  const sort: OrdemEtiquetas = o.sort ?? (o.filtro === 'mais_usadas' ? 'questoes' : 'nome')
+  const top = new Set([...base].filter((e) => e.questoes > 0).sort((a, b) => b.questoes - a.questoes).slice(0, 10).map((e) => e.id))
+  // multi (E entre dimensões, OU dentro); o `filtro` legado só vale se nenhum multi veio
+  const multi: FiltrosEt = o.multi && Object.values(o.multi).some((v) => v?.length) ? o.multi : filtroLegadoEt(o.filtro ?? '')
+  const passaBusca = (e: EtiquetaQ) => !termo || plano(e.nome).includes(termo)
+  let l = base.filter((e) => passaBusca(e) && passaEt(e, multi, top))
+  const facetas = facetasEt(base, multi, top, passaBusca)
+  const sort: OrdemEtiquetas = o.sort ?? (multi.situacao?.length === 1 && multi.situacao[0] === 'mais_usadas' ? 'questoes' : 'nome')
   const dir = (o.dir ?? (sort === 'nome' ? 'asc' : 'desc')) === 'desc' ? -1 : 1
   const val = (e: EtiquetaQ) => (sort === 'questoes' ? e.questoes : sort === 'simulados' ? e.emSimulados : sort === 'ultimo' ? (e.ultimoUso ? Date.parse(e.ultimoUso) : 0) : sort === 'criada' ? (e.criadoEm ? Date.parse(e.criadoEm) : 0) : 0)
   l = [...l].sort((a, b) => ((sort === 'nome' ? ptbr(a.nome, b.nome) : val(a) - val(b)) || ptbr(a.nome, b.nome) || (a.id < b.id ? -1 : 1)) * dir)
   const pp = Math.min(100, Math.max(5, o.pp ?? 14)), page = Math.max(1, o.page ?? 1)
-  return { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, indicadores: { ...ind, duplicadas }, degradado }
+  return { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, facetas, indicadores: { ...ind, duplicadas }, degradado }
 }
 
 // ───────────────────────── detalhe (drawer) ─────────────────────────

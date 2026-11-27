@@ -7,6 +7,7 @@ import { listarTaxonomia } from '@/app/admin/questoes/taxonomia-actions'
 import { CAMPOS_CLASSIF, VISOES_Q } from './biblioteca-questoes-tipos'
 import { VIS_SQL } from './biblioteca-questoes-vis'
 import { aquecerDuplicadas, duplicadasEmCache, gruposDuplicados, idsDuplicadas, plano } from './biblioteca-questoes-duplicadas'
+import { filtrarTax, unirLegadoTax, type FiltrosTax } from './taxonomia-filtros'
 import { deteccaoCache, invalidarDeteccao } from './cache-deteccao'
 import { chaveRelatorio, esquecer, remember } from '@/lib/cache/relatorio-cache'
 import type {
@@ -108,10 +109,11 @@ export async function itensTaxonomia(svc: SupabaseClient, tenantId: string, tipo
   return { itens, degradado }
 }
 
-export async function listarTaxonomiaG(svc: SupabaseClient, tenantId: string, tipo: TipoTaxG, o: { q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; disciplina?: string; semUso?: boolean; fresh?: boolean }): Promise<RespostaTaxG> {
+export async function listarTaxonomiaG(svc: SupabaseClient, tenantId: string, tipo: TipoTaxG, o: { q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; disciplina?: string; semUso?: boolean; multi?: FiltrosTax; fresh?: boolean }): Promise<RespostaTaxG> {
   const { itens, degradado } = await itensTaxonomia(svc, tenantId, tipo, o.fresh)
   const termo = plano(o.q ?? '')
-  let l = itens.filter((i) => (!termo || plano(i.nome).includes(termo) || plano(i.paiNome ?? '').includes(termo)) && (!o.disciplina || i.paiId === o.disciplina) && (!o.semUso || i.questoes === 0))
+  const r0 = filtrarTax(itens, unirLegadoTax(o.multi, o.disciplina, o.semUso), (i) => !termo || plano(i.nome).includes(termo) || plano(i.paiNome ?? '').includes(termo))
+  let l = r0.lista
   const dir = o.dir === 'desc' ? -1 : 1
   const sort = o.sort ?? (tipo === 'ano' ? 'nome' : 'questoes')
   l = [...l].sort((a, b) => {
@@ -119,7 +121,7 @@ export async function listarTaxonomiaG(svc: SupabaseClient, tenantId: string, ti
     return (c || ptbr(a.nome, b.nome) || (a.id < b.id ? -1 : 1)) * dir
   })
   const pp = Math.min(100, Math.max(5, o.pp ?? 14)), page = Math.max(1, o.page ?? 1)
-  const out: RespostaTaxG = { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, degradado }
+  const out: RespostaTaxG = { itens: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, degradado, facetas: r0.facetas }
   if (tipo === 'assunto') out.disciplinas = (await itensTaxonomia(svc, tenantId, 'disciplina')).itens.map((d) => ({ id: d.id, nome: d.nome })).sort((a, b) => ptbr(a.nome, b.nome))
   return out
 }

@@ -11,8 +11,8 @@ import { limparCacheQuestoes } from './biblioteca-questoes'
 import { aquecerDeteccao, deteccaoCache, invalidarDeteccao } from './cache-deteccao'
 import { unificarQuestoes } from './biblioteca-questoes-acoes'
 import {
-  FILTROS_U_PADRAO, LIMIAR_MIN, LIMIAR_PADRAO, chavePar,
-  type FacetaU, type FiltrosU, type GrupoU, type HistoricoU, type InicialUnificar, type NivelDup, type PreviaU, type RespostaGruposU, type ResumoU,
+  DIMS_U, FILTROS_U_PADRAO, LIMIAR_MIN, LIMIAR_PADRAO, chavePar, valoresGrupoU,
+  type DimU, type FacetaU, type FacetasContU, type FiltrosU, type GrupoU, type HistoricoU, type InicialUnificar, type NivelDup, type PreviaU, type RespostaGruposU, type ResumoU,
 } from './questoes-unificar-tipos'
 
 // DETECÇÃO + UNIFICAÇÃO SEGURA de questões duplicadas (Biblioteca › Questões › Unificar). Somente servidor.
@@ -231,24 +231,23 @@ export async function listarGrupos(svc: SupabaseClient, tenantId: string, f: Fil
   for (const g of pend) resumo.porNivel[g.nivel]++
   const base = f.vista === 'ignoradas' ? ignoradas : f.vista === 'resolvidas' ? resol : pend
   const termo = plano(f.q ?? '')
-  const passa = (g: Comp) =>
-    (!f.nivel || g.nivel === f.nivel) && (!f.disciplina || g.discs.has(f.disciplina)) && (!f.banca || g.bancas.has(f.banca)) && (!f.ano || g.anos.has(f.ano)) &&
-    (!f.status || g.statuses.has(f.status)) &&
-    (f.uso === 'simulado' ? g.emSimulado : f.uso === 'respostas' ? g.comRespostas : f.uso === 'livre' ? !g.emSimulado && !g.comRespostas : true) &&
-    (f.gabarito === 'divergente' ? g.gabDiverge : f.gabarito === 'ok' ? !g.gabDiverge : true) &&
-    (!termo || g.idx.some((i) => e.items[i].enun.includes(termo) || (e.items[i].cod ?? '').toLowerCase() === f.q.trim().toLowerCase() || (e.items[i].ext ?? '').toLowerCase().includes(f.q.trim().toLowerCase())))
-  const filtrados = base.filter(passa)
+  const buscaOk = (g: Comp) => !termo || g.idx.some((i) => e.items[i].enun.includes(termo) || (e.items[i].cod ?? '').toLowerCase() === f.q.trim().toLowerCase() || (e.items[i].ext ?? '').toLowerCase().includes(f.q.trim().toLowerCase()))
+  // E entre dimensões, OU dentro da dimensão; `ignorar` = a dimensão que está sendo contada (faceta)
+  const passa = (g: Comp, ignorar?: DimU) => buscaOk(g) && DIMS_U.every((d) => d === ignorar || !f[d]?.length || valoresGrupoU(g, d).some((v) => f[d].includes(v)))
+  const filtrados = base.filter((g) => passa(g))
   filtrados.sort((a, b) => RANK[a.nivel] - RANK[b.nivel] || Number(b.comRespostas) - Number(a.comRespostas) || b.ids.length - a.ids.length || b.scoreMin - a.scoreMin || (a.id < b.id ? -1 : 1))
   // facetas = grupos da vista, sem aplicar os filtros de taxonomia (para o usuário ver o que existe)
   const fd = new Map<string, number>(), fb = new Map<string, number>(), fa = new Map<string, number>()
   for (const g of base) { for (const x of g.discs) fd.set(x, (fd.get(x) ?? 0) + 1); for (const x of g.bancas) fb.set(x, (fb.get(x) ?? 0) + 1); for (const x of g.anos) fa.set(x, (fa.get(x) ?? 0) + 1) }
+  const contagens = Object.fromEntries(DIMS_U.map((d) => [d, {}])) as unknown as FacetasContU
+  for (const d of DIMS_U) for (const g of base) if (passa(g, d)) for (const v of valoresGrupoU(g, d)) contagens[d][v] = (contagens[d][v] ?? 0) + 1
   const pp = Math.min(50, Math.max(5, f.pp || 14)), page = Math.max(1, f.page || 1)
   const grupos: GrupoU[] = filtrados.slice((page - 1) * pp, page * pp).map((g) => {
     const primeira = g.idx.map((i) => e.items[i]).find((b) => b.status !== 'arquivada') ?? e.items[g.idx[0]]
     return { id: g.id, ids: g.ids, n: g.ids.length, ativas: g.ativas, nivel: g.nivel, scoreMin: g.scoreMin, amostra: primeira.amostra, emSimulado: g.emSimulado, comRespostas: g.comRespostas, gabDiverge: g.gabDiverge, ignorados: g.ignorados }
   })
   return {
-    ok: true, grupos, total: filtrados.length, page, pp, totalQuestoes: e.items.length, geradoEm: e.at, limiar, resumo, ignorarServidor: e.ignServidor, degradado: e.degradado,
+    ok: true, grupos, contagens, total: filtrados.length, page, pp, totalQuestoes: e.items.length, geradoEm: e.at, limiar, resumo, ignorarServidor: e.ignServidor, degradado: e.degradado,
     facetas: { disciplinas: faceta(fd, e.disc), bancas: faceta(fb, e.banca), anos: faceta(fa, null).map((x) => ({ ...x, nome: x.id })).sort((a, b) => Number(b.id) - Number(a.id)) },
   }
 }

@@ -1,29 +1,31 @@
-import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { CabecalhoArea } from '@/components/admin/cabecalho-area'
 import { AbasLinha } from '@/components/ui/abas-linha'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import Link from 'next/link'
-import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { BookOpen, Merge, Tag, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { QuestoesFilters } from '@/components/admin/questoes-filters'
+import { Suspense } from 'react'
+import { QuestoesFiltrosLista } from '@/components/admin/questoes-filtros-lista'
+import { listarQuestoes, opcoesQuestoes } from '@/lib/admin-revisao/biblioteca-questoes'
+import { paramsDeEstadoQ, type OpcoesQ } from '@/lib/admin-revisao/biblioteca-questoes-tipos'
+import { estadoQDeUrlAdmin } from '@/lib/admin-revisao/questoes-lista-url'
 import { PaginationControls } from '@/components/admin/pagination-controls'
-import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
-import { TaxonomiaUnificacao } from '@/components/admin/taxonomia-unificacao'
-import { DisciplinasClassificacao } from '@/components/admin/disciplinas-classificacao'
+import { QuestoesUnificar } from '../revisao/biblioteca/questoes-unificar'
+import { QuestoesEtiquetas } from '../revisao/biblioteca/questoes-etiquetas'
+import { ClassificacaoUnificada } from './classificacao-unificada'
+import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { carregarInicialUnificar } from '@/lib/admin-revisao/questoes-unificar'
+import { carregarInicialClassificacao } from '@/lib/admin-revisao/questoes-classificacao'
+import { carregarInicialEtiquetas } from '@/lib/admin-revisao/questoes-etiquetas'
+import { carregarInicialUnificarDisciplinas } from '@/lib/admin-revisao/biblioteca-pastas-unificar'
 import { listarDisciplinasClassificacao, listarPastasConteudo } from './disciplinas-actions'
 import { QuestoesTabela } from '@/components/admin/questoes-tabela'
-import { listarTaxonomia } from './taxonomia-actions'
 import { ehTipoTaxonomia } from './taxonomia-tipos'
-import { listarUnificacoesRecentes } from './disciplinas-actions'
-import { EtiquetasClient } from '../etiquetas/etiquetas-client'
-import { listarEtiquetas } from '../etiquetas/actions'
-import { sanearBusca } from '@/lib/seguranca/postgrest-safe'
 
 const PER_PAGE_OPTIONS = [10, 12, 15, 20]
 const PER_PAGE_DEFAULT = 12
@@ -37,6 +39,8 @@ interface PageProps {
     dificuldade?: string
     tipo?: string
     status?: string
+    /** filtros multi do card (listas "a|b"): disc, ass, det, banca, orgao, cargo, ano, dif, etq — lidos via estadoQDeUrlAdmin */
+    [filtroMulti: string]: string | undefined
     tab?: string
     tipoTax?: string
     pp?: string
@@ -47,13 +51,12 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
   const perPage = PER_PAGE_OPTIONS.includes(Number(params.pp)) ? Number(params.pp) : PER_PAGE_DEFAULT
-  const q = sanearBusca(params.q ?? '')
-  // Se o termo for um código de questão (ex.: "Q-6BA4EF94"), busca pelo id (faixa de UUID).
-  const faixaCodigo = q ? faixaUuidDoCodigo(q) : null
-  const status = params.status ?? ''
-  const disciplina = params.disciplina ?? ''
-  const dificuldade = params.dificuldade ?? ''
-  const tipo = params.tipo ?? ''
+  // Filtros multi-valor ("a|b") + links antigos de valor único; higienizados (uuid/ano/whitelist) no SQL (montarWhere). Código "Q-XXXXXXXX" também é tratado lá.
+  const paramsUrl = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) if (typeof v === 'string' && v) paramsUrl.set(k, v)
+  const estado = { ...estadoQDeUrlAdmin(paramsUrl), page: Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1, pp: perPage }
+  const q = estado.q
+  const qsExport = paramsDeEstadoQ(estado).toString()
 
   const tab = params.tab === 'etiquetas'
     ? 'etiquetas'
@@ -68,90 +71,39 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const [supabase, tenantId, podeImportarPlataforma] = await Promise.all([createServiceClient(), getCurrentTenantId(), isSuperAdmin()])
 
   // ── Aba QUESTÕES: filtro (disciplinas) + lista paginada (só busca aqui) ──
-  let disciplinas: { id: string; nome: string }[] = []
-  let questoes: any[] = []
+  let opcoesFiltro: OpcoesQ = { bancas: [], orgaos: [], anos: [], etiquetas: [], disciplinas: [] }
+  let questoes: Awaited<ReturnType<typeof listarQuestoes>>['rows'] = []
   let count: number | null = 0
   let totalPages = 1
-  const nomeAssunto = new Map<string, string>()
-  const nomeOrgao = new Map<string, string>()
-  const qtdAlternativas = new Map<string, number>()
   if (tab === 'questoes') {
-    // Disciplinas (filtro) em paralelo com a query principal; taxonomia muda pouco → cache 5 min por tenant.
-    const discP = remember(chaveRelatorio(tenantId, 'questoes-filtro-disciplinas'), 300, async () => {
-      const { data: disc } = await supabase
-        .from('simulado_disciplinas').select('id, nome')
-        .eq('tenant_id', tenantId ?? NADA).order('nome')
-      return (disc ?? []) as { id: string; nome: string }[]
-    })
-
-    // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
-    // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
-    const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-    // `formato` NÃO existe nesta base (só bases novas) — não incluir aqui senão o select 400 e derruba
-    // TODOS os extras. O tipo Certo/Errado é derivado da contagem de alternativas mais abaixo.
-    const EXTRAS = ', cargo, assunto_detalhe, assunto_id, orgao_id'
-    const montarQuery = (comCodigo: boolean, comExtras: boolean) => {
-      const sel: string = (comCodigo ? 'id, codigo, ' : 'id, ') + REST + (comExtras ? EXTRAS : '')
-      let query = supabase
-        .from('simulado_questoes')
-        .select(sel, { count: 'exact' })
-        .eq('deletado', false)
-        .eq('tenant_id', tenantId ?? NADA)
-        .order('created_at', { ascending: false })
-        .range((page - 1) * perPage, page * perPage - 1)
-      if (faixaCodigo) query = query.gte('id', faixaCodigo.lo).lte('id', faixaCodigo.hi)
-      else if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
-      if (status) query = query.eq('status', status)
-      if (disciplina) query = query.eq('disciplina_id', disciplina)
-      if (dificuldade) query = query.eq('nivel_dificuldade', dificuldade)
-      if (tipo) query = query.eq('tipo', tipo)
-      return query
-    }
-    // SELECT fixo (colunas codigo/cargo/assunto_detalhe/assunto_id/orgao_id já migradas). Um único
-    // fallback mínimo p/ bases antigas/dev — sem a escada de 3 tentativas no caminho feliz.
-    const [discRes, resFull] = await Promise.all([discP, montarQuery(true, true)])
-    disciplinas = discRes
-    let res = resFull
-    if (res.error) res = await montarQuery(false, false)
-    questoes = (res.data ?? []) as any[]
-    count = res.count
-    totalPages = Math.ceil((count ?? 0) / perPage)
-
-    // Nomes de Assunto/Órgão via SERVICE ROLE: a taxonomia (simulado_assuntos/orgaos) tem RLS que barra
-    // o embed sob a sessão do admin (por isso vinham vazios). Resolve pelos ids presentes na página.
-    // Também conta as alternativas de cada questão → 2 = Certo/Errado, senão Múltipla (não há coluna `formato`).
-    const admin = createAdminClient()
-    const qIds = questoes.map((x) => x.id)
-    const assIds = [...new Set(questoes.map((x) => x.assunto_id).filter(Boolean))]
-    const orgIds = [...new Set(questoes.map((x) => x.orgao_id).filter(Boolean))]
-    const [assRows, orgRows, altRows] = await Promise.all([
-      assIds.length ? admin.from('simulado_assuntos').select('id, nome').in('id', assIds) : Promise.resolve({ data: [] as any[] }),
-      orgIds.length ? admin.from('simulado_orgaos').select('id, nome').in('id', orgIds) : Promise.resolve({ data: [] as any[] }),
-      qIds.length ? admin.from('simulado_alternativas').select('questao_id').in('questao_id', qIds) : Promise.resolve({ data: [] as any[] }),
+    // Lista + total filtrados em SQL agregado (mesmo núcleo da Biblioteca: tenant sempre no $1, multi-valor, busca por código) + opções do card (cache por tenant).
+    const [lista, opc] = await Promise.all([
+      listarQuestoes(supabase, tenantId ?? NADA, estado),
+      opcoesQuestoes(supabase, tenantId ?? NADA).catch(() => opcoesFiltro),
     ])
-    for (const a of (assRows.data ?? []) as any[]) nomeAssunto.set(a.id, a.nome)
-    for (const o of (orgRows.data ?? []) as any[]) nomeOrgao.set(o.id, o.nome)
-    for (const r of (altRows.data ?? []) as any[]) qtdAlternativas.set(r.questao_id, (qtdAlternativas.get(r.questao_id) ?? 0) + 1)
+    opcoesFiltro = opc
+    questoes = lista.rows
+    count = lista.total
+    totalPages = Math.ceil((count ?? 0) / perPage)
   }
 
   // ── Aba UNIFICAÇÃO: itens da taxonomia escolhida + (só disciplina) unificações recentes p/ desfazer ──
-  const [itensTax, recentesUnif] = tab === 'unificacao'
-    ? await Promise.all([
-        listarTaxonomia(tipoTax).then((r) => r.itens ?? []),
-        tipoTax === 'disciplina' ? listarUnificacoesRecentes().then((r) => r.itens ?? []) : Promise.resolve([] as { id: string; mantida: string; duplicadas: string[]; questoes: number; criado_em: string }[]),
-      ])
-    : [[], []]
-
-  // ── Aba ETIQUETAS: rótulos das questões (movida da sidebar para cá) ──
-  const etiquetas = tab === 'etiquetas' ? await listarEtiquetas().then((r) => (r.ok ? r.itens ?? [] : [])) : []
-
-  // ── Aba CLASSIFICAÇÃO: disciplinas + classificação/cor/ordem + vínculo pasta→disciplina ──
-  const [discClass, pastasConteudo] = tab === 'classificacao'
-    ? await Promise.all([
-        listarDisciplinasClassificacao().then((r) => (r.ok ? r.itens ?? [] : [])),
-        listarPastasConteudo().then((r) => (r.ok ? r.itens ?? [] : [])),
-      ])
-    : [[], []]
+  // As 3 abas abaixo renderizam os MESMOS componentes da Biblioteca (SSR `inicial` só da aba ativa; o resto vai pelas rotas /api/admin/revisao/biblioteca/*).
+  const ehGestao = tab !== 'questoes'
+  const acesso = ehGestao ? await getCurrentAccess() : null
+  const podeEditarQ = !!acesso && accessCan(acesso, 'questoes:update')
+  const podeTaxonomia = !!acesso && accessCan(acesso, 'classificacao:manage')
+  const podeVerQ = !!acesso && accessCan(acesso, 'questoes:view')
+  const podeMateriais = !!acesso && accessCan(acesso, 'configuracoes:update')
+  const secaoUnificar = params.tab === 'disciplinas' ? 'disciplinas' as const : (params.tipoTax && ehTipoTaxonomia(params.tipoTax) ? 'termos' as const : undefined)
+  const [ssrDup, ssrDisc, ssrClassif, ssrEtiq, discClass, pastasConteudo] = await Promise.all([
+    tab === 'unificacao' && tenantId && !secaoUnificar ? carregarInicialUnificar(tenantId).catch(() => null) : null,
+    tab === 'unificacao' && tenantId && secaoUnificar === 'disciplinas' ? carregarInicialUnificarDisciplinas(tenantId, 'conteudo').catch(() => null) : null,
+    tab === 'classificacao' && tenantId ? carregarInicialClassificacao(tenantId).catch(() => null) : null,
+    tab === 'etiquetas' && tenantId ? carregarInicialEtiquetas(tenantId).catch(() => null) : null,
+    tab === 'classificacao' ? listarDisciplinasClassificacao().then((r) => (r.ok ? r.itens ?? [] : [])) : [],
+    tab === 'classificacao' ? listarPastasConteudo().then((r) => (r.ok ? r.itens ?? [] : [])) : [],
+  ])
 
 
   return (
@@ -161,13 +113,13 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         descricao={tab === 'questoes'
               ? `${count ?? 0} questões cadastradas`
               : tab === 'etiquetas'
-                ? `${etiquetas.length} etiqueta(s) — rótulos para organizar e sinalizar questões`
+                ? 'Etiquetas — rótulos para organizar e sinalizar questões'
                 : tab === 'classificacao'
-                  ? `${discClass.length} disciplina(s) — classifique e dê cor (usado no Cronograma Adaptativo)`
-                  : `${itensTax.length} item(ns) — mescle os duplicados`}
+                  ? 'Classificação — qualidade, cadastro da taxonomia e disciplinas'
+                  : 'Unificação — questões duplicadas, termos, etiquetas e disciplinas'}
         acoes={tab === 'questoes' ? (
           <>
-            <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
+            <ExportQuestoesButton filtros={{ q, status: estado.status, disciplina: estado.disc, dificuldade: estado.dif, tipo: estado.tipo, qs: qsExport }} />
             <NovaQuestaoDialog podeImportarPlataforma={podeImportarPlataforma} />
           </>
         ) : undefined}
@@ -182,35 +134,29 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       />
 
       {tab === 'classificacao' ? (
-        <DisciplinasClassificacao itens={discClass} pastas={pastasConteudo} />
+        <ClassificacaoUnificada podeEditar={podeEditarQ} podeTaxonomia={podeTaxonomia} inicial={ssrClassif ?? undefined} disciplinas={discClass} pastas={pastasConteudo} />
       ) : tab === 'etiquetas' ? (
-        <EtiquetasClient inicial={etiquetas} />
+        <QuestoesEtiquetas podeEditar={podeEditarQ} inicial={ssrEtiq} />
       ) : tab === 'unificacao' ? (
-        <TaxonomiaUnificacao tipo={tipoTax} itens={itensTax} recentes={recentesUnif} />
+        <QuestoesUnificar podeEditar={podeEditarQ} secaoInicial={secaoUnificar} inicial={ssrDup ? { duplicadas: ssrDup } : null}
+          disciplinas={{ podeEditarMateriais: podeMateriais, podeTaxonomiaVer: podeVerQ, podeTaxonomiaEditar: podeEditarQ, inicial: ssrDisc }} />
       ) : (
       // marginTop inline vence o space-y-5 do pai (senão o gap de cima ficaria 20px e o de baixo 12px).
       // space-y-3 dá o mesmo respiro (12px) entre linha de filtros ↔ tabela ↔ paginação.
       <div className="space-y-3" style={{ marginTop: '0.75rem' }}>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <h3 className="text-sm font-semibold leading-tight">Questões</h3>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{(count ?? 0).toLocaleString('pt-BR')} cadastrada(s)</span>
-        </div>
+      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
         <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:w-[520px]" />}>
-          <QuestoesFilters disciplinas={disciplinas ?? []} />
+          <QuestoesFiltrosLista opcoes={opcoesFiltro} />
         </Suspense>
       </div>
 
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <CardContent className="p-0">
-          <QuestoesTabela questoes={(questoes ?? []).map((q: any) => ({
+          <QuestoesTabela questoes={questoes.map((q) => ({
             id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null,
-            formato: qtdAlternativas.get(q.id) === 2 ? 'certo_errado' : 'multipla',
-            nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assunto_detalhe ?? null,
-            disciplina: (q.disciplinas as { nome?: string } | null)?.nome ?? null,
-            assunto: q.assunto_id ? (nomeAssunto.get(q.assunto_id) ?? null) : null,
-            banca: (q.bancas as { nome?: string } | null)?.nome ?? null,
-            orgao: q.orgao_id ? (nomeOrgao.get(q.orgao_id) ?? null) : null,
+            formato: q.formato,
+            nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assuntoDetalhe ?? null,
+            disciplina: q.disciplina, assunto: q.assunto, banca: q.banca, orgao: q.orgao,
           }))} />
         </CardContent>
       </Card>

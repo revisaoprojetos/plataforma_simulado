@@ -6,30 +6,26 @@
 // (Todas / Não resolvidas / Que errei). A navegação reusa o motor funcional existente (useBancoNav +
 // URL por searchParams), então o filtro continua server-side e otimizado — só o VISUAL é o novo.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ClipboardCheck, Check, Percent, BookOpen, Search, SlidersHorizontal, X, FileText, Star, Loader2 } from 'lucide-react'
-import { internaTokensStyle, internaVars, INTERNA_FONT, type Brand, type InternaTheme } from '../interna-tokens'
+import { internaTokensStyle, INTERNA_FONT, type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { useCm } from '@/lib/brand/cor-marca'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QCore } from '../qcore'
 import { useBancoNav } from '@/components/aluno/banco-questoes-client'
 import type { Opt, AssuntoOpt, FiltrosParams } from '@/components/aluno/questoes-filtros-aluno'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MultiFiltro, ArvoreAssuntos, type DetalheNo } from './multi-filtro'
+import { lerLista, juntarLista } from '@/lib/aluno/filtros-multi'
 import { QuestoesTabs } from '../questoes-tabs'
 
 export interface BancoStats { resolvidas: number; acertos: number; aproveitamento: number; total: number }
-export type BancoFiltroData = { disciplinas: Opt[]; assuntos: AssuntoOpt[]; bancas: Opt[]; anos: number[]; params: FiltrosParams }
+export type BancoFiltroData = { disciplinas: Opt[]; assuntos: AssuntoOpt[]; bancas: Opt[]; orgaos?: Opt[]; cargos?: string[]; detalhes?: DetalheNo[]; anos: number[]; params: FiltrosParams }
 
 const DIFICULDADES = [{ v: 'facil', r: 'Fácil' }, { v: 'medio', r: 'Médio' }, { v: 'dificil', r: 'Difícil' }]
 const SEGMENTOS = [{ v: '', r: 'Todas' }, { v: 'nao_resolvidas', r: 'Não resolvidas' }, { v: 'errei', r: 'Que errei' }]
 
 const fmt = (n: number) => n.toLocaleString('pt-BR')
-
-// Estilo do POPUP dos selects de filtro — resolvido por marca×tema no PlatformBanco e consumido pelo
-// FiltroSelect. O popup é portalado p/ fora do `.app`, perdendo os tokens herdados; sem isto cai no
-// branco + accent roxo do shadcn (ignora a marca, pior ainda no tema escuro/azul).
-const SelectCorCtx = createContext<React.CSSProperties | undefined>(undefined)
 
 export function PlatformBanco({
   brand,
@@ -58,17 +54,10 @@ export function PlatformBanco({
   const theme = useTemaInterno(themeProp)
   const cm = useCm()
   const { nav, pending } = useBancoNav()
-  // Popup dos selects tematizado com os tokens MEQ do tema RESOLVIDO (inclui azul). Sem isto o dropdown
-  // (portalado p/ fora do .app) fica branco com accent roxo do shadcn — o "branco em volta das opções".
-  const corPopup = useMemo<React.CSSProperties>(() => {
-    const c = internaVars(brand, theme)
-    return {
-      background: c.surface2, color: c.ink, border: `1px solid ${c.line}`,
-      ['--popover' as never]: c.surface2, ['--popover-foreground' as never]: c.ink,
-      ['--accent' as never]: c.chip, ['--accent-foreground' as never]: c.brand, ['--border' as never]: c.line,
-    }
-  }, [brand, theme])
   const { disciplinas, assuntos, bancas, anos, params } = filtros
+  const orgaos = filtros.orgaos ?? []
+  const cargos = filtros.cargos ?? []
+  const detalhes = filtros.detalhes ?? []
 
   // Rascunho editável da sidebar (aplica só no "Filtrar"); ressincroniza quando a URL aplicada muda.
   const [f, setF] = useState<FiltrosParams>({ ...params })
@@ -78,10 +67,42 @@ export function PlatformBanco({
   const set = (k: keyof FiltrosParams, v: string) => setF((p) => ({ ...p, [k]: v || undefined }))
   const toggle = (k: keyof FiltrosParams) => setF((p) => ({ ...p, [k]: p[k] ? undefined : '1' }))
 
+  // Assuntos/tópicos oferecidos: só os das disciplinas escolhidas (nenhuma escolhida = todos).
+  const discSel = lerLista(f.disciplina)
   const assuntosDaDisc = useMemo(
-    () => (f.disciplina ? assuntos.filter((a) => a.disciplina_id === f.disciplina) : assuntos),
-    [assuntos, f.disciplina],
+    () => (discSel.length ? assuntos.filter((a) => a.disciplina_id && discSel.includes(a.disciplina_id)) : assuntos),
+    [assuntos, f.disciplina], // eslint-disable-line react-hooks/exhaustive-deps
   )
+  const detalhesDaDisc = useMemo(() => {
+    const ids = new Set(assuntosDaDisc.map((a) => a.id))
+    return detalhes.filter((d) => ids.has(d.assunto_id))
+  }, [assuntosDaDisc, detalhes])
+  // Acordeão: só um painel de filtro aberto por vez (a sidebar não vira uma lista gigante).
+  const [painel, setPainel] = useState<string | null>(null)
+  const tp = (k: string) => () => setPainel((a) => (a === k ? null : k))
+
+  // Contagem AO VIVO: a cada mudança no rascunho, pergunta ao servidor quantas questões casam (total + por opção).
+  type Fac = { total: number; contagens: Record<string, Record<string, number>> }
+  const [fac, setFac] = useState<Fac | null>(null)
+  const [contando, setContando] = useState(false)
+  const rascunhoKey = JSON.stringify([f.disciplina, f.assunto, f.detalhe, f.banca, f.orgao, f.cargo, f.ano, f.dificuldade, f.busca, f.comentadas])
+  useEffect(() => {
+    const ac = new AbortController()
+    setContando(true)
+    const t = setTimeout(async () => {
+      try {
+        const usp = new URLSearchParams()
+        for (const k of ['disciplina', 'assunto', 'detalhe', 'banca', 'orgao', 'cargo', 'ano', 'dificuldade', 'busca', 'comentadas'] as const) if (f[k]) usp.set(k, String(f[k]))
+        const r = await fetch(`/api/aluno/questoes-facetas?${usp}`, { signal: ac.signal, cache: 'no-store' })
+        const j = await r.json()
+        if (j?.ok) setFac({ total: j.total, contagens: j.contagens })
+      } catch { /* abortado/offline: mantém o último valor */ }
+      if (!ac.signal.aborted) setContando(false)
+    }, 250)
+    return () => { clearTimeout(t); ac.abort() }
+  }, [rascunhoKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const totalRascunho = fac?.total ?? stats.total
+  const multi = (k: keyof FiltrosParams) => (v: string[]) => setF((p) => ({ ...p, [k]: juntarLista(v) }))
 
   const urlDe = (merged: FiltrosParams) => {
     const usp = new URLSearchParams()
@@ -91,20 +112,27 @@ export function PlatformBanco({
   const aplicar = () => nav(urlDe(f))
   const limparTudo = () => nav('/aluno/questoes')
   // Chips e segmento operam sobre o estado APLICADO (URL), navegando na hora.
-  const removerAplicado = (k: keyof FiltrosParams) => nav(urlDe({ ...params, [k]: undefined }))
   const irSegmento = (v: string) => nav(urlDe({ ...params, minhas: v || undefined }))
 
-  // Chips do que está aplicado (não do rascunho).
-  const nomeDe = (arr: { id: string; nome: string }[], id?: string) => arr.find((x) => x.id === id)?.nome
-  const chips: { k: keyof FiltrosParams; label: string }[] = []
-  if (params.disciplina) chips.push({ k: 'disciplina', label: nomeDe(disciplinas, params.disciplina) ?? 'Disciplina' })
-  if (params.assunto) chips.push({ k: 'assunto', label: nomeDe(assuntos, params.assunto) ?? 'Assunto' })
-  if (params.banca) chips.push({ k: 'banca', label: nomeDe(bancas, params.banca) ?? 'Banca' })
-  if (params.ano) chips.push({ k: 'ano', label: String(params.ano) })
-  if (params.dificuldade) chips.push({ k: 'dificuldade', label: DIFICULDADES.find((d) => d.v === params.dificuldade)?.r ?? params.dificuldade })
+  // Chips do que está aplicado (não do rascunho): UM chip por valor selecionado; remover tira só aquele valor.
+  const nomeDe = (arr: { id: string; nome: string }[], id: string) => arr.find((x) => x.id === id)?.nome
+  const chips: { k: keyof FiltrosParams; valor?: string; label: string }[] = []
+  const porLista = (k: keyof FiltrosParams, rot: (v: string) => string) => { for (const v of lerLista(params[k])) chips.push({ k, valor: v, label: rot(v) }) }
+  porLista('disciplina', (v) => nomeDe(disciplinas, v) ?? 'Disciplina')
+  porLista('assunto', (v) => nomeDe(assuntos, v) ?? 'Assunto')
+  porLista('detalhe', (v) => v)
+  porLista('banca', (v) => nomeDe(bancas, v) ?? 'Banca')
+  porLista('orgao', (v) => nomeDe(orgaos, v) ?? 'Órgão')
+  porLista('cargo', (v) => v)
+  porLista('ano', (v) => v)
+  porLista('dificuldade', (v) => DIFICULDADES.find((d) => d.v === v)?.r ?? v)
   if (params.busca) chips.push({ k: 'busca', label: `"${params.busca}"` })
   if (params.comentadas) chips.push({ k: 'comentadas', label: 'Com comentário' })
   if (params.favoritas) chips.push({ k: 'favoritas', label: 'Favoritas' })
+  const removerChip = (c: { k: keyof FiltrosParams; valor?: string }) =>
+    nav(urlDe({ ...params, [c.k]: c.valor === undefined ? undefined : juntarLista(lerLista(params[c.k]).filter((x) => x !== c.valor)),
+      // Tirar a última disciplina não derruba assunto; só a troca de disciplina na sidebar limpa assunto/tópico.
+    }))
 
   const segAtivo = params.minhas ?? ''
 
@@ -118,7 +146,6 @@ export function PlatformBanco({
   const LABEL: React.CSSProperties = { display: 'block', marginBottom: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)' }
 
   return (
-    <SelectCorCtx.Provider value={corPopup}>
     <div style={{ ...internaTokensStyle(brand, theme), minHeight: '100%', padding: 24, fontFamily: INTERNA_FONT[brand] }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {/* Herói */}
@@ -149,7 +176,7 @@ export function PlatformBanco({
           {chips.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {chips.map((c) => (
-                <button key={c.k} type="button" onClick={() => removerAplicado(c.k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 10px', borderRadius: 99, border: 0, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                <button key={c.k + (c.valor ?? '')} type="button" onClick={() => removerChip(c)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 10px', borderRadius: 99, border: 0, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   {c.label}
                   <span style={{ width: 18, height: 18, borderRadius: 50, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', opacity: 0.7 }}><X size={11} /></span>
                 </button>
@@ -160,9 +187,12 @@ export function PlatformBanco({
         </div>
 
         {/* 2 colunas: sidebar de filtros + lista */}
-        <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
+        {/* O <main> do shell tem overflow-y:auto mas NÃO é o scroller (quem rola é a página): isso fazia o sticky nunca "grudar".
+              Nesta tela liberamos o overflow do main para a barra de filtros acompanhar a rolagem da página. */}
+          <style>{'.shr-main:has(.banco-filtros){overflow:visible!important}'}</style>
+          <div className="banco-filtros grid grid-cols-1 gap-[18px] lg:grid-cols-[380px_minmax(0,1fr)] lg:items-start">
           {/* SIDEBAR */}
-          <aside className="lg:sticky lg:top-[90px]" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 18 }}>
+          <aside className="lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <b style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 15, color: 'var(--ink)' }}><SlidersHorizontal size={16} style={{ color: 'var(--brand)' }} />Filtros</b>
               <button type="button" onClick={limparTudo} style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', background: 'none', border: 0, cursor: 'pointer' }}>Limpar</button>
@@ -182,28 +212,38 @@ export function PlatformBanco({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={LABEL}>Disciplina</label>
-                <FiltroSelect value={f.disciplina ?? ''} placeholder="Todas" onChange={(v) => setF((p) => ({ ...p, disciplina: v || undefined, assunto: undefined }))}
-                  options={[{ v: '', label: 'Todas' }, ...disciplinas.map((d) => ({ v: d.id, label: d.nome }))]} />
+                <MultiFiltro vazio="Todas" selecionados={lerLista(f.disciplina)} busca="Buscar disciplina…" contagens={fac?.contagens.disciplina} aberto={painel === 'disciplina'} onToggle={tp('disciplina')}
+                  onChange={(v) => setF((p) => ({ ...p, disciplina: juntarLista(v), assunto: undefined, detalhe: undefined }))}
+                  options={disciplinas.map((d) => ({ v: d.id, label: d.nome }))} />
               </div>
               <div>
                 <label style={LABEL}>Assunto</label>
-                <FiltroSelect value={f.assunto ?? ''} placeholder="Todos" onChange={(v) => set('assunto', v)}
-                  options={[{ v: '', label: 'Todos' }, ...assuntosDaDisc.map((a) => ({ v: a.id, label: a.nome }))]} />
+                <ArvoreAssuntos vazio="Todos" assuntos={assuntosDaDisc.map((a) => ({ id: a.id, nome: a.nome, pai_id: a.pai_id ?? null }))} detalhes={detalhesDaDisc}
+                  contAssunto={fac?.contagens.assunto} contDetalhe={fac?.contagens.detalhe} aberto={painel === 'assunto'} onToggle={tp('assunto')} selAssuntos={lerLista(f.assunto)} selDetalhes={lerLista(f.detalhe)} onAssuntos={multi('assunto')} onDetalhes={multi('detalhe')} />
               </div>
               <div>
                 <label style={LABEL}>Banca</label>
-                <FiltroSelect value={f.banca ?? ''} placeholder="Todas" onChange={(v) => set('banca', v)}
-                  options={[{ v: '', label: 'Todas' }, ...bancas.map((b) => ({ v: b.id, label: b.nome }))]} />
+                <MultiFiltro vazio="Todas" selecionados={lerLista(f.banca)} busca="Buscar banca…" contagens={fac?.contagens.banca} aberto={painel === 'banca'} onToggle={tp('banca')} onChange={multi('banca')} options={bancas.map((b) => ({ v: b.id, label: b.nome }))} />
               </div>
+              {orgaos.length > 0 && (
+                <div>
+                  <label style={LABEL}>Órgão</label>
+                  <MultiFiltro vazio="Todos" selecionados={lerLista(f.orgao)} busca="Buscar órgão…" contagens={fac?.contagens.orgao} aberto={painel === 'orgao'} onToggle={tp('orgao')} onChange={multi('orgao')} options={orgaos.map((o) => ({ v: o.id, label: o.nome }))} />
+                </div>
+              )}
+              {cargos.length > 0 && (
+                <div>
+                  <label style={LABEL}>Cargo</label>
+                  <MultiFiltro vazio="Todos" selecionados={lerLista(f.cargo)} busca="Buscar cargo…" contagens={fac?.contagens.cargo} aberto={painel === 'cargo'} onToggle={tp('cargo')} onChange={multi('cargo')} options={cargos.map((c) => ({ v: c, label: c }))} />
+                </div>
+              )}
               <div>
                 <label style={LABEL}>Ano</label>
-                <FiltroSelect value={f.ano ?? ''} placeholder="Todos" onChange={(v) => set('ano', v)}
-                  options={[{ v: '', label: 'Todos' }, ...anos.map((a) => ({ v: String(a), label: String(a) }))]} />
+                <MultiFiltro vazio="Todos" selecionados={lerLista(f.ano)} contagens={fac?.contagens.ano} aberto={painel === 'ano'} onToggle={tp('ano')} onChange={multi('ano')} options={anos.map((a) => ({ v: String(a), label: String(a) }))} />
               </div>
               <div>
                 <label style={LABEL}>Dificuldade</label>
-                <FiltroSelect value={f.dificuldade ?? ''} placeholder="Todas" onChange={(v) => set('dificuldade', v)}
-                  options={[{ v: '', label: 'Todas' }, ...DIFICULDADES.map((d) => ({ v: d.v, label: d.r }))]} />
+                <MultiFiltro vazio="Todas" selecionados={lerLista(f.dificuldade)} contagens={fac?.contagens.dificuldade} aberto={painel === 'dificuldade'} onToggle={tp('dificuldade')} onChange={multi('dificuldade')} options={DIFICULDADES.map((d) => ({ v: d.v, label: d.r }))} />
               </div>
             </div>
 
@@ -212,9 +252,12 @@ export function PlatformBanco({
               <ToggleLinha on={f.favoritas === '1'} onClick={() => toggle('favoritas')} icon={<Star size={14} />} label="Somente favoritas" />
             </div>
 
-            <button type="button" onClick={aplicar} style={{ width: '100%', marginTop: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, border: 0, background: 'var(--brand)', color: cm('#FFFFFF'), fontSize: 13.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -12px color-mix(in oklab, var(--brand) 70%, transparent)' }}>
-              <Search size={14} />Filtrar {fmt(stats.total)} questões
-            </button>
+            {/* Botão fixo no rodapé da sidebar: sempre visível mesmo com painéis abertos; o número acompanha as seleções. */}
+            <div style={{ position: 'sticky', bottom: -18, margin: '16px -18px -18px', padding: '12px 18px 18px', background: 'var(--surface)', borderTop: '1px solid var(--line)', borderRadius: '0 0 20px 20px' }}>
+              <button type="button" onClick={aplicar} style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, border: 0, background: 'var(--brand)', color: cm('#FFFFFF'), fontSize: 13.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -12px color-mix(in oklab, var(--brand) 70%, transparent)' }}>
+                {contando ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}Filtrar {fmt(totalRascunho)} {totalRascunho === 1 ? 'questão' : 'questões'}
+              </button>
+            </div>
           </aside>
 
           {/* LISTA */}
@@ -264,7 +307,6 @@ export function PlatformBanco({
         </div>
       </div>
     </div>
-    </SelectCorCtx.Provider>
   )
 }
 
@@ -293,31 +335,6 @@ function DesempenhoFiltroCard({ d, porDia }: { d: { acertos: number; erros: numb
         </div>
       )}
     </div>
-  )
-}
-
-/** Dropdown estilizado (base-ui Select) com a MESMA cara dos inputs da sidebar — substitui o
- *  `<select>` nativo (lista do SO feia). Usa sentinela '__all__' p/ a opção "Todas/Todos" (valor ''). */
-function FiltroSelect({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: { v: string; label: string }[]; placeholder: string }) {
-  const ALL = '__all__'
-  const cor = useContext(SelectCorCtx)
-  return (
-    <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? '' : String(v))}>
-      <SelectTrigger
-        className="w-full justify-between"
-        style={{ height: 42, padding: '0 10px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface2)', color: 'var(--ink)', fontSize: 13, fontWeight: 600 }}
-      >
-        {/* base-ui renderiza o VALOR cru por padrão (mostrava "__all__"); função-filho mapeia p/ o rótulo. */}
-        <SelectValue placeholder={placeholder}>
-          {(val) => options.find((o) => (o.v || ALL) === val)?.label ?? placeholder}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent style={cor}>
-        {options.map((o) => (
-          <SelectItem key={o.v || ALL} value={o.v || ALL}>{o.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   )
 }
 

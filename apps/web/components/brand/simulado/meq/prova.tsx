@@ -160,7 +160,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, onMark, onFlag, onPrev, onNe
         Julgue o item a seguir.
       </div>
 
-      <p style={{ margin: '0 0 18px', fontSize: FZ[fz], lineHeight: 1.7, color: 'var(--ink)' }}>{q.enunciado}</p>
+      <p style={{ margin: '0 0 18px', fontSize: FZ[fz], lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{q.enunciado}</p>
 
       <div className={`${P}-ce`} style={{ display: 'flex', gap: 12 }}>
         <CEBtn label="Certo" grad={CERTO_GRAD} color={OK_GREEN} sel={resp === 'C'} dim={resp === 'E'} onClick={() => onMark('C')} />

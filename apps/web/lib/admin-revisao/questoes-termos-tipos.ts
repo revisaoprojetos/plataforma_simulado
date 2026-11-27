@@ -51,6 +51,13 @@ export interface RespostaGruposTermos {
   ignoradoPersistente: boolean
   geradoEm: number
   degradado?: boolean
+  /** tipos consultados (lista combinada) */
+  tipos?: TipoTermo[]
+  /** nº de grupos por opção de cada filtro (cada dimensão com os OUTROS filtros aplicados) */
+  facetas?: Record<'tipo' | 'confianca' | 'disciplina' | 'faixa' | 'variantes', Record<string, number>>
+  opcoesDisciplina?: { v: string; label: string }[]
+  /** AVISOS: duplicados por tipo (todos os tipos mesclaveis, sem os filtros da tela; só descarta "São termos diferentes") — calculado no servidor */
+  porTipo?: ResumoTipoTermo[]
 }
 export interface RespostaResumosTermos { ok: boolean; error?: string; resumos: ResumoTipoTermo[]; geradoEm: number }
 

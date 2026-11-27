@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { facetasBancoEstudio, listarQuestoesBanco, opcoesBancoEstudio } from '@/lib/conteudo/questoes-estudio'
+import { FILTROS_VAZIOS, contarAplicados, filtrosDeParams } from '@/lib/conteudo/questoes-estudio-filtros'
 import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import { SemAcessoArea } from '@/app/admin/conteudos/_components/sem-acesso-area'
 import { lerClassificacaoPadrao } from '../actions'
@@ -12,11 +14,12 @@ const SEM = '00000000-0000-0000-0000-000000000000'
 
 // BANCO › editar: título + classificação padrão + questões + stats. Dados reais; mesmos selects/embeds
 // da página de produção /admin/banco-questoes/[id].
-export default async function BancoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BancoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const access = await getCurrentAccess()
   if (!(access.isAdmin || access.permissions.includes('questoes:view'))) return <SemAcessoArea />
   const tid = access.tenantId ?? SEM
   const { id } = await params
+  const sp = await searchParams
   const svc = createAdminClient()
 
   // Banco (colunas tolerantes).
@@ -31,13 +34,14 @@ export default async function BancoPage({ params }: { params: Promise<{ id: stri
     svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', id).eq('tenant_id', tid).order('questao_id', { ascending: true }))
   const ids = vinculos.map((v) => v.questao_id)
 
-  let questoes: any[] = []
-  if (ids.length) {
-    questoes = await fetchAllByIn<any>(ids, (chunk) =>
-      svc.from('simulado_questoes')
-        .select('id, enunciado, tipo, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)')
-        .in('id', chunk).eq('tenant_id', tid).order('created_at', { ascending: true }))
-  }
+  // Questões do banco já FILTRADAS no banco (card multi-seleção) + opções/contagens do núcleo de facetas. `ids` (todas) só serve p/ "usos em quiz".
+  const fe = filtrosDeParams((k) => sp[k])
+  const [resultado, base] = await Promise.all([
+    listarQuestoesBanco(svc, tid, id, fe, { sort: 'numero', dir: 'asc' }),
+    facetasBancoEstudio(tid, id, FILTROS_VAZIOS),
+  ])
+  const opcoesEstudio = base ? await opcoesBancoEstudio(tid, base.contagens) : null
+  const questoes = resultado.rows
 
   // Formato C/E vem das alternativas (2 opções "Certo"/"Errado").
   const ceSet = new Set<string>()
@@ -69,18 +73,22 @@ export default async function BancoPage({ params }: { params: Promise<{ id: stri
   ])
   const opcoes: OpcoesCadastro = { disciplinas, assuntos, bancas, orgaos }
 
-  const linhas: QuestaoDetalheRow[] = questoes.map((q: any) => ({
-    id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
+  const linhas: QuestaoDetalheRow[] = questoes.map((q) => ({
+    id: q.id, enunciado: q.enunciado, tipo: q.tipo ?? null,
     formato: q.tipo === 'discursiva' ? null : (ceSet.has(q.id) ? 'certo_errado' : 'multipla'),
     nivel_dificuldade: q.nivel_dificuldade, status: q.status,
-    disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null, assuntoDetalhe: q.assunto_detalhe ?? null,
-    banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
+    disciplina: q.disciplina, assunto: q.assunto, assuntoDetalhe: q.assunto_detalhe,
+    banca: q.banca, orgao: q.orgao, ano: q.ano, cargo: q.cargo,
   }))
 
   return (
     <BancoDetalhe
       banco={{ id: banco.id, nome: banco.nome, tipo: banco.tipo === 'discursiva' ? 'discursiva' : 'objetiva', cor: banco.cor ?? null, criadoEm: banco.criado_em ?? null }}
       questoes={linhas}
+      totalBanco={base?.total ?? ids.length}
+      filtrosEstudio={fe}
+      opcoesEstudio={opcoesEstudio}
+      facInicial={contarAplicados(fe) === 0 ? base : null}
       usosEmQuiz={usosEmQuiz}
       opcoes={opcoes}
       classPadraoInicial={{

@@ -12,6 +12,7 @@ import { Scissors, Bookmark, Check, X, ArrowRight, Lock, MessageSquare, BarChart
 import type { Brand } from './interna-tokens'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { AddToCaderno } from '@/components/aluno/add-to-caderno'
+import { MarkdownContent } from '@/components/markdown-content'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 const OK = 'var(--pn-1fa868,#1FA868)'
@@ -133,7 +134,8 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
       </div>
 
       {/* enunciado */}
-      <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{questao.enunciado}</p>
+      {/* Mesmo renderizador do admin/aluno legado: respeita quebras de linha, parágrafos e **negrito** só onde houver marcação. */}
+      <div style={{ fontSize: 16, lineHeight: 1.65, fontWeight: 400, color: 'var(--ink)', textAlign: 'justify', hyphens: 'auto', overflowWrap: 'anywhere' }}><MarkdownContent>{questao.enunciado}</MarkdownContent></div>
 
       {questao.imagem_url && (
         <div style={{ borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface2)', padding: 8 }}>
@@ -159,14 +161,14 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
             return (
               <div
                 key={alt.id} className="qc-alt"
-                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 12px 12px 14px', borderRadius: bits.altRadius, border: `1.5px solid ${bd}`, background: bg, opacity: eliminada && !revelado ? 0.42 : 1, transition: 'border-color .2s,background .2s,opacity .2s,box-shadow .2s', boxShadow: escolha && !revelado ? `0 0 0 3px ${bits.selBg}` : 'none' }}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 12px 12px 12px', borderRadius: bits.altRadius, border: `1.5px solid ${bd}`, background: bg, opacity: eliminada && !revelado ? 0.42 : 1, transition: 'border-color .2s,background .2s,opacity .2s,box-shadow .2s', boxShadow: escolha && !revelado ? `0 0 0 3px ${bits.selBg}` : 'none' }}
               >
                 {/* tesoura — coluna à ESQUERDA (sem efeito depois de revelar) */}
                 <button
                   type="button" onClick={() => toggleCut(alt.id)} disabled={revelado}
                   aria-label={eliminada ? `Restaurar alternativa ${LETRA[i]}` : `Eliminar alternativa ${LETRA[i]}`} title="Eliminar alternativa"
                   className="qc-cut"
-                  style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 0, background: eliminada ? 'var(--flagBg,color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent))' : 'transparent', color: eliminada ? 'var(--flag,var(--pn-e5484d,#E5484D))' : 'var(--muted2,var(--muted))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: revelado ? 'default' : 'pointer', alignSelf: 'center' }}
+                  style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 9, border: 0, background: eliminada ? 'var(--flagBg,color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent))' : 'transparent', color: eliminada ? 'var(--flag,var(--pn-e5484d,#E5484D))' : 'var(--muted2,var(--muted))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: revelado ? 'default' : 'pointer', alignSelf: 'center' }}
                 >
                   <Scissors size={16} style={{ transform: eliminada ? 'rotate(-12deg)' : 'none' }} />
                 </button>
@@ -175,7 +177,7 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
                   style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 12, padding: 0, border: 0, background: 'none', font: 'inherit', textAlign: 'left', cursor: revelado || eliminada ? 'default' : 'pointer' }}
                 >
                   <span style={{ width: 30, height: 30, borderRadius: bits.letterRadius, background: dot, color: ink, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 800, transition: 'background .2s,color .2s' }}>{LETRA[i]}</span>
-                  <span style={{ paddingTop: 5, fontSize: 14.5, lineHeight: 1.5, color: 'var(--ink)', textDecoration: eliminada && !revelado ? 'line-through' : 'none', whiteSpace: 'pre-wrap' }}>{alt.texto}</span>
+                  <span style={{ paddingTop: 4, fontSize: 14.5, lineHeight: 1.5, color: 'var(--ink)', textDecoration: eliminada && !revelado ? 'line-through' : 'none', textAlign: 'justify', overflowWrap: 'anywhere', minWidth: 0 }}><MarkdownContent inline>{alt.texto}</MarkdownContent></span>
                   {mostrarCerta && <span style={{ marginLeft: 'auto', height: 20, padding: '0 8px', borderRadius: 99, background: OK, color: '#FFF', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>GABARITO</span>}
                   {mostrarErrada && <span style={{ marginLeft: 'auto', height: 20, padding: '0 8px', borderRadius: 99, background: ERR, color: '#FFF', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>SUA RESPOSTA</span>}
                 </button>
@@ -236,7 +238,7 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
             <span style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--chip)', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><GraduationCap size={17} /></span>
             <div>
               <b style={{ fontSize: 13, color: 'var(--ink)' }}>Comentário do professor</b>
-              <p style={{ margin: '4px 0 0', fontSize: 13.5, lineHeight: 1.6, color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{questao.comentario_professor?.trim() || 'Sem comentário.'}</p>
+              <div style={{ margin: '4px 0 0', fontSize: 13.5, lineHeight: 1.6, color: 'var(--muted)', textAlign: 'justify' }}>{questao.comentario_professor?.trim() ? <MarkdownContent>{questao.comentario_professor}</MarkdownContent> : 'Sem comentário.'}</div>
             </div>
           </div>
         )}

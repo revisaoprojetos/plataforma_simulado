@@ -6,7 +6,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft, ChevronRight, Upload, Plus, Download, Copy, Pencil, Trash2, Loader2, Save, Link2,
@@ -21,6 +21,8 @@ import { salvarClassificacaoPadrao } from '../actions'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { formatBrt } from '@/lib/brt'
 import { ImportarQuestoesModal } from '../importar-questoes-modal'
+import { BotaoFiltrosEstudio, ChipsFiltrosEstudio, FiltrosEstudioCard } from '@/components/admin/questoes-filtros-estudio'
+import { contarAplicados, paramsDeFiltros, type ContagensEstudio, type FiltrosEstudio, type OpcoesEstudio } from '@/lib/conteudo/questoes-estudio-filtros'
 
 export type QuestaoDetalheRow = QuestaoLinha
 export type OpcoesCadastro = {
@@ -35,15 +37,25 @@ type Aba = 'todas' | 'objetivas' | 'discursivas'
 const BASE = '/admin/conteudos/materiais/questoes'
 
 export function BancoDetalhe({
-  banco, questoes, usosEmQuiz, opcoes, classPadraoInicial,
+  banco, questoes, totalBanco, usosEmQuiz, opcoes, classPadraoInicial, filtrosEstudio, opcoesEstudio, facInicial,
 }: {
   banco: { id: string; nome: string; tipo: 'objetiva' | 'discursiva'; cor: string | null; criadoEm: string | null }
+  /** questões JÁ filtradas no servidor pelo card (multi-seleção) */
   questoes: QuestaoDetalheRow[]
+  /** total do banco sem filtros */
+  totalBanco: number
+  filtrosEstudio: FiltrosEstudio
+  opcoesEstudio: OpcoesEstudio | null
+  facInicial: { total: number; contagens: ContagensEstudio } | null
   usosEmQuiz: number
   opcoes: OpcoesCadastro
   classPadraoInicial: ClassSel
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const [cardAberto, setCardAberto] = React.useState(true)
+  const nAplicados = contarAplicados(filtrosEstudio)
+  const aplicarFiltros = (f: FiltrosEstudio) => { const p = paramsDeFiltros(f); router.push(`${pathname}${p.toString() ? `?${p}` : ''}`) }
   const [pending, startTransition] = React.useTransition()
   const [importOpen, setImportOpen] = React.useState(false)
   const cor = banco.cor ?? '#6d28d9'
@@ -138,7 +150,7 @@ export function BancoDetalhe({
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Banco de questões{banco.tipo === 'discursiva' ? ' · Discursiva' : ''}</p>
           <h1 className="text-2xl font-bold tracking-tight">{banco.nome}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">{questoes.length} {questoes.length === 1 ? 'questão' : 'questões'}</span>
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">{totalBanco} {totalBanco === 1 ? 'questão' : 'questões'}</span>
             {banco.criadoEm && <span>Atualizado em {formatBrt(banco.criadoEm)}</span>}
           </div>
         </div>
@@ -197,9 +209,15 @@ export function BancoDetalhe({
                 <Segmented aba={aba} onChange={setAba} />
               </div>
             </div>
+            {opcoesEstudio && cardAberto && (
+              <FiltrosEstudioCard opcoes={opcoesEstudio} aplicado={filtrosEstudio} banco={banco.id} q="" facInicial={facInicial}
+                onAplicar={aplicarFiltros} onFechar={() => setCardAberto(false)} />
+            )}
+            {opcoesEstudio && nAplicados > 0 && <ChipsFiltrosEstudio opcoes={opcoesEstudio} aplicado={filtrosEstudio} onChange={aplicarFiltros} />}
             {questoesFiltradas.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-                {questoes.length === 0 ? 'Nenhuma questão neste banco. Use “Adicionar questão” (do acervo) ou importe um CSV.' : 'Nenhuma questão nesse filtro.'}
+              <div className="space-y-3 rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+                <p>{totalBanco === 0 ? 'Nenhuma questão neste banco. Use “Adicionar questão” (do acervo) ou importe um CSV.' : 'Nenhuma questão nesse filtro.'}</p>
+                {opcoesEstudio && totalBanco > 0 && !cardAberto && <BotaoFiltrosEstudio n={nAplicados} aberto={false} onClick={() => setCardAberto(true)} />}
               </div>
             ) : (
               <QuestoesTabelaBase
@@ -207,6 +225,7 @@ export function BancoDetalhe({
                 titulo={banco.nome}
                 cor={cor}
                 semCabecalho
+                filtrosSlot={opcoesEstudio ? <BotaoFiltrosEstudio n={nAplicados} aberto={cardAberto} onClick={() => setCardAberto((a) => !a)} /> : undefined}
                 editHrefBase="/admin/questoes"
                 onRemover={(ids) => removerQuestoes(banco.id, ids)}
               />
@@ -220,7 +239,7 @@ export function BancoDetalhe({
         {/* Sidebar */}
         <aside className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Stat valor={questoes.length} label="questões" />
+            <Stat valor={totalBanco} label="questões" />
             <Stat valor={usosEmQuiz} label="usos em quiz" />
           </div>
 

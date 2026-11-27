@@ -230,7 +230,7 @@ export function ResultadoRevisao({ theme, data }: SimScreenProps) {
                       {cur.status === 'errada' && <StatusPill color={ERR} bg="rgba(229,72,77,.12)" label="Errou" />}
                       {cur.status === 'branco' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12, fontWeight: 800 }}>Em branco</span>}
                     </div>
-                    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)' }}>{cur.enunciado}</p>
+                    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{cur.enunciado}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {(cur.alternativas ?? []).map((a) => {
                         const isG = a.letra === cur.gabarito

@@ -60,7 +60,7 @@ function QuestaoCard({ q, revelou }: { q: QuestaoRevisao; revelou: boolean }) {
             {revelou && q.respondida && <span className={cn('rounded-md px-2 py-0.5 text-[11px] font-semibold', q.acertou ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400')}>{q.acertou ? 'Acertou' : 'Errou'}</span>}
             {!q.respondida && <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">Em branco</span>}
           </div>
-          <p className="text-sm text-foreground/90">{q.enunciado}</p>
+          <p className="whitespace-pre-wrap text-sm text-foreground/90">{q.enunciado}</p>
         </div>
       </div>
 

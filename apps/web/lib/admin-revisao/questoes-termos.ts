@@ -17,6 +17,7 @@ import type {
   ConfTermo, ExemploQuestao, GrupoTermo, InicialTermos, MesclagemLog, PreviaMescla, ProporNorm, RespostaGruposTermos, RespostaNorm, RespostaResumosTermos, ResumoTipoTermo, TipoTermo, VarianteTermo,
 } from './questoes-termos-tipos'
 import { TIPOS_TERMO } from './questoes-termos-tipos'
+import { calcularFacetasTermo, filtrarGruposTermo, opcoesDisciplina, type FiltrosTermo } from './termos-filtros'
 
 // UNIFICAR › TERMOS DA TAXONOMIA (somente servidor).
 // Mapa dos campos: disciplina/assunto/banca/órgão = TABELA própria + FK em simulado_questoes (mesclar = repontar a FK e remover a variante vazia);
@@ -106,16 +107,36 @@ async function todosOsGrupos(svc: SupabaseClient, tenantId: string, tipo: TipoTe
   }, { fresh })
 }
 
-export interface OpcLista { limiar?: number; confianca?: string; q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; verIgnorados?: boolean; ign?: string[]; fresh?: boolean }
+export interface OpcLista { limiar?: number; confianca?: string; q?: string; sort?: string; dir?: 'asc' | 'desc'; page?: number; pp?: number; verIgnorados?: boolean; ign?: string[]; fresh?: boolean
+  /** filtros multi-valor (Unificar unificado): tipo · confiança · disciplina · faixa de questões · nº de termos */
+  filtros?: FiltrosTermo }
 export async function listarGrupos(svc: SupabaseClient, tenantId: string, tipo: TipoTermo, o: OpcLista): Promise<RespostaGruposTermos> {
+  return listarGruposMulti(svc, tenantId, [tipo], o)
+}
+/** Lista COMBINADA de grupos candidatos de 1+ tipos (a detecção segue em cache por tipo; filtros/facetas/ordenação/paginação em memória sobre ela). */
+export async function listarGruposMulti(svc: SupabaseClient, tenantId: string, tipos: TipoTermo[], o: OpcLista): Promise<RespostaGruposTermos> {
   const limiar = Math.min(0.98, Math.max(0.6, o.limiar ?? 0.85))
-  const [base, ignBanco] = await Promise.all([todosOsGrupos(svc, tenantId, tipo, limiar, !!o.fresh), ignoradosDoTipo(svc, tenantId, tipo, !!o.fresh)])
-  const ign = new Set<string>([...(ignBanco ?? []), ...(o.ign ?? [])])
-  const visiveis = base.grupos.filter((g) => o.verIgnorados ? ign.has(g.id) : !ign.has(g.id))
+  // Carrega TODOS os tipos mesclaveis (detecção em cache por tipo) para que a faceta "Tipo" conte também os não selecionados; `tipos` vira filtro.
+  const sel = [...new Set(tipos)].filter((t) => t !== 'ano')
+  const lista = TIPOS_TERMO.filter((t) => t.mesclavel).map((t) => t.id)
+  const tipo0 = sel[0] ?? tipos[0]
+  const partes = await Promise.all(lista.map(async (t) => {
+    const [base, ignBanco] = await Promise.all([todosOsGrupos(svc, tenantId, t, limiar, !!o.fresh), ignoradosDoTipo(svc, tenantId, t, !!o.fresh)])
+    return { t, base, ignBanco }
+  }))
+  const ign = new Set<string>(); for (const p of partes) for (const x of p.ignBanco ?? []) ign.add(x)
+  for (const x of o.ign ?? []) ign.add(x)
+  const todos = partes.flatMap((p) => p.base.grupos)
+  const visiveis = todos.filter((g) => o.verIgnorados ? ign.has(g.id) : !ign.has(g.id))
   const porConfianca: Record<ConfTermo, number> = { alta: 0, media: 0, baixa: 0 }
-  for (const g of base.grupos) if (!ign.has(g.id)) porConfianca[g.confianca]++
+  for (const g of todos) if (!ign.has(g.id)) porConfianca[g.confianca]++
   const termo = plano(o.q ?? '')
-  let l = visiveis.filter((g) => (!o.confianca || g.confianca === o.confianca) && (!termo || g.variantes.some((v) => plano(v.nome).includes(termo) || plano(v.paiNome ?? '').includes(termo))))
+  const filtros: FiltrosTermo = { ...(o.filtros ?? {}) }
+  if (o.confianca && !filtros.confianca?.length) filtros.confianca = [o.confianca]
+  if (!filtros.tipo?.length) filtros.tipo = sel
+  const porBusca = visiveis.filter((g) => !termo || g.variantes.some((v) => plano(v.nome).includes(termo) || plano(v.paiNome ?? '').includes(termo)))
+  const facetas = calcularFacetasTermo(porBusca, filtros)
+  let l = filtrarGruposTermo(porBusca, filtros)
   const dir = o.dir === 'asc' ? 1 : -1 // padrão: maior primeiro (nome: use dir=asc)
   const sort = o.sort ?? 'questoes'
   if (sort !== 'confianca') {
@@ -125,9 +146,17 @@ export async function listarGrupos(svc: SupabaseClient, tenantId: string, tipo: 
     })
   }
   const pp = Math.min(100, Math.max(5, o.pp ?? 20)), page = Math.max(1, o.page ?? 1)
-  const ativos = base.grupos.filter((g) => !ign.has(g.id))
-  const resumo: ResumoTipoTermo = { tipo, termos: base.itens, questoes: base.questoes, grupos: ativos.length, variantesEmGrupos: ativos.reduce((s, g) => s + g.variantes.length, 0), questoesEmGrupos: ativos.reduce((s, g) => s + g.questoes, 0) }
-  return { ok: true, tipo, grupos: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, porConfianca, limiar, resumo, ignorados: base.grupos.filter((g) => ign.has(g.id)).length, ignoradoPersistente: ignBanco !== null, geradoEm: Date.now(), degradado: base.degradado }
+  const ativos = todos.filter((g) => !ign.has(g.id) && (filtros.tipo ?? []).includes(g.tipo))
+  const dosSel = partes.filter((p) => (filtros.tipo ?? []).includes(p.t))
+  const resumo: ResumoTipoTermo = { tipo: tipo0, termos: dosSel.reduce((s, p) => s + p.base.itens, 0), questoes: dosSel.reduce((s, p) => s + p.base.questoes, 0), grupos: ativos.length, variantesEmGrupos: ativos.reduce((s, g) => s + g.variantes.length, 0), questoesEmGrupos: ativos.reduce((s, g) => s + g.questoes, 0) }
+  const porTipo: ResumoTipoTermo[] = partes.map((p) => {
+    const a = p.base.grupos.filter((g) => !ign.has(g.id))
+    return { tipo: p.t, termos: p.base.itens, questoes: p.base.questoes, grupos: a.length, variantesEmGrupos: a.reduce((s, g) => s + g.variantes.length, 0), questoesEmGrupos: a.reduce((s, g) => s + g.questoes, 0) }
+  })
+  return {
+    ok: true, porTipo, tipo: tipo0, tipos: sel, grupos: l.slice((page - 1) * pp, page * pp), total: l.length, page, pp, porConfianca, limiar, resumo, ignorados: todos.filter((g) => ign.has(g.id)).length,
+    ignoradoPersistente: partes.every((p) => p.ignBanco !== null), geradoEm: Date.now(), degradado: partes.some((p) => p.base.degradado), facetas, opcoesDisciplina: opcoesDisciplina(porBusca),
+  }
 }
 
 export async function resumosTodosTipos(svc: SupabaseClient, tenantId: string, limiar: number, ign: Record<string, string[]>, fresh: boolean): Promise<RespostaResumosTermos> {
@@ -148,7 +177,8 @@ export async function carregarInicialTermos(tenantId: string): Promise<InicialTe
     const svc = createAdminClient()
     const [resumos, grupos] = await Promise.all([
       resumosTodosTipos(svc, tenantId, 0.85, {}, false),
-      listarGrupos(svc, tenantId, TIPO_TERMO_PADRAO, { limiar: 0.85, sort: 'questoes', dir: 'desc', page: 1, pp: 20, ign: [] }),
+      // padrão = TODOS os tipos mesclados (o cliente usa a mesma chave `tipos` para semear o cache)
+      listarGruposMulti(svc, tenantId, TIPOS_TERMO.filter((t) => t.mesclavel).map((t) => t.id), { limiar: 0.85, sort: 'questoes', dir: 'desc', page: 1, pp: 20, ign: [] }),
     ])
     return { resumos, grupos }
   } catch { return null }

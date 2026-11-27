@@ -377,7 +377,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
                 {questaoAtual.categoria_discursiva}
               </p>
             )}
-            <p className="leading-relaxed text-sm">{questaoAtual.enunciado}</p>
+            <p className="whitespace-pre-wrap leading-relaxed text-sm">{questaoAtual.enunciado}</p>
             {questaoAtual.imagem_url && (
               <div className="mt-4 overflow-hidden rounded-lg border bg-muted/30 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

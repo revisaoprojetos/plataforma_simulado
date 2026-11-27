@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
-import { ehTipoTermo } from '@/lib/admin-revisao/questoes-termos-tipos'
+import { ehTipoTermo, type TipoTermo } from '@/lib/admin-revisao/questoes-termos-tipos'
 import {
-  aplicarNormalizacao, desfazerMescla, exemplosDoTermo, historico, ignorarGrupo, limparCacheTermos, listarAnos, listarGrupos, mesclarTermos, previaMescla, propostasNormalizacao, resumosTodosTipos,
+  aplicarNormalizacao, desfazerMescla, exemplosDoTermo, historico, ignorarGrupo, limparCacheTermos, listarAnos, listarGrupos, listarGruposMulti, mesclarTermos, previaMescla, propostasNormalizacao, resumosTodosTipos,
 } from '@/lib/admin-revisao/questoes-termos'
+import { FAIXAS_TERMO, lerListaTermo, type FiltrosTermo } from '@/lib/admin-revisao/termos-filtros'
 
 export const dynamic = 'force-dynamic'
 const HEX16 = /^[0-9a-f]{16}$/
@@ -32,6 +33,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await resumosTodosTipos(svc, tenantId, limiar, m, fresh))
     }
     if (s === 'historico') return NextResponse.json(await historico(svc, tenantId))
+    if (s === 'grupos' && sp.get('tipos')) {
+      const tipos = lerListaTermo(sp.get('tipos')).filter(ehTipoTermo) as TipoTermo[]
+      if (!tipos.length) return NextResponse.json({ ok: false, error: 'Tipo inválido.' }, { status: 400 })
+      const f: FiltrosTermo = { confianca: lerListaTermo(sp.get('confs')).filter((c) => ['alta', 'media', 'baixa'].includes(c)), disciplina: lerListaTermo(sp.get('disc')), faixa: lerListaTermo(sp.get('faixa')).filter((x) => FAIXAS_TERMO.some((y) => y.v === x)), variantes: lerListaTermo(sp.get('nv')) }
+      return NextResponse.json(await listarGruposMulti(svc, tenantId, tipos, {
+        limiar, filtros: f, q: sp.get('q') ?? '',
+        sort: sp.get('sort') ?? undefined, dir: sp.get('dir') === 'asc' ? 'asc' : 'desc', page: num(sp.get('page'), 1), pp: num(sp.get('pp'), 20), verIgnorados: sp.get('ignorados') === '1', ign, fresh,
+      }))
+    }
     if (!ehTipoTermo(tipo)) return NextResponse.json({ ok: false, error: 'Tipo inválido.' }, { status: 400 })
     if (s === 'grupos') {
       return NextResponse.json(await listarGrupos(svc, tenantId, tipo, {

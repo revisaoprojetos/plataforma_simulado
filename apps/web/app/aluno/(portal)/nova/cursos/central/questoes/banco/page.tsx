@@ -244,7 +244,7 @@ export default async function BancoPage({ searchParams }: PageProps) {
                     {aberta.ano && <Tag kind="gold">{aberta.ano}</Tag>}
                     <Muted size={12.5}>{fonteDe(aberta)}</Muted>
                   </Row>
-                  <H2 style={{ fontSize: 18 }}>{aberta.enunciado}</H2>
+                  <H2 style={{ fontSize: 18, whiteSpace: 'pre-wrap' }}>{aberta.enunciado}</H2>
                   <Col gap={10}>
                     {(alts ?? []).map((a: any, i: number) => (
                       <Row key={a.id} gap={14} style={{ flexWrap: 'nowrap', alignItems: 'flex-start', padding: '14px 16px', borderRadius: 14, border: '1px solid var(--line)' }}>

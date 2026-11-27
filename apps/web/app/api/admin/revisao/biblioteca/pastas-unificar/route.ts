@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     if (s === 'grupos') {
       const ign = (sp.get('ign') ?? '').split(',').map((x) => x.trim()).filter((x) => HEX16.test(x)).slice(0, 400)
       return NextResponse.json(await listarGruposPU(svc, tenantId, {
-        categoria, limiar: Number(sp.get('limiar')) || 0.85, confianca: ['alta', 'media', 'baixa'].includes(sp.get('confianca') ?? '') ? sp.get('confianca')! : undefined, q: sp.get('q') ?? '',
+        categoria, limiar: Number(sp.get('limiar')) || 0.85, confianca: ((sp.get('confianca') ?? '').split(',').filter((x) => ['alta', 'media', 'baixa'].includes(x)).join(',')) || undefined, q: sp.get('q') ?? '',
         sort: sp.get('sort') ?? undefined, dir: sp.get('dir') === 'asc' ? 'asc' : 'desc', page: num(sp.get('page'), 1), pp: num(sp.get('pp'), 20), verIgnorados: sp.get('ignorados') === '1', ign, fresh,
       }))
     }

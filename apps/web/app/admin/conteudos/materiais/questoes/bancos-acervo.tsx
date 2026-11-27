@@ -26,6 +26,8 @@ import { criarBanco, renomearBanco, duplicarBanco, excluirBanco, moverBancoParaP
 import { excluirQuestoes } from '@/app/admin/questoes/actions'
 import { listarDestinosBanco, duplicarQuestoesNoBanco, moverQuestoesEntreBancos } from './actions'
 import { ImportarQuestoesModal } from './importar-questoes-modal'
+import { BotaoFiltrosEstudio, ChipsFiltrosEstudio, FiltrosEstudioCard } from '@/components/admin/questoes-filtros-estudio'
+import { PARAM_COM, PARAM_DIM, contarAplicados, paramsDeFiltros, type ContagensEstudio, type FiltrosEstudio, type OpcoesEstudio } from '@/lib/conteudo/questoes-estudio-filtros'
 
 export type BancoRow = {
   id: string
@@ -60,7 +62,8 @@ export type QuestaoDetalhe = {
   // `cargo` não tem fonte no esquema atual → não é exibido.
   classificacao: { disciplina: string | null; assunto: string | null; prova: string | null }
 }
-type Filtros = { disc: string | null; banca: string | null; ano: number | null; dif: string | null; sit: string | null }
+/** Nível 1 (lista de bancos): filtros por NOME da classificação padrão. O nível 2 usa o card multi-seleção (FiltrosEstudio). */
+type Filtros = { disc: string | null; banca: string | null }
 
 const BASE = '/admin/conteudos/materiais/questoes'
 const BTN_LOTE = 'inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[10px] border bg-card px-[11px] text-[12.5px] font-bold text-foreground hover:bg-muted'
@@ -97,7 +100,7 @@ const DIF_TOM: Record<string, 'ok' | 'warn' | 'bad'> = { facil: 'ok', medio: 'wa
 const SIT_TOM: Record<string, 'ok' | 'warn' | 'neutro'> = { publicada: 'ok', rascunho: 'warn', arquivada: 'neutro' }
 
 export function BancosAcervo({
-  modo, banco, rows, total, questoes, totalQuestoes, detalhe, filtros, disciplinasFiltro, bancasFiltro, anosFiltro,
+  modo, banco, rows, total, questoes, totalQuestoes, detalhe, filtros, disciplinasFiltro, bancasFiltro, filtrosEstudio, opcoesEstudio, facInicial,
 }: {
   modo: 'bancos' | 'banco'
   banco: BancoRow | null
@@ -109,16 +112,19 @@ export function BancosAcervo({
   filtros: Filtros
   disciplinasFiltro: string[]
   bancasFiltro: string[]
-  anosFiltro: number[]
+  /** Nível 2: filtros multi-seleção aplicados (URL), opções do banco e contagens iniciais (só sem filtros). */
+  filtrosEstudio: FiltrosEstudio
+  opcoesEstudio: OpcoesEstudio | null
+  facInicial: { total: number; contagens: ContagensEstudio } | null
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [pending, startTransition] = React.useTransition()
 
-  const [importOpen, setImportOpen] = React.useState(false)
+  const [importOpen, setImportOpen] = React.useState(true)
   const [criar, setCriar] = React.useState<null | { nome: string; tipo: 'objetiva' | 'discursiva' }>(null)
-  const [preview, setPreview] = React.useState(false)
+  const [preview, setPreview] = React.useState(true)
   const [selBanco, setSelBanco] = React.useState<BancoRow | null>(null)
   const [moverBancos, setMoverBancos] = React.useState<string[] | null>(null)
   const [moverQuestoes, setMoverQuestoes] = React.useState<string[] | null>(null)
@@ -131,8 +137,13 @@ export function BancosAcervo({
   const abrirBanco = (id: string) => router.push(`${BASE}?sel=${id}`)
   const voltarBancos = () => router.push(BASE)
   const selecionarQuestao = (id: string) => pushParams((p) => { p.set('qsel', id) })
-  const setFiltro = (chave: 'disc' | 'banca' | 'ano' | 'dif' | 'sit', v: string | null) =>
-    pushParams((p) => { if (v) p.set(chave, v); else p.delete(chave); p.delete('page'); p.delete('qsel') })
+  /** Aplica os filtros multi-seleção do card: troca só os parâmetros dos filtros, volta à 1ª página e limpa a prévia. */
+  const aplicarFiltrosEstudio = (f: FiltrosEstudio) =>
+    pushParams((p) => {
+      for (const k of [...Object.values(PARAM_DIM), PARAM_COM]) p.delete(k)
+      for (const [k, v] of paramsDeFiltros(f)) p.set(k, v)
+      p.delete('page'); p.delete('qsel')
+    })
 
   function criarBancoAgora() {
     if (!criar) return
@@ -258,7 +269,7 @@ export function BancosAcervo({
 
   function exportar() {
     const p = new URLSearchParams()
-    for (const k of ['q', 'disc', 'banca', 'ano', 'dif', 'sit', 'sort', 'dir']) { const v = searchParams.get(k); if (v) p.set(k, v) }
+    for (const k of ['q', 'sort', 'dir', PARAM_COM, ...Object.values(PARAM_DIM)]) { const v = searchParams.get(k); if (v) p.set(k, v) }
     if (modo === 'banco' && banco) p.set('banco', banco.id)
     const a = document.createElement('a')
     a.href = `/api/admin/conteudos/questoes/export${p.toString() ? `?${p}` : ''}`
@@ -307,9 +318,9 @@ export function BancosAcervo({
           />
         ) : (
           <ListaQuestoes
-            questoes={questoes} total={totalQuestoes} filtros={filtros} detalhe={detalhe}
-            disciplinasFiltro={disciplinasFiltro} bancasFiltro={bancasFiltro} anosFiltro={anosFiltro}
-            onSel={selecionarQuestao} ac={acoesQuestao} setFiltro={setFiltro}
+            questoes={questoes} total={totalQuestoes} detalhe={detalhe} bancoId={banco?.id ?? ''}
+            filtrosEstudio={filtrosEstudio} opcoesEstudio={opcoesEstudio} facInicial={facInicial}
+            onSel={selecionarQuestao} ac={acoesQuestao} onAplicar={aplicarFiltrosEstudio}
           />
         )}
 
@@ -477,13 +488,17 @@ function ListaBancos({
 
 // ───────────────────────────── Lista de questões do banco (DataTable) ─────────────────────────────
 function ListaQuestoes({
-  questoes, total, filtros, detalhe, disciplinasFiltro, bancasFiltro, anosFiltro, onSel, ac, setFiltro,
+  questoes, total, detalhe, bancoId, filtrosEstudio, opcoesEstudio, facInicial, onSel, ac, onAplicar,
 }: {
-  questoes: QuestaoPreviewLinha[]; total: number; filtros: Filtros; detalhe: QuestaoDetalhe | null
-  disciplinasFiltro: string[]; bancasFiltro: string[]; anosFiltro: number[]
+  questoes: QuestaoPreviewLinha[]; total: number; detalhe: QuestaoDetalhe | null; bancoId: string
+  filtrosEstudio: FiltrosEstudio; opcoesEstudio: OpcoesEstudio | null; facInicial: { total: number; contagens: ContagensEstudio } | null
   onSel: (id: string) => void; ac: AcoesQuestao
-  setFiltro: (c: 'disc' | 'banca' | 'ano' | 'dif' | 'sit', v: string | null) => void
+  onAplicar: (f: FiltrosEstudio) => void
 }) {
+  const searchParams = useSearchParams()
+  const [cardAberto, setCardAberto] = React.useState(true)
+  const nAplicados = contarAplicados(filtrosEstudio)
+  const q = searchParams.get('q') ?? ''
   const columns: DataTableColumn<QuestaoPreviewLinha>[] = [
     { key: 'numero', header: 'Nº', sortable: true, width: '4.5rem', render: (x) => <span className="font-mono text-xs tabular-nums text-muted-foreground">{String(x.numero).padStart(2, '0')}</span> },
     {
@@ -520,25 +535,24 @@ function ListaQuestoes({
     { label: 'Excluir', icon: <Trash2 className="h-4 w-4" />, destructive: true, separatorBefore: true, disabled: ac.pending, onClick: () => ac.excluir([x.id]) },
   ]
   return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {opcoesEstudio && cardAberto && (
+        <FiltrosEstudioCard opcoes={opcoesEstudio} aplicado={filtrosEstudio} banco={bancoId} q={q} facInicial={facInicial}
+          onAplicar={onAplicar} onFechar={() => setCardAberto(false)} />
+      )}
+      {opcoesEstudio && nAplicados > 0 && <ChipsFiltrosEstudio opcoes={opcoesEstudio} aplicado={filtrosEstudio} onChange={onAplicar} />}
     <DataTable<QuestaoPreviewLinha>
       rows={questoes} total={total} columns={columns} getRowId={(x) => x.id}
       defaultSort={{ key: 'numero', dir: 'asc' }}
       searchable searchPlaceholder="Pesquise pelo enunciado da questão"
-      filters={(
-        <>
-          <FiltroPill label="Disciplina" valorAtual={filtros.disc} opcoes={disciplinasFiltro.map((v) => ({ value: v, label: v }))} onPick={(v) => setFiltro('disc', v)} />
-          <FiltroPill label="Banca" valorAtual={filtros.banca} opcoes={bancasFiltro.map((v) => ({ value: v, label: v }))} onPick={(v) => setFiltro('banca', v)} />
-          <FiltroPill label="Ano" valorAtual={filtros.ano == null ? null : String(filtros.ano)} opcoes={anosFiltro.map((a) => ({ value: String(a), label: String(a) }))} onPick={(v) => setFiltro('ano', v)} />
-          <FiltroPill label="Dificuldade" valorAtual={filtros.dif} opcoes={Object.entries(DIF_LABEL).map(([value, label]) => ({ value, label }))} onPick={(v) => setFiltro('dif', v)} />
-          <FiltroPill label="Situação" valorAtual={filtros.sit} opcoes={Object.entries(SIT_LABEL).map(([value, label]) => ({ value, label }))} onPick={(v) => setFiltro('sit', v)} />
-        </>
-      )}
+      filters={opcoesEstudio ? <BotaoFiltrosEstudio n={nAplicados} aberto={cardAberto} onClick={() => setCardAberto((a) => !a)} /> : undefined}
       rowActions={rowActions}
       bulkActions={(s) => <BulkQuestoes s={s} ac={ac} />}
       onRowClick={(x) => onSel(x.id)} activeRowId={detalhe?.id ?? null} rowHeight="h-20"
       nomeSingular="questão" nomePlural="questões"
-      empty={<span className="inline-flex flex-col items-center gap-2"><FileQuestion className="h-6 w-6 opacity-50" />Nenhuma questão encontrada. Importe um CSV ou use “Adicionar questão”.</span>}
+      empty={<span className="inline-flex flex-col items-center gap-2"><FileQuestion className="h-6 w-6 opacity-50" />{nAplicados > 0 || q ? 'Nenhuma questão com esses filtros.' : 'Nenhuma questão encontrada. Importe um CSV ou use “Adicionar questão”.'}</span>}
     />
+    </div>
   )
 }
 
@@ -582,7 +596,7 @@ function MoverDialog({ titulo, rotulo, modo, excluirId, onClose, onConfirmar }: 
 }) {
   const [itens, setItens] = React.useState<{ id: string; nome: string }[] | null>(null)
   const [destino, setDestino] = React.useState<string>('')
-  const [salvando, setSalvando] = React.useState(false)
+  const [salvando, setSalvando] = React.useState(true)
   React.useEffect(() => {
     let vivo = true
     listarDestinosBanco(excluirId).then((r) => { if (vivo) setItens(modo === 'pasta' ? r.pastas : r.bancos) }).catch(() => { if (vivo) setItens([]) })
@@ -702,7 +716,7 @@ function PainelQuestao({ detalhe, ac }: { detalhe: QuestaoDetalhe; ac: AcoesQues
         <Chip tom="neutro">{detalhe.tipo === 'discursiva' ? 'Discursiva' : 'Objetiva'}</Chip>
         {detalhe.gabarito && <Chip tom="ok">Gabarito {detalhe.gabarito}</Chip>}
       </div>
-      <p className="text-sm font-bold leading-relaxed text-foreground">{detalhe.enunciado || '—'}</p>
+      <p className="whitespace-pre-wrap text-sm font-bold leading-relaxed text-foreground">{detalhe.enunciado || '—'}</p>
       {detalhe.tipo !== 'discursiva' && detalhe.alternativas.length > 0 && (
         <div className="space-y-2">
           {detalhe.alternativas.map((a, i) => (
@@ -782,7 +796,7 @@ function PreviewDialog({ detalhe, onClose }: { detalhe: QuestaoDetalhe; onClose:
         </div>
         <DialogTitle className="sr-only">Pré-visualização da questão</DialogTitle>
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pt-1">
-          <p className="text-sm font-semibold leading-relaxed text-foreground">{detalhe.enunciado || '—'}</p>
+          <p className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-foreground">{detalhe.enunciado || '—'}</p>
           {detalhe.tipo !== 'discursiva' && detalhe.alternativas.length > 0 && (
             <div className="space-y-2">
               {detalhe.alternativas.map((a, i) => (

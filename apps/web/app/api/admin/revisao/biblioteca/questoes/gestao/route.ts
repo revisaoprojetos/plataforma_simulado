@@ -9,6 +9,7 @@ import { classificarEmMassa, etiquetaEmMassa, fichaQuestao, mesclarEtiquetas, pr
 import { previewUnificacaoTax, unificarTaxonomia } from '@/app/admin/questoes/taxonomia-actions'
 import { atualizarDisciplinaClassificacao } from '@/app/admin/questoes/disciplinas-actions'
 import { criarItemTaxonomia, excluirItemTaxonomia, renomearItemTaxonomia, reparentarAssunto } from '@/app/admin/conteudos/classificacao/actions'
+import { FAIXAS_TAX, OPCOES_CLASSE_TAX, SEM_DISCIPLINA, listaCsvTax } from '@/lib/admin-revisao/taxonomia-filtros'
 import { distribuicaoQuestoes, limparCacheClassificacao, sugestoesRapidas, taxonomiaRapida } from '@/lib/admin-revisao/questoes-classificacao'
 import { atualizarEtiqueta, criarEtiqueta, excluirEtiqueta } from '@/app/admin/etiquetas/actions'
 
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     if (s === 'distribuicao') return NextResponse.json({ ok: true, ...(await distribuicaoQuestoes(svc, tenantId, fresh)) })
     if (s === 'taxonomia') {
       const tipo = sp.get('tipo'); if (!ehTipoTaxG(tipo)) return NextResponse.json({ ok: false, error: 'Tipo inválido.' }, { status: 400 })
-      const opt = { q: sp.get('q') ?? '', sort: sp.get('sort') ?? undefined, dir: sp.get('dir') === 'desc' ? 'desc' as const : sp.get('dir') === 'asc' ? 'asc' as const : undefined, disciplina: UUID.test(sp.get('disciplina') ?? '') ? sp.get('disciplina')! : undefined, semUso: sp.get('semuso') === '1', ...pg }
+      const opt = { q: sp.get('q') ?? '', sort: sp.get('sort') ?? undefined, dir: sp.get('dir') === 'desc' ? 'desc' as const : sp.get('dir') === 'asc' ? 'asc' as const : undefined, disciplina: undefined, semUso: sp.get('semuso') === '1', multi: { disciplina: listaCsvTax(sp.get('disciplina'), (x) => UUID.test(x) || x === SEM_DISCIPLINA), uso: listaCsvTax(sp.get('uso'), (x) => x === 'em_uso' || x === 'sem_uso'), faixa: listaCsvTax(sp.get('faixa'), (x) => FAIXAS_TAX.some((f) => f.v === x)), classe: listaCsvTax(sp.get('classe'), (x) => OPCOES_CLASSE_TAX.some((o) => o.v === x)) }, ...pg }
       // agregação única em cache (classificacao); sem SQL direto cai na implementação antiga
       const rapida = await taxonomiaRapida(tenantId, tipo, opt)
       return NextResponse.json({ ok: true, ...(rapida ?? (await listarTaxonomiaG(svc, tenantId, tipo, { ...opt, fresh }))) })

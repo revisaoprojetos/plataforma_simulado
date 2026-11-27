@@ -7,12 +7,14 @@ import { cn } from '@/lib/utils'
 import { useBancoNav } from '@/components/aluno/banco-questoes-client'
 
 export type Opt = { id: string; nome: string }
-export type AssuntoOpt = { id: string; nome: string; disciplina_id: string | null }
+export type AssuntoOpt = { id: string; nome: string; disciplina_id: string | null; pai_id?: string | null }
 
+// Disciplina/assunto/banca/ano/dificuldade/orgao/cargo/detalhe aceitam VÁRIOS valores separados por "|" (multi-seleção).
 export type FiltrosParams = {
   tipo?: string; minhas?: string; disciplina?: string; assunto?: string
   banca?: string; ano?: string; dificuldade?: string; busca?: string; comentadas?: string; favoritas?: string
   erros_simulado?: string
+  orgao?: string; cargo?: string; detalhe?: string
 }
 
 const DIFICULDADES = [{ v: 'facil', r: 'Fácil' }, { v: 'medio', r: 'Médio' }, { v: 'dificil', r: 'Difícil' }]

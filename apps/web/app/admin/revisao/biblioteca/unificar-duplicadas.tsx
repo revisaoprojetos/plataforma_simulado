@@ -13,10 +13,11 @@ import { cn } from '@/lib/utils'
 import { plano } from '@/lib/admin-revisao/texto-plano'
 import { DESC_NIVEL_DUP, ROTULO_NIVEL_DUP } from '@/lib/admin-revisao/biblioteca-questoes-gestao-tipos'
 import {
-  FILTROS_U_PADRAO, LIMIAR_MIN, LIMIAR_PADRAO, type GrupoU, type InicialUnificar, type HistoricoU, type MembroDup, type NivelDup, type PreviaU, type RespostaGruposU, type UsoFiltro, type VistaU,
+  FILTROS_U_PADRAO, LIMIAR_MIN, LIMIAR_PADRAO, listasVaziasU, paramsListasU, type ListasU, type GrupoU, type InicialUnificar, type HistoricoU, type MembroDup, type NivelDup, type PreviaU, type RespostaGruposU, type VistaU,
 } from '@/lib/admin-revisao/questoes-unificar-tipos'
-import { AbasSublinhado, Carregando, ErroTentar, ItemTrilho, PainelCard, Trilho, Vazio, campoBusca, selectBarra } from './gestao-ui'
+import { AbasSublinhado, Carregando, ErroTentar, ItemTrilho, PainelCard, Trilho, Vazio, campoBusca } from './gestao-ui'
 import { aoMutar, limparCacheG } from './questoes-api'
+import { DuplicadasFiltrosCard } from './duplicadas-filtros-card'
 
 const URL_U = '/api/admin/revisao/biblioteca/questoes-unificar'
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
@@ -84,7 +85,7 @@ function sugerirMestre(m: MembroDup[]): { id: string; motivo: string } {
 
 // ════════════════════════════════════════ COMPONENTE ════════════════════════════════════════
 /** Chave de cache dos filtros padrão (a mesma que o cliente monta no 1º render) — o `inicial` do SSR vale para ela. */
-const CHAVE_PADRAO = qs({ s: 'grupos', ...FILTROS_U_PADRAO })
+const CHAVE_PADRAO = qs({ s: 'grupos', ...FILTROS_U_PADRAO, ...paramsListasU(FILTROS_U_PADRAO) })
 
 export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTotal, inicial }: {
   podeEditar: boolean; idsManuais?: string[] | null; onAbrirBanco?: (e: { q: string; page: number }) => void; onTotal?: (n: number) => void
@@ -94,8 +95,7 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
   const semente = useRef<InicialUnificar | null>(inicial ?? null)
   const g0 = inicial?.grupos.grupos[0]
   const [vista, setVista] = useState<VistaU>('pendentes')
-  const [nivel, setNivel] = useState(''); const [uso, setUso] = useState<UsoFiltro>(''); const [gabarito, setGabarito] = useState('')
-  const [disciplina, setDisciplina] = useState(''); const [banca, setBanca] = useState(''); const [ano, setAno] = useState(''); const [status, setStatus] = useState('')
+  const [listas, setListas] = useState<ListasU>(listasVaziasU())
   const [limiar, setLimiar] = useState(LIMIAR_PADRAO); const [limiarAplicado, setLimiarAplicado] = useState(LIMIAR_PADRAO)
   const [busca, setBusca] = useState(''); const [q, setQ] = useState(''); const [page, setPage] = useState(1)
   const [dados, setDados] = useState<RespostaGruposU | null>(inicial?.grupos ?? null); const [erro, setErro] = useState<string | null>(null); const [carregando, setCarregando] = useState(!inicial)
@@ -104,12 +104,11 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
   const [mestre, setMestre] = useState(() => (!idsManuais?.length && inicial?.primeiro ? sugerirMestre(inicial.primeiro.membros).id : '')); const [motivoMestre, setMotivoMestre] = useState(() => (!idsManuais?.length && inicial?.primeiro ? sugerirMestre(inicial.primeiro.membros).motivo : ''))
   const [acao, setAcao] = useState<'completa' | 'arquivar' | null>(null); const [historicoAberto, setHistoricoAberto] = useState(false)
   const [ignLocal, setIgnLocal] = useState<Set<string>>(new Set())
-  const [filtrosAbertos, setFiltrosAbertos] = useState(false)
   const seq = useRef(0)
   const sementeMembros = useRef(!!inicial?.primeiro && !idsManuais?.length)
 
   useEffect(() => { setIgnLocal(lerIgnLocal()) }, [])
-  const filtros = useMemo(() => ({ s: 'grupos', vista, nivel, uso, gabarito, disciplina, banca, ano, status, limiar: limiarAplicado, q, page, pp: 14 }), [vista, nivel, uso, gabarito, disciplina, banca, ano, status, limiarAplicado, q, page])
+  const filtros = useMemo(() => ({ s: 'grupos', vista, ...paramsListasU(listas), limiar: limiarAplicado, q, page, pp: 14 }), [vista, listas, limiarAplicado, q, page])
   // semeia o cache do cliente com o SSR (voltar a esta tela / trocar de vista e voltar < 60 s não chama a API)
   useEffect(() => {
     if (!inicial) return
@@ -135,7 +134,7 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
   // prefetch da próxima página (interação < 300 ms)
   useEffect(() => { if (dados && page * dados.pp < dados.total) prefetchU({ ...filtros, page: page + 1 }) }, [dados, filtros, page])
 
-  const nFiltros = [nivel, uso, disciplina, banca, ano, status, gabarito].filter(Boolean).length + (limiarAplicado !== LIMIAR_PADRAO ? 1 : 0)
+  const nFiltros = Object.values(listas).reduce((t, l) => t + l.length, 0) + (limiarAplicado !== LIMIAR_PADRAO ? 1 : 0)
   const lista = useMemo(() => (dados?.grupos ?? []).filter((g) => vista !== 'pendentes' || !ignLocal.has(chaveGrupo(g.ids))), [dados, vista, ignLocal])
   useEffect(() => { if (!grupo && lista.length) setGrupo({ id: lista[0].id, ids: lista[0].ids, nivel: lista[0].nivel, scoreMin: lista[0].scoreMin, gabDiverge: lista[0].gabDiverge }) }, [lista]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -180,6 +179,14 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
 
   const resumo = dados?.resumo
   return (
+    <div className="space-y-4">
+      <section className="space-y-3 rounded-2xl border bg-card p-3 shadow-sm" aria-label="Filtros das duplicadas">
+        <DuplicadasFiltrosCard valor={listas} onChange={(v) => { setListas(v); setPage(1) }} facetas={dados?.facetas} contagens={dados?.contagens} />
+        <label className="block max-w-md text-[11px] font-medium text-muted-foreground">
+          <span className="flex justify-between"><span>Similaridade mínima (grupos “muito semelhantes”)</span><b className="tabular-nums text-foreground">{Math.round(limiar * 100)}%</b></span>
+          <input type="range" min={Math.round(LIMIAR_MIN * 100)} max={100} step={1} value={Math.round(limiar * 100)} onChange={(e) => setLimiar(Number(e.target.value) / 100)} className="mt-1 w-full accent-[var(--primary)]" aria-label="Similaridade mínima" />
+        </label>
+      </section>
     <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <Trilho titulo="Grupos de duplicadas" rotulo="Grupos de questões duplicadas"
         acao={<span className="flex items-center gap-2">
@@ -200,31 +207,11 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
             </p>
           )}
           <div className="relative"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Enunciado, código ou código externo" aria-label="Buscar grupo" className={campoBusca} autoComplete="off" /></div>
-          <button type="button" onClick={() => setFiltrosAbertos((v) => !v)} aria-expanded={filtrosAbertos} className="flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted">
-            <span>Filtros{nFiltros > 0 ? ` (${nFiltros} ativo${nFiltros > 1 ? 's' : ''})` : ''}</span><ChevronRight className={cn('h-3.5 w-3.5 transition-transform', filtrosAbertos && 'rotate-90')} />
-          </button>
-          {filtrosAbertos && <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <select className={selectBarra} value={nivel} onChange={(e) => { setNivel(e.target.value); setPage(1) }} aria-label="Tipo de coincidência">
-              <option value="">Tipo: todos</option>{NIVEIS.map((n) => <option key={n} value={n}>{ROTULO_NIVEL_DUP[n]}{resumo ? ` (${resumo.porNivel[n]})` : ''}</option>)}
-            </select>
-            <select className={selectBarra} value={uso} onChange={(e) => { setUso(e.target.value as UsoFiltro); setPage(1) }} aria-label="Uso"><option value="">Uso: todos</option><option value="simulado">Em simulado</option><option value="respostas">Com respostas de alunos</option><option value="livre">Sem uso</option></select>
-            <select className={selectBarra} value={disciplina} onChange={(e) => { setDisciplina(e.target.value); setPage(1) }} aria-label="Disciplina"><option value="">Disciplina: todas</option>{dados?.facetas.disciplinas.map((d) => <option key={d.id} value={d.id}>{d.nome} ({d.n})</option>)}</select>
-            <select className={selectBarra} value={banca} onChange={(e) => { setBanca(e.target.value); setPage(1) }} aria-label="Banca"><option value="">Banca: todas</option>{dados?.facetas.bancas.map((d) => <option key={d.id} value={d.id}>{d.nome} ({d.n})</option>)}</select>
-            <select className={selectBarra} value={ano} onChange={(e) => { setAno(e.target.value); setPage(1) }} aria-label="Ano"><option value="">Ano: todos</option>{dados?.facetas.anos.map((d) => <option key={d.id} value={d.id}>{d.nome} ({d.n})</option>)}</select>
-            <select className={selectBarra} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }} aria-label="Status"><option value="">Status: todos</option><option value="publicada">Ativa</option><option value="rascunho">Rascunho</option><option value="arquivada">Arquivada</option></select>
-          </div>
-          <select className={cn(selectBarra, 'w-full')} value={gabarito} onChange={(e) => { setGabarito(e.target.value); setPage(1) }} aria-label="Gabarito"><option value="">Gabarito: todos</option><option value="divergente">Só gabarito divergente</option><option value="ok">Só gabarito igual</option></select>
-          <label className="block text-[11px] font-medium text-muted-foreground">
-            <span className="flex justify-between"><span>Similaridade mínima (grupos “muito semelhantes”)</span><b className="tabular-nums text-foreground">{Math.round(limiar * 100)}%</b></span>
-            <input type="range" min={Math.round(LIMIAR_MIN * 100)} max={100} step={1} value={Math.round(limiar * 100)} onChange={(e) => setLimiar(Number(e.target.value) / 100)} className="mt-1 w-full accent-[var(--primary)]" aria-label="Similaridade mínima" />
-          </label>
-          </div>}
         </div>
         {erro && !dados ? <ErroTentar msg={erro} onTentar={() => void carregar(true)} /> : !dados ? <Carregando linhas={7} /> : (
           <ul className={cn('space-y-1', carregando && 'opacity-60')}>
             {grupo?.manual && <li><ItemTrilho ativo onClick={() => {}} n={grupo.ids.length}><ShieldCheck className="h-4 w-4 shrink-0" />Seleção manual do Banco</ItemTrilho></li>}
-            {lista.length === 0 && <li><Vazio>{vista === 'resolvidas' ? 'Nenhum grupo resolvido.' : vista === 'ignoradas' ? 'Nenhum grupo marcado como “não é duplicada”.' : q || nivel || uso || disciplina || banca || ano || status || gabarito ? 'Nenhum grupo com este filtro.' : 'Nenhuma duplicada pendente.'}</Vazio></li>}
+            {lista.length === 0 && <li><Vazio>{vista === 'resolvidas' ? 'Nenhum grupo resolvido.' : vista === 'ignoradas' ? 'Nenhum grupo marcado como “não é duplicada”.' : q || nFiltros > 0 ? 'Nenhum grupo com este filtro.' : 'Nenhuma duplicada pendente.'}</Vazio></li>}
             {lista.map((g) => (
               <li key={g.id}>
                 <button type="button" onClick={() => irPara(g)} aria-current={grupo?.id === g.id} onPointerEnter={() => prefetchU({ s: 'membros', ids: g.ids.join(',') })} onFocus={() => prefetchU({ s: 'membros', ids: g.ids.join(',') })}
@@ -333,6 +320,7 @@ export function UnificarDuplicadas({ podeEditar, idsManuais, onAbrirBanco, onTot
           onFeito={() => { setAcao(null); setGrupo(null); setMembros(null) }} />
       )}
       {historicoAberto && <HistoricoDialog podeEditar={podeEditar} onClose={() => setHistoricoAberto(false)} />}
+    </div>
     </div>
   )
 }
